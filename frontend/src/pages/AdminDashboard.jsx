@@ -34,8 +34,8 @@ export default function AdminDashboard() {
     const roles = ["Admin", "Doctor", "Nurse", "Pharmacist", "Lab Technician", "Radiologist", "Receptionist"];
     const SYSTEM_PERMISSIONS = [
         "users:manage", "clinical:write", "clinical:read", 
-        "patients:read", "patients:write", "pharmacy:manage", 
-        "pharmacy:read", "laboratory:manage", "laboratory:read", 
+        "patients:read", "patients:write", "history:read", "history:manage",
+        "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read", 
         "radiology:manage", "radiology:read", "wards:manage", 
         "billing:read", "billing:manage"
     ];

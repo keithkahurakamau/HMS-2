@@ -59,7 +59,7 @@ def get_bed_board(db: Session = Depends(get_db)):
                 
                 if active_admission:
                     patient = db.query(Patient).filter(Patient.patient_id == active_admission.patient_id).first()
-                    bed_info["patient"] = f"{patient.surname}, {patient.first_name}" if patient else "Unknown"
+                    bed_info["patient"] = f"{patient.surname}, {patient.other_names}" if patient else "Unknown"
                     bed_info["admission_date"] = active_admission.admitted_at.strftime("%Y-%m-%d")
                     bed_info["diagnosis"] = active_admission.primary_diagnosis
                     bed_info["admission_id"] = active_admission.admission_id

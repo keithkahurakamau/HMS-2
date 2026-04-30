@@ -18,6 +18,7 @@ from app.models.laboratory import LabTestCatalog, LabTestRequiredItem, LabTest
 from app.models.clinical import Appointment, PatientQueue, MedicalRecord
 from app.models.billing import Invoice, InvoiceItem, Payment
 from app.models.audit import AuditLog
+from app.models.medical_history import ConsentRecord, MedicalHistoryEntry
 
 def reset_database():
     """
@@ -59,8 +60,8 @@ def seed_database():
         # 2a. Create Core System Permissions
         permissions_data = [
             "users:manage", "clinical:write", "clinical:read", 
-            "patients:read", "patients:write", "pharmacy:manage", 
-            "pharmacy:read", "laboratory:manage", "laboratory:read", 
+            "patients:read", "patients:write", "history:read", "history:manage",
+            "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read", 
             "wards:manage", "billing:read", "billing:manage"
         ]
         
@@ -73,9 +74,9 @@ def seed_database():
 
         # 2b. Create Roles and Map Permissions to them
         roles_config = {
-            "Admin": ["users:manage", "clinical:read", "patients:read", "pharmacy:read", "laboratory:read", "wards:manage", "billing:manage"],
-            "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write", "pharmacy:read", "laboratory:read"],
-            "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read"],
+            "Admin": ["users:manage", "clinical:read", "patients:read", "pharmacy:read", "laboratory:read", "wards:manage", "billing:manage", "history:read", "history:manage"],
+            "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write", "pharmacy:read", "laboratory:read", "history:read", "history:manage"],
+            "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read"],
             "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read"],
             "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read"],
             "Receptionist": ["patients:read", "patients:write", "billing:read"]
@@ -267,17 +268,18 @@ def seed_database():
         db.flush()
 
         batches = [
-            {"item": "Amoxicillin 625mg", "loc": "Pharmacy", "batch": "AMOX-01", "qty": 1000},
-            {"item": "Paracetamol 500mg IV", "loc": "Wards", "batch": "PARA-IV-99", "qty": 150},
-            {"item": "Surgical Gloves (Box)", "loc": "Wards", "batch": "GLV-22", "qty": 20},
-            {"item": "CBC Reagent Pack", "loc": "Laboratory", "batch": "RGT-CBC-01", "qty": 15},
-            {"item": "Amoxicillin 625mg", "loc": "Main Store", "batch": "AMOX-02", "qty": 5000}
+            {"item": "Amoxicillin 625mg", "loc": "Pharmacy", "batch": "AMOX-01", "qty": 1000, "supplier": "MedKEM Logistics"},
+            {"item": "Paracetamol 500mg IV", "loc": "Wards", "batch": "PARA-IV-99", "qty": 150, "supplier": "Global Pharma"},
+            {"item": "Surgical Gloves (Box)", "loc": "Wards", "batch": "GLV-22", "qty": 20, "supplier": "Surgical Supplies Ltd"},
+            {"item": "CBC Reagent Pack", "loc": "Laboratory", "batch": "RGT-CBC-01", "qty": 15, "supplier": "LabTech Diagnostics"},
+            {"item": "Amoxicillin 625mg", "loc": "Main Store", "batch": "AMOX-02", "qty": 5000, "supplier": "MedKEM Logistics"}
         ]
 
         for b in batches:
             batch = StockBatch(
                 item_id=catalog[b["item"]].item_id, location_id=locations[b["loc"]].location_id,
-                batch_number=b["batch"], quantity=b["qty"], expiry_date=datetime.now() + timedelta(days=365)
+                batch_number=b["batch"], quantity=b["qty"], expiry_date=datetime.now() + timedelta(days=365),
+                supplier_name=b["supplier"]
             )
             db.add(batch)
         db.flush()
@@ -364,6 +366,61 @@ def seed_database():
         # Add a quick Audit Log just to populate the table
         audit = AuditLog(user_id=staff["dr.kahura@hospital.com"].user_id, action="CREATE", entity_type="MedicalRecord", entity_id=str(record.record_id), new_value={"diagnosis": "Severe Malaria"})
         db.add(audit)
+
+        # ==========================================
+        # 9. MEDICAL HISTORY (KDPA Compliant)
+        # ==========================================
+        print("   -> Seeding Medical History & Consents...")
+        # Add Consent
+        consent = ConsentRecord(
+            patient_id=primary_patient.patient_id,
+            recorded_by=receptionist_id,
+            consent_type="Treatment",
+            consent_given=True,
+            consent_method="Written",
+            notes="Standard outpatient treatment consent signed."
+        )
+        db.add(consent)
+        
+        # Add a couple of Medical History Entries
+        hist1 = MedicalHistoryEntry(
+            patient_id=primary_patient.patient_id,
+            recorded_by=staff["dr.kahura@hospital.com"].user_id,
+            entry_type="SURGICAL_HISTORY",
+            title="Appendectomy",
+            description="Laparoscopic appendectomy without complications.",
+            event_date="2015",
+            severity="N/A",
+            status="Resolved",
+            is_sensitive=False
+        )
+        
+        hist2 = MedicalHistoryEntry(
+            patient_id=primary_patient.patient_id,
+            recorded_by=staff["dr.kahura@hospital.com"].user_id,
+            entry_type="ALLERGY",
+            title="Penicillin Allergy",
+            description="Patient develops severe hives and shortness of breath.",
+            event_date="Childhood",
+            severity="Severe",
+            status="Active",
+            is_sensitive=False
+        )
+        
+        hist3 = MedicalHistoryEntry(
+            patient_id=primary_patient.patient_id,
+            recorded_by=staff["dr.kahura@hospital.com"].user_id,
+            entry_type="MENTAL_HEALTH",
+            title="Anxiety Disorder",
+            description="Generalized anxiety disorder, managed with therapy.",
+            event_date="2020",
+            severity="Moderate",
+            status="Managed",
+            is_sensitive=True # Sensitive data to test KDPA redaction
+        )
+        
+        db.add_all([hist1, hist2, hist3])
+        db.flush()
 
         db.commit()
         print("✅ SUCCESS: Enterprise Database perfectly seeded and ready for Production Testing!")

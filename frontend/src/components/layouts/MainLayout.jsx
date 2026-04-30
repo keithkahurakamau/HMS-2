@@ -3,7 +3,8 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
     LayoutDashboard, Users, Stethoscope, TestTube, 
-    Pill, Bed, Package, Receipt, LogOut, Menu, X, ShieldCheck
+    Pill, Bed, Package, Receipt, LogOut, Menu, X, ShieldCheck,
+    ClipboardList, Radio
 } from 'lucide-react';
 
 export default function MainLayout() {
@@ -12,15 +13,16 @@ export default function MainLayout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const NAVIGATION = [
-        { name: 'Command Center', path: '/admin', icon: <LayoutDashboard size={20} />, allowedRoles: ['Admin'] },
-        { name: 'Patient Registry', path: '/patients', icon: <Users size={20} />, allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'] },
-        { name: 'Clinical Desk', path: '/clinical', icon: <Stethoscope size={20} />, allowedRoles: ['Admin', 'Doctor'] },
-        { name: 'Laboratory', path: '/laboratory', icon: <TestTube size={20} />, allowedRoles: ['Admin', 'Lab Technician', 'Doctor'] },
-        { name: 'Radiology', path: '/radiology', icon: <ShieldCheck size={20} />, allowedRoles: ['Admin', 'Radiologist', 'Doctor'] },
-        { name: 'Pharmacy', path: '/pharmacy', icon: <Pill size={20} />, allowedRoles: ['Admin', 'Pharmacist', 'Doctor'] },
-        { name: 'Wards & Admissions', path: '/wards', icon: <Bed size={20} />, allowedRoles: ['Admin', 'Nurse', 'Doctor'] },
-        { name: 'Inventory Hub', path: '/inventory', icon: <Package size={20} />, allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'] },
-        { name: 'Billing & Finance', path: '/billing', icon: <Receipt size={20} />, allowedRoles: ['Admin', 'Receptionist'] },
+        { name: 'Command Center',    path: '/admin',           icon: <LayoutDashboard size={20} />, allowedRoles: ['Admin'] },
+        { name: 'Patient Registry',  path: '/patients',        icon: <Users size={20} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'] },
+        { name: 'Medical History',   path: '/medical-history', icon: <ClipboardList size={20} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse'] },
+        { name: 'Clinical Desk',     path: '/clinical',        icon: <Stethoscope size={20} />,     allowedRoles: ['Admin', 'Doctor'] },
+        { name: 'Laboratory',        path: '/laboratory',      icon: <TestTube size={20} />,        allowedRoles: ['Admin', 'Lab Technician', 'Doctor'] },
+        { name: 'Radiology',         path: '/radiology',       icon: <Radio size={20} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'] },
+        { name: 'Pharmacy',          path: '/pharmacy',        icon: <Pill size={20} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'] },
+        { name: 'Wards & Admissions',path: '/wards',           icon: <Bed size={20} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'] },
+        { name: 'Inventory Hub',     path: '/inventory',       icon: <Package size={20} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'] },
+        { name: 'Billing & Finance', path: '/billing',         icon: <Receipt size={20} />,         allowedRoles: ['Admin', 'Receptionist'] },
     ];
 
     const filteredNav = NAVIGATION.filter(item => item.allowedRoles.includes(user?.role));

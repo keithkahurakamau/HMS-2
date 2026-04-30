@@ -42,6 +42,7 @@ class StockBatch(Base):
     batch_number = Column(String(100), index=True, nullable=False)
     quantity = Column(Integer, nullable=False)
     expiry_date = Column(Date, index=True, nullable=False) # Crucial for First-Expire-First-Out sorting
+    supplier_name = Column(String(255), nullable=True)
     
     added_at = Column(DateTime(timezone=True), server_default=func.now())
 

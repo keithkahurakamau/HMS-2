@@ -11,9 +11,10 @@ class LocationResponse(LocationCreate):
     class Config: from_attributes = True
 
 class InventoryItemCreate(BaseModel):
-    item_code: str
+    item_code: Optional[str] = None
     name: str
     category: str # Drug/Consumable/Reagent/Equipment
+    unit_cost: float
     unit_price: float
     reorder_threshold: int = 10
     is_active: bool = True
@@ -28,6 +29,7 @@ class StockBatchCreate(BaseModel):
     batch_number: str
     quantity: int
     expiry_date: date
+    supplier_name: Optional[str] = None
 
 class StockBatchResponse(StockBatchCreate):
     batch_id: int

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import { 
@@ -17,7 +18,7 @@ export default function Patients() {
 
     // Interactive States
     const [activeDropdown, setActiveDropdown] = useState(null);
-    const [historyDrawer, setHistoryDrawer] = useState({ isOpen: false, data: null, loading: false });
+    const navigate = useNavigate();
 
     // Form State
     const defaultFormState = {
@@ -81,16 +82,9 @@ export default function Patients() {
     };
 
     // --- Action: View History ---
-    const viewHistory = async (patientId) => {
+    const viewHistory = (patientId) => {
         setActiveDropdown(null);
-        setHistoryDrawer({ isOpen: true, data: null, loading: true });
-        try {
-            const response = await apiClient.get(`/patients/${patientId}/history`);
-            setHistoryDrawer({ isOpen: true, data: response.data, loading: false });
-        } catch (error) {
-            toast.error("Failed to retrieve medical history");
-            setHistoryDrawer({ isOpen: false, data: null, loading: false });
-        }
+        navigate(`/medical-history?patient_id=${patientId}`);
     };
 
     // --- Action: Deactivate Patient ---
@@ -243,67 +237,7 @@ export default function Patients() {
                 </div>
             </div>
 
-            {/* --- Sliding History Drawer Overlay --- */}
-            {historyDrawer.isOpen && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex justify-end">
-                    <div className="bg-white w-full max-w-xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
-                        {/* Drawer Header */}
-                        <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-start shrink-0">
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-800">Medical History</h2>
-                                {historyDrawer.data && (
-                                    <p className="text-sm font-medium text-brand-600 mt-1">
-                                        {historyDrawer.data.demographics.name} | {historyDrawer.data.demographics.opd}
-                                    </p>
-                                )}
-                            </div>
-                            <button onClick={() => setHistoryDrawer({ isOpen: false, data: null, loading: false })} className="p-2 bg-white text-slate-400 hover:text-red-500 rounded-lg shadow-sm border border-slate-200">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        {/* Drawer Content */}
-                        <div className="p-6 flex-1 overflow-y-auto bg-slate-50/50">
-                            {historyDrawer.loading ? (
-                                <div className="flex justify-center items-center h-40 text-slate-500"><Activity className="animate-spin mr-2" size={20}/> Fetching records...</div>
-                            ) : historyDrawer.data ? (
-                                <div className="space-y-6">
-                                    
-                                    {/* Critical Alerts Banner */}
-                                    <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex gap-3">
-                                        <AlertCircle className="text-orange-500 shrink-0" size={20} />
-                                        <div className="text-sm">
-                                            <p className="font-semibold text-orange-800">Vitals & Alerts</p>
-                                            <p className="text-orange-700 mt-1"><span className="font-medium">Allergies:</span> {historyDrawer.data.demographics.allergies}</p>
-                                            <p className="text-orange-700"><span className="font-medium">Conditions:</span> {historyDrawer.data.demographics.chronic_conditions}</p>
-                                            <p className="text-orange-700"><span className="font-medium">Blood Group:</span> <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold">{historyDrawer.data.demographics.blood_group}</span></p>
-                                        </div>
-                                    </div>
-
-                                    {/* Clinical Records Timeline */}
-                                    <div>
-                                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2"><FileText size={16}/> Clinical Notes</h3>
-                                        {historyDrawer.data.clinical_records.length === 0 ? (
-                                            <p className="text-sm text-slate-500 italic">No previous clinical notes found.</p>
-                                        ) : (
-                                            historyDrawer.data.clinical_records.map(rec => (
-                                                <div key={rec.record_id} className="mb-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative before:absolute before:left-0 before:top-4 before:bottom-4 before:w-1 before:bg-brand-500 before:rounded-r-md">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded">Diagnosis: {rec.diagnosis || 'Pending'}</span>
-                                                    </div>
-                                                    <p className="text-sm text-slate-700 mb-2"><span className="font-medium">Complaint:</span> {rec.chief_complaint}</p>
-                                                    <p className="text-sm text-slate-700"><span className="font-medium">Treatment:</span> {rec.treatment_plan}</p>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                    
-                                </div>
-                            ) : null}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* --- History Drawer removed in favor of full Medical History module --- */}
 
             {/* Slide-over Modal for Registration */}
             {isModalOpen && (

@@ -14,6 +14,7 @@ import Laboratory from './pages/Laboratory';
 import Wards from './pages/Wards';
 import AdminDashboard from './pages/AdminDashboard';
 import Radiology from './pages/Radiology';
+import MedicalHistory from './pages/MedicalHistory';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="pharmacy" element={<Pharmacy />} />
             <Route path="wards" element={<Wards />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="medical-history" element={<MedicalHistory />} />
             
             <Route path="appointments" element={<PagePlaceholder title="Appointments" />} />
             <Route path="billing" element={<PagePlaceholder title="Billing & Accounts" />} />

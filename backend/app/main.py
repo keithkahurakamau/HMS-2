@@ -26,6 +26,7 @@ import app.routes.admin as admin_module
 import app.routes.analytics as analytics_module
 import app.routes.websockets as websockets_module
 import app.routes.radiology as radiology_module
+import app.routes.medical_history as medical_history_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -94,6 +95,7 @@ app.include_router(billing_module.router)
 app.include_router(analytics_module.router)
 app.include_router(websockets_module.router)
 app.include_router(radiology_module.router)
+app.include_router(medical_history_module.router)
 
 # 9. Health Check Route
 @app.get("/")
