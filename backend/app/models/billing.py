@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Index
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.config.database import Base
 
@@ -15,6 +16,9 @@ class Invoice(Base):
     
     billing_date = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     created_by = Column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
+
+    items = relationship("InvoiceItem", backref="invoice", cascade="all, delete-orphan")
+    patient = relationship("Patient", backref="invoices")
 
     __table_args__ = (Index('idx_invoice_status_date', 'status', 'billing_date'),)
 

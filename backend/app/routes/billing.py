@@ -16,7 +16,23 @@ router = APIRouter(prefix="/api/billing", tags=["Billing & Cashier"])
 @router.get("/queue", response_model=List[InvoiceResponse], dependencies=[Depends(RequirePermission("billing:process"))])
 def get_billing_queue(db: Session = Depends(get_db)):
     """Returns all patients with Pending invoices."""
-    return db.query(Invoice).filter(Invoice.status == "Pending").order_by(Invoice.billing_date.asc()).all()
+    invoices = db.query(Invoice).filter(Invoice.status.in_(["Pending", "Partially Paid", "Pending M-Pesa"])).order_by(Invoice.billing_date.asc()).all()
+    
+    result = []
+    for inv in invoices:
+        inv_dict = {
+            "invoice_id": inv.invoice_id,
+            "patient_id": inv.patient_id,
+            "patient_name": f"{inv.patient.surname}, {inv.patient.other_names}" if inv.patient else "Unknown",
+            "patient_opd": inv.patient.outpatient_no if inv.patient else "N/A",
+            "total_amount": float(inv.total_amount),
+            "amount_paid": float(inv.amount_paid),
+            "status": inv.status,
+            "billing_date": inv.billing_date,
+            "items": [{"id": i.id, "description": i.description, "amount": float(i.amount), "item_type": i.item_type} for i in inv.items]
+        }
+        result.append(inv_dict)
+    return result
 
 @router.post("/process-payment", dependencies=[Depends(RequirePermission("billing:process"))])
 def process_cash_card_payment(req: PaymentRequest, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):

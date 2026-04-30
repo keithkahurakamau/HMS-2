@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { 
     Bed, Activity, Search, Filter, UserPlus, 
-    LogOut, Pill, FileText, AlertCircle, X, Package, Plus, Trash2
+    LogOut, Pill, FileText, AlertCircle, X, Package, Plus, Trash2, CheckCircle2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -11,6 +11,7 @@ export default function Wards() {
     const [wardInventory, setWardInventory] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [patients, setPatients] = useState([]);
     
     // UI Modals & Target Entities
     const [activeBed, setActiveBed] = useState(null); 
@@ -34,6 +35,9 @@ export default function Wards() {
             
             const invResponse = await apiClient.get('/wards/inventory');
             setWardInventory(invResponse.data || []);
+            
+            const patResponse = await apiClient.get('/patients');
+            setPatients(patResponse.data || []);
         } catch (error) {
             toast.error("Network Exception: Failed to load Ward data.");
         } finally {
@@ -219,7 +223,60 @@ export default function Wards() {
                 ))}
             </div>
 
-            {/* ADMISSION MODAL OMITTED FOR BREVITY BUT REMAINS IN APP */}
+            {/* ADMISSION MODAL */}
+            {isAdmitModalOpen && (
+                <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAdmitModalOpen(false)}></div>
+                    <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
+                        <div className="p-6 border-b border-slate-100 bg-brand-700 text-white shrink-0">
+                            <h2 className="text-xl font-bold flex items-center gap-2"><UserPlus size={24} className="text-brand-200" /> Admit Patient</h2>
+                            <p className="text-sm text-brand-100 mt-1">Allocate a bed and create a new inpatient admission record.</p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+                            <form id="admitForm" onSubmit={handleAdmit} className="space-y-6">
+                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Select Patient</label>
+                                        <select required value={admitForm.patient_id} onChange={(e) => setAdmitForm({...admitForm, patient_id: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                                            <option value="">Choose a registered patient...</option>
+                                            {patients.map(p => (
+                                                <option key={p.patient_id} value={p.patient_id}>
+                                                    {p.surname}, {p.other_names} ({p.outpatient_no})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Select Available Bed</label>
+                                        <select required value={admitForm.bed_id} onChange={(e) => setAdmitForm({...admitForm, bed_id: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                                            <option value="">Assign a bed...</option>
+                                            {wards.map(ward => (
+                                                <optgroup key={ward.id} label={ward.name}>
+                                                    {ward.beds.filter(b => b.status === 'Available').map(bed => (
+                                                        <option key={bed.id} value={bed.id}>Bed {bed.number}</option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Primary Diagnosis (Reason for Admission)</label>
+                                        <input required type="text" value={admitForm.diagnosis} onChange={(e) => setAdmitForm({...admitForm, diagnosis: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="e.g. Severe Malaria" />
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div className="p-6 border-t border-slate-200 bg-white flex gap-3 shrink-0">
+                            <button type="button" onClick={() => setIsAdmitModalOpen(false)} className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 w-1/3 transition-colors">Cancel</button>
+                            <button type="submit" form="admitForm" className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-lg font-bold shadow-sm flex items-center justify-center gap-2 transition-colors">
+                                Allocate & Admit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* SLIDE-OVER: INPATIENT CHART & AUDIT INVENTORY */}
             {activeBed && (

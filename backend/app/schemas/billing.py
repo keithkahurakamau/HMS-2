@@ -26,6 +26,8 @@ class InvoiceItemResponse(BaseModel):
 class InvoiceResponse(BaseModel):
     invoice_id: int
     patient_id: int
+    patient_name: Optional[str] = None
+    patient_opd: Optional[str] = None
     total_amount: float
     amount_paid: float
     status: str

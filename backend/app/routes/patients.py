@@ -11,6 +11,7 @@ from app.models.clinical import MedicalRecord, Appointment, PatientQueue
 from app.models.laboratory import LabTest
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
+from app.models.billing import Invoice, InvoiceItem
 
 router = APIRouter(prefix="/api/patients", tags=["Patient Registry"])
 
@@ -209,7 +210,7 @@ class QueueRequest(BaseModel):
     acuity_level: int = 3
 
 @router.post("/{patient_id}/route", dependencies=[Depends(RequirePermission("patients:write"))])
-def route_patient(patient_id: int, request: QueueRequest, db: Session = Depends(get_db)):
+def route_patient(patient_id: int, request: QueueRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -230,5 +231,32 @@ def route_patient(patient_id: int, request: QueueRequest, db: Session = Depends(
         status="Waiting"
     )
     db.add(new_queue)
+    
+    # Generate Consultation Fee Invoice
+    fee_mapping = {
+        "General OPD": 1000.0,
+        "Specialist Clinic": 2500.0,
+        "Dental": 1500.0,
+        "Emergency": 3000.0
+    }
+    amount = fee_mapping.get(request.department, 1000.0)
+    
+    invoice = Invoice(
+        patient_id=patient_id,
+        total_amount=amount,
+        status="Pending",
+        created_by=current_user["user_id"]
+    )
+    db.add(invoice)
+    db.flush()
+    
+    item = InvoiceItem(
+        invoice_id=invoice.invoice_id,
+        description=f"Consultation Fee - {request.department}",
+        amount=amount,
+        item_type="Consultation"
+    )
+    db.add(item)
+    
     db.commit()
-    return {"message": f"Patient successfully routed to {request.department}."}
+    return {"message": f"Patient routed to {request.department}. Consultation fee of {amount} generated."}
