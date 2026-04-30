@@ -25,7 +25,7 @@ import app.routes.users as users_module
 import app.routes.admin as admin_module
 import app.routes.analytics as analytics_module
 import app.routes.websockets as websockets_module
-
+import app.routes.radiology as radiology_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -45,12 +45,12 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 5. Configure CORS (Localhost + Vercel Preview/Prod Domains)
+# 5. Configure CORS (Must be added BEFORE custom http middlewares)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",    # React accessed via localhost
-        "http://127.0.0.1:5173",    # React accessed via IP
+        "http://localhost:5173",    
+        "http://127.0.0.1:5173",    
         "http://localhost:3000",
     ],
     allow_origin_regex=r"https://.*\.vercel\.app", 
@@ -59,26 +59,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 6. Global Middleware: Process Time & Unhandled Exception Catcher
+# 6. Global Middleware: Process Time (Removed Exception Catcher from here)
 @app.middleware("http")
-async def global_middleware(request: Request, call_next):
+async def process_time_middleware(request: Request, call_next):
     start_time = time.time()
-    try:
-        response = await call_next(request)
-        
-        # Add processing time header for performance monitoring
-        process_time = time.time() - start_time
-        response.headers["X-Process-Time"] = str(process_time)
-        return response
-        
-    except Exception as e:
-        logger.error(f"Unhandled Exception on {request.method} {request.url.path}: {e}", exc_info=True)
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "An internal server error occurred. System operators have been notified."},
-        )
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    return response
 
-# 7. Include API Routers
+# 7. Proper Global Exception Handler (Preserves CORS headers)
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled Exception on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal server error occurred. System operators have been notified."},
+    )
+
+# 8. Include API Routers
 app.include_router(auth_module.router)
 app.include_router(dashboard_module.router)
 app.include_router(users_module.router)
@@ -90,12 +89,13 @@ app.include_router(clinical_module.router)
 app.include_router(laboratory_module.router)
 app.include_router(pharmacy_module.router)
 app.include_router(inventory_module.router)
-app.include_router(wards_module.router) # Corrected: Resolves NameError
+app.include_router(wards_module.router)
 app.include_router(billing_module.router)
 app.include_router(analytics_module.router)
 app.include_router(websockets_module.router)
+app.include_router(radiology_module.router)
 
-# 8. Health Check Route
+# 9. Health Check Route
 @app.get("/")
 def root():
     return {

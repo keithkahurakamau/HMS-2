@@ -40,6 +40,42 @@ class PatientCreate(BaseModel):
     nok_contact: Optional[str] = None
     notes: Optional[str] = None
 
+    # Insurance
+    insurance_provider: Optional[str] = None
+    insurance_policy_number: Optional[str] = None
+
+class PatientUpdate(BaseModel):
+    surname: Optional[str] = None
+    other_names: Optional[str] = None
+    sex: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    marital_status: Optional[str] = None
+    religion: Optional[str] = None
+    primary_language: Optional[str] = None
+    blood_group: Optional[str] = None
+    allergies: Optional[str] = None
+    chronic_conditions: Optional[str] = None
+    id_type: Optional[str] = None
+    id_number: Optional[str] = None
+    nationality: Optional[str] = None
+    telephone_1: Optional[str] = None
+    telephone_2: Optional[str] = None
+    email: Optional[EmailStr] = None
+    postal_address: Optional[str] = None
+    postal_code: Optional[str] = None
+    residence: Optional[str] = None
+    town: Optional[str] = None
+    occupation: Optional[str] = None
+    employer_name: Optional[str] = None
+    reference_number: Optional[str] = None
+    nok_name: Optional[str] = None
+    nok_relationship: Optional[str] = None
+    nok_contact: Optional[str] = None
+    notes: Optional[str] = None
+    insurance_provider: Optional[str] = None
+    insurance_policy_number: Optional[str] = None
+    is_active: Optional[bool] = None
+
 class PatientResponse(PatientCreate):
     patient_id: int
     outpatient_no: str

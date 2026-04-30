@@ -2,11 +2,10 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { Activity } from 'lucide-react'; // Added for the loading spinner
+import { Activity } from 'lucide-react';
 
-// Page & Layout Imports
+// Page Imports
 import Login from './pages/Login';
-import MainLayout from './layouts/MainLayout';
 import Patients from './pages/Patients';
 import ClinicalDesk from './pages/ClinicalDesk';
 import Pharmacy from './pages/Pharmacy';
@@ -14,6 +13,10 @@ import Inventory from './pages/Inventory';
 import Laboratory from './pages/Laboratory';
 import Wards from './pages/Wards';
 import AdminDashboard from './pages/AdminDashboard';
+import Radiology from './pages/Radiology';
+
+// Layout Import
+import MainLayout from './components/layouts/MainLayout';
 
 // Protection Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -33,11 +36,11 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// 🚨 SMART ROUTER: Directs users to their specific departmental dashboard based on RBAC
+// SMART ROUTER
 const RoleBasedRedirect = () => {
     const { user, loading } = useAuth();
     
-    if (loading) return null; // Let ProtectedRoute handle the spinner
+    if (loading) return null; 
     if (!user) return <Navigate to="/login" replace />;
     
     switch (user.role) {
@@ -46,14 +49,14 @@ const RoleBasedRedirect = () => {
         case 'Nurse': return <Navigate to="/wards" replace />;
         case 'Pharmacist': return <Navigate to="/pharmacy" replace />;
         case 'Lab Technician': return <Navigate to="/laboratory" replace />;
+        case 'Radiologist': return <Navigate to="/radiology" replace />;
         case 'Receptionist': return <Navigate to="/patients" replace />;
         default: 
-            console.warn(`Unrecognized role: ${user.role}`);
             return <Navigate to="/login" replace />;
     }
 };
 
-// Temporary Placeholder for Pages not yet fully built
+// Temporary Placeholder
 const PagePlaceholder = ({ title }) => (
     <div className="bg-white rounded-xl shadow-soft p-6 border border-slate-100">
         <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
@@ -70,24 +73,20 @@ export default function App() {
           <Route path="/login" element={<Login />} />
 
           <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-            
-            {/* 🚨 Auto-redirect root to the Smart Router */}
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<RoleBasedRedirect />} /> 
             
-            {/* Core Hospital Modules */}
             <Route path="admin" element={<AdminDashboard />} /> 
             <Route path="patients" element={<Patients />} />
             <Route path="clinical" element={<ClinicalDesk />} />
             <Route path="laboratory" element={<Laboratory />} />
+            <Route path="radiology" element={<Radiology />} />
             <Route path="pharmacy" element={<Pharmacy />} />
             <Route path="wards" element={<Wards />} />
             <Route path="inventory" element={<Inventory />} />
             
-            {/* Pending Modules */}
             <Route path="appointments" element={<PagePlaceholder title="Appointments" />} />
             <Route path="billing" element={<PagePlaceholder title="Billing & Accounts" />} />
-            
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

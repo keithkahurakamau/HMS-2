@@ -3,7 +3,9 @@ import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import { 
     Search, UserPlus, X, Activity, Clock, ShieldCheck, 
-    MapPin, Phone, Briefcase, HeartPulse, FileText 
+    MapPin, Phone, Briefcase, HeartPulse, FileText, 
+    MoreVertical, Stethoscope, TestTube, AlertCircle, UserMinus,
+    Pill, Bed, CreditCard
 } from 'lucide-react';
 
 export default function Patients() {
@@ -13,25 +15,26 @@ export default function Patients() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Form State strictly mirroring the SQLAlchemy backend model
-    const [formData, setFormData] = useState({
-        // 1. Demographics
+    // Interactive States
+    const [activeDropdown, setActiveDropdown] = useState(null);
+    const [historyDrawer, setHistoryDrawer] = useState({ isOpen: false, data: null, loading: false });
+
+    // Form State
+    const defaultFormState = {
         surname: '', other_names: '', sex: 'Male', date_of_birth: '',
         marital_status: 'Single', religion: '', primary_language: '',
-        // 2. Clinical Baselines
         blood_group: 'Unknown', allergies: '', chronic_conditions: '',
-        // 3. ID & Contact
         id_type: 'National ID', id_number: '', nationality: 'Kenyan',
         telephone_1: '', telephone_2: '', email: '',
-        // 4. Address & Employment
         postal_address: '', postal_code: '', residence: '', town: '',
         occupation: '', employer_name: '', reference_number: '',
-        // 5. Next of Kin & Meta
         nok_name: '', nok_relationship: '', nok_contact: '', notes: ''
-    });
+    };
+    const [formData, setFormData] = useState(defaultFormState);
 
     useEffect(() => {
-        fetchPatients();
+        const delayDebounce = setTimeout(() => fetchPatients(), 500);
+        return () => clearTimeout(delayDebounce);
     }, [searchQuery]);
 
     const fetchPatients = async () => {
@@ -57,18 +60,7 @@ export default function Patients() {
             await apiClient.post('/patients/', formData);
             toast.success("Patient registered successfully & OP Number generated.");
             setIsModalOpen(false);
-            
-            // Reset form strictly to model defaults
-            setFormData({
-                surname: '', other_names: '', sex: 'Male', date_of_birth: '',
-                marital_status: 'Single', religion: '', primary_language: '',
-                blood_group: 'Unknown', allergies: '', chronic_conditions: '',
-                id_type: 'National ID', id_number: '', nationality: 'Kenyan',
-                telephone_1: '', telephone_2: '', email: '',
-                postal_address: '', postal_code: '', residence: '', town: '',
-                occupation: '', employer_name: '', reference_number: '',
-                nok_name: '', nok_relationship: '', nok_contact: '', notes: ''
-            });
+            setFormData(defaultFormState);
             fetchPatients();
         } catch (error) {
             toast.error(error.response?.data?.detail || "Registration failed");
@@ -77,13 +69,51 @@ export default function Patients() {
         }
     };
 
+    // --- Action: Route Patient ---
+    const routePatient = async (patientId, department) => {
+        try {
+            await apiClient.post(`/patients/${patientId}/route`, { department, acuity_level: 3 });
+            toast.success(`Successfully sent to ${department} queue.`);
+            setActiveDropdown(null);
+        } catch (error) {
+            toast.error(error.response?.data?.detail || `Failed to route to ${department}`);
+        }
+    };
+
+    // --- Action: View History ---
+    const viewHistory = async (patientId) => {
+        setActiveDropdown(null);
+        setHistoryDrawer({ isOpen: true, data: null, loading: true });
+        try {
+            const response = await apiClient.get(`/patients/${patientId}/history`);
+            setHistoryDrawer({ isOpen: true, data: response.data, loading: false });
+        } catch (error) {
+            toast.error("Failed to retrieve medical history");
+            setHistoryDrawer({ isOpen: false, data: null, loading: false });
+        }
+    };
+
+    // --- Action: Deactivate Patient ---
+    const deactivatePatient = async (patientId) => {
+        if (!window.confirm("Are you sure you want to deactivate this patient record?")) return;
+        
+        try {
+            await apiClient.delete(`/patients/${patientId}`);
+            toast.success("Patient record deactivated.");
+            setActiveDropdown(null);
+            fetchPatients();
+        } catch (error) {
+            toast.error("Failed to deactivate patient.");
+        }
+    };
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative h-full">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Patient Directory</h1>
-                    <p className="text-sm text-slate-500 mt-1">Manage comprehensive registrations, medical records, and triage queues.</p>
+                    <p className="text-sm text-slate-500 mt-1">Manage comprehensive registrations, medical records, and departmental queues.</p>
                 </div>
                 <button 
                     onClick={() => setIsModalOpen(true)}
@@ -109,8 +139,8 @@ export default function Patients() {
             </div>
 
             {/* Data Table */}
-            <div className="bg-white rounded-xl shadow-soft border border-slate-100 overflow-hidden">
-                <div className="overflow-x-auto">
+            <div className="bg-white rounded-xl shadow-soft border border-slate-100 overflow-visible">
+                <div className="overflow-x-auto overflow-y-visible pb-24">
                     <table className="w-full text-left text-sm text-slate-600">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b border-slate-200">
                             <tr>
@@ -118,7 +148,7 @@ export default function Patients() {
                                 <th className="px-6 py-4">Patient Profile</th>
                                 <th className="px-6 py-4">Contact Info</th>
                                 <th className="px-6 py-4">Registered Date</th>
-                                <th className="px-6 py-4 text-right">Actions</th>
+                                <th className="px-6 py-4 text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -132,7 +162,7 @@ export default function Patients() {
                             ) : patients.length === 0 ? (
                                 <tr>
                                     <td colSpan="5" className="px-6 py-12 text-center text-slate-400">
-                                        No patients found matching your search.
+                                        No active patients found matching your search.
                                     </td>
                                 </tr>
                             ) : (
@@ -158,9 +188,52 @@ export default function Patients() {
                                         <td className="px-6 py-4 text-slate-500">
                                             {new Date(patient.registered_on).toLocaleDateString()}
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button className="text-brand-600 hover:text-brand-800 text-sm font-medium mr-3">View File</button>
-                                            <button className="text-accent-600 hover:text-accent-800 text-sm font-medium">Triage</button>
+                                        <td 
+                                            className="px-6 py-4 text-center relative"
+                                            onMouseLeave={() => setActiveDropdown(null)}
+                                        >
+                                            {/* Action Dropdown Trigger */}
+                                            <button 
+                                                onMouseEnter={() => setActiveDropdown(patient.patient_id)}
+                                                className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                                            >
+                                                <MoreVertical size={18} />
+                                            </button>
+
+                                            {/* Dropdown Menu */}
+                                            {activeDropdown === patient.patient_id && (
+                                                <div className="absolute right-10 top-10 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-20 text-left">
+                                                    <div className="px-3 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">Route To</div>
+                                                    <button onClick={() => routePatient(patient.patient_id, 'Clinical Desk')} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                        <Stethoscope size={16} className="text-blue-500" /> Clinical Desk
+                                                    </button>
+                                                    <button onClick={() => routePatient(patient.patient_id, 'Laboratory')} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                        <TestTube size={16} className="text-purple-500" /> Laboratory
+                                                    </button>
+                                                    <button onClick={() => routePatient(patient.patient_id, 'Radiology')} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                        <Activity size={16} className="text-indigo-500" /> Radiology
+                                                    </button>
+                                                    <button onClick={() => routePatient(patient.patient_id, 'Pharmacy')} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                        <Pill size={16} className="text-emerald-500" /> Pharmacy
+                                                    </button>
+                                                    <button onClick={() => routePatient(patient.patient_id, 'Billing')} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                        <CreditCard size={16} className="text-amber-500" /> Billing
+                                                    </button>
+                                                    <button onClick={() => routePatient(patient.patient_id, 'Wards')} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                        <Bed size={16} className="text-rose-500" /> Wards
+                                                    </button>
+                                                    
+                                                    <div className="border-t border-slate-100 my-1"></div>
+                                                    <div className="px-3 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">Manage</div>
+                                                    
+                                                    <button onClick={() => viewHistory(patient.patient_id)} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                        <Clock size={16} className="text-slate-500" /> View History
+                                                    </button>
+                                                    <button onClick={() => deactivatePatient(patient.patient_id)} className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                                                        <UserMinus size={16} /> Deactivate
+                                                    </button>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -170,7 +243,69 @@ export default function Patients() {
                 </div>
             </div>
 
-            {/* Slide-over Modal for Registration (Expanded to max-w-4xl for grid layout) */}
+            {/* --- Sliding History Drawer Overlay --- */}
+            {historyDrawer.isOpen && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex justify-end">
+                    <div className="bg-white w-full max-w-xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
+                        {/* Drawer Header */}
+                        <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-start shrink-0">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-800">Medical History</h2>
+                                {historyDrawer.data && (
+                                    <p className="text-sm font-medium text-brand-600 mt-1">
+                                        {historyDrawer.data.demographics.name} | {historyDrawer.data.demographics.opd}
+                                    </p>
+                                )}
+                            </div>
+                            <button onClick={() => setHistoryDrawer({ isOpen: false, data: null, loading: false })} className="p-2 bg-white text-slate-400 hover:text-red-500 rounded-lg shadow-sm border border-slate-200">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Drawer Content */}
+                        <div className="p-6 flex-1 overflow-y-auto bg-slate-50/50">
+                            {historyDrawer.loading ? (
+                                <div className="flex justify-center items-center h-40 text-slate-500"><Activity className="animate-spin mr-2" size={20}/> Fetching records...</div>
+                            ) : historyDrawer.data ? (
+                                <div className="space-y-6">
+                                    
+                                    {/* Critical Alerts Banner */}
+                                    <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex gap-3">
+                                        <AlertCircle className="text-orange-500 shrink-0" size={20} />
+                                        <div className="text-sm">
+                                            <p className="font-semibold text-orange-800">Vitals & Alerts</p>
+                                            <p className="text-orange-700 mt-1"><span className="font-medium">Allergies:</span> {historyDrawer.data.demographics.allergies}</p>
+                                            <p className="text-orange-700"><span className="font-medium">Conditions:</span> {historyDrawer.data.demographics.chronic_conditions}</p>
+                                            <p className="text-orange-700"><span className="font-medium">Blood Group:</span> <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold">{historyDrawer.data.demographics.blood_group}</span></p>
+                                        </div>
+                                    </div>
+
+                                    {/* Clinical Records Timeline */}
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2"><FileText size={16}/> Clinical Notes</h3>
+                                        {historyDrawer.data.clinical_records.length === 0 ? (
+                                            <p className="text-sm text-slate-500 italic">No previous clinical notes found.</p>
+                                        ) : (
+                                            historyDrawer.data.clinical_records.map(rec => (
+                                                <div key={rec.record_id} className="mb-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative before:absolute before:left-0 before:top-4 before:bottom-4 before:w-1 before:bg-brand-500 before:rounded-r-md">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded">Diagnosis: {rec.diagnosis || 'Pending'}</span>
+                                                    </div>
+                                                    <p className="text-sm text-slate-700 mb-2"><span className="font-medium">Complaint:</span> {rec.chief_complaint}</p>
+                                                    <p className="text-sm text-slate-700"><span className="font-medium">Treatment:</span> {rec.treatment_plan}</p>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                    
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Slide-over Modal for Registration */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setIsModalOpen(false)}></div>

@@ -84,7 +84,6 @@ def seed_database():
         roles = {}
         for r_name, p_list in roles_config.items():
             role = Role(name=r_name, description=f"{r_name} Access Level")
-            # Attach the specific permission objects to the role
             for p_code in p_list:
                 role.permissions.append(perms[p_code])
             db.add(role)
@@ -107,7 +106,7 @@ def seed_database():
             user = User(
                 email=u["email"], 
                 full_name=u["full_name"],
-                hashed_password=get_password_hash("password123"),  # Actual password hashing applied
+                hashed_password=get_password_hash("password123"),
                 role_id=roles[u["role"]].role_id,
                 specialization=u["spec"],
                 license_number=u["lic"],
@@ -118,37 +117,136 @@ def seed_database():
         db.flush()
 
         # ==========================================
-        # 3. PATIENT REGISTRY (Fully Populated)
+        # 3. PATIENT REGISTRY (Expanded & Localized)
         # ==========================================
-        print("   -> Seeding Patient Registry...")
-        p1 = Patient(
-            outpatient_no="OP-2026-0001", inpatient_no="IP-2026-0001",
-            surname="Smith", other_names="Jane Mary", sex="Female",
-            date_of_birth=datetime(1995, 5, 12).date(), marital_status="Single",
-            religion="Christian", primary_language="English", blood_group="O+",
-            allergies="Penicillin, Peanuts", chronic_conditions="Asthma",
-            id_type="National ID", id_number="29384756", nationality="Kenyan",
-            telephone_1="0712345678", email="jane.smith@example.com",
-            postal_address="P.O Box 1234", postal_code="00100", residence="Kilimani", town="Nairobi",
-            occupation="Software Engineer", employer_name="Tech Corp Kenya",
-            nok_name="John Smith", nok_relationship="Father", nok_contact="0799123456",
-            registered_by=staff["rec.brian@hospital.com"].user_id
-        )
+        print("   -> Seeding Patient Registry (10 Patients)...")
         
-        p2 = Patient(
-            outpatient_no="OP-2026-0002", inpatient_no=None,
-            surname="Doe", other_names="John Michael", sex="Male",
-            date_of_birth=datetime(1980, 11, 23).date(), marital_status="Married",
-            religion="Muslim", primary_language="Swahili", blood_group="A-",
-            allergies="None", chronic_conditions="Hypertension",
-            id_type="Passport", id_number="A1234567", nationality="Ugandan",
-            telephone_1="0723456789", email="johndoe@example.com",
-            residence="Westlands", town="Nairobi", occupation="Businessman",
-            nok_name="Mary Doe", nok_relationship="Wife", nok_contact="0744123456",
-            registered_by=staff["rec.brian@hospital.com"].user_id
-        )
-        db.add_all([p1, p2])
+        receptionist_id = staff["rec.brian@hospital.com"].user_id
+        
+        patients_data = [
+            {
+                "outpatient_no": "OP-2026-0001", "inpatient_no": "IP-2026-0001",
+                "surname": "Kamau", "other_names": "David Njoroge", "sex": "Male",
+                "date_of_birth": datetime(1985, 4, 12).date(), "marital_status": "Married",
+                "religion": "Christian", "primary_language": "Swahili", "blood_group": "O+",
+                "allergies": "Penicillin", "chronic_conditions": "Hypertension",
+                "id_type": "National ID", "id_number": "29384756", "nationality": "Kenyan",
+                "telephone_1": "0712345678", "telephone_2": "0722000111", "email": "david.kamau@example.com",
+                "residence": "Roysambu", "town": "Nairobi", "occupation": "Civil Engineer",
+                "nok_name": "Jane Kamau", "nok_relationship": "Wife", "nok_contact": "0799123456",
+                "reference_number": "NHIF-998877"
+            },
+            {
+                "outpatient_no": "OP-2026-0002", "inpatient_no": None,
+                "surname": "Achieng", "other_names": "Sarah", "sex": "Female",
+                "date_of_birth": datetime(1992, 11, 23).date(), "marital_status": "Single",
+                "religion": "Christian", "primary_language": "English", "blood_group": "A+",
+                "allergies": "None", "chronic_conditions": "Asthma",
+                "id_type": "National ID", "id_number": "33445566", "nationality": "Kenyan",
+                "telephone_1": "0723456789", "email": "sarah.achieng@example.com",
+                "residence": "Kilimani", "town": "Nairobi", "occupation": "Financial Analyst",
+                "nok_name": "Peter Omondi", "nok_relationship": "Brother", "nok_contact": "0744123456"
+            },
+            {
+                "outpatient_no": "OP-2026-0003", "inpatient_no": None,
+                "surname": "Mohammed", "other_names": "Ali Tariq", "sex": "Male",
+                "date_of_birth": datetime(1978, 2, 15).date(), "marital_status": "Married",
+                "religion": "Muslim", "primary_language": "Somali", "blood_group": "B+",
+                "allergies": "Dust, Pollen", "chronic_conditions": "Type 2 Diabetes",
+                "id_type": "Passport", "id_number": "A1234567", "nationality": "Somalian",
+                "telephone_1": "0733445566", "residence": "Eastleigh", "town": "Nairobi", 
+                "occupation": "Businessman", "nok_name": "Fatuma Ali", "nok_relationship": "Wife", 
+                "nok_contact": "0733998877"
+            },
+            {
+                "outpatient_no": "OP-2026-0004", "inpatient_no": "IP-2026-0002",
+                "surname": "Wanjiru", "other_names": "Grace", "sex": "Female",
+                "date_of_birth": datetime(1955, 6, 30).date(), "marital_status": "Widowed",
+                "religion": "Christian", "primary_language": "Kikuyu", "blood_group": "O-",
+                "allergies": "Sulfa Drugs", "chronic_conditions": "Arthritis, Hypertension",
+                "id_type": "National ID", "id_number": "11223344", "nationality": "Kenyan",
+                "telephone_1": "0700112233", "residence": "Kasarani", "town": "Nairobi", 
+                "occupation": "Retired", "nok_name": "John Ndungu", "nok_relationship": "Son", 
+                "nok_contact": "0722334455"
+            },
+            {
+                "outpatient_no": "OP-2026-0005", "inpatient_no": None,
+                "surname": "Smith", "other_names": "Robert", "sex": "Male",
+                "date_of_birth": datetime(1989, 8, 10).date(), "marital_status": "Single",
+                "religion": "Other", "primary_language": "English", "blood_group": "AB+",
+                "allergies": "Peanuts", "chronic_conditions": "None",
+                "id_type": "Alien ID", "id_number": "F9988776", "nationality": "British",
+                "telephone_1": "0755667788", "email": "rob.smith@ukmail.com",
+                "residence": "Westlands", "town": "Nairobi", "occupation": "Diplomat",
+                "nok_name": "Emma Smith", "nok_relationship": "Sister", "nok_contact": "+447911123456"
+            },
+            {
+                "outpatient_no": "OP-2026-0006", "inpatient_no": None,
+                "surname": "Mutua", "other_names": "Faith Syombua", "sex": "Female",
+                "date_of_birth": datetime(2015, 1, 5).date(), "marital_status": "Single",
+                "religion": "Christian", "primary_language": "Swahili", "blood_group": "A-",
+                "allergies": "None", "chronic_conditions": "None",
+                "id_type": "Birth Certificate", "id_number": "BC-2015-8899", "nationality": "Kenyan",
+                "telephone_1": "0799887766", "residence": "Langata", "town": "Nairobi", 
+                "occupation": "Student", "nok_name": "Daniel Mutua", "nok_relationship": "Father", 
+                "nok_contact": "0799887766"
+            },
+            {
+                "outpatient_no": "OP-2026-0007", "inpatient_no": None,
+                "surname": "Kipchoge", "other_names": "Eliud", "sex": "Male",
+                "date_of_birth": datetime(1984, 11, 5).date(), "marital_status": "Married",
+                "religion": "Christian", "primary_language": "Kalenjin", "blood_group": "O+",
+                "allergies": "None", "chronic_conditions": "None",
+                "id_type": "National ID", "id_number": "22334455", "nationality": "Kenyan",
+                "telephone_1": "0722111222", "residence": "Eldoret", "town": "Eldoret", 
+                "occupation": "Athlete", "nok_name": "Grace Sugut", "nok_relationship": "Wife", 
+                "nok_contact": "0722999888"
+            },
+            {
+                "outpatient_no": "OP-2026-0008", "inpatient_no": None,
+                "surname": "Onyango", "other_names": "Kevin", "sex": "Male",
+                "date_of_birth": datetime(2000, 3, 18).date(), "marital_status": "Single",
+                "religion": "Christian", "primary_language": "English", "blood_group": "B-",
+                "allergies": "Latex", "chronic_conditions": "None",
+                "id_type": "National ID", "id_number": "39998877", "nationality": "Kenyan",
+                "telephone_1": "0711223344", "email": "kevin.onyango@usiu.ac.ke",
+                "residence": "Thika Road", "town": "Nairobi", "occupation": "University Student",
+                "nok_name": "Rose Onyango", "nok_relationship": "Mother", "nok_contact": "0733112233"
+            },
+            {
+                "outpatient_no": "OP-2026-0009", "inpatient_no": "IP-2026-0003",
+                "surname": "Naidoo", "other_names": "Priya", "sex": "Female",
+                "date_of_birth": datetime(1990, 7, 22).date(), "marital_status": "Married",
+                "religion": "Hindu", "primary_language": "English", "blood_group": "AB-",
+                "allergies": "Shellfish", "chronic_conditions": "PCOS",
+                "id_type": "Passport", "id_number": "Z99887766", "nationality": "South African",
+                "telephone_1": "0744556677", "residence": "Parklands", "town": "Nairobi", 
+                "occupation": "Architect", "nok_name": "Rajesh Naidoo", "nok_relationship": "Husband", 
+                "nok_contact": "0744998877"
+            },
+            {
+                "outpatient_no": "OP-2026-0010", "inpatient_no": None,
+                "surname": "Odhiambo", "other_names": "Brian", "sex": "Male",
+                "date_of_birth": datetime(1995, 12, 10).date(), "marital_status": "Single",
+                "religion": "Christian", "primary_language": "Luo", "blood_group": "O+",
+                "allergies": "None", "chronic_conditions": "None",
+                "id_type": "National ID", "id_number": "35556677", "nationality": "Kenyan",
+                "telephone_1": "0799112233", "residence": "South B", "town": "Nairobi", 
+                "occupation": "Graphic Designer", "nok_name": "Mercy Odhiambo", "nok_relationship": "Sister", 
+                "nok_contact": "0700998877"
+            }
+        ]
+
+        db_patients = []
+        for p_data in patients_data:
+            patient = Patient(**p_data, registered_by=receptionist_id)
+            db.add(patient)
+            db_patients.append(patient)
+            
         db.flush()
+        
+        # Reference the first patient for clinical workflow data below
+        primary_patient = db_patients[0] 
 
         # ==========================================
         # 4. INVENTORY & PROCUREMENT
@@ -206,17 +304,17 @@ def seed_database():
         # 6. CLINICAL WORKFLOW (Appts, Queue, Records)
         # ==========================================
         print("   -> Seeding Clinical Encounters...")
-        # 1. Create an Appointment
-        appt = Appointment(patient_id=p1.patient_id, doctor_id=staff["dr.kahura@hospital.com"].user_id, appointment_date=datetime.now(timezone.utc), status="Completed")
+        # 1. Create an Appointment for the primary patient
+        appt = Appointment(patient_id=primary_patient.patient_id, doctor_id=staff["dr.kahura@hospital.com"].user_id, appointment_date=datetime.now(timezone.utc), status="Completed")
         db.add(appt)
         
         # 2. Put patient in Queue
-        queue = PatientQueue(patient_id=p1.patient_id, department="Consultation", acuity_level=2, status="In Progress", assigned_to=staff["dr.kahura@hospital.com"].user_id)
+        queue = PatientQueue(patient_id=primary_patient.patient_id, department="Consultation", acuity_level=2, status="In Progress", assigned_to=staff["dr.kahura@hospital.com"].user_id)
         db.add(queue)
         
         # 3. Create the Medical Record (SOAP Note)
         record = MedicalRecord(
-            patient_id=p1.patient_id, doctor_id=staff["dr.kahura@hospital.com"].user_id,
+            patient_id=primary_patient.patient_id, doctor_id=staff["dr.kahura@hospital.com"].user_id,
             record_status="Billed", blood_pressure="130/85", heart_rate=92, temperature=39.1,
             chief_complaint="Severe fever and chills for 3 days.",
             diagnosis="Severe Malaria", treatment_plan="Admit to GMW for IV therapy. Run CBC.",
@@ -226,7 +324,7 @@ def seed_database():
         db.flush()
 
         # 4. Generate Lab Order from the Medical Record
-        test = LabTest(patient_id=p1.patient_id, record_id=record.record_id, ordered_by=staff["dr.kahura@hospital.com"].user_id, catalog_id=lab_cat.catalog_id, test_name="Complete Blood Count (CBC)", billed_price=1500.0, status="Pending Collection", priority="STAT")
+        test = LabTest(patient_id=primary_patient.patient_id, record_id=record.record_id, ordered_by=staff["dr.kahura@hospital.com"].user_id, catalog_id=lab_cat.catalog_id, test_name="Complete Blood Count (CBC)", billed_price=1500.0, status="Pending Collection", priority="STAT")
         db.add(test)
         db.flush()
 
@@ -245,7 +343,7 @@ def seed_database():
         db.flush()
 
         adm = AdmissionRecord(
-            patient_id=p1.patient_id, bed_id=b1.bed_id, admitting_doctor_id=staff["dr.kahura@hospital.com"].user_id,
+            patient_id=primary_patient.patient_id, bed_id=b1.bed_id, admitting_doctor_id=staff["dr.kahura@hospital.com"].user_id,
             primary_diagnosis="Severe Malaria", status="Active"
         )
         db.add(adm)
@@ -255,7 +353,7 @@ def seed_database():
         # 8. BILLING & INVOICING
         # ==========================================
         print("   -> Seeding Billing Data...")
-        inv = Invoice(patient_id=p1.patient_id, appointment_id=appt.appointment_id, total_amount=4000.0, status="Pending", created_by=staff["rec.brian@hospital.com"].user_id)
+        inv = Invoice(patient_id=primary_patient.patient_id, appointment_id=appt.appointment_id, total_amount=4000.0, status="Pending", created_by=staff["rec.brian@hospital.com"].user_id)
         db.add(inv)
         db.flush()
 

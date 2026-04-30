@@ -5,7 +5,7 @@ from typing import List
 from datetime import datetime, date
 
 from app.config.database import get_db
-from app.models.user import User, Role
+from app.models.user import User, Role, Permission 
 from app.models.patient import Patient
 from app.models.wards import AdmissionRecord
 from app.models.billing import Invoice
@@ -22,28 +22,11 @@ router = APIRouter(prefix="/api/admin", tags=["Admin Controls"])
 # ==========================================
 @router.get("/metrics")
 def get_system_metrics(db: Session = Depends(get_db)):
-    """Aggregates top-level hospital metrics for the Admin dashboard."""
-    
-    # 1. Total Patients
     total_patients = db.query(func.count(Patient.patient_id)).scalar()
-
-    # 2. Active Admissions
-    active_admissions = db.query(func.count(AdmissionRecord.admission_id)).filter(
-        AdmissionRecord.status == "Active"
-    ).scalar()
-
-    # 3. Today's Revenue (Sum of all invoices generated today)
+    active_admissions = db.query(func.count(AdmissionRecord.admission_id)).filter(AdmissionRecord.status == "Active").scalar()
     today = date.today()
-    daily_revenue = db.query(func.sum(Invoice.total_amount)).filter(
-        func.date(Invoice.billing_date) == today
-    ).scalar() or 0.0
-
-    # 4. Low Stock Alerts (Across all locations)
-    low_stock_count = db.query(func.count(StockBatch.batch_id)).join(
-        InventoryItem, StockBatch.item_id == InventoryItem.item_id
-    ).filter(
-        StockBatch.quantity <= InventoryItem.reorder_threshold
-    ).scalar()
+    daily_revenue = db.query(func.sum(Invoice.total_amount)).filter(func.date(Invoice.billing_date) == today).scalar() or 0.0
+    low_stock_count = db.query(func.count(StockBatch.batch_id)).join(InventoryItem, StockBatch.item_id == InventoryItem.item_id).filter(StockBatch.quantity <= InventoryItem.reorder_threshold).scalar()
 
     return {
         "total_patients": total_patients,
@@ -57,10 +40,7 @@ def get_system_metrics(db: Session = Depends(get_db)):
 # ==========================================
 @router.get("/users")
 def get_staff_directory(db: Session = Depends(get_db)):
-    """Fetches all registered staff members."""
     users = db.query(User).all()
-    
-    # Map response to exclude hashed_passwords
     return [
         {
             "user_id": u.user_id,
@@ -73,33 +53,58 @@ def get_staff_directory(db: Session = Depends(get_db)):
         } for u in users
     ]
 
+@router.post("/users", dependencies=[Depends(RequirePermission("users:manage"))])
+def create_staff(payload: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    from app.core.security import get_password_hash
+    
+    existing = db.query(User).filter(User.email == payload.get("email")).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="User with this email already exists.")
+        
+    role = db.query(Role).filter(Role.name == payload.get("role")).first()
+    if not role:
+        raise HTTPException(status_code=400, detail="Invalid role specified.")
+        
+    new_user = User(
+        email=payload.get("email"),
+        full_name=payload.get("full_name"),
+        hashed_password=get_password_hash(payload.get("password")),
+        role_id=role.role_id,
+        specialization=payload.get("specialization"),
+        license_number=payload.get("license_number"),
+        is_active=True
+    )
+    db.add(new_user)
+    db.commit()
+    return {"message": "Staff created successfully"}
+
 @router.patch("/users/{user_id}/status", dependencies=[Depends(RequirePermission("users:manage"))])
-def toggle_user_status(user_id: int, status_update: dict, db: Session = Depends(get_db)):
-    """Locks or Unlocks a staff account."""
+def toggle_user_status(user_id: int, status_update: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    if user_id == current_user["user_id"]:
+        raise HTTPException(status_code=400, detail="Safety Protocol: You cannot lock your own active session.")
+        
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    old_status = user.is_active
     user.is_active = status_update.get("is_active", user.is_active)
+    
+    log_audit(db=db, user_id=current_user["user_id"], action="UPDATE", entity_type="UserStatus", entity_id=str(user.user_id), old_value={"is_active": old_status}, new_value={"is_active": user.is_active}, ip_address=request.client.host)
     db.commit()
     return {"message": f"User status updated to {'Active' if user.is_active else 'Locked'}"}
 
 @router.patch("/users/{user_id}/role", dependencies=[Depends(RequirePermission("users:manage"))])
 def update_user_role(user_id: int, role_update: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    """Dynamically changes a user's RBAC Role (e.g., promoting a Nurse to Admin)."""
-    
-    # 1. Find the User
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # 2. Find the requested Role
     new_role_name = role_update.get("role")
     new_role = db.query(Role).filter(Role.name == new_role_name).first()
     if not new_role:
         raise HTTPException(status_code=400, detail=f"Role '{new_role_name}' does not exist.")
         
-    # Prevent removing the last Admin
     if user.role.name == "Admin" and new_role_name != "Admin":
         admin_count = db.query(func.count(User.user_id)).join(Role).filter(Role.name == "Admin", User.is_active == True).scalar()
         if admin_count <= 1:
@@ -108,18 +113,7 @@ def update_user_role(user_id: int, role_update: dict, request: Request, db: Sess
     old_role_name = user.role.name
     user.role_id = new_role.role_id
     
-    # 3. Log the security change
-    log_audit(
-        db=db, 
-        user_id=current_user["user_id"], 
-        action="UPDATE", 
-        entity_type="UserRole", 
-        entity_id=str(user.user_id), 
-        old_value={"role": old_role_name}, 
-        new_value={"role": new_role_name}, 
-        ip_address=request.client.host
-    )
-    
+    log_audit(db=db, user_id=current_user["user_id"], action="UPDATE", entity_type="UserRole", entity_id=str(user.user_id), old_value={"role": old_role_name}, new_value={"role": new_role_name}, ip_address=request.client.host)
     db.commit()
     return {"message": f"User {user.email} promoted to {new_role_name} successfully."}
 
@@ -128,18 +122,7 @@ def update_user_role(user_id: int, role_update: dict, request: Request, db: Sess
 # ==========================================
 @router.get("/audit-logs")
 def get_audit_trail(limit: int = 100, db: Session = Depends(get_db)):
-    """Fetches the immutable security audit trails, latest first."""
-    
-    # Join with User to get the name of the person who took the action
-    logs = db.query(
-        AuditLog, 
-        User.full_name.label("actor_name")
-    ).outerjoin(
-        User, AuditLog.user_id == User.user_id
-    ).order_by(
-        AuditLog.timestamp.desc()
-    ).limit(limit).all() 
-
+    logs = db.query(AuditLog, User.full_name.label("actor_name")).outerjoin(User, AuditLog.user_id == User.user_id).order_by(AuditLog.timestamp.desc()).limit(limit).all() 
     formatted_logs = []
     for log, actor_name in logs:
         formatted_logs.append({
@@ -152,7 +135,6 @@ def get_audit_trail(limit: int = 100, db: Session = Depends(get_db)):
             "old_value": log.old_value,
             "new_value": log.new_value
         })
-        
     return formatted_logs
 
 # ==========================================
@@ -160,5 +142,73 @@ def get_audit_trail(limit: int = 100, db: Session = Depends(get_db)):
 # ==========================================
 @router.get("/pricing", dependencies=[Depends(RequirePermission("users:manage"))])
 def get_service_pricing(db: Session = Depends(get_db)):
-    """Fetches base pricing for lab tests and catalog services."""
-    return db.query(LabTestCatalog).all()
+    return db.query(LabTestCatalog).order_by(LabTestCatalog.category, LabTestCatalog.test_name).all()
+
+@router.post("/pricing", dependencies=[Depends(RequirePermission("users:manage"))])
+def create_service_pricing(payload: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    new_service = LabTestCatalog(
+        test_name=payload.get("test_name"),
+        category=payload.get("category"),
+        base_price=float(payload.get("base_price", 0.0)),
+        default_specimen_type=payload.get("description", "") # Mapping description to existing column
+    )
+    db.add(new_service)
+    
+    log_audit(db=db, user_id=current_user["user_id"], action="CREATE", entity_type="PricingCatalog", entity_id=payload.get("test_name"), old_value=None, new_value=payload, ip_address=request.client.host)
+    
+    db.commit()
+    return {"message": "Service package added to catalog."}
+
+@router.put("/pricing/{catalog_id}", dependencies=[Depends(RequirePermission("users:manage"))])
+def update_service_pricing(catalog_id: int, payload: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    item = db.query(LabTestCatalog).filter(LabTestCatalog.catalog_id == catalog_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Service package not found.")
+        
+    old_data = {"test_name": item.test_name, "base_price": item.base_price}
+    
+    item.test_name = payload.get("test_name", item.test_name)
+    item.category = payload.get("category", item.category)
+    item.base_price = float(payload.get("base_price", item.base_price))
+    item.default_specimen_type = payload.get("description", item.default_specimen_type)
+    
+    log_audit(db=db, user_id=current_user["user_id"], action="UPDATE", entity_type="PricingCatalog", entity_id=str(catalog_id), old_value=old_data, new_value=payload, ip_address=request.client.host)
+    
+    db.commit()
+    return {"message": "Service package updated."}
+
+# ==========================================
+# 5. ROLE PERMISSIONS MANAGEMENT
+# ==========================================
+@router.get("/roles/{role_name}/permissions", dependencies=[Depends(RequirePermission("users:manage"))])
+def get_role_permissions(role_name: str, db: Session = Depends(get_db)):
+    role = db.query(Role).filter(Role.name == role_name).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    return [p.codename for p in role.permissions]
+
+@router.put("/roles/{role_name}/permissions", dependencies=[Depends(RequirePermission("users:manage"))])
+def update_role_permissions(role_name: str, payload: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    if role_name == "Admin":
+        raise HTTPException(status_code=400, detail="Admin permissions cannot be restricted.")
+
+    role = db.query(Role).filter(Role.name == role_name).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+
+    new_perms_list = payload.get("permissions", [])
+    valid_perms = db.query(Permission).filter(Permission.codename.in_(new_perms_list)).all()
+    old_perms = [p.codename for p in role.permissions]
+
+    role.permissions = valid_perms
+
+    log_audit(
+        db=db, user_id=current_user["user_id"], action="UPDATE", 
+        entity_type="RolePermissions", entity_id=role_name, 
+        old_value={"permissions": old_perms}, 
+        new_value={"permissions": [p.codename for p in valid_perms]}, 
+        ip_address=request.client.host
+    )
+
+    db.commit()
+    return {"message": f"Permissions for {role_name} updated successfully."}

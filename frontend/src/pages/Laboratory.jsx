@@ -169,7 +169,7 @@ export default function Laboratory() {
                                                 </div>
                                                 <div className="flex justify-between items-center text-xs text-slate-500 mb-2">
                                                     <span className="font-semibold text-slate-700">{order.patient}</span>
-                                                    <span className="font-mono text-slate-400">{order.test_id}</span>
+                                                    <span className="font-mono text-slate-400">ID: {order.test_id}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-xs">
                                                     <span className={`px-2 py-0.5 rounded font-bold ${order.status === 'Pending Collection' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>{order.status}</span>
@@ -236,9 +236,8 @@ export default function Laboratory() {
                                                     <Activity className="text-brand-600" size={18} /> Enter Discrete Results
                                                 </h3>
 
-                                                {/* Extremely simple fallback UI for dynamic tests based on catalog_id. 
-                                                    In production, you'd fetch the specific schema for the test type. */}
-                                                {activeTest.catalog_id === 1 ? (
+                                                {/* Fallback to simple qualitative input if not a specialized discrete test */}
+                                                {activeTest.test_name.includes('CBC') || activeTest.test_name.includes('Blood') ? (
                                                     <div className="space-y-4">
                                                         <div className="grid grid-cols-12 gap-4 items-center bg-slate-50 p-3 rounded-lg border border-slate-100 font-semibold text-xs text-slate-500 uppercase tracking-wider">
                                                             <div className="col-span-4">Parameter</div>
@@ -273,7 +272,13 @@ export default function Laboratory() {
                                                 ) : (
                                                     <div>
                                                         <label className="block text-xs font-bold text-slate-700 mb-1.5">Qualitative Result / Impression</label>
-                                                        <textarea rows="2" className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Enter findings..."></textarea>
+                                                        <textarea 
+                                                            rows="3" 
+                                                            value={results.qualitative || ''}
+                                                            onChange={(e) => setResults({ qualitative: e.target.value })}
+                                                            className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
+                                                            placeholder="Enter qualitative findings..."
+                                                        ></textarea>
                                                     </div>
                                                 )}
                                                 
@@ -371,10 +376,6 @@ export default function Laboratory() {
                             </h2>
                             <p className="text-sm text-slate-500 mt-1">This catalog is managed by Hospital Administration and determines what Doctors can order.</p>
                         </div>
-                        <div className="relative w-64">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input type="text" placeholder="Search dictionary..." className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
-                        </div>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto">
@@ -383,26 +384,24 @@ export default function Laboratory() {
                                 <tr>
                                     <th className="px-6 py-4">Test Code & Name</th>
                                     <th className="px-6 py-4">Category</th>
-                                    <th className="px-6 py-4">Required Specimen</th>
-                                    <th className="px-6 py-4">Est. Turnaround</th>
-                                    <th className="px-6 py-4 text-right">Base Price</th>
+                                    <th className="px-6 py-4">Description / Specimen</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {isLoading ? (
-                                    <tr><td colSpan="5" className="text-center py-8">Loading Catalog...</td></tr>
+                                    <tr><td colSpan="3" className="text-center py-8">Loading Catalog...</td></tr>
+                                ) : catalog.length === 0 ? (
+                                    <tr><td colSpan="3" className="text-center py-8 text-slate-500">No Laboratory packages found in Admin Pricing Catalog.</td></tr>
                                 ) : catalog.map((test) => (
                                     <tr key={test.catalog_id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="font-bold text-slate-900">{test.test_name}</div>
-                                            <div className="text-xs font-mono text-slate-500 mt-0.5">{test.test_code}</div>
+                                            <div className="text-xs font-mono text-slate-500 mt-0.5">PKG-LAB-{String(test.catalog_id).padStart(4, '0')}</div>
                                         </td>
                                         <td className="px-6 py-4 font-medium text-slate-700">{test.category}</td>
                                         <td className="px-6 py-4">
-                                            <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-semibold">{test.default_specimen_type}</span>
+                                            <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-xs font-semibold">{test.default_specimen_type || 'General'}</span>
                                         </td>
-                                        <td className="px-6 py-4 text-slate-500 flex items-center gap-1"><Clock size={14}/> {test.turnaround_hours} Hours</td>
-                                        <td className="px-6 py-4 text-right font-bold text-slate-700">KES {test.base_price?.toLocaleString()}</td>
                                     </tr>
                                 ))}
                             </tbody>

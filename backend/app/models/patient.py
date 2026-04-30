@@ -51,6 +51,10 @@ class Patient(Base):
     registered_on = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     registered_by = Column(Integer, ForeignKey("users.user_id"), index=True)
 
+    # 7. Insurance Details (Mayo Clinic Standards)
+    insurance_provider = Column(String(255), nullable=True)
+    insurance_policy_number = Column(String(100), nullable=True)
+
     __table_args__ = (
         Index('idx_patient_name', 'surname', 'other_names'),
     )
