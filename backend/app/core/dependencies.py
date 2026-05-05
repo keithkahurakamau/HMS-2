@@ -16,6 +16,9 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
             detail="Not authenticated. No access token cookie found."
         )
         
+    if token.startswith("Bearer "):
+        token = token.split("Bearer ")[1]
+        
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id: int = payload.get("user_id")

@@ -5,12 +5,15 @@ from sqlalchemy.orm import Session
 from app.models.mpesa import MpesaConfig, MpesaTransaction
 from app.utils.encryption import decrypt_data
 from fastapi import HTTPException
+from app.config.settings import settings
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Replace with "https://api.safaricom.co.ke" for production
-DARAJA_BASE_URL = "https://sandbox.safaricom.co.ke"
+if settings.MPESA_ENV.lower() == "production":
+    DARAJA_BASE_URL = "https://api.safaricom.co.ke"
+else:
+    DARAJA_BASE_URL = "https://sandbox.safaricom.co.ke"
 
 def get_mpesa_config(db: Session):
     config = db.query(MpesaConfig).first()

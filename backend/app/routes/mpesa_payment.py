@@ -18,23 +18,46 @@ class STKPushRequest(BaseModel):
     invoice_id: int
     callback_url: str
 
+import requests
+from app.config.settings import settings
+
+def get_ngrok_url():
+    """Automatically fetches the active Ngrok HTTPS URL for local testing"""
+    try:
+        r = requests.get("http://127.0.0.1:4040/api/tunnels", timeout=2)
+        tunnels = r.json().get("tunnels", [])
+        for t in tunnels:
+            if t.get("public_url", "").startswith("https"):
+                return t["public_url"]
+    except Exception:
+        pass
+    return None
+
 @router.post("/stk-push")
 def trigger_stk_push(payload: STKPushRequest, db: Session = Depends(get_db)):
     """
     Triggers an M-Pesa STK push to the provided phone number.
-    Note: In production, the callback_url must be a publicly accessible HTTPS URL.
+    Automatically resolves Ngrok URL during local sandbox testing.
     """
     # Verify invoice exists
     invoice = db.query(Invoice).filter(Invoice.invoice_id == payload.invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
         
+    # Auto-resolve Ngrok callback URL
+    callback_url = payload.callback_url
+    if settings.MPESA_ENV.lower() == "sandbox":
+        ngrok_url = get_ngrok_url()
+        if ngrok_url:
+            callback_url = f"{ngrok_url}/api/payments/mpesa/callback"
+            logger.info(f"Auto-resolved Ngrok Callback URL: {callback_url}")
+            
     return initiate_stk_push(
         db=db,
         phone_number=payload.phone_number,
         amount=payload.amount,
         invoice_id=payload.invoice_id,
-        callback_url=payload.callback_url
+        callback_url=callback_url
     )
 
 @router.post("/callback")

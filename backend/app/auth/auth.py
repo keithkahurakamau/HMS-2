@@ -55,23 +55,24 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
     access_token, refresh_token = create_tokens(subject=user.user_id, tenant_id=tenant_id)
 
     # Secure Cookie configurations
+    is_production = settings.MPESA_ENV.lower() == "production"
     cookie_params = {
         "httponly": True,
-        "secure": True, # Ensure this is True in Vercel/Render production
-        "samesite": "none",
-        "domain": None # Adjust if cross-subdomain auth is needed
+        "secure": is_production, # Must be True in production for SameSite=None
+        "samesite": "none" if is_production else "lax",
+        "domain": None 
     }
 
     response.set_cookie(
         key="access_token",
-        value=f"Bearer {access_token}",
+        value=access_token,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         **cookie_params
     )
     
     response.set_cookie(
         key="refresh_token",
-        value=f"Bearer {refresh_token}",
+        value=refresh_token,
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         **cookie_params
     )

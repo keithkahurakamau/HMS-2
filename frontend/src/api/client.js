@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export const apiClient = axios.create({
-    baseURL: 'http://127.0.0.1:8000/api',
+    baseURL: '/api',
     withCredentials: true, // CRITICAL: This ensures the secure cookies are sent with every request
     xsrfCookieName: 'csrf_token', // Extracts token from this cookie
     xsrfHeaderName: 'X-CSRF-Token', // Attaches to this header

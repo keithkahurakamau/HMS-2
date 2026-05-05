@@ -15,6 +15,7 @@ export default function Billing() {
     const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [mpesaPhone, setMpesaPhone] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [mpesaStatus, setMpesaStatus] = useState(null); // 'waiting', 'success', 'failed'
 
     const fetchQueue = async () => {
         setIsLoading(true);
@@ -37,6 +38,41 @@ export default function Billing() {
         inv.patient_opd.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const pollMpesaStatus = async (checkoutRequestId) => {
+        let attempts = 0;
+        const interval = setInterval(async () => {
+            attempts++;
+            if (attempts > 20) { // 60 seconds timeout
+                clearInterval(interval);
+                setMpesaStatus(null);
+                setIsProcessing(false);
+                toast.error("M-Pesa request timed out. Patient did not enter PIN.");
+                return;
+            }
+            try {
+                const res = await apiClient.get(`/payments/mpesa/status/${checkoutRequestId}`);
+                if (res.data.status === 'Success') {
+                    clearInterval(interval);
+                    setMpesaStatus('success');
+                    toast.success("M-Pesa payment received successfully!");
+                    setIsProcessing(false);
+                    setMpesaStatus(null);
+                    setActiveInvoice(null);
+                    fetchQueue();
+                } else if (res.data.status === 'Failed') {
+                    clearInterval(interval);
+                    setMpesaStatus('failed');
+                    toast.error(`M-Pesa payment failed: ${res.data.result_desc || 'Cancelled by user'}`);
+                    setIsProcessing(false);
+                    setMpesaStatus(null);
+                }
+                // If status is still Pending, continue polling
+            } catch (error) {
+                // Ignore errors during polling and keep trying
+            }
+        }, 3000);
+    };
+
     const handleProcessPayment = async (e) => {
         e.preventDefault();
         setIsProcessing(true);
@@ -46,14 +82,27 @@ export default function Billing() {
             const amountDue = activeInvoice.total_amount - activeInvoice.amount_paid;
 
             if (paymentMethod === 'M-Pesa') {
-                if (!mpesaPhone) return toast.error("Phone number required for M-Pesa");
-                await apiClient.post('/billing/process-mpesa', {
-                    idempotency_key: idempotencyKey,
-                    invoice_id: activeInvoice.invoice_id,
+                if (!mpesaPhone) {
+                    setIsProcessing(false);
+                    return toast.error("Phone number required for M-Pesa");
+                }
+                const res = await apiClient.post('/payments/mpesa/stk-push', {
                     phone_number: mpesaPhone,
-                    amount: amountDue
+                    amount: amountDue,
+                    invoice_id: activeInvoice.invoice_id,
+                    callback_url: 'https://placeholder.ngrok.app/callback' // Overridden by backend dynamically
                 });
-                toast.success("STK Push sent to patient's phone.");
+                
+                toast.success("STK Push sent to patient's phone. Waiting for PIN...");
+                setMpesaStatus('waiting');
+                
+                if (res.data.CheckoutRequestID) {
+                    pollMpesaStatus(res.data.CheckoutRequestID);
+                } else {
+                    toast.error("Invalid response from Safaricom.");
+                    setIsProcessing(false);
+                    setMpesaStatus(null);
+                }
             } else {
                 await apiClient.post('/billing/process-payment', {
                     idempotency_key: idempotencyKey,
@@ -62,14 +111,14 @@ export default function Billing() {
                     payment_method: paymentMethod
                 });
                 toast.success(`Payment of KES ${amountDue.toFixed(2)} processed via ${paymentMethod}.`);
+                setActiveInvoice(null);
+                fetchQueue();
+                setIsProcessing(false);
             }
-            
-            setActiveInvoice(null);
-            fetchQueue();
         } catch (error) {
             toast.error(error.response?.data?.detail || "Payment processing failed");
-        } finally {
             setIsProcessing(false);
+            setMpesaStatus(null);
         }
     };
 
@@ -226,18 +275,19 @@ export default function Billing() {
                                             </div>
                                         )}
 
-                                        <button 
-                                            type="submit" 
-                                            disabled={isProcessing}
-                                            className={`w-full py-4 rounded-xl font-black text-white text-lg flex items-center justify-center gap-2 transition-colors shadow-md ${
-                                                paymentMethod === 'M-Pesa' ? 'bg-green-600 hover:bg-green-700' :
-                                                paymentMethod === 'Card' ? 'bg-purple-600 hover:bg-purple-700' :
-                                                'bg-brand-600 hover:bg-brand-700'
-                                            } disabled:opacity-50`}
-                                        >
-                                            {isProcessing ? <Activity className="animate-spin" /> : <CheckCircle2 size={24} />}
-                                            {paymentMethod === 'M-Pesa' ? 'Trigger M-Pesa STK Push' : 'Confirm Payment & Close Bill'}
-                                        </button>
+                                            <button 
+                                                type="submit" 
+                                                disabled={isProcessing}
+                                                className={`w-full py-4 rounded-xl font-black text-white text-lg flex items-center justify-center gap-2 transition-colors shadow-md ${
+                                                    mpesaStatus === 'waiting' ? 'bg-orange-500 hover:bg-orange-600 animate-pulse' :
+                                                    paymentMethod === 'M-Pesa' ? 'bg-green-600 hover:bg-green-700' :
+                                                    paymentMethod === 'Card' ? 'bg-purple-600 hover:bg-purple-700' :
+                                                    'bg-brand-600 hover:bg-brand-700'
+                                                } disabled:opacity-80 cursor-pointer disabled:cursor-not-allowed`}
+                                            >
+                                                {mpesaStatus === 'waiting' ? <Smartphone className="animate-bounce" size={24}/> : isProcessing ? <Activity className="animate-spin" size={24}/> : <CheckCircle2 size={24} />}
+                                                {mpesaStatus === 'waiting' ? 'Awaiting PIN from Patient...' : paymentMethod === 'M-Pesa' ? 'Trigger M-Pesa STK Push' : 'Confirm Payment & Close Bill'}
+                                            </button>
                                     </form>
                                 </div>
                             </div>

@@ -30,6 +30,9 @@ export default function AdminDashboard() {
     const [roleEditForm, setRoleEditForm] = useState({ role: '' });
     const [pricingForm, setPricingForm] = useState({ catalog_id: null, test_name: '', category: 'Consultation', description: '', base_price: 0 });
 
+    const [mpesaConfig, setMpesaConfig] = useState({ paybill_number: '', consumer_key: '', consumer_secret: '', passkey: '', account_reference: 'HMS-BILLING', transaction_desc: 'Hospital Bill Payment', kcb_account_number: '' });
+    const [isMpesaConfigured, setIsMpesaConfigured] = useState(false);
+
     // --- ROLE PERMISSIONS STATE ---
     const roles = ["Admin", "Doctor", "Nurse", "Pharmacist", "Lab Technician", "Radiologist", "Receptionist"];
     const SYSTEM_PERMISSIONS = [
@@ -49,6 +52,7 @@ export default function AdminDashboard() {
         if (activeTab === 'audit') fetchAuditLogs();
         if (activeTab === 'pricing') fetchPricing();
         if (activeTab === 'roles') fetchRolePermissions(selectedRoleForPerms);
+        if (activeTab === 'mpesa') fetchMpesaConfig();
     }, [activeTab]);
 
     useEffect(() => {
@@ -61,6 +65,17 @@ export default function AdminDashboard() {
     const fetchStaff = async () => { setIsLoading(true); try { const res = await apiClient.get('/admin/users'); setStaffList(res.data || []); } catch (e) { toast.error("Failed to load staff"); } finally { setIsLoading(false); } };
     const fetchAuditLogs = async () => { setIsLoading(true); try { const res = await apiClient.get('/admin/audit-logs'); setAuditLogs(res.data || []); } catch (e) {} finally { setIsLoading(false); } };
     const fetchPricing = async () => { setIsLoading(true); try { const res = await apiClient.get('/admin/pricing'); setPricingList(res.data || []); } catch (e) { toast.error("Failed to load catalog"); } finally { setIsLoading(false); } };
+    
+    const fetchMpesaConfig = async () => { 
+        setIsLoading(true); 
+        try { 
+            const res = await apiClient.get('/admin/mpesa/config'); 
+            if (res.data.configured) { 
+                setIsMpesaConfigured(true); 
+                setMpesaConfig(prev => ({...prev, paybill_number: res.data.paybill_number, account_reference: res.data.account_reference, transaction_desc: res.data.transaction_desc, kcb_account_number: res.data.kcb_account_number || ''})); 
+            } 
+        } catch(e){} finally { setIsLoading(false); } 
+    };
     
     const fetchRolePermissions = async (roleName) => {
         setIsLoading(true);
@@ -141,6 +156,16 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleSaveMpesaConfig = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        try {
+            await apiClient.post('/admin/mpesa/config', mpesaConfig);
+            toast.success("M-Pesa configuration securely encrypted and saved.");
+            fetchMpesaConfig();
+        } catch (error) { toast.error(error.response?.data?.detail || "Failed to save M-Pesa settings."); } finally { setIsSubmitting(false); }
+    };
+
     const togglePermission = (perm) => {
         if (currentRolePerms.includes(perm)) {
             setCurrentRolePerms(currentRolePerms.filter(p => p !== perm));
@@ -187,6 +212,9 @@ export default function AdminDashboard() {
                     </button>
                     <button onClick={() => setActiveTab('audit')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'audit' ? 'bg-red-500 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
                         <ShieldAlert size={16} /> Audit
+                    </button>
+                    <button onClick={() => setActiveTab('mpesa')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'mpesa' ? 'bg-green-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
+                        <CheckCircle2 size={16} /> M-Pesa
                     </button>
                 </div>
                 <div className="text-right px-4 text-sm font-bold text-slate-400 flex items-center gap-2 shrink-0">
@@ -496,6 +524,76 @@ export default function AdminDashboard() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 6: M-PESA INTEGRATION */}
+            {activeTab === 'mpesa' && (
+                <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <div>
+                            <h2 className="font-bold text-slate-800 flex items-center gap-2 text-green-700">Safaricom Daraja API Settings</h2>
+                            <p className="text-xs text-slate-500 mt-1">Configure your Paybill and API credentials securely. Credentials are encrypted at rest using AES.</p>
+                        </div>
+                        {isMpesaConfigured && (
+                            <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-2 shadow-sm border border-green-200">
+                                <CheckCircle2 size={14}/> Active & Configured
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-slate-50 flex justify-center">
+                        <form id="mpesaForm" onSubmit={handleSaveMpesaConfig} className="w-full max-w-2xl bg-white p-8 rounded-xl border border-slate-200 shadow-sm space-y-6 h-fit">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Paybill / Till Number <span className="text-red-500">*</span></label>
+                                    <input required type="text" value={mpesaConfig.paybill_number} onChange={e => setMpesaConfig({...mpesaConfig, paybill_number: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                                    <p className="text-xs text-slate-500 mt-1">Sandbox: Use <strong>174379</strong>. Production: Use your assigned Safaricom Shortcode to avoid conflicts.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Account Reference (STK Push)</label>
+                                    <input required type="text" value={mpesaConfig.account_reference} onChange={e => setMpesaConfig({...mpesaConfig, account_reference: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                                </div>
+                            </div>
+                            
+                            <hr className="border-slate-100" />
+                            
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2"><Key size={16} className="text-brand-500"/> Daraja API Credentials</h3>
+                                <div className="space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Consumer Key <span className="text-red-500">*</span></label>
+                                        <input required type="password" placeholder="Enter new Daraja Consumer Key..." value={mpesaConfig.consumer_key} onChange={e => setMpesaConfig({...mpesaConfig, consumer_key: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none font-mono" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Consumer Secret <span className="text-red-500">*</span></label>
+                                        <input required type="password" placeholder="Enter new Daraja Consumer Secret..." value={mpesaConfig.consumer_secret} onChange={e => setMpesaConfig({...mpesaConfig, consumer_secret: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none font-mono" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Lipa Na M-Pesa Passkey <span className="text-red-500">*</span></label>
+                                        <input required type="password" placeholder="Enter STK Push Passkey..." value={mpesaConfig.passkey} onChange={e => setMpesaConfig({...mpesaConfig, passkey: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none font-mono" />
+                                    </div>
+                                    <p className="text-xs text-slate-500 font-medium">⚠️ Never share these keys. They are instantly encrypted via AES before touching the database.</p>
+                                </div>
+                            </div>
+
+                            <hr className="border-slate-100" />
+
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-800 mb-4">Bank Integration (Reconciliation)</h3>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">KCB Bank Account Number (Optional)</label>
+                                    <input type="text" placeholder="e.g. 1122334455" value={mpesaConfig.kcb_account_number} onChange={e => setMpesaConfig({...mpesaConfig, kcb_account_number: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                                </div>
+                            </div>
+
+                            <div className="pt-4 flex justify-end">
+                                <button type="submit" disabled={isSubmitting} className="px-6 py-3 bg-green-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50">
+                                    {isSubmitting ? <Activity className="animate-spin" size={18}/> : <Save size={18}/>}
+                                    Encrypt & Save Settings
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
