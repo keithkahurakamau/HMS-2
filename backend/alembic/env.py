@@ -25,6 +25,8 @@ from app.models.inventory import Location, InventoryItem, StockBatch, StockTrans
 from app.models.wards import Ward, Bed, AdmissionRecord
 from app.models.billing import Invoice, InvoiceItem, Payment, IdempotencyKey
 from app.models.audit import AuditLog
+from app.models.medical_history import MedicalHistoryEntry, DataAccessLog, ConsentRecord
+from app.models.mpesa import MpesaConfig, MpesaTransaction
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

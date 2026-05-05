@@ -20,6 +20,7 @@ export default function ClinicalDesk() {
     const [clinicalNotes, setClinicalNotes] = useState({ cc: '', hpi: '', objective: '', diagnosis: '', plan: '', internal_notes: '' });
     const [icdSearch, setIcdSearch] = useState('');
     const [showIcdDropdown, setShowIcdDropdown] = useState(false);
+    const [chargeConsultation, setChargeConsultation] = useState(false);
     
     const mockIcdDatabase = ["A09 - Infectious gastroenteritis", "E11.9 - Type 2 diabetes mellitus", "I10 - Essential hypertension", "B50.9 - Severe Malaria", "J03.90 - Acute tonsillitis", "R50.9 - Fever, unspecified"];
     const filteredIcd = mockIcdDatabase.filter(code => code.toLowerCase().includes(icdSearch.toLowerCase()));
@@ -57,6 +58,7 @@ export default function ClinicalDesk() {
         setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' }); 
         setClinicalNotes({ cc: '', hpi: '', objective: '', diagnosis: '', plan: '', internal_notes: '' });
         setIcdSearch('');
+        setChargeConsultation(false);
     };
 
     // --- ACTION HANDLERS ---
@@ -96,6 +98,14 @@ export default function ClinicalDesk() {
         try {
             await apiClient.post('/clinical/submit', payload);
             
+            // Generate Consultation Fee if checked
+            if (chargeConsultation && targetStatus !== 'Draft') {
+                await apiClient.post('/billing/consultation-fee', {
+                    patient_id: activePatient.patient_id,
+                    amount: 1000.0
+                });
+            }
+            
             if (targetStatus === 'Pharmacy') toast.success("Record saved and routed to Pharmacy!");
             else if (targetStatus === 'Billed') toast.success("Record saved and sent to Billing!");
             else if (targetStatus === 'Draft') toast.success("Draft saved successfully.");
@@ -115,7 +125,7 @@ export default function ClinicalDesk() {
     };
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
+        <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
             
             {/* TOP PANEL: Collapsible Queue (Unchanged) */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm shrink-0 flex flex-col z-30">
@@ -261,6 +271,23 @@ export default function ClinicalDesk() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div><label className="block text-xs font-bold text-slate-700 mb-1.5">Internal Notes (Nursing/Ward)</label><input type="text" value={clinicalNotes.internal_notes} onChange={(e) => setClinicalNotes({...clinicalNotes, internal_notes: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" placeholder="e.g. Please administer stat dose before discharge" /></div>
                                     <div><label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1"><CalendarPlus size={14}/> Next Follow-Up</label><button onClick={() => handleNotImplemented('Scheduling')} className="w-full px-4 py-2 text-left bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400">Select date...</button></div>
+                                </div>
+                                
+                                <div className="border border-brand-200 bg-brand-50 p-4 rounded-lg flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <input 
+                                            type="checkbox" 
+                                            id="chargeFee" 
+                                            checked={chargeConsultation}
+                                            onChange={(e) => setChargeConsultation(e.target.checked)}
+                                            className="w-5 h-5 text-brand-600 rounded border-brand-300 focus:ring-brand-500"
+                                        />
+                                        <div>
+                                            <label htmlFor="chargeFee" className="text-sm font-bold text-brand-900 cursor-pointer block">Authorize Consultation Fee</label>
+                                            <p className="text-xs text-brand-700">Check this box to automatically generate a consultation invoice at the cashier.</p>
+                                        </div>
+                                    </div>
+                                    <span className="font-black text-brand-600">KES 1000</span>
                                 </div>
                             </div>
                         </div>

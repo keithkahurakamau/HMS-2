@@ -83,7 +83,7 @@ export default function Radiology() {
     };
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
+        <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
             
             {/* RADIOLOGY HEADER */}
             <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm shrink-0">

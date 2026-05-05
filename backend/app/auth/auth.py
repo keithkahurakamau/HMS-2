@@ -47,8 +47,12 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
     user.locked_until = None
     db.commit()
 
-    # Token generation
-    access_token, refresh_token = create_tokens(subject=user.user_id)
+    tenant_id = request.headers.get("X-Tenant-ID")
+    if not tenant_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-Tenant-ID header is required")
+
+    # Token generation with tenant binding
+    access_token, refresh_token = create_tokens(subject=user.user_id, tenant_id=tenant_id)
 
     # Secure Cookie configurations
     cookie_params = {

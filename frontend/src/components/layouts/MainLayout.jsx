@@ -11,18 +11,21 @@ export default function MainLayout() {
     const { user, logout } = useAuth();
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    
+    // Get the dynamic hospital name from the portal selection
+    const tenantName = localStorage.getItem('hms_tenant_name') || 'HMS Enterprise';
 
     const NAVIGATION = [
-        { name: 'Command Center',    path: '/admin',           icon: <LayoutDashboard size={20} />, allowedRoles: ['Admin'] },
-        { name: 'Patient Registry',  path: '/patients',        icon: <Users size={20} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'] },
-        { name: 'Medical History',   path: '/medical-history', icon: <ClipboardList size={20} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse'] },
-        { name: 'Clinical Desk',     path: '/clinical',        icon: <Stethoscope size={20} />,     allowedRoles: ['Admin', 'Doctor'] },
-        { name: 'Laboratory',        path: '/laboratory',      icon: <TestTube size={20} />,        allowedRoles: ['Admin', 'Lab Technician', 'Doctor'] },
-        { name: 'Radiology',         path: '/radiology',       icon: <Radio size={20} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'] },
-        { name: 'Pharmacy',          path: '/pharmacy',        icon: <Pill size={20} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'] },
-        { name: 'Wards & Admissions',path: '/wards',           icon: <Bed size={20} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'] },
-        { name: 'Inventory Hub',     path: '/inventory',       icon: <Package size={20} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'] },
-        { name: 'Billing & Finance', path: '/billing',         icon: <Receipt size={20} />,         allowedRoles: ['Admin', 'Receptionist'] },
+        { name: 'Command Center',    path: '/app/admin',           icon: <LayoutDashboard size={20} />, allowedRoles: ['Admin'] },
+        { name: 'Patient Registry',  path: '/app/patients',        icon: <Users size={20} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'] },
+        { name: 'Medical History',   path: '/app/medical-history', icon: <ClipboardList size={20} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse'] },
+        { name: 'Clinical Desk',     path: '/app/clinical',        icon: <Stethoscope size={20} />,     allowedRoles: ['Admin', 'Doctor'] },
+        { name: 'Laboratory',        path: '/app/laboratory',      icon: <TestTube size={20} />,        allowedRoles: ['Admin', 'Lab Technician', 'Doctor'] },
+        { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={20} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'] },
+        { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={20} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'] },
+        { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={20} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'] },
+        { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={20} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'] },
+        { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={20} />,         allowedRoles: ['Admin', 'Receptionist'] },
     ];
 
     const filteredNav = NAVIGATION.filter(item => item.allowedRoles.includes(user?.role));
@@ -36,11 +39,11 @@ export default function MainLayout() {
 
             <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="h-16 flex items-center justify-between px-6 bg-slate-950/50 border-b border-slate-800 shrink-0">
-                    <div className="flex items-center gap-2 font-black text-white text-xl tracking-tight">
-                        <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+                    <div className="flex items-center gap-2 font-black text-white text-xl tracking-tight overflow-hidden">
+                        <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center shrink-0">
                             <ShieldCheck size={20} className="text-white" />
                         </div>
-                        HMS <span className="text-brand-500 font-medium">Enterprise</span>
+                        <span className="truncate" title={tenantName}>{tenantName}</span>
                     </div>
                     <button className="md:hidden text-slate-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}><X size={24} /></button>
                 </div>

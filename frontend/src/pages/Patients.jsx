@@ -84,7 +84,7 @@ export default function Patients() {
     // --- Action: View History ---
     const viewHistory = (patientId) => {
         setActiveDropdown(null);
-        navigate(`/medical-history?patient_id=${patientId}`);
+        navigate(`/app/medical-history?patient_id=${patientId}`);
     };
 
     // --- Action: Deactivate Patient ---
@@ -184,11 +184,10 @@ export default function Patients() {
                                         </td>
                                         <td 
                                             className="px-6 py-4 text-center relative"
-                                            onMouseLeave={() => setActiveDropdown(null)}
                                         >
                                             {/* Action Dropdown Trigger */}
                                             <button 
-                                                onMouseEnter={() => setActiveDropdown(patient.patient_id)}
+                                                onClick={() => setActiveDropdown(activeDropdown === patient.patient_id ? null : patient.patient_id)}
                                                 className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                                             >
                                                 <MoreVertical size={18} />

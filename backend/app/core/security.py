@@ -29,3 +29,8 @@ def create_refresh_token(data: dict):
     to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
+def create_tokens(subject: int, tenant_id: str):
+    access_token = create_access_token({"user_id": subject, "tenant_id": tenant_id})
+    refresh_token = create_refresh_token({"user_id": subject, "tenant_id": tenant_id})
+    return access_token, refresh_token

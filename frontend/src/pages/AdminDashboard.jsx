@@ -168,7 +168,7 @@ export default function AdminDashboard() {
     const filteredPricing = pricingList.filter(item => item.test_name.toLowerCase().includes(searchQuery.toLowerCase()) || item.category.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
+        <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
             
             {/* HEADER & TABS */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 shadow-sm flex flex-col md:flex-row items-center justify-between shrink-0 gap-2">
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex-1 overflow-auto">
-                        <table className="w-full text-left text-sm text-slate-600">
+                        <table className="w-full text-left text-sm text-slate-600 min-w-[800px]">
                             <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
                                 <tr>
                                     <th className="px-6 py-4">Staff Member</th>
@@ -339,7 +339,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex-1 overflow-auto">
-                        <table className="w-full text-left text-sm text-slate-600">
+                        <table className="w-full text-left text-sm text-slate-600 min-w-[800px]">
                             <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
                                 <tr>
                                     <th className="px-6 py-4">Service / Test Name</th>
@@ -464,7 +464,7 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500 mt-1">Tracks all critical CREATE, UPDATE, and DELETE operations across the hospital infrastructure.</p>
                     </div>
                     <div className="flex-1 overflow-auto">
-                        <table className="w-full text-left text-sm text-slate-600">
+                        <table className="w-full text-left text-sm text-slate-600 min-w-[800px]">
                             <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
                                 <tr>
                                     <th className="px-6 py-3">Timestamp (UTC)</th>

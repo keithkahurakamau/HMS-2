@@ -19,9 +19,14 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id: int = payload.get("user_id")
+        token_tenant_id: str = payload.get("tenant_id")
         
-        if user_id is None:
+        if user_id is None or token_tenant_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+            
+        request_tenant_id = request.headers.get("X-Tenant-ID")
+        if request_tenant_id != token_tenant_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant access strictly forbidden")
             
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")

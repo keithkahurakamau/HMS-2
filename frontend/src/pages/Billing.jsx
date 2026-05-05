@@ -135,8 +135,8 @@ export default function Billing() {
                 {/* Main Cashier Workspace */}
                 <div className="md:col-span-3">
                     {activeInvoice ? (
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-140px)]">
-                            <div className="p-6 bg-slate-900 text-white shrink-0 flex justify-between items-start">
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[60vh] md:h-[calc(100vh-140px)]">
+                            <div className="p-6 bg-slate-900 text-white shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
                                     <h2 className="text-2xl font-black mb-1">{activeInvoice.patient_name}</h2>
                                     <p className="text-slate-400 font-medium">{activeInvoice.patient_opd} • Invoice #{activeInvoice.invoice_id}</p>
@@ -151,8 +151,8 @@ export default function Billing() {
                                 {/* Bill Breakdown */}
                                 <div>
                                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Itemized Breakdown</h3>
-                                    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                        <table className="w-full text-left text-sm text-slate-600">
+                                    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden overflow-x-auto shadow-sm">
+                                        <table className="w-full text-left text-sm text-slate-600 min-w-[500px]">
                                             <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500">
                                                 <tr>
                                                     <th className="px-4 py-3">Description</th>

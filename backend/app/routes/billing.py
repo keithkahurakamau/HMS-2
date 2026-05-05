@@ -10,6 +10,11 @@ from app.schemas.billing import PaymentRequest, MPesaRequest, InvoiceResponse
 from app.core.dependencies import get_current_user, RequirePermission
 from app.services.payment_service import mpesa_service
 from app.utils.audit import log_audit
+from pydantic import BaseModel
+
+class ConsultationFeeRequest(BaseModel):
+    patient_id: int
+    amount: float = 1000.0
 
 router = APIRouter(prefix="/api/billing", tags=["Billing & Cashier"])
 
@@ -85,4 +90,35 @@ def initiate_mpesa_payment(req: MPesaRequest, db: Session = Depends(get_db), cur
         db.commit()
         return {"status": "STK Push Sent", "checkout_request_id": response.get("CheckoutRequestID")}
     
+    
     raise HTTPException(status_code=400, detail="M-Pesa request failed")
+
+@router.post("/consultation-fee", dependencies=[Depends(RequirePermission("clinical:write"))])
+def charge_consultation_fee(req: ConsultationFeeRequest, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    # Check if a pending invoice already exists for this patient, else create one
+    invoice = db.query(Invoice).filter(Invoice.patient_id == req.patient_id, Invoice.status == "Pending").first()
+    
+    if not invoice:
+        invoice = Invoice(
+            patient_id=req.patient_id,
+            total_amount=0,
+            status="Pending",
+            created_by=current_user["user_id"]
+        )
+        db.add(invoice)
+        db.flush()
+        
+    invoice.total_amount += req.amount
+    
+    item = InvoiceItem(
+        invoice_id=invoice.invoice_id,
+        description="Doctor Consultation Fee",
+        amount=req.amount,
+        item_type="Consultation"
+    )
+    db.add(item)
+    
+    log_audit(db, current_user["user_id"], "CREATE", "InvoiceItem", item.id, None, {"amount": req.amount, "type": "Consultation"}, request.client.host)
+    
+    db.commit()
+    return {"message": "Consultation fee successfully charged."}

@@ -235,7 +235,7 @@ export default function Inventory() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-slate-600">
+                    <table className="w-full text-left text-sm text-slate-600 min-w-[600px]">
                         <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200">
                             <tr>
                                 <th className="px-6 py-4">Item Details</th>

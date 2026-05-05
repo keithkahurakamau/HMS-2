@@ -147,7 +147,7 @@ export default function Pharmacy() {
     };
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
+        <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
             {/* GLOBAL PHARMACY HEADER & TABS */}
             <div className="bg-white border border-slate-200 rounded-xl p-2 shadow-sm flex items-center justify-between shrink-0">
                 <div className="flex bg-slate-100 p-1 rounded-lg w-full max-w-md">

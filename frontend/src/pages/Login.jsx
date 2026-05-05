@@ -10,6 +10,9 @@ export default function Login() {
     
     const { login } = useAuth();
     const navigate = useNavigate();
+    
+    // Get dynamic tenant name
+    const tenantName = localStorage.getItem('hms_tenant_name') || 'HMS Enterprise';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -17,7 +20,7 @@ export default function Login() {
         
         const success = await login(email, password);
         if (success) {
-            navigate('/dashboard');
+            navigate('/app/dashboard');
         }
         
         setIsSubmitting(false);
@@ -30,7 +33,7 @@ export default function Login() {
                     <Activity size={48} strokeWidth={1.5} />
                 </div>
                 <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900">
-                    MayoClinic ERP
+                    {tenantName}
                 </h2>
                 <p className="mt-2 text-center text-sm text-slate-600">
                     Enterprise Hospital Management System

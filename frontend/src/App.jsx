@@ -16,9 +16,15 @@ import AdminDashboard from './pages/AdminDashboard';
 import Radiology from './pages/Radiology';
 import MedicalHistory from './pages/MedicalHistory';
 import Billing from './pages/Billing';
+import Portal from './pages/Portal';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
+
+// Super Admin Imports
+import SuperAdminLayout from './components/layouts/SuperAdminLayout';
+import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
+import TenantsManager from './pages/superadmin/TenantsManager';
 
 // Protection Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -46,13 +52,13 @@ const RoleBasedRedirect = () => {
     if (!user) return <Navigate to="/login" replace />;
     
     switch (user.role) {
-        case 'Admin': return <Navigate to="/admin" replace />;
-        case 'Doctor': return <Navigate to="/clinical" replace />;
-        case 'Nurse': return <Navigate to="/wards" replace />;
-        case 'Pharmacist': return <Navigate to="/pharmacy" replace />;
-        case 'Lab Technician': return <Navigate to="/laboratory" replace />;
-        case 'Radiologist': return <Navigate to="/radiology" replace />;
-        case 'Receptionist': return <Navigate to="/patients" replace />;
+        case 'Admin': return <Navigate to="/app/admin" replace />;
+        case 'Doctor': return <Navigate to="/app/clinical" replace />;
+        case 'Nurse': return <Navigate to="/app/wards" replace />;
+        case 'Pharmacist': return <Navigate to="/app/pharmacy" replace />;
+        case 'Lab Technician': return <Navigate to="/app/laboratory" replace />;
+        case 'Radiologist': return <Navigate to="/app/radiology" replace />;
+        case 'Receptionist': return <Navigate to="/app/patients" replace />;
         default: 
             return <Navigate to="/login" replace />;
     }
@@ -72,10 +78,19 @@ export default function App() {
       <BrowserRouter>
         <Toaster position="top-right" />
         <Routes>
+          <Route path="/" element={<Portal />} />
           <Route path="/login" element={<Login />} />
 
-          <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
+          {/* Super Admin Back-Office (Isolated from Hospital Workspaces) */}
+          <Route path="/superadmin" element={<SuperAdminLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<SuperAdminDashboard />} />
+            <Route path="tenants" element={<TenantsManager />} />
+            <Route path="*" element={<SuperAdminDashboard />} />
+          </Route>
+
+          <Route path="/app" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+            <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<RoleBasedRedirect />} /> 
             
             <Route path="admin" element={<AdminDashboard />} /> 
@@ -92,7 +107,7 @@ export default function App() {
             <Route path="billing" element={<Billing />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

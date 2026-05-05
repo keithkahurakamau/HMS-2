@@ -231,32 +231,5 @@ def route_patient(patient_id: int, request: QueueRequest, db: Session = Depends(
         status="Waiting"
     )
     db.add(new_queue)
-    
-    # Generate Consultation Fee Invoice
-    fee_mapping = {
-        "General OPD": 1000.0,
-        "Specialist Clinic": 2500.0,
-        "Dental": 1500.0,
-        "Emergency": 3000.0
-    }
-    amount = fee_mapping.get(request.department, 1000.0)
-    
-    invoice = Invoice(
-        patient_id=patient_id,
-        total_amount=amount,
-        status="Pending",
-        created_by=current_user["user_id"]
-    )
-    db.add(invoice)
-    db.flush()
-    
-    item = InvoiceItem(
-        invoice_id=invoice.invoice_id,
-        description=f"Consultation Fee - {request.department}",
-        amount=amount,
-        item_type="Consultation"
-    )
-    db.add(item)
-    
     db.commit()
-    return {"message": f"Patient routed to {request.department}. Consultation fee of {amount} generated."}
+    return {"message": f"Patient successfully routed to {request.department}."}

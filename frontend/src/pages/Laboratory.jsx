@@ -121,7 +121,7 @@ export default function Laboratory() {
     };
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
+        <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
             
             {/* LIS HEADER & TABS */}
             <div className="bg-white border border-slate-200 rounded-xl p-2 shadow-sm flex items-center justify-between shrink-0">
@@ -238,8 +238,8 @@ export default function Laboratory() {
 
                                                 {/* Fallback to simple qualitative input if not a specialized discrete test */}
                                                 {activeTest.test_name.includes('CBC') || activeTest.test_name.includes('Blood') ? (
-                                                    <div className="space-y-4">
-                                                        <div className="grid grid-cols-12 gap-4 items-center bg-slate-50 p-3 rounded-lg border border-slate-100 font-semibold text-xs text-slate-500 uppercase tracking-wider">
+                                                    <div className="space-y-4 overflow-x-auto pb-4">
+                                                        <div className="grid grid-cols-12 gap-4 items-center bg-slate-50 p-3 rounded-lg border border-slate-100 font-semibold text-xs text-slate-500 uppercase tracking-wider min-w-[600px]">
                                                             <div className="col-span-4">Parameter</div>
                                                             <div className="col-span-3">Result Value</div>
                                                             <div className="col-span-2">Unit</div>
@@ -251,7 +251,7 @@ export default function Laboratory() {
                                                             { key: 'wbc', name: 'White Blood Cells (WBC)', unit: 'x10^9/L', min: 4.0, max: 11.0 },
                                                             { key: 'hgb', name: 'Hemoglobin (HGB)', unit: 'g/dL', min: 12.0, max: 16.0 },
                                                         ].map(param => (
-                                                            <div key={param.key} className="grid grid-cols-12 gap-4 items-center border-b border-slate-50 pb-2">
+                                                            <div key={param.key} className="grid grid-cols-12 gap-4 items-center border-b border-slate-50 pb-2 min-w-[600px]">
                                                                 <div className="col-span-4 font-bold text-sm text-slate-700">{param.name}</div>
                                                                 <div className="col-span-3">
                                                                     <input 
@@ -318,8 +318,8 @@ export default function Laboratory() {
                                                 </div>
 
                                                 {consumedItems.length > 0 && (
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
-                                                        <table className="w-full text-left text-sm text-slate-600">
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg overflow-x-auto">
+                                                        <table className="w-full text-left text-sm text-slate-600 min-w-[400px]">
                                                             <thead className="bg-slate-100 text-slate-500 text-xs uppercase font-bold border-b border-slate-200">
                                                                 <tr>
                                                                     <th className="px-4 py-2">Item Name & Batch</th>
@@ -378,8 +378,8 @@ export default function Laboratory() {
                         </div>
                     </div>
                     
-                    <div className="flex-1 overflow-y-auto">
-                        <table className="w-full text-left text-sm text-slate-600">
+                    <div className="flex-1 overflow-auto">
+                        <table className="w-full text-left text-sm text-slate-600 min-w-[500px]">
                             <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
                                 <tr>
                                     <th className="px-6 py-4">Test Code & Name</th>

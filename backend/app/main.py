@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+import secrets
 
 from app.config.settings import settings
 
@@ -27,6 +28,9 @@ import app.routes.analytics as analytics_module
 import app.routes.websockets as websockets_module
 import app.routes.radiology as radiology_module
 import app.routes.medical_history as medical_history_module
+import app.routes.public as public_module
+import app.routes.mpesa_admin as mpesa_admin_module
+import app.routes.mpesa_payment as mpesa_payment_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -69,6 +73,38 @@ async def process_time_middleware(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
+# 6b. CSRF Protection Middleware
+@app.middleware("http")
+async def csrf_middleware(request: Request, call_next):
+    # Set CSRF cookie for safe methods if missing
+    if request.method in ["GET", "HEAD", "OPTIONS"]:
+        response = await call_next(request)
+        if not request.cookies.get("csrf_token"):
+            response.set_cookie(
+                "csrf_token", 
+                secrets.token_hex(32), 
+                httponly=False, 
+                secure=True, 
+                samesite="none"
+            )
+        return response
+    
+    # Exclude login and webhooks/public endpoints from CSRF check
+    if request.url.path.startswith("/api/auth/login") or request.url.path.startswith("/public"):
+        return await call_next(request)
+
+    # Validate Double Submit Cookie for state-changing methods
+    csrf_cookie = request.cookies.get("csrf_token")
+    csrf_header = request.headers.get("x-csrf-token")
+    
+    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+        return JSONResponse(
+            status_code=403, 
+            content={"detail": "CSRF verification failed. Missing or invalid token."}
+        )
+        
+    return await call_next(request)
+
 # 7. Proper Global Exception Handler (Preserves CORS headers)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -96,6 +132,9 @@ app.include_router(analytics_module.router)
 app.include_router(websockets_module.router)
 app.include_router(radiology_module.router)
 app.include_router(medical_history_module.router)
+app.include_router(public_module.router)
+app.include_router(mpesa_admin_module.router)
+app.include_router(mpesa_payment_module.router)
 
 # 9. Health Check Route
 @app.get("/")
