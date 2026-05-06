@@ -39,24 +39,7 @@ def get_my_permissions(current_user: dict = Depends(get_current_user), db: Sessi
     user = db.query(User).filter(User.user_id == current_user["user_id"]).first()
     if not user or not user.role:
         return []
-
-    role_name = user.role.name
-    
-    # Map roles to specific API permissions to unblock RBAC testing
-    if role_name == "Admin":
-        return ["*"]  # Wildcard grants access to everything
-    elif role_name == "Doctor":
-        return ["clinical:write", "clinical:read", "patients:read", "patients:write", "pharmacy:read", "laboratory:read"]
-    elif role_name == "Nurse":
-        return ["clinical:read", "patients:read", "wards:manage", "pharmacy:read"]
-    elif role_name == "Pharmacist":
-        return ["pharmacy:manage", "pharmacy:read", "patients:read"]
-    elif role_name == "Lab Technician":
-        return ["laboratory:manage", "laboratory:read", "patients:read"]
-    elif role_name == "Receptionist":
-        return ["patients:read", "patients:write", "billing:read"]
-        
-    return []
+    return [p.codename for p in user.role.permissions]
 
 # ==========================================
 # 2. USER MANAGEMENT (CRUD)

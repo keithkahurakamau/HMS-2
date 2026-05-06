@@ -16,6 +16,10 @@ export default function Billing() {
     const [mpesaPhone, setMpesaPhone] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [mpesaStatus, setMpesaStatus] = useState(null); // 'waiting', 'success', 'failed'
+    
+    // Ledger Modal State
+    const [isLedgerOpen, setIsLedgerOpen] = useState(false);
+    const [mpesaLogs, setMpesaLogs] = useState([]);
 
     const fetchQueue = async () => {
         setIsLoading(true);
@@ -96,8 +100,8 @@ export default function Billing() {
                 toast.success("STK Push sent to patient's phone. Waiting for PIN...");
                 setMpesaStatus('waiting');
                 
-                if (res.data.CheckoutRequestID) {
-                    pollMpesaStatus(res.data.CheckoutRequestID);
+                if (res.data.checkout_request_id) {
+                    pollMpesaStatus(res.data.checkout_request_id);
                 } else {
                     toast.error("Invalid response from Safaricom.");
                     setIsProcessing(false);
@@ -122,6 +126,20 @@ export default function Billing() {
         }
     };
 
+    const fetchMpesaLogs = async () => {
+        try {
+            const res = await apiClient.get('/billing/mpesa-transactions');
+            setMpesaLogs(res.data || []);
+        } catch (error) {
+            toast.error("Failed to fetch M-Pesa ledger");
+        }
+    };
+
+    const openLedger = () => {
+        setIsLedgerOpen(true);
+        fetchMpesaLogs();
+    };
+
     return (
         <div className="space-y-6 pb-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -138,6 +156,9 @@ export default function Billing() {
                             className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none w-64 shadow-sm"
                         />
                     </div>
+                    <button onClick={openLedger} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-green-700 transition-colors">
+                        <Smartphone size={16} /> M-Pesa Ledger
+                    </button>
                 </div>
             </div>
 
@@ -190,9 +211,14 @@ export default function Billing() {
                                     <h2 className="text-2xl font-black mb-1">{activeInvoice.patient_name}</h2>
                                     <p className="text-slate-400 font-medium">{activeInvoice.patient_opd} • Invoice #{activeInvoice.invoice_id}</p>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-slate-400 text-xs font-bold uppercase mb-1">Total Balance Due</p>
-                                    <p className="text-3xl font-black text-green-400">KES {(activeInvoice.total_amount - activeInvoice.amount_paid).toFixed(2)}</p>
+                                <div className="text-right flex items-center gap-4">
+                                    <div>
+                                        <p className="text-slate-400 text-xs font-bold uppercase mb-1">Total Balance Due</p>
+                                        <p className="text-3xl font-black text-green-400">KES {(activeInvoice.total_amount - activeInvoice.amount_paid).toFixed(2)}</p>
+                                    </div>
+                                    <button onClick={() => window.print()} className="ml-4 p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700 no-print" title="Print Invoice">
+                                        <FileText size={20} />
+                                    </button>
                                 </div>
                             </div>
 
@@ -300,6 +326,58 @@ export default function Billing() {
                     )}
                 </div>
             </div>
+
+            {/* --- M-PESA LEDGER MODAL --- */}
+            {isLedgerOpen && (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsLedgerOpen(false)}></div>
+                    <div className="relative w-full max-w-4xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
+                        <div className="p-6 border-b border-slate-100 bg-slate-900 text-white shrink-0 flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold flex items-center gap-2"><Smartphone size={24} className="text-green-400" /> M-Pesa Receipts Ledger</h2>
+                                <p className="text-sm text-slate-400 mt-1">Verify real-time STK Push statuses and Daraja receipt codes.</p>
+                            </div>
+                            <button onClick={() => setIsLedgerOpen(false)} className="text-slate-400 hover:text-white"><X size={24}/></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
+                            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                                <table className="w-full text-left text-sm text-slate-600 min-w-[800px]">
+                                    <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500 sticky top-0">
+                                        <tr>
+                                            <th className="px-6 py-4">Timestamp</th>
+                                            <th className="px-6 py-4">Phone Number</th>
+                                            <th className="px-6 py-4">Invoice #</th>
+                                            <th className="px-6 py-4">Amount (KES)</th>
+                                            <th className="px-6 py-4">Receipt Details</th>
+                                            <th className="px-6 py-4 text-right">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                                        {mpesaLogs.length === 0 ? (
+                                            <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400 font-sans">No M-Pesa transactions found.</td></tr>
+                                        ) : (
+                                            mpesaLogs.map((log) => (
+                                                <tr key={log.id} className="hover:bg-slate-50">
+                                                    <td className="px-6 py-4 text-slate-500">{new Date(log.created_at).toLocaleString()}</td>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">{log.phone_number}</td>
+                                                    <td className="px-6 py-4 font-bold text-brand-700">INV-{log.invoice_id}</td>
+                                                    <td className="px-6 py-4 font-black text-slate-900">{log.amount ? log.amount.toFixed(2) : '-'}</td>
+                                                    <td className="px-6 py-4 text-slate-500 max-w-xs truncate">{log.receipt_number || log.result_desc || 'Waiting for Callback...'}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <span className={`px-2.5 py-1 rounded text-xs font-bold inline-block ${log.status === 'Success' ? 'bg-green-100 text-green-700' : log.status === 'Failed' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700 animate-pulse'}`}>
+                                                            {log.status}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

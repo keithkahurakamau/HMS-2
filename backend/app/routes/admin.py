@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/admin", tags=["Admin Controls"])
 # ==========================================
 # 1. SYSTEM METRICS OVERVIEW
 # ==========================================
-@router.get("/metrics")
+@router.get("/metrics", dependencies=[Depends(RequirePermission("users:manage"))])
 def get_system_metrics(db: Session = Depends(get_db)):
     total_patients = db.query(func.count(Patient.patient_id)).scalar()
     active_admissions = db.query(func.count(AdmissionRecord.admission_id)).filter(AdmissionRecord.status == "Active").scalar()
@@ -38,7 +38,7 @@ def get_system_metrics(db: Session = Depends(get_db)):
 # ==========================================
 # 2. STAFF DIRECTORY & PROVISIONING
 # ==========================================
-@router.get("/users")
+@router.get("/users", dependencies=[Depends(RequirePermission("users:manage"))])
 def get_staff_directory(db: Session = Depends(get_db)):
     users = db.query(User).all()
     return [
@@ -53,26 +53,53 @@ def get_staff_directory(db: Session = Depends(get_db)):
         } for u in users
     ]
 
+from pydantic import BaseModel, EmailStr, field_validator
+import re
+
+class StaffCreateRequest(BaseModel):
+    email: EmailStr
+    full_name: str
+    password: str
+    role: str
+    specialization: str | None = None
+    license_number: str | None = None
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not re.search(r"[A-Z]", v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r"[a-z]", v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r"\d", v):
+            raise ValueError('Password must contain at least one digit')
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError('Password must contain at least one special character')
+        return v
+
 @router.post("/users", dependencies=[Depends(RequirePermission("users:manage"))])
-def create_staff(payload: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def create_staff(payload: StaffCreateRequest, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     from app.core.security import get_password_hash
     
-    existing = db.query(User).filter(User.email == payload.get("email")).first()
+    existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="User with this email already exists.")
         
-    role = db.query(Role).filter(Role.name == payload.get("role")).first()
+    role = db.query(Role).filter(Role.name == payload.role).first()
     if not role:
         raise HTTPException(status_code=400, detail="Invalid role specified.")
         
     new_user = User(
-        email=payload.get("email"),
-        full_name=payload.get("full_name"),
-        hashed_password=get_password_hash(payload.get("password")),
+        email=payload.email,
+        full_name=payload.full_name,
+        hashed_password=get_password_hash(payload.password),
         role_id=role.role_id,
-        specialization=payload.get("specialization"),
-        license_number=payload.get("license_number"),
-        is_active=True
+        specialization=payload.specialization,
+        license_number=payload.license_number,
+        is_active=True,
+        must_change_password=True
     )
     db.add(new_user)
     db.commit()
@@ -120,7 +147,7 @@ def update_user_role(user_id: int, role_update: dict, request: Request, db: Sess
 # ==========================================
 # 3. IMMUTABLE AUDIT LEDGER
 # ==========================================
-@router.get("/audit-logs")
+@router.get("/audit-logs", dependencies=[Depends(RequirePermission("users:manage"))])
 def get_audit_trail(limit: int = 100, db: Session = Depends(get_db)):
     logs = db.query(AuditLog, User.full_name.label("actor_name")).outerjoin(User, AuditLog.user_id == User.user_id).order_by(AuditLog.timestamp.desc()).limit(limit).all() 
     formatted_logs = []

@@ -11,6 +11,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
     """
     token = request.cookies.get("access_token")
     if not token:
+        print("AUTH_ERROR: No access_token cookie found")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Not authenticated. No access token cookie found."
@@ -21,22 +22,31 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
         
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id: int = payload.get("user_id")
-        token_tenant_id: str = payload.get("tenant_id")
+        print(f"DECODED PAYLOAD: {payload}")
+        user_id = payload.get("user_id") or payload.get("sub")
+        token_tenant_id = payload.get("tenant_id")
         
         if user_id is None or token_tenant_id is None:
+            print("AUTH_ERROR: Invalid payload structure")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
             
         request_tenant_id = request.headers.get("X-Tenant-ID")
         if request_tenant_id != token_tenant_id:
+            print(f"AUTH_ERROR: Tenant mismatch: req={request_tenant_id}, tok={token_tenant_id}")
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant access strictly forbidden")
             
-    except JWTError:
+    except JWTError as e:
+        print(f"AUTH_ERROR: JWT decode failed: {e}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
         
     # Verify user exists and fetch live permissions
     user = db.query(User).filter(User.user_id == user_id).first()
-    if not user or not user.is_active:
+    if not user:
+        print("AUTH_ERROR: User not found in DB")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        
+    if not user.is_active:
+        print("AUTH_ERROR: User is not active")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User no longer active")
 
     role = db.query(Role).filter(Role.role_id == user.role_id).first()
@@ -59,9 +69,6 @@ class RequirePermission:
         self.required_permission = required_permission
 
     def __call__(self, current_user: dict = Depends(get_current_user)):
-        if "users:manage" in current_user["permissions"]:
-            return current_user # Admins automatically bypass specific permission checks
-            
         if self.required_permission not in current_user["permissions"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

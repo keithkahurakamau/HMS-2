@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, Activity } from 'lucide-react';
+import ChangePassword from './ChangePassword';
 
 export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    const { login } = useAuth();
+    const { login, mustChangePassword, pendingUserId, clearMustChange } = useAuth();
     const navigate = useNavigate();
     
     // Get dynamic tenant name
@@ -18,13 +19,19 @@ export default function Login() {
         e.preventDefault();
         setIsSubmitting(true);
         
-        const success = await login(email, password);
-        if (success) {
+        const result = await login(email, password);
+        if (result?.success) {
             navigate('/app/dashboard');
         }
+        // If mustChangePassword, the AuthContext state triggers the ChangePassword UI below
         
         setIsSubmitting(false);
     };
+
+    // Show the forced password change screen if required
+    if (mustChangePassword && pendingUserId) {
+        return <ChangePassword userId={pendingUserId} onSuccess={() => { clearMustChange(); }} />;
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

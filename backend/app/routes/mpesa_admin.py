@@ -64,3 +64,25 @@ def update_mpesa_config(
     
     db.commit()
     return {"message": "M-Pesa configuration updated and securely encrypted."}
+
+@router.get("/transactions")
+def get_mpesa_transactions(db: Session = Depends(get_db), user: dict = Depends(RequirePermission("settings:read"))):
+    """
+    Returns all M-Pesa transactions for auditing and tracking.
+    """
+    from app.models.mpesa import MpesaTransaction
+    transactions = db.query(MpesaTransaction).order_by(MpesaTransaction.transaction_date.desc()).limit(100).all()
+    
+    return [
+        {
+            "id": txn.id,
+            "invoice_id": txn.invoice_id,
+            "phone_number": txn.phone_number,
+            "amount": float(txn.amount) if txn.amount else None,
+            "status": txn.status,
+            "receipt_number": txn.receipt_number,
+            "result_desc": txn.result_desc,
+            "created_at": txn.transaction_date.isoformat() if txn.transaction_date else None
+        }
+        for txn in transactions
+    ]

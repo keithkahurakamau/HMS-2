@@ -122,3 +122,26 @@ def charge_consultation_fee(req: ConsultationFeeRequest, request: Request, db: S
     
     db.commit()
     return {"message": "Consultation fee successfully charged."}
+
+@router.get("/mpesa-transactions")
+def get_billing_mpesa_transactions(db: Session = Depends(get_db)):
+    """
+    Returns M-Pesa transactions for cashiers and pharmacists to verify receipts.
+    No strict permissions here since multiple roles (billing, pharmacy, admin) might need to verify receipts.
+    """
+    from app.models.mpesa import MpesaTransaction
+    transactions = db.query(MpesaTransaction).order_by(MpesaTransaction.transaction_date.desc()).limit(100).all()
+    
+    return [
+        {
+            "id": txn.id,
+            "invoice_id": txn.invoice_id,
+            "phone_number": txn.phone_number,
+            "amount": float(txn.amount) if txn.amount else None,
+            "status": txn.status,
+            "receipt_number": txn.receipt_number,
+            "result_desc": txn.result_desc,
+            "created_at": txn.transaction_date.isoformat() if txn.transaction_date else None
+        }
+        for txn in transactions
+    ]

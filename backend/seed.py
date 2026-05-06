@@ -1,12 +1,13 @@
 import os
 import sys
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
+from sqlalchemy.orm import sessionmaker
 
 # Ensure the app module can be found
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.config.database import SessionLocal, Base, engine
+from app.config.database import DefaultSessionLocal as SessionLocal, Base, default_engine as engine
 from app.core.security import get_password_hash
 
 # Import ALL your models
@@ -20,24 +21,25 @@ from app.models.billing import Invoice, InvoiceItem, Payment
 from app.models.audit import AuditLog
 from app.models.medical_history import ConsentRecord, MedicalHistoryEntry
 
-def reset_database():
+def reset_database(target_engine):
     """
     DANGER ZONE: Wipes the entire database schema using raw PostgreSQL CASCADE.
-    This bypasses all foreign key deadlocks and guarantees a clean slate.
     """
     print("🧨 Wiping existing database schema with CASCADE...")
-    with engine.connect() as connection:
+    with target_engine.connect() as connection:
         connection.execute(text("DROP SCHEMA public CASCADE;"))
         connection.execute(text("CREATE SCHEMA public;"))
         connection.execute(text("GRANT ALL ON SCHEMA public TO public;"))
         connection.commit()
         
     print("🏗️ Rebuilding database schema...")
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=target_engine)
 
-def seed_database():
-    print("🌱 Initiating Full Enterprise Hospital Seed Protocol...")
-    db = SessionLocal()
+def seed_database(target_engine, hospital_name="General Hospital", staff_domain="hospital.com"):
+    """Seeds a single tenant database with full E2E data."""
+    print(f"🌱 Seeding [{hospital_name}] @ {staff_domain}...")
+    TenantSession = sessionmaker(autocommit=False, autoflush=False, bind=target_engine)
+    db = TenantSession()
     
     try:
         # ==========================================
@@ -74,7 +76,12 @@ def seed_database():
 
         # 2b. Create Roles and Map Permissions to them
         roles_config = {
-            "Admin": ["users:manage", "clinical:read", "patients:read", "pharmacy:read", "laboratory:read", "wards:manage", "billing:manage", "history:read", "history:manage"],
+            "Admin": [
+                "users:manage", "clinical:write", "clinical:read", 
+                "patients:read", "patients:write", "history:read", "history:manage",
+                "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read", 
+                "wards:manage", "billing:read", "billing:manage"
+            ],
             "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write", "pharmacy:read", "laboratory:read", "history:read", "history:manage"],
             "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read"],
             "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read"],
@@ -93,13 +100,13 @@ def seed_database():
 
         # 2c. Create Staff Users
         users_data = [
-            {"email": "admin@hospital.com", "full_name": "System Admin", "role": "Admin", "spec": None, "lic": None},
-            {"email": "dr.kahura@hospital.com", "full_name": "Dr. James Kahura", "role": "Doctor", "spec": "Internal Medicine", "lic": "MPDB-1001"},
-            {"email": "dr.omondi@hospital.com", "full_name": "Dr. Sarah Omondi", "role": "Doctor", "spec": "Pediatrics", "lic": "MPDB-2002"},
-            {"email": "nurse.joy@hospital.com", "full_name": "Nurse Joy Wanjiku", "role": "Nurse", "spec": "Ward Matron", "lic": "NCK-8822"},
-            {"email": "pharm.keith@hospital.com", "full_name": "Pharm. Keith Kamau", "role": "Pharmacist", "spec": "Clinical Pharmacist", "lic": "PPB-5533"},
-            {"email": "lab.alice@hospital.com", "full_name": "Alice Mutua", "role": "Lab Technician", "spec": "Pathology", "lic": "KMLTTB-9911"},
-            {"email": "rec.brian@hospital.com", "full_name": "Brian Koech", "role": "Receptionist", "spec": None, "lic": None}
+            {"email": f"admin@{staff_domain}", "full_name": "System Admin", "role": "Admin", "spec": None, "lic": None},
+            {"email": f"dr.kahura@{staff_domain}", "full_name": "Dr. James Kahura", "role": "Doctor", "spec": "Internal Medicine", "lic": "MPDB-1001"},
+            {"email": f"dr.omondi@{staff_domain}", "full_name": "Dr. Sarah Omondi", "role": "Doctor", "spec": "Pediatrics", "lic": "MPDB-2002"},
+            {"email": f"nurse.joy@{staff_domain}", "full_name": "Nurse Joy Wanjiku", "role": "Nurse", "spec": "Ward Matron", "lic": "NCK-8822"},
+            {"email": f"pharm.keith@{staff_domain}", "full_name": "Pharm. Keith Kamau", "role": "Pharmacist", "spec": "Clinical Pharmacist", "lic": "PPB-5533"},
+            {"email": f"lab.alice@{staff_domain}", "full_name": "Alice Mutua", "role": "Lab Technician", "spec": "Pathology", "lic": "KMLTTB-9911"},
+            {"email": f"rec.brian@{staff_domain}", "full_name": "Brian Koech", "role": "Receptionist", "spec": None, "lic": None}
         ]
         
         staff = {}
@@ -107,7 +114,7 @@ def seed_database():
             user = User(
                 email=u["email"], 
                 full_name=u["full_name"],
-                hashed_password=get_password_hash("password123"),
+                hashed_password=get_password_hash("Password@123"),
                 role_id=roles[u["role"]].role_id,
                 specialization=u["spec"],
                 license_number=u["lic"],
@@ -122,7 +129,7 @@ def seed_database():
         # ==========================================
         print("   -> Seeding Patient Registry (10 Patients)...")
         
-        receptionist_id = staff["rec.brian@hospital.com"].user_id
+        receptionist_id = staff[f"rec.brian@{staff_domain}"].user_id
         
         patients_data = [
             {
@@ -288,13 +295,19 @@ def seed_database():
         # 5. LAB CATALOG & BILL OF MATERIALS (BOM)
         # ==========================================
         print("   -> Seeding Lab Catalog & BOMs...")
-        lab_cat = LabTestCatalog(test_name="Complete Blood Count (CBC)", category="Hematology", default_specimen_type="Whole Blood", base_price=1500.0)
-        db.add(lab_cat)
+        lab_tests_catalog = [
+            LabTestCatalog(test_name="Complete Blood Count (CBC)", category="Hematology", default_specimen_type="Whole Blood", base_price=1500.0),
+            LabTestCatalog(test_name="Malaria Rapid Test (RDT)", category="Parasitology", default_specimen_type="Whole Blood", base_price=800.0),
+            LabTestCatalog(test_name="Blood Glucose (Fasting)", category="Chemistry", default_specimen_type="Whole Blood", base_price=600.0),
+            LabTestCatalog(test_name="Urine Full Analysis", category="Urinalysis", default_specimen_type="Urine", base_price=500.0),
+            LabTestCatalog(test_name="HIV 1 & 2 Rapid Test", category="Serology", default_specimen_type="Whole Blood", base_price=1200.0),
+        ]
+        for ltc in lab_tests_catalog:
+            db.add(ltc)
         db.flush()
 
-        # Link the Reagent to the Test (When a CBC is done, it deducts 1 CBC Reagent Pack)
         bom = LabTestRequiredItem(
-            catalog_id=lab_cat.catalog_id,
+            catalog_id=lab_tests_catalog[0].catalog_id,
             inventory_item_id=catalog["CBC Reagent Pack"].item_id,
             item_name="CBC Reagent Pack",
             quantity_required=1
@@ -303,127 +316,245 @@ def seed_database():
         db.flush()
 
         # ==========================================
-        # 6. CLINICAL WORKFLOW (Appts, Queue, Records)
-        # ==========================================
-        print("   -> Seeding Clinical Encounters...")
-        # 1. Create an Appointment for the primary patient
-        appt = Appointment(patient_id=primary_patient.patient_id, doctor_id=staff["dr.kahura@hospital.com"].user_id, appointment_date=datetime.now(timezone.utc), status="Completed")
-        db.add(appt)
-        
-        # 2. Put patient in Queue
-        queue = PatientQueue(patient_id=primary_patient.patient_id, department="Consultation", acuity_level=2, status="In Progress", assigned_to=staff["dr.kahura@hospital.com"].user_id)
-        db.add(queue)
-        
-        # 3. Create the Medical Record (SOAP Note)
-        record = MedicalRecord(
-            patient_id=primary_patient.patient_id, doctor_id=staff["dr.kahura@hospital.com"].user_id,
-            record_status="Billed", blood_pressure="130/85", heart_rate=92, temperature=39.1,
-            chief_complaint="Severe fever and chills for 3 days.",
-            diagnosis="Severe Malaria", treatment_plan="Admit to GMW for IV therapy. Run CBC.",
-            icd10_code="B50.9"
-        )
-        db.add(record)
-        db.flush()
-
-        # 4. Generate Lab Order from the Medical Record
-        test = LabTest(patient_id=primary_patient.patient_id, record_id=record.record_id, ordered_by=staff["dr.kahura@hospital.com"].user_id, catalog_id=lab_cat.catalog_id, test_name="Complete Blood Count (CBC)", billed_price=1500.0, status="Pending Collection", priority="STAT")
-        db.add(test)
-        db.flush()
-
-        # ==========================================
-        # 7. WARDS & ADMISSIONS
+        # 6. WARDS & BEDS (before admissions)
         # ==========================================
         print("   -> Seeding Wards & Bed Allocations...")
         w1 = Ward(name="General Medical Ward", capacity=12)
         w2 = Ward(name="Intensive Care Unit (ICU)", capacity=4)
-        db.add_all([w1, w2])
+        w3 = Ward(name="Paediatric Ward", capacity=8)
+        db.add_all([w1, w2, w3])
         db.flush()
 
-        b1 = Bed(ward_id=w1.ward_id, bed_number="GMW-01", status="Occupied")
-        b2 = Bed(ward_id=w1.ward_id, bed_number="GMW-02", status="Available")
-        db.add_all([b1, b2])
+        beds = [
+            Bed(ward_id=w1.ward_id, bed_number="GMW-01", status="Occupied"),
+            Bed(ward_id=w1.ward_id, bed_number="GMW-02", status="Available"),
+            Bed(ward_id=w1.ward_id, bed_number="GMW-03", status="Available"),
+            Bed(ward_id=w2.ward_id, bed_number="ICU-01", status="Occupied"),
+            Bed(ward_id=w3.ward_id, bed_number="PAE-01", status="Available"),
+        ]
+        db.add_all(beds)
         db.flush()
+        b_gmw01, b_gmw02, b_gmw03, b_icu01, b_pae01 = beds
 
-        adm = AdmissionRecord(
-            patient_id=primary_patient.patient_id, bed_id=b1.bed_id, admitting_doctor_id=staff["dr.kahura@hospital.com"].user_id,
-            primary_diagnosis="Severe Malaria", status="Active"
+        # ==========================================
+        # 7. CLINICAL WORKFLOW — MULTI-PATIENT E2E
+        # ==========================================
+        print("   -> Seeding Clinical Encounters (5 patients)...")
+
+        # --- PATIENT 1: David Kamau — Full E2E: Admission, CBC lab, Paid invoice ---
+        p1 = db_patients[0]
+        appt1 = Appointment(patient_id=p1.patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                            appointment_date=datetime.now(timezone.utc) - timedelta(days=1), status="Completed")
+        db.add(appt1)
+        q1 = PatientQueue(patient_id=p1.patient_id, department="Consultation", acuity_level=2,
+                          status="Done", assigned_to=staff[f"dr.kahura@{staff_domain}"].user_id)
+        db.add(q1)
+        rec1 = MedicalRecord(
+            patient_id=p1.patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+            record_status="Billed", blood_pressure="130/85", heart_rate=92, temperature=39.1,
+            chief_complaint="Severe fever and chills for 3 days.",
+            diagnosis="Severe Malaria", treatment_plan="Admit to GMW. IV Quinine. CBC STAT.",
+            icd10_code="B50.9"
         )
-        db.add(adm)
+        db.add(rec1)
+        db.flush()
+        test1 = LabTest(patient_id=p1.patient_id, record_id=rec1.record_id,
+                        ordered_by=staff[f"dr.kahura@{staff_domain}"].user_id,
+                        catalog_id=lab_tests_catalog[0].catalog_id, test_name="Complete Blood Count (CBC)",
+                        billed_price=1500.0, status="Completed", priority="STAT",
+                        result_summary="WBC: 12.4, RBC: 3.2, Hb: 9.1g/dL — Anaemia noted.",
+                        performed_by_id=staff[f"lab.alice@{staff_domain}"].user_id)
+        db.add(test1)
+        adm1 = AdmissionRecord(patient_id=p1.patient_id, bed_id=b_gmw01.bed_id,
+                               admitting_doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                               primary_diagnosis="Severe Malaria", status="Active")
+        db.add(adm1)
+        db.flush()
+        inv1 = Invoice(patient_id=p1.patient_id, appointment_id=appt1.appointment_id,
+                       total_amount=4000.0, amount_paid=4000.0, status="Paid",
+                       created_by=staff[f"rec.brian@{staff_domain}"].user_id)
+        db.add(inv1)
+        db.flush()
+        db.add_all([
+            InvoiceItem(invoice_id=inv1.invoice_id, description="Consultation Fee", amount=2500.0, item_type="Consultation"),
+            InvoiceItem(invoice_id=inv1.invoice_id, description="Complete Blood Count (CBC)", amount=1500.0, item_type="Laboratory", reference_id=test1.test_id),
+            Payment(invoice_id=inv1.invoice_id, amount=4000.0, payment_method="Cash"),
+        ])
+        db.flush()
+
+        # --- PATIENT 2: Sarah Achieng — Outpatient, Pending lab, Pending billing ---
+        p2 = db_patients[1]
+        appt2 = Appointment(patient_id=p2.patient_id, doctor_id=staff[f"dr.omondi@{staff_domain}"].user_id,
+                            appointment_date=datetime.now(timezone.utc), status="Completed")
+        db.add(appt2)
+        q2 = PatientQueue(patient_id=p2.patient_id, department="Consultation", acuity_level=3,
+                          status="Done", assigned_to=staff[f"dr.omondi@{staff_domain}"].user_id)
+        db.add(q2)
+        rec2 = MedicalRecord(
+            patient_id=p2.patient_id, doctor_id=staff[f"dr.omondi@{staff_domain}"].user_id,
+            record_status="Billed", blood_pressure="118/76", heart_rate=88, temperature=37.2,
+            chief_complaint="Shortness of breath and wheezing for 2 days.",
+            diagnosis="Acute Asthma Exacerbation", treatment_plan="Salbutamol nebulization. Peak flow monitoring.",
+            icd10_code="J45.901"
+        )
+        db.add(rec2)
+        db.flush()
+        test2 = LabTest(patient_id=p2.patient_id, record_id=rec2.record_id,
+                        ordered_by=staff[f"dr.omondi@{staff_domain}"].user_id,
+                        catalog_id=lab_tests_catalog[3].catalog_id, test_name="Urine Full Analysis",
+                        billed_price=500.0, status="Pending Collection", priority="Routine")
+        db.add(test2)
+        db.flush()
+        inv2 = Invoice(patient_id=p2.patient_id, appointment_id=appt2.appointment_id,
+                       total_amount=3000.0, status="Pending",
+                       created_by=staff[f"rec.brian@{staff_domain}"].user_id)
+        db.add(inv2)
+        db.flush()
+        db.add_all([
+            InvoiceItem(invoice_id=inv2.invoice_id, description="Consultation Fee", amount=2500.0, item_type="Consultation"),
+            InvoiceItem(invoice_id=inv2.invoice_id, description="Urine Full Analysis", amount=500.0, item_type="Laboratory", reference_id=test2.test_id),
+        ])
+        db.flush()
+
+        # --- PATIENT 3: Ali Mohammed — Pending M-Pesa payment (tests M-Pesa ledger) ---
+        p3 = db_patients[2]
+        appt3 = Appointment(patient_id=p3.patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                            appointment_date=datetime.now(timezone.utc) - timedelta(hours=2), status="Completed")
+        db.add(appt3)
+        rec3 = MedicalRecord(
+            patient_id=p3.patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+            record_status="Billed", blood_pressure="145/92", heart_rate=78, temperature=36.8,
+            chief_complaint="Elevated blood sugar, dizziness.",
+            diagnosis="Type 2 Diabetes — Uncontrolled", treatment_plan="Adjust Metformin dose. Blood glucose monitoring.",
+            icd10_code="E11.9"
+        )
+        db.add(rec3)
+        db.flush()
+        test3 = LabTest(patient_id=p3.patient_id, record_id=rec3.record_id,
+                        ordered_by=staff[f"dr.kahura@{staff_domain}"].user_id,
+                        catalog_id=lab_tests_catalog[2].catalog_id, test_name="Blood Glucose (Fasting)",
+                        billed_price=600.0, status="Completed", priority="Routine",
+                        result_summary="Fasting glucose: 14.2 mmol/L — High",
+                        performed_by_id=staff[f"lab.alice@{staff_domain}"].user_id)
+        db.add(test3)
+        db.flush()
+        inv3 = Invoice(patient_id=p3.patient_id, appointment_id=appt3.appointment_id,
+                       total_amount=3100.0, status="Pending M-Pesa",
+                       created_by=staff[f"rec.brian@{staff_domain}"].user_id)
+        db.add(inv3)
+        db.flush()
+        db.add_all([
+            InvoiceItem(invoice_id=inv3.invoice_id, description="Consultation Fee", amount=2500.0, item_type="Consultation"),
+            InvoiceItem(invoice_id=inv3.invoice_id, description="Blood Glucose (Fasting)", amount=600.0, item_type="Laboratory", reference_id=test3.test_id),
+        ])
+        db.flush()
+
+        # --- PATIENT 4: Grace Wanjiru — ICU Admission ---
+        p4 = db_patients[3]
+        appt4 = Appointment(patient_id=p4.patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                            appointment_date=datetime.now(timezone.utc) - timedelta(days=2), status="Completed")
+        db.add(appt4)
+        rec4 = MedicalRecord(
+            patient_id=p4.patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+            record_status="Admitted", blood_pressure="180/110", heart_rate=110, temperature=38.5,
+            chief_complaint="Hypertensive crisis, severe headache.",
+            diagnosis="Hypertensive Emergency", treatment_plan="ICU admission. IV Labetalol. Continuous monitoring.",
+            icd10_code="I16.1"
+        )
+        db.add(rec4)
+        db.flush()
+        adm4 = AdmissionRecord(patient_id=p4.patient_id, bed_id=b_icu01.bed_id,
+                               admitting_doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                               primary_diagnosis="Hypertensive Emergency", status="Active")
+        db.add(adm4)
+        db.flush()
+
+        # --- PATIENT 5: Faith Mutua (Paediatric) — Waiting in queue ---
+        p5 = db_patients[5]
+        appt5 = Appointment(patient_id=p5.patient_id, doctor_id=staff[f"dr.omondi@{staff_domain}"].user_id,
+                            appointment_date=datetime.now(timezone.utc) + timedelta(hours=1), status="Confirmed")
+        db.add(appt5)
+        q5 = PatientQueue(patient_id=p5.patient_id, department="Paediatrics", acuity_level=3,
+                          status="Waiting", assigned_to=staff[f"dr.omondi@{staff_domain}"].user_id)
+        db.add(q5)
         db.flush()
 
         # ==========================================
-        # 8. BILLING & INVOICING
-        # ==========================================
-        print("   -> Seeding Billing Data...")
-        inv = Invoice(patient_id=primary_patient.patient_id, appointment_id=appt.appointment_id, total_amount=4000.0, status="Pending", created_by=staff["rec.brian@hospital.com"].user_id)
-        db.add(inv)
-        db.flush()
-
-        inv_item1 = InvoiceItem(invoice_id=inv.invoice_id, description="Consultation Fee", amount=2500.0, item_type="Consultation")
-        inv_item2 = InvoiceItem(invoice_id=inv.invoice_id, description="Complete Blood Count (CBC)", amount=1500.0, item_type="Laboratory", reference_id=test.test_id)
-        db.add_all([inv_item1, inv_item2])
-        
-        # Add a quick Audit Log just to populate the table
-        audit = AuditLog(user_id=staff["dr.kahura@hospital.com"].user_id, action="CREATE", entity_type="MedicalRecord", entity_id=str(record.record_id), new_value={"diagnosis": "Severe Malaria"})
-        db.add(audit)
-
-        # ==========================================
-        # 9. MEDICAL HISTORY (KDPA Compliant)
+        # 8. MEDICAL HISTORY & CONSENTS (3 patients)
         # ==========================================
         print("   -> Seeding Medical History & Consents...")
-        # Add Consent
-        consent = ConsentRecord(
-            patient_id=primary_patient.patient_id,
-            recorded_by=receptionist_id,
-            consent_type="Treatment",
-            consent_given=True,
-            consent_method="Written",
-            notes="Standard outpatient treatment consent signed."
-        )
-        db.add(consent)
-        
-        # Add a couple of Medical History Entries
-        hist1 = MedicalHistoryEntry(
-            patient_id=primary_patient.patient_id,
-            recorded_by=staff["dr.kahura@hospital.com"].user_id,
-            entry_type="SURGICAL_HISTORY",
-            title="Appendectomy",
-            description="Laparoscopic appendectomy without complications.",
-            event_date="2015",
-            severity="N/A",
-            status="Resolved",
-            is_sensitive=False
-        )
-        
-        hist2 = MedicalHistoryEntry(
-            patient_id=primary_patient.patient_id,
-            recorded_by=staff["dr.kahura@hospital.com"].user_id,
-            entry_type="ALLERGY",
-            title="Penicillin Allergy",
-            description="Patient develops severe hives and shortness of breath.",
-            event_date="Childhood",
-            severity="Severe",
-            status="Active",
-            is_sensitive=False
-        )
-        
-        hist3 = MedicalHistoryEntry(
-            patient_id=primary_patient.patient_id,
-            recorded_by=staff["dr.kahura@hospital.com"].user_id,
-            entry_type="MENTAL_HEALTH",
-            title="Anxiety Disorder",
-            description="Generalized anxiety disorder, managed with therapy.",
-            event_date="2020",
-            severity="Moderate",
-            status="Managed",
-            is_sensitive=True # Sensitive data to test KDPA redaction
-        )
-        
-        db.add_all([hist1, hist2, hist3])
+        for pid in [p1.patient_id, p2.patient_id, p3.patient_id]:
+            db.add(ConsentRecord(
+                patient_id=pid, recorded_by=receptionist_id,
+                consent_type="Treatment", consent_given=True,
+                consent_method="Written", notes="Standard outpatient treatment consent."
+            ))
+        db.flush()
+
+        db.add_all([
+            MedicalHistoryEntry(patient_id=p1.patient_id, recorded_by=staff[f"dr.kahura@{staff_domain}"].user_id,
+                                entry_type="SURGICAL_HISTORY", title="Appendectomy",
+                                description="Laparoscopic appendectomy 2015, no complications.",
+                                event_date="2015", severity="N/A", status="Resolved", is_sensitive=False),
+            MedicalHistoryEntry(patient_id=p1.patient_id, recorded_by=staff[f"dr.kahura@{staff_domain}"].user_id,
+                                entry_type="ALLERGY", title="Penicillin Allergy",
+                                description="Severe hives and anaphylaxis risk.",
+                                event_date="Childhood", severity="Severe", status="Active", is_sensitive=False),
+            MedicalHistoryEntry(patient_id=p1.patient_id, recorded_by=staff[f"dr.kahura@{staff_domain}"].user_id,
+                                entry_type="MENTAL_HEALTH", title="Anxiety Disorder",
+                                description="Generalised anxiety, managed with therapy.",
+                                event_date="2020", severity="Moderate", status="Managed", is_sensitive=True),
+            MedicalHistoryEntry(patient_id=p2.patient_id, recorded_by=staff[f"dr.omondi@{staff_domain}"].user_id,
+                                entry_type="CHRONIC_CONDITION", title="Bronchial Asthma",
+                                description="Diagnosed 2018. Salbutamol PRN.",
+                                event_date="2018", severity="Moderate", status="Managed", is_sensitive=False),
+            MedicalHistoryEntry(patient_id=p3.patient_id, recorded_by=staff[f"dr.kahura@{staff_domain}"].user_id,
+                                entry_type="CHRONIC_CONDITION", title="Type 2 Diabetes Mellitus",
+                                description="Diagnosed 2019. Metformin 500mg BD.",
+                                event_date="2019", severity="Moderate", status="Managed", is_sensitive=False),
+        ])
+        db.flush()
+
+        # ==========================================
+        # 9. AUDIT LOGS (Seed a realistic trail)
+        # ==========================================
+        print("   -> Seeding Audit Trail...")
+        db.add_all([
+            AuditLog(user_id=staff[f"dr.kahura@{staff_domain}"].user_id, action="CREATE",
+                     entity_type="MedicalRecord", entity_id=str(rec1.record_id),
+                     new_value={"diagnosis": "Severe Malaria"}),
+            AuditLog(user_id=staff[f"rec.brian@{staff_domain}"].user_id, action="CREATE",
+                     entity_type="Invoice", entity_id=str(inv1.invoice_id),
+                     new_value={"total": 4000.0, "patient_id": p1.patient_id}),
+            AuditLog(user_id=staff[f"rec.brian@{staff_domain}"].user_id, action="UPDATE",
+                     entity_type="Invoice", entity_id=str(inv1.invoice_id),
+                     old_value={"status": "Pending"}, new_value={"status": "Paid"}),
+        ])
         db.flush()
 
         db.commit()
-        print("✅ SUCCESS: Enterprise Database perfectly seeded and ready for Production Testing!")
+        print("")
+        print("✅ SUCCESS: Full E2E database seeded!")
+        print("")
+        print(f"   📋 Test Credentials (password: Password@123) — domain: {staff_domain}")
+        print(f"   ┌─────────────────────────────────────────────────┐")
+        print(f"   │  admin@{staff_domain:30s} → Admin              │")
+        print(f"   │  dr.kahura@{staff_domain:26s} → Doctor             │")
+        print(f"   │  dr.omondi@{staff_domain:26s} → Doctor (Paeds)     │")
+        print(f"   │  nurse.joy@{staff_domain:26s} → Nurse              │")
+        print(f"   │  pharm.keith@{staff_domain:24s} → Pharmacist         │")
+        print(f"   │  lab.alice@{staff_domain:26s} → Lab Technician     │")
+        print(f"   │  rec.brian@{staff_domain:26s} → Receptionist       │")
+        print(f"   └─────────────────────────────────────────────────┘")
+        print("")
+        print("   🏥 Test Scenarios Ready:")
+        print("   • Patient 1 (Kamau)     — Admitted GMW, CBC Completed, Invoice PAID ✅")
+        print("   • Patient 2 (Achieng)   — Outpatient, Lab Pending Collection, Invoice Pending 🟡")
+        print("   • Patient 3 (Mohammed)  — Outpatient, Lab Done, Invoice Pending M-Pesa 📱")
+        print("   • Patient 4 (Wanjiru)   — ICU Admitted, Hypertensive Emergency 🔴")
+        print("   • Patient 5 (Mutua)     — In Paediatric Queue, Appointment booked 🟢")
+
+
 
     except Exception as e:
         db.rollback()
@@ -431,6 +562,112 @@ def seed_database():
     finally:
         db.close()
 
+def create_db_if_not_exists(db_name: str, base_url: str):
+    """Creates a PostgreSQL database if it doesn't already exist."""
+    admin_engine = create_engine(f"{base_url}/postgres", isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as conn:
+        exists = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}'")).fetchone()
+        if not exists:
+            conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+            print(f"   ✅ Database '{db_name}' created.")
+        else:
+            print(f"   ⏩ Database '{db_name}' already exists.")
+    admin_engine.dispose()
+
+
+def seed_master_db(master_engine):
+    """Seeds the central hms_master database with the superadmin and tenant registry."""
+    from app.models.master import Tenant, SuperAdmin
+    
+    print("🌱 Seeding Master Registry (hms_master)...")
+    Base.metadata.create_all(bind=master_engine)
+    
+    MasterSession = sessionmaker(autocommit=False, autoflush=False, bind=master_engine)
+    db = MasterSession()
+    
+    try:
+        # 1. Create or update Superadmin
+        existing_admin = db.query(SuperAdmin).filter(SuperAdmin.email == "superadmin@hms.co.ke").first()
+        if not existing_admin:
+            sa = SuperAdmin(
+                email="superadmin@hms.co.ke",
+                full_name="HMS Platform Superadmin",
+                hashed_password=get_password_hash("SuperAdmin@2026"),
+                is_active=True
+            )
+            db.add(sa)
+            print("   → Superadmin account created.")
+        else:
+            print("   → Superadmin account already exists.")
+        
+        # 2. Register Tenants
+        tenants_config = [
+            {"name": "Mayo Clinic Nairobi", "domain": "mayoclinic.hms.co.ke", "db_name": "mayoclinic_db", "theme_color": "blue", "is_premium": True, "staff_domain": "mayoclinic.com"},
+            {"name": "St. John's Hospital", "domain": "stjohns.hms.co.ke", "db_name": "stjohns_db", "theme_color": "emerald", "is_premium": False, "staff_domain": "stjohns.com"},
+        ]
+        
+        registered = []
+        for t in tenants_config:
+            existing = db.query(Tenant).filter(Tenant.db_name == t["db_name"]).first()
+            if not existing:
+                tenant = Tenant(
+                    name=t["name"], domain=t["domain"], db_name=t["db_name"],
+                    theme_color=t["theme_color"], is_premium=t["is_premium"]
+                )
+                db.add(tenant)
+                print(f"   → Registered tenant: {t['name']}")
+            else:
+                print(f"   → Tenant '{t['name']}' already registered.")
+            registered.append(t)
+        
+        db.commit()
+        print("✅ Master registry seeded.\n")
+        return registered
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ MASTER SEED FAILED: {e}")
+        return []
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
-    reset_database()
-    seed_database()
+    from app.config.settings import settings
+    base_url = settings.DATABASE_URL.rsplit('/', 1)[0]
+
+    print("\n" + "="*60)
+    print("  👑 HMS PLATFORM SEED ORCHESTRATOR")
+    print("="*60)
+    
+    # ========================================
+    # PHASE 1: Master Database (hms_master)
+    # ========================================
+    print("\n── PHASE 1: Master Registry ──")
+    create_db_if_not_exists("hms_master", base_url)
+    m_engine = create_engine(f"{base_url}/hms_master")
+    tenants_to_seed = seed_master_db(m_engine)
+    m_engine.dispose()
+
+    print(f"\n   👑 Superadmin Login:")
+    print(f"   Email: superadmin@hms.co.ke")
+    print(f"   Password: SuperAdmin@2026\n")
+
+    # ========================================
+    # PHASE 2: Tenant Databases (auto-loop)
+    # ========================================
+    print("── PHASE 2: Tenant Provisioning ──\n")
+    for i, t in enumerate(tenants_to_seed, 1):
+        print("=" * 60)
+        print(f"  🏥 TENANT {i}: {t['name']}")
+        print("=" * 60)
+        create_db_if_not_exists(t["db_name"], base_url)
+        t_engine = create_engine(f"{base_url}/{t['db_name']}")
+        reset_database(t_engine)
+        seed_database(t_engine, hospital_name=t["name"], staff_domain=t["staff_domain"])
+        t_engine.dispose()
+        print()
+
+    print("=" * 60)
+    print("  🎉 ALL DATABASES SEEDED SUCCESSFULLY")
+    print("=" * 60)

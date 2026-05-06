@@ -41,6 +41,7 @@ class User(Base):
     
     # Security & Lockout
     is_active = Column(Boolean, default=True)
+    must_change_password = Column(Boolean, default=False)
     failed_login_attempts = Column(Integer, default=0)
     locked_until = Column(DateTime(timezone=True), nullable=True)
     

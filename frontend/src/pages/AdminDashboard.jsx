@@ -18,6 +18,7 @@ export default function AdminDashboard() {
     const [auditLogs, setAuditLogs] = useState([]);
     const [pricingList, setPricingList] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [mpesaLogs, setMpesaLogs] = useState([]);
 
     const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
     const [isEditRoleModalOpen, setIsEditRoleModalOpen] = useState(false);
@@ -53,6 +54,7 @@ export default function AdminDashboard() {
         if (activeTab === 'pricing') fetchPricing();
         if (activeTab === 'roles') fetchRolePermissions(selectedRoleForPerms);
         if (activeTab === 'mpesa') fetchMpesaConfig();
+        if (activeTab === 'mpesa_logs') fetchMpesaLogs();
     }, [activeTab]);
 
     useEffect(() => {
@@ -75,6 +77,14 @@ export default function AdminDashboard() {
                 setMpesaConfig(prev => ({...prev, paybill_number: res.data.paybill_number, account_reference: res.data.account_reference, transaction_desc: res.data.transaction_desc, kcb_account_number: res.data.kcb_account_number || ''})); 
             } 
         } catch(e){} finally { setIsLoading(false); } 
+    };
+
+    const fetchMpesaLogs = async () => {
+        setIsLoading(true);
+        try {
+            const res = await apiClient.get('/admin/mpesa/transactions');
+            setMpesaLogs(res.data || []);
+        } catch (e) { toast.error("Failed to load M-Pesa logs"); } finally { setIsLoading(false); }
     };
     
     const fetchRolePermissions = async (roleName) => {
@@ -214,7 +224,10 @@ export default function AdminDashboard() {
                         <ShieldAlert size={16} /> Audit
                     </button>
                     <button onClick={() => setActiveTab('mpesa')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'mpesa' ? 'bg-green-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
-                        <CheckCircle2 size={16} /> M-Pesa
+                        <CheckCircle2 size={16} /> Daraja Settings
+                    </button>
+                    <button onClick={() => setActiveTab('mpesa_logs')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'mpesa_logs' ? 'bg-green-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
+                        <Activity size={16} /> M-Pesa Logs
                     </button>
                 </div>
                 <div className="text-right px-4 text-sm font-bold text-slate-400 flex items-center gap-2 shrink-0">
@@ -594,6 +607,52 @@ export default function AdminDashboard() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 7: M-PESA LOGS */}
+            {activeTab === 'mpesa_logs' && (
+                <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50">
+                        <h2 className="font-bold text-slate-800 flex items-center gap-2 text-green-700">M-Pesa Transaction Logs</h2>
+                        <p className="text-xs text-slate-500 mt-1">Real-time status of all Safaricom STK Push transactions.</p>
+                    </div>
+                    <div className="flex-1 overflow-auto">
+                        <table className="w-full text-left text-sm text-slate-600 min-w-[800px]">
+                            <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
+                                <tr>
+                                    <th className="px-6 py-3">Timestamp</th>
+                                    <th className="px-6 py-3">Phone Number</th>
+                                    <th className="px-6 py-3">Invoice #</th>
+                                    <th className="px-6 py-3">Amount (KES)</th>
+                                    <th className="px-6 py-3">Receipt / Details</th>
+                                    <th className="px-6 py-3">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                                {isLoading ? (
+                                    <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400 font-sans"><Activity className="animate-spin mx-auto mb-2" /> Loading logs...</td></tr>
+                                ) : mpesaLogs.length === 0 ? (
+                                    <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400 font-sans">No M-Pesa transactions found.</td></tr>
+                                ) : (
+                                    mpesaLogs.map((log) => (
+                                        <tr key={log.id} className="hover:bg-slate-50">
+                                            <td className="px-6 py-3 text-slate-500">{new Date(log.created_at).toLocaleString()}</td>
+                                            <td className="px-6 py-3 font-bold text-slate-800">{log.phone_number}</td>
+                                            <td className="px-6 py-3 font-bold text-brand-700">INV-{log.invoice_id}</td>
+                                            <td className="px-6 py-3 font-black text-slate-900">{log.amount ? log.amount.toFixed(2) : '-'}</td>
+                                            <td className="px-6 py-3 text-slate-500 max-w-xs truncate">{log.receipt_number || log.result_desc || 'Waiting for Safaricom Callback...'}</td>
+                                            <td className="px-6 py-3">
+                                                <span className={`px-2 py-0.5 rounded font-bold ${log.status === 'Success' ? 'bg-green-100 text-green-700' : log.status === 'Failed' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700 animate-pulse'}`}>
+                                                    {log.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}

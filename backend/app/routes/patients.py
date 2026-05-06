@@ -10,6 +10,7 @@ from app.models.patient import Patient
 from app.models.clinical import MedicalRecord, Appointment, PatientQueue
 from app.models.laboratory import LabTest
 from app.core.dependencies import get_current_user, RequirePermission
+from app.core.limiter import limiter
 from app.utils.audit import log_audit
 from app.models.billing import Invoice, InvoiceItem
 
@@ -36,7 +37,8 @@ def generate_op_number(db: Session) -> str:
 # 1. SEARCH & LIST PATIENTS
 # ==========================================
 @router.get("/", dependencies=[Depends(RequirePermission("patients:read"))])
-def get_patients(search: str = Query("", description="Search by name, ID, OP number, or phone"), skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_patients(request: Request, search: str = Query("", description="Search by name, ID, OP number, or phone"), skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
     query = db.query(Patient).filter(Patient.is_active == True) 
     
     if search:

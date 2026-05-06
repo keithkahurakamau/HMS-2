@@ -23,14 +23,39 @@ from app.config.settings import settings
 
 def get_ngrok_url():
     """Automatically fetches the active Ngrok HTTPS URL for local testing"""
+    import os
+    
+    # 0. Check for a manual override file
     try:
-        r = requests.get("http://127.0.0.1:4040/api/tunnels", timeout=2)
-        tunnels = r.json().get("tunnels", [])
-        for t in tunnels:
+        override_file = os.path.join(os.path.dirname(__file__), "..", "..", "ngrok_url.txt")
+        if os.path.exists(override_file):
+            with open(override_file, "r") as f:
+                url = f.read().strip()
+                if url.startswith("http"):
+                    return url
+    except Exception:
+        pass
+
+    # 1. Check WSL localhost
+    try:
+        r = requests.get("http://127.0.0.1:4040/api/tunnels", timeout=1)
+        for t in r.json().get("tunnels", []):
             if t.get("public_url", "").startswith("https"):
                 return t["public_url"]
     except Exception:
         pass
+        
+    # 2. Check Windows host IP (WSL2 bridge)
+    try:
+        host_ip = os.popen("cat /etc/resolv.conf | grep nameserver | awk '{print $2}'").read().strip()
+        if host_ip:
+            r = requests.get(f"http://{host_ip}:4040/api/tunnels", timeout=1)
+            for t in r.json().get("tunnels", []):
+                if t.get("public_url", "").startswith("https"):
+                    return t["public_url"]
+    except Exception:
+        pass
+        
     return None
 
 @router.post("/stk-push")

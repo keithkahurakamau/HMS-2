@@ -3,15 +3,15 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 import secrets
+from app.core.limiter import limiter
 
 from app.config.settings import settings
 
 # Absolute path imports enforcing modular monolith architecture
-import app.routes.auth as auth_module
+import app.auth.auth as auth_module
 import app.routes.dashboard as dashboard_module
 import app.routes.patients as patients_module
 import app.routes.appointments as appointments_module
@@ -36,8 +36,7 @@ import app.routes.mpesa_payment as mpesa_payment_module
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 2. Setup SlowAPI Rate Limiter
-limiter = Limiter(key_func=get_remote_address)
+# 2. Setup SlowAPI Rate Limiter (Imported from app.core.limiter)
 
 # 3. Initialize FastAPI Application
 app = FastAPI(
@@ -57,8 +56,8 @@ app.add_middleware(
         "http://localhost:5173",    
         "http://127.0.0.1:5173",    
         "http://localhost:3000",
+        "https://mayoclinic-erp.vercel.app"
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app", 
     allow_credentials=True, 
     allow_methods=["*"],
     allow_headers=["*"],

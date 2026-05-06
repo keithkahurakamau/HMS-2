@@ -9,6 +9,7 @@ from app.config.database import get_db
 from app.models.inventory import Location, InventoryItem, StockBatch, InventoryUsageLog, StockTransfer
 from app.schemas.inventory import LocationCreate, LocationResponse, InventoryItemCreate, InventoryItemResponse, StockBatchCreate, StockBatchResponse, UsageLogResponse
 from app.core.dependencies import get_current_user, RequirePermission
+from app.core.limiter import limiter
 from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/inventory", tags=["Central Inventory"])
@@ -34,7 +35,8 @@ def create_item(item_in: InventoryItemCreate, request: Request, db: Session = De
     return new_item
 
 @router.get("/items", response_model=List[InventoryItemResponse], dependencies=[Depends(RequirePermission("pharmacy:read"))])
-def get_items(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_items(request: Request, db: Session = Depends(get_db)):
     """Retrieve all active inventory items."""
     return db.query(InventoryItem).filter(InventoryItem.is_active == True).all()
 

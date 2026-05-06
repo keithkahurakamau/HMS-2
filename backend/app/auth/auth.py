@@ -6,7 +6,7 @@ from app.config.settings import settings
 from app.models.user import User
 from app.core.security import verify_password, create_tokens
 from app.core.limiter import limiter
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
@@ -47,6 +47,14 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
     user.locked_until = None
     db.commit()
 
+    # Block login if forced password change is required
+    if user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="PASSWORD_CHANGE_REQUIRED",
+            headers={"X-User-ID": str(user.user_id)}
+        )
+
     tenant_id = request.headers.get("X-Tenant-ID")
     if not tenant_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-Tenant-ID header is required")
@@ -60,7 +68,8 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
         "httponly": True,
         "secure": is_production, # Must be True in production for SameSite=None
         "samesite": "none" if is_production else "lax",
-        "domain": None 
+        "domain": None,
+        "path": "/"
     }
 
     response.set_cookie(
@@ -87,3 +96,52 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
         "role": user.role.name if user.role else None,
         "permissions": permissions
     }
+
+@router.post("/logout")
+async def logout(response: Response):
+    is_production = settings.MPESA_ENV.lower() == "production"
+    cookie_params = {
+        "httponly": True,
+        "secure": is_production,
+        "samesite": "none" if is_production else "lax",
+        "domain": None,
+        "path": "/"
+    }
+    response.delete_cookie("access_token", **cookie_params)
+    response.delete_cookie("refresh_token", **cookie_params)
+    return {"message": "Logged out securely"}
+
+
+class ChangePasswordRequest(BaseModel):
+    user_id: int
+    new_password: str
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, v):
+        import re
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not re.search(r"[A-Z]", v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r"[a-z]", v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r"\d", v):
+            raise ValueError('Password must contain at least one digit')
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError('Password must contain at least one special character')
+        return v
+
+@router.post("/change-password")
+@limiter.limit("5/minute")
+async def change_password(request: Request, payload: ChangePasswordRequest, db: Session = Depends(get_db)):
+    """Allows a user to set a new password when must_change_password is True."""
+    from app.core.security import get_password_hash
+    user = db.query(User).filter(User.user_id == payload.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.hashed_password = get_password_hash(payload.new_password)
+    user.must_change_password = False
+    db.commit()
+    return {"message": "Password updated successfully. Please log in with your new credentials."}

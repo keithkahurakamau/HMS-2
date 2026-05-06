@@ -8,8 +8,20 @@ from fastapi import Request
 default_engine = create_engine(settings.DATABASE_URL)
 DefaultSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=default_engine)
 
+# Master DB Engine — always points at hms_master for tenant registry & superadmin
+_master_db_url = settings.DATABASE_URL.rsplit('/', 1)[0] + "/hms_master"
+master_engine = create_engine(_master_db_url)
+MasterSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=master_engine)
+
 Base = declarative_base()
 
+def get_master_db():
+    """Yields a session to the central hms_master database."""
+    db = MasterSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 tenant_engines = {}
 
 def get_tenant_engine(tenant_db_name: str):
