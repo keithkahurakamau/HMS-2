@@ -10,7 +10,7 @@ from app.models.laboratory import LabTest, LabTestCatalog
 from app.models.inventory import StockBatch, InventoryItem, InventoryUsageLog, Location
 from app.models.patient import Patient
 from app.models.user import User
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, RequirePermission
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class TestCompletionRequest(BaseModel):
 # ==========================================
 # 1. FETCH LAB QUEUE
 # ==========================================
-@router.get("/queue")
+@router.get("/queue", dependencies=[Depends(RequirePermission("laboratory:read"))])
 def get_lab_queue(db: Session = Depends(get_db)):
     try:
         tests = db.query(LabTest).filter(
@@ -58,7 +58,7 @@ def get_lab_queue(db: Session = Depends(get_db)):
 # ==========================================
 # 2. FETCH ADMIN TEST CATALOG
 # ==========================================
-@router.get("/catalog")
+@router.get("/catalog", dependencies=[Depends(RequirePermission("laboratory:read"))])
 def get_lab_catalog(db: Session = Depends(get_db)):
     try:
         return db.query(LabTestCatalog).filter(LabTestCatalog.is_active == True).order_by(LabTestCatalog.test_name).all()
@@ -69,7 +69,7 @@ def get_lab_catalog(db: Session = Depends(get_db)):
 # ==========================================
 # 3. FETCH LOCAL LAB INVENTORY
 # ==========================================
-@router.get("/inventory")
+@router.get("/inventory", dependencies=[Depends(RequirePermission("laboratory:read"))])
 def get_lab_inventory(db: Session = Depends(get_db)):
     try:
         lab_loc = db.query(Location).filter(Location.name == "Laboratory").first()

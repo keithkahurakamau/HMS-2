@@ -25,7 +25,7 @@ class WardConsumptionRequest(BaseModel):
 
 # --- WARD & BED MANAGEMENT ENDPOINTS ---
 
-@router.get("/board")
+@router.get("/board", dependencies=[Depends(get_current_user)])
 def get_bed_board(db: Session = Depends(get_db)):
     """Fetches the entire hospital ward layout, including active patients."""
     wards = db.query(Ward).all()
@@ -121,7 +121,7 @@ def discharge_patient(admission_id: int, req: DischargeRequest, db: Session = De
 
 # --- WARD INVENTORY & CONSUMPTION ENDPOINTS ---
 
-@router.get("/inventory")
+@router.get("/inventory", dependencies=[Depends(get_current_user)])
 def get_ward_inventory(db: Session = Depends(get_db)):
     """Fetches all stock currently physically located in the Wards."""
     # Find the generic "Wards" location (or specific ward if configured)

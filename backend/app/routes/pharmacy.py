@@ -14,7 +14,7 @@ from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/pharmacy", tags=["Pharmacy"])
 
-@router.get("/inventory")
+@router.get("/inventory", dependencies=[Depends(RequirePermission("pharmacy:read"))])
 def get_pharmacy_inventory(db: Session = Depends(get_db)):
     """Fetches all stock currently physically located in the Pharmacy."""
     # Find the Pharmacy location
