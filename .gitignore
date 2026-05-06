@@ -87,3 +87,24 @@ npm-debug.log
 yarn-error.log
 yarn-debug.log
 pnpm-debug.log
+
+# Frontend build output
+frontend/dist/
+frontend/node_modules/
+
+# Claude Code & AI tooling (not project source)
+.claude/
+.claude-flow/
+.swarm/
+.mcp.json
+CLAUDE.md
+ruvector.db
+
+# Database files
+*.db
+*.sqlite
+
+# Local utility scripts (not part of the app)
+backend/fix_permissions.py
+backend/check_users.py
+backend/reset_admin.py

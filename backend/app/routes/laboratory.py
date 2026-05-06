@@ -61,7 +61,7 @@ def get_lab_queue(db: Session = Depends(get_db)):
 @router.get("/catalog")
 def get_lab_catalog(db: Session = Depends(get_db)):
     try:
-        return db.query(LabTestCatalog).filter(LabTestCatalog.category == "Laboratory").order_by(LabTestCatalog.test_name).all()
+        return db.query(LabTestCatalog).filter(LabTestCatalog.is_active == True).order_by(LabTestCatalog.test_name).all()
     except Exception as e:
         logger.error(f"Error fetching catalog: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch catalog.")

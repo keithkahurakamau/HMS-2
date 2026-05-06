@@ -36,7 +36,7 @@ export default function Wards() {
             const invResponse = await apiClient.get('/wards/inventory');
             setWardInventory(invResponse.data || []);
             
-            const patResponse = await apiClient.get('/patients');
+            const patResponse = await apiClient.get('/patients/');
             setPatients(patResponse.data || []);
         } catch (error) {
             toast.error("Network Exception: Failed to load Ward data.");

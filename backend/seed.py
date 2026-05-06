@@ -20,6 +20,7 @@ from app.models.clinical import Appointment, PatientQueue, MedicalRecord
 from app.models.billing import Invoice, InvoiceItem, Payment
 from app.models.audit import AuditLog
 from app.models.medical_history import ConsentRecord, MedicalHistoryEntry
+from app.models.radiology import RadiologyRequest, RadiologyResult
 
 def reset_database(target_engine):
     """
@@ -61,10 +62,10 @@ def seed_database(target_engine, hospital_name="General Hospital", staff_domain=
         
         # 2a. Create Core System Permissions
         permissions_data = [
-            "users:manage", "clinical:write", "clinical:read", 
+            "users:manage", "clinical:write", "clinical:read",
             "patients:read", "patients:write", "history:read", "history:manage",
-            "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read", 
-            "wards:manage", "billing:read", "billing:manage"
+            "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read",
+            "wards:manage", "billing:read", "billing:manage", "radiology:manage"
         ]
         
         perms = {}
@@ -77,16 +78,17 @@ def seed_database(target_engine, hospital_name="General Hospital", staff_domain=
         # 2b. Create Roles and Map Permissions to them
         roles_config = {
             "Admin": [
-                "users:manage", "clinical:write", "clinical:read", 
+                "users:manage", "clinical:write", "clinical:read",
                 "patients:read", "patients:write", "history:read", "history:manage",
-                "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read", 
-                "wards:manage", "billing:read", "billing:manage"
+                "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read",
+                "wards:manage", "billing:read", "billing:manage", "radiology:manage"
             ],
             "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write", "pharmacy:read", "laboratory:read", "history:read", "history:manage"],
             "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read"],
             "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read"],
             "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read"],
-            "Receptionist": ["patients:read", "patients:write", "billing:read"]
+            "Radiologist": ["radiology:manage", "clinical:read", "patients:read"],
+            "Receptionist": ["patients:read", "patients:write", "billing:read", "billing:manage"]
         }
 
         roles = {}
@@ -106,6 +108,7 @@ def seed_database(target_engine, hospital_name="General Hospital", staff_domain=
             {"email": f"nurse.joy@{staff_domain}", "full_name": "Nurse Joy Wanjiku", "role": "Nurse", "spec": "Ward Matron", "lic": "NCK-8822"},
             {"email": f"pharm.keith@{staff_domain}", "full_name": "Pharm. Keith Kamau", "role": "Pharmacist", "spec": "Clinical Pharmacist", "lic": "PPB-5533"},
             {"email": f"lab.alice@{staff_domain}", "full_name": "Alice Mutua", "role": "Lab Technician", "spec": "Pathology", "lic": "KMLTTB-9911"},
+            {"email": f"rad.mwangi@{staff_domain}", "full_name": "Dr. Peter Mwangi", "role": "Radiologist", "spec": "Radiology", "lic": "MPDB-3033"},
             {"email": f"rec.brian@{staff_domain}", "full_name": "Brian Koech", "role": "Receptionist", "spec": None, "lic": None}
         ]
         

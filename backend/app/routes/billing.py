@@ -18,7 +18,7 @@ class ConsultationFeeRequest(BaseModel):
 
 router = APIRouter(prefix="/api/billing", tags=["Billing & Cashier"])
 
-@router.get("/queue", response_model=List[InvoiceResponse], dependencies=[Depends(RequirePermission("billing:process"))])
+@router.get("/queue", response_model=List[InvoiceResponse], dependencies=[Depends(RequirePermission("billing:manage"))])
 def get_billing_queue(db: Session = Depends(get_db)):
     """Returns all patients with Pending invoices."""
     invoices = db.query(Invoice).filter(Invoice.status.in_(["Pending", "Partially Paid", "Pending M-Pesa"])).order_by(Invoice.billing_date.asc()).all()
@@ -39,7 +39,7 @@ def get_billing_queue(db: Session = Depends(get_db)):
         result.append(inv_dict)
     return result
 
-@router.post("/process-payment", dependencies=[Depends(RequirePermission("billing:process"))])
+@router.post("/process-payment", dependencies=[Depends(RequirePermission("billing:manage"))])
 def process_cash_card_payment(req: PaymentRequest, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     try:
         idem_key = db.query(IdempotencyKey).filter(IdempotencyKey.key == req.idempotency_key).first()
@@ -71,7 +71,7 @@ def process_cash_card_payment(req: PaymentRequest, request: Request, db: Session
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/process-mpesa", dependencies=[Depends(RequirePermission("billing:process"))])
+@router.post("/process-mpesa", dependencies=[Depends(RequirePermission("billing:manage"))])
 def initiate_mpesa_payment(req: MPesaRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     invoice = db.query(Invoice).filter(Invoice.invoice_id == req.invoice_id).first()
     if not invoice or invoice.status == "Paid":

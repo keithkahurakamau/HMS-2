@@ -12,7 +12,7 @@ from app.core.dependencies import RequirePermission
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics & Dashboard"])
 
-@router.get("/dashboard", dependencies=[Depends(RequirePermission("reports:view"))])
+@router.get("/dashboard", dependencies=[Depends(RequirePermission("users:manage"))])
 def get_dashboard_metrics(db: Session = Depends(get_db)):
     """Aggregates system-wide telemetry for the Command Center."""
     today = date.today()

@@ -18,7 +18,7 @@ class MpesaConfigSchema(BaseModel):
     kcb_account_number: str = None
 
 @router.get("/config")
-def get_mpesa_config(db: Session = Depends(get_db), user: dict = Depends(RequirePermission("settings:read"))):
+def get_mpesa_config(db: Session = Depends(get_db), user: dict = Depends(RequirePermission("users:manage"))):
     """
     Returns the public M-Pesa configuration.
     CRITICAL: Does NOT return the decrypted Consumer Key, Secret, or Passkey.
@@ -40,7 +40,7 @@ def get_mpesa_config(db: Session = Depends(get_db), user: dict = Depends(Require
 def update_mpesa_config(
     payload: MpesaConfigSchema, 
     db: Session = Depends(get_db), 
-    user: dict = Depends(RequirePermission("settings:write"))
+    user: dict = Depends(RequirePermission("users:manage"))
 ):
     """
     Updates or creates the M-Pesa settings dynamically.
@@ -66,7 +66,7 @@ def update_mpesa_config(
     return {"message": "M-Pesa configuration updated and securely encrypted."}
 
 @router.get("/transactions")
-def get_mpesa_transactions(db: Session = Depends(get_db), user: dict = Depends(RequirePermission("settings:read"))):
+def get_mpesa_transactions(db: Session = Depends(get_db), user: dict = Depends(RequirePermission("users:manage"))):
     """
     Returns all M-Pesa transactions for auditing and tracking.
     """

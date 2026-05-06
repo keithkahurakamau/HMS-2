@@ -10,7 +10,7 @@ from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
 
-@router.post("/", response_model=AppointmentResponse, dependencies=[Depends(RequirePermission("appointments:manage"))])
+@router.post("/", response_model=AppointmentResponse, dependencies=[Depends(RequirePermission("patients:write"))])
 def create_appointment(appt_in: AppointmentCreate, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     new_appt = Appointment(**appt_in.model_dump())
     db.add(new_appt)
@@ -22,6 +22,6 @@ def create_appointment(appt_in: AppointmentCreate, request: Request, db: Session
     db.refresh(new_appt)
     return new_appt
 
-@router.get("/", response_model=List[AppointmentResponse], dependencies=[Depends(RequirePermission("appointments:manage"))])
+@router.get("/", response_model=List[AppointmentResponse], dependencies=[Depends(RequirePermission("patients:write"))])
 def list_appointments(db: Session = Depends(get_db)):
     return db.query(Appointment).order_by(Appointment.appointment_date.asc()).all()
