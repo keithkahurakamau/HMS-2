@@ -30,6 +30,8 @@ import MainLayout from './components/layouts/MainLayout';
 import SuperAdminLayout from './components/layouts/SuperAdminLayout';
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import TenantsManager from './pages/superadmin/TenantsManager';
+import PlatformBilling from './pages/superadmin/PlatformBilling';
+import PlatformSettings from './pages/superadmin/PlatformSettings';
 
 // Protection Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -69,14 +71,6 @@ const RoleBasedRedirect = () => {
     }
 };
 
-// Temporary Placeholder
-const PagePlaceholder = ({ title }) => (
-    <div className="bg-white rounded-xl shadow-soft p-6 border border-slate-100">
-        <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
-        <p className="text-slate-500 mt-2">This module is under construction.</p>
-    </div>
-);
-
 export default function App() {
   return (
     <ThemeProvider>
@@ -95,6 +89,8 @@ export default function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="tenants" element={<TenantsManager />} />
+            <Route path="billing" element={<PlatformBilling />} />
+            <Route path="settings" element={<PlatformSettings />} />
             <Route path="*" element={<SuperAdminDashboard />} />
           </Route>
 

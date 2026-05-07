@@ -93,6 +93,23 @@ export default function Laboratory() {
         setConsumedItems(consumedItems.filter(c => c.batch_id !== batch_id));
     };
 
+    const handleRejectSample = async () => {
+        if (!activeTest) return;
+        const reason = window.prompt(
+            'Reason for rejecting this sample (e.g. haemolysis, wrong specimen, insufficient volume):'
+        );
+        if (!reason) return;
+        try {
+            await apiClient.post(`/laboratory/tests/${activeTest.test_id}/reject`, { reason });
+            toast.success('Sample rejected. Requesting clinician will be notified.');
+            setQueue(queue.filter(q => q.test_id !== activeTest.test_id));
+            setActiveTest(null);
+            setIsQueueOpen(true);
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Reject failed.');
+        }
+    };
+
     const handleReleaseResults = async () => {
         const payload = {
             result_data: results,
@@ -365,7 +382,10 @@ export default function Laboratory() {
                                 {/* Workbench Footer Actions */}
                                 {activeTest.status === 'In Progress' && (
                                     <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)] z-10">
-                                        <button className="px-5 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 flex items-center gap-2 transition-colors">
+                                        <button
+                                            onClick={handleRejectSample}
+                                            className="px-5 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 flex items-center gap-2 transition-colors"
+                                        >
                                             <XCircle size={18} /> Reject Sample
                                         </button>
                                         <button onClick={handleReleaseResults} className="px-6 py-2.5 bg-accent-600 hover:bg-accent-700 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-colors">

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { 
-    LayoutDashboard, Building2, CreditCard, Settings, 
-    ShieldAlert, LogOut, Search, Bell, Activity
+import {
+    LayoutDashboard, Building2, CreditCard, Settings,
+    ShieldAlert, LogOut, Search, Activity
 } from 'lucide-react';
 
 export default function SuperAdminLayout() {
@@ -70,10 +70,6 @@ export default function SuperAdminLayout() {
                             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                             <input type="text" placeholder="Quick search tenants..." className="bg-slate-900 border border-slate-700 rounded-full pl-9 pr-4 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500 w-64 transition-colors" />
                         </div>
-                        <button className="text-slate-400 hover:text-white relative">
-                            <Bell size={20} />
-                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full"></span>
-                        </button>
                     </div>
                 </header>
 

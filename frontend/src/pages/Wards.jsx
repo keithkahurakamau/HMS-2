@@ -105,6 +105,28 @@ export default function Wards() {
         setConsumeQty('');
     };
 
+    const [clinicalNote, setClinicalNote] = useState('');
+    const [isSavingNote, setIsSavingNote] = useState(false);
+
+    const handleSaveClinicalNote = async () => {
+        if (!activeBed?.admission_id || !clinicalNote.trim()) {
+            toast.error('Type an observation first.');
+            return;
+        }
+        setIsSavingNote(true);
+        try {
+            await apiClient.post(`/wards/admissions/${activeBed.admission_id}/notes`, {
+                note: clinicalNote.trim(),
+            });
+            toast.success('Observation logged to audit trail.');
+            setClinicalNote('');
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not save observation.');
+        } finally {
+            setIsSavingNote(false);
+        }
+    };
+
     const handleConsumeStock = async () => {
         if (cart.length === 0) return;
         setIsConsuming(true);
@@ -363,8 +385,20 @@ export default function Wards() {
                             {/* Standard Clinical Log */}
                             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
                                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Clinical Log</h3>
-                                <textarea rows="3" className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none mb-3" placeholder="Append observation parameters..."></textarea>
-                                <button className="w-full bg-slate-800 text-white py-2 rounded-lg text-sm font-bold hover:bg-slate-900">Commit Block</button>
+                                <textarea
+                                    rows="3"
+                                    value={clinicalNote}
+                                    onChange={(e) => setClinicalNote(e.target.value)}
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none mb-3"
+                                    placeholder="Append observation parameters... (e.g. vitals, medication response, mood)"
+                                />
+                                <button
+                                    onClick={handleSaveClinicalNote}
+                                    disabled={isSavingNote || !clinicalNote.trim()}
+                                    className="w-full bg-slate-800 text-white py-2 rounded-lg text-sm font-bold hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isSavingNote ? 'Saving…' : 'Commit Observation'}
+                                </button>
                             </div>
                         </div>
 

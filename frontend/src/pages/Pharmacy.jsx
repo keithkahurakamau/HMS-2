@@ -115,6 +115,23 @@ export default function Pharmacy() {
         }
     };
 
+    const handleReturnToDoctor = async () => {
+        if (!activeOrder?.record_id) return;
+        const reason = window.prompt(
+            'Why is this prescription being returned to the doctor? (e.g. dose ambiguity, drug-drug interaction)'
+        );
+        if (!reason) return;
+        try {
+            await apiClient.post(`/clinical/prescriptions/${activeOrder.record_id}/return`, { reason });
+            toast.success('Returned to doctor with reason.');
+            setQueue(queue.filter(q => q.id !== activeOrder.id));
+            setActiveOrder(null);
+            setIsQueueOpen(true);
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Return failed.');
+        }
+    };
+
     const handleRxDispense = async () => {
         if (!activeOrder) return;
         setIsProcessing(true);
@@ -272,7 +289,7 @@ export default function Pharmacy() {
                                     >
                                         <Printer size={16}/> Print Rx
                                     </button>
-                                    <button className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 flex items-center gap-2"><XCircle size={16}/> Return to Doctor</button>
+                                    <button onClick={handleReturnToDoctor} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 flex items-center gap-2"><XCircle size={16}/> Return to Doctor</button>
                                     <button onClick={handleRxDispense} disabled={isProcessing} className="px-6 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
                                         <CheckCircle2 size={18}/> {isProcessing ? 'Processing...' : 'Dispense & Close'}
                                     </button>

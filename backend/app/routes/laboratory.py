@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Optional, Dict, Any
@@ -157,3 +157,32 @@ def complete_lab_test(
         db.rollback()
         logger.error(f"Transaction failed: {e}")
         raise HTTPException(status_code=500, detail=f"Transaction failed: {str(e)}")
+
+
+# ==========================================
+# 5. REJECT TEST (sample contamination, wrong specimen, etc.)
+# ==========================================
+class RejectRequest(BaseModel):
+    reason: str
+
+
+@router.post("/tests/{test_id}/reject", dependencies=[Depends(RequirePermission("laboratory:manage"))])
+def reject_lab_test(
+    test_id: int,
+    payload: RejectRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Marks the test as Rejected and records the reason. Lab consumables are not deducted."""
+    test = db.query(LabTest).filter(LabTest.test_id == test_id).first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Lab test not found.")
+    if test.status == "Completed":
+        raise HTTPException(status_code=400, detail="Cannot reject a completed test.")
+
+    test.status = "Rejected"
+    test.lab_technician_notes = (test.lab_technician_notes or "") + f"\nREJECTED ({datetime.now().isoformat()}): {payload.reason}"
+    test.performed_by_id = current_user["user_id"]
+    db.commit()
+    return {"status": "rejected", "message": "Sample rejected. Requesting clinician will be notified."}

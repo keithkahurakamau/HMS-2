@@ -88,6 +88,39 @@ def provision_hospital(tenant: TenantCreate, db: Session = Depends(get_master_db
     }
 
 
+class TenantUpdate(BaseModel):
+    name: Optional[str] = None
+    domain: Optional[str] = None
+    theme_color: Optional[str] = None
+    is_premium: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+@router.patch("/hospitals/{tenant_id}")
+def update_tenant(tenant_id: int, payload: TenantUpdate, db: Session = Depends(get_master_db)):
+    """Updates a tenant's display attributes or suspension state. Identifier
+    fields (db_name) are intentionally not editable — renaming a database
+    is a destructive operation that requires data migration."""
+    tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found.")
+
+    update = payload.model_dump(exclude_unset=True)
+    for field, value in update.items():
+        setattr(tenant, field, value)
+    db.commit()
+    db.refresh(tenant)
+    return {
+        "id": f"tenant_{tenant.tenant_id}",
+        "name": tenant.name,
+        "domain": tenant.domain,
+        "db_name": tenant.db_name,
+        "theme_color": tenant.theme_color,
+        "is_premium": tenant.is_premium,
+        "is_active": tenant.is_active,
+    }
+
+
 class SuperAdminLogin(BaseModel):
     email: str
     password: str

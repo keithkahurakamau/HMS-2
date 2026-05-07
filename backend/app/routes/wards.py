@@ -11,6 +11,7 @@ from app.models.patient import Patient
 from app.models.inventory import StockBatch, InventoryItem, InventoryUsageLog, Location
 from app.schemas.wards import AdmissionRequest, DischargeRequest
 from app.core.dependencies import get_current_user
+from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/wards", tags=["Wards & Admissions"])
 
@@ -203,3 +204,38 @@ def consume_ward_stock(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Transaction failed.")
+
+# ==========================================
+# CLINICAL OBSERVATIONS LOG (per admission)
+# ==========================================
+class ClinicalNoteRequest(BaseModel):
+    note: str
+
+
+@router.post("/admissions/{admission_id}/notes")
+def append_clinical_note(
+    admission_id: int,
+    payload: ClinicalNoteRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Appends a free-text observation to the admission record. Persists in audit_logs
+    so the timeline is recoverable even if the admission row is later edited."""
+    admission = db.query(AdmissionRecord).filter(AdmissionRecord.admission_id == admission_id).first()
+    if not admission:
+        raise HTTPException(status_code=404, detail="Admission not found.")
+    if not payload.note.strip():
+        raise HTTPException(status_code=400, detail="Note cannot be empty.")
+
+    log_audit(
+        db,
+        current_user["user_id"],
+        "OBSERVATION",
+        "AdmissionRecord",
+        str(admission_id),
+        old_value=None,
+        new_value={"note": payload.note},
+        ip_address=None,
+    )
+    db.commit()
+    return {"message": "Observation logged.", "admission_id": admission_id}

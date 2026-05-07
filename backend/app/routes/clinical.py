@@ -161,5 +161,42 @@ def get_pending_prescriptions(db: Session = Depends(get_db)):
                 }
             ]
         })
-        
+
     return formatted_prescriptions
+
+
+# ==========================================
+# 5. RETURN PRESCRIPTION TO DOCTOR
+# ==========================================
+from pydantic import BaseModel as _BM
+
+
+class ReturnPrescriptionRequest(_BM):
+    reason: str
+
+
+@router.post("/prescriptions/{record_id}/return", dependencies=[Depends(RequirePermission("pharmacy:manage"))])
+def return_prescription(
+    record_id: int,
+    payload: ReturnPrescriptionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Pharmacist sends a prescription back to the doctor for clarification."""
+    record = db.query(MedicalRecord).filter(MedicalRecord.record_id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Prescription not found.")
+    if record.record_status != "Pharmacy":
+        raise HTTPException(status_code=400, detail="Only pharmacy-routed prescriptions can be returned.")
+
+    record.record_status = "Returned"
+    record.internal_notes = (record.internal_notes or "") + f"\nRETURNED BY PHARMACY ({datetime.now(timezone.utc).isoformat()}): {payload.reason}"
+
+    log_audit(
+        db, current_user["user_id"], "UPDATE", "MedicalRecord", str(record_id),
+        {"record_status": "Pharmacy"}, {"record_status": "Returned", "reason": payload.reason},
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return {"message": "Prescription returned to doctor.", "record_id": record_id}

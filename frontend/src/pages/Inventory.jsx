@@ -22,6 +22,7 @@ export default function Inventory() {
     const [isLoading, setIsLoading] = useState(true);
     
     const [searchQuery, setSearchQuery] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('All');
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [isProcurementModalOpen, setIsProcurementModalOpen] = useState(false);
 
@@ -148,10 +149,17 @@ export default function Inventory() {
     };
 
     // --- RENDER HELPERS ---
-    const displayedInventory = inventory.filter(item => 
-        item.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        item.item_code?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const availableCategories = Array.from(
+        new Set(inventory.map(i => i.category).filter(Boolean))
+    ).sort();
+
+    const displayedInventory = inventory.filter(item => {
+        const matchesSearch =
+            item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.item_code?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = categoryFilter === 'All' || item.category === categoryFilter;
+        return matchesSearch && matchesCategory;
+    });
 
     const totalInventoryValue = inventory.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unit_cost || 0)), 0);
 
@@ -231,7 +239,28 @@ export default function Inventory() {
                         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input type="text" placeholder={`Search ${activeLocation.name} stock...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm transition-all" />
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-bold hover:bg-white bg-slate-50"><Filter size={16} /> Filters</button>
+                    <div className="flex items-center gap-2">
+                        <Filter size={16} className="text-slate-400" aria-hidden="true" />
+                        <select
+                            value={categoryFilter}
+                            onChange={(e) => setCategoryFilter(e.target.value)}
+                            aria-label="Filter by category"
+                            className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        >
+                            <option value="All">All categories</option>
+                            {availableCategories.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                        </select>
+                        {categoryFilter !== 'All' && (
+                            <button
+                                onClick={() => setCategoryFilter('All')}
+                                className="text-xs font-bold text-slate-500 hover:text-slate-800"
+                            >
+                                Clear
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
