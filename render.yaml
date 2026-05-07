@@ -1,0 +1,43 @@
+# Render Blueprint — HMS backend
+#
+# How the seed runs once on deploy:
+#   The start command (render-start.sh) checks for seed_superadmin.py before
+#   each uvicorn boot. The seed itself is idempotent — it skips inserting the
+#   superadmin row when one already exists — so leaving the file in place
+#   across normal redeploys is harmless.
+#
+#   To "remove the seed after first deploy" as planned:
+#     1. Push this branch — Render runs the seed automatically on first boot.
+#     2. Sign in at /superadmin/login with the seed credentials.
+#     3. Delete backend/seed_superadmin.py from the repo and push again.
+#     4. Render redeploys; render-start.sh sees the file is gone and skips
+#        straight to uvicorn.
+#
+# Required environment variables (set as secrets in the Render dashboard):
+#   DATABASE_URL              — managed Postgres connection string
+#   SECRET_KEY                — JWT signing key
+#   SEED_SUPERADMIN_EMAIL     — optional, defaults to superadmin@hms.co.ke
+#   SEED_SUPERADMIN_PASSWORD  — optional, defaults to SuperAdmin@2026
+#                               (override at least once for production!)
+
+services:
+  - type: web
+    name: hms-backend
+    runtime: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./render-start.sh
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SEED_SUPERADMIN_EMAIL
+        sync: false
+      - key: SEED_SUPERADMIN_PASSWORD
+        sync: false
