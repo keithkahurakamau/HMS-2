@@ -397,7 +397,7 @@ export default function MedicalHistory() {
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)} />
-                    <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 max-h-[90vh]">
+                    <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up max-h-[90vh]">
                         <div className="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">{editEntry ? 'Edit History Entry' : 'Add History Entry'}</h2>

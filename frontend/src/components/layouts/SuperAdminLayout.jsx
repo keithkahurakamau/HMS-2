@@ -4,9 +4,16 @@ import {
     LayoutDashboard, Building2, CreditCard, Settings,
     ShieldAlert, LogOut, Search, Activity
 } from 'lucide-react';
+import { clearSuperAdminSession } from '../../pages/superadmin/SuperAdminLogin';
 
 export default function SuperAdminLayout() {
     const navigate = useNavigate();
+    const adminName = localStorage.getItem('hms_superadmin_name');
+
+    const handleExit = () => {
+        clearSuperAdminSession();
+        navigate('/superadmin/login', { replace: true });
+    };
 
     const NAV = [
         { name: 'Overview',                 path: '/superadmin/dashboard', icon: <LayoutDashboard size={18} /> },
@@ -58,7 +65,12 @@ export default function SuperAdminLayout() {
                 </nav>
 
                 <div className="p-4 border-t border-white/5">
-                    <button onClick={() => navigate('/login')} className="flex items-center gap-2 text-sm font-semibold text-ink-400 hover:text-rose-400 transition-colors w-full px-3 py-2 rounded-lg hover:bg-rose-500/10">
+                    {adminName && (
+                        <div className="mb-2 px-3 text-2xs text-ink-500 uppercase tracking-[0.16em] truncate">
+                            Signed in as <span className="text-amber-300/90 normal-case tracking-normal">{adminName}</span>
+                        </div>
+                    )}
+                    <button onClick={handleExit} className="flex items-center gap-2 text-sm font-semibold text-ink-400 hover:text-rose-400 transition-colors w-full px-3 py-2 rounded-lg hover:bg-rose-500/10">
                         <LogOut size={16} /> Exit console
                     </button>
                 </div>

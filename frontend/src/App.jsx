@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -32,6 +32,7 @@ import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import TenantsManager from './pages/superadmin/TenantsManager';
 import PlatformBilling from './pages/superadmin/PlatformBilling';
 import PlatformSettings from './pages/superadmin/PlatformSettings';
+import SuperAdminLogin, { isSuperAdminAuthenticated } from './pages/superadmin/SuperAdminLogin';
 
 // Protection Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -47,6 +48,17 @@ const ProtectedRoute = ({ children }) => {
   
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
+// Superadmin route guard — checks for the platform-level token in localStorage.
+// On miss, redirect to /superadmin/login while preserving the original path so
+// the user lands where they intended after authenticating.
+const SuperAdminProtectedRoute = ({ children }) => {
+  const location = useLocation();
+  if (!isSuperAdminAuthenticated()) {
+    return <Navigate to="/superadmin/login" replace state={{ from: location }} />;
   }
   return children;
 };
@@ -85,7 +97,8 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Super Admin Back-Office (Isolated from Hospital Workspaces) */}
-          <Route path="/superadmin" element={<SuperAdminLayout />}>
+          <Route path="/superadmin/login" element={<SuperAdminLogin />} />
+          <Route path="/superadmin" element={<SuperAdminProtectedRoute><SuperAdminLayout /></SuperAdminProtectedRoute>}>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="tenants" element={<TenantsManager />} />

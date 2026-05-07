@@ -226,40 +226,40 @@ export default function TenantsManager() {
 
             {/* Edit tenant modal */}
             {editing && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center">
-                            <h2 className="text-lg font-black text-white">Edit Tenant — <span className="text-amber-400">{editing.name}</span></h2>
-                            <button onClick={() => setEditing(null)} aria-label="Close" className="text-slate-500 hover:text-white"><X size={20} /></button>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/80 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-ink-900 ring-1 ring-white/10 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
+                        <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+                            <h2 className="text-base font-semibold text-white tracking-tight">Edit tenant &mdash; <span className="text-amber-400">{editing.name}</span></h2>
+                            <button onClick={() => setEditing(null)} aria-label="Close" className="p-2 rounded-lg text-ink-400 hover:text-white hover:bg-white/10 transition-colors"><X size={18} /></button>
                         </div>
                         <form onSubmit={handleEdit} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Display Name</label>
+                                <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Display Name</label>
                                 <input
                                     required
                                     type="text"
                                     value={editForm.name}
                                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+                                    className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Subdomain Route</label>
+                                <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Subdomain Route</label>
                                 <input
                                     required
                                     type="text"
                                     value={editForm.domain}
                                     onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })}
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+                                    className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Theme Color</label>
+                                    <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Theme Color</label>
                                     <select
                                         value={editForm.theme_color}
                                         onChange={(e) => setEditForm({ ...editForm, theme_color: e.target.value })}
-                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+                                        className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all"
                                     >
                                         <option value="blue">Blue</option>
                                         <option value="emerald">Emerald</option>
@@ -268,27 +268,24 @@ export default function TenantsManager() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Subscription Tier</label>
+                                    <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Subscription Tier</label>
                                     <select
                                         value={editForm.is_premium ? 'true' : 'false'}
                                         onChange={(e) => setEditForm({ ...editForm, is_premium: e.target.value === 'true' })}
-                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+                                        className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all"
                                     >
                                         <option value="false">Standard</option>
                                         <option value="true">Premium</option>
                                     </select>
                                 </div>
                             </div>
-                            <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3 text-xs text-slate-400">
-                                Database name <code className="text-slate-300 font-mono">{editing.db_name}</code> is immutable.
+                            <div className="bg-white/[0.04] ring-1 ring-white/10 rounded-lg p-3 text-xs text-ink-400">
+                                Database name <code className="text-ink-200 font-mono">{editing.db_name}</code> is immutable.
                             </div>
-                            <div className="mt-6 pt-6 border-t border-slate-800 flex justify-end gap-3">
-                                <button type="button" onClick={() => setEditing(null)} className="px-5 py-2.5 text-sm font-bold text-slate-400 hover:text-white">Cancel</button>
-                                <button
-                                    type="submit"
-                                    disabled={savingEdit}
-                                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold disabled:opacity-50"
-                                >
+                            <div className="mt-6 pt-5 border-t border-white/5 flex justify-end gap-2">
+                                <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-semibold text-ink-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
+                                <button type="submit" disabled={savingEdit}
+                                    className="px-5 py-2 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 shadow-soft transition-all">
                                     {savingEdit ? 'Saving…' : 'Save changes'}
                                 </button>
                             </div>
@@ -299,40 +296,36 @@ export default function TenantsManager() {
 
             {/* One-time provisioning result — shows admin temp password */}
             {provisionResult && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-amber-500/50 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-800 bg-amber-500/10">
-                            <h2 className="text-lg font-black text-amber-400">Tenant ready — admin temporary password</h2>
-                            <p className="text-xs text-amber-300/80 mt-1">Shown once. Deliver to the admin via a secure channel.</p>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/80 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-ink-900 ring-1 ring-amber-500/30 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
+                        <div className="px-6 py-4 border-b border-amber-500/20 bg-amber-500/10">
+                            <h2 className="text-base font-semibold text-amber-300 tracking-tight">Tenant ready &mdash; admin temporary password</h2>
+                            <p className="text-xs text-amber-200/80 mt-1">Shown once. Deliver to the admin via a secure channel.</p>
                         </div>
-                        <div className="p-6 space-y-4 text-sm">
-                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
-                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tenant</div>
-                                <div className="text-white font-bold">{provisionResult.db_name}</div>
+                        <div className="p-6 space-y-3 text-sm">
+                            <div className="bg-white/[0.03] ring-1 ring-white/10 rounded-xl p-4">
+                                <div className="text-2xs font-semibold text-ink-400 uppercase tracking-[0.14em] mb-2">Tenant</div>
+                                <div className="text-white font-semibold">{provisionResult.db_name}</div>
                             </div>
-                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
-                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Admin email</div>
+                            <div className="bg-white/[0.03] ring-1 ring-white/10 rounded-xl p-4">
+                                <div className="text-2xs font-semibold text-ink-400 uppercase tracking-[0.14em] mb-2">Admin email</div>
                                 <div className="text-white font-mono text-xs break-all">{provisionResult.admin_email}</div>
                             </div>
-                            <div className="bg-slate-950 border border-amber-500/30 rounded-lg p-4">
-                                <div className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">Temporary password</div>
-                                <code className="text-emerald-300 font-mono text-base break-all select-all">{provisionResult.admin_temp_password}</code>
-                                <button
-                                    onClick={() => { navigator.clipboard.writeText(provisionResult.admin_temp_password); toast.success('Copied'); }}
-                                    className="mt-3 text-xs text-amber-400 hover:text-amber-300 font-bold"
-                                >
+                            <div className="bg-amber-500/5 ring-1 ring-amber-500/30 rounded-xl p-4">
+                                <div className="text-2xs font-semibold text-amber-400 uppercase tracking-[0.14em] mb-2">Temporary password</div>
+                                <code className="text-accent-300 font-mono text-base break-all select-all">{provisionResult.admin_temp_password}</code>
+                                <button onClick={() => { navigator.clipboard.writeText(provisionResult.admin_temp_password); toast.success('Copied'); }}
+                                    className="mt-3 inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-semibold">
                                     Copy to clipboard
                                 </button>
                             </div>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-ink-400 leading-relaxed">
                                 The admin will be forced to choose a new password on first login.
                             </p>
                             <div className="flex justify-end pt-2">
-                                <button
-                                    onClick={() => setProvisionResult(null)}
-                                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold"
-                                >
-                                    I've saved it — close
+                                <button onClick={() => setProvisionResult(null)}
+                                    className="px-5 py-2 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-white rounded-lg text-sm font-semibold shadow-soft transition-all">
+                                    I&rsquo;ve saved it &mdash; close
                                 </button>
                             </div>
                         </div>
@@ -342,41 +335,41 @@ export default function TenantsManager() {
 
             {/* Provision Modal */}
             {isAddModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center">
-                            <h2 className="text-lg font-black text-white">Provision New Tenant</h2>
-                            <button onClick={() => setIsAddModalOpen(false)} className="text-slate-500 hover:text-white"><MoreVertical size={20}/></button>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/80 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-ink-900 ring-1 ring-white/10 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
+                        <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+                            <h2 className="text-base font-semibold text-white tracking-tight">Provision new tenant</h2>
+                            <button onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-400 hover:text-white hover:bg-white/10 transition-colors"><X size={18} /></button>
                         </div>
                         <form onSubmit={handleProvisionTenant} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Hospital Name</label>
-                                <input required type="text" value={newTenant.name} onChange={e => setNewTenant({...newTenant, name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none" placeholder="e.g. Aga Khan Hospital" />
+                                <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Hospital Name</label>
+                                <input required type="text" value={newTenant.name} onChange={e => setNewTenant({...newTenant, name: e.target.value})} className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all" placeholder="e.g. Aga Khan Hospital" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Subdomain Route</label>
-                                    <input required type="text" value={newTenant.domain} onChange={e => setNewTenant({...newTenant, domain: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none" placeholder="e.g. agakhan.hms.com" />
+                                    <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Subdomain Route</label>
+                                    <input required type="text" value={newTenant.domain} onChange={e => setNewTenant({...newTenant, domain: e.target.value})} className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all" placeholder="e.g. agakhan.hms.com" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Database Name</label>
+                                    <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Database Name</label>
                                     <input required type="text" value={newTenant.db_name} onChange={e => setNewTenant({...newTenant, db_name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none font-mono text-sm" placeholder="e.g. agakhan_db" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Bootstrap Admin Email</label>
-                                    <input required type="email" value={newTenant.admin_email} onChange={e => setNewTenant({...newTenant, admin_email: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none" placeholder="admin@agakhan.com" />
+                                    <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Bootstrap Admin Email</label>
+                                    <input required type="email" value={newTenant.admin_email} onChange={e => setNewTenant({...newTenant, admin_email: e.target.value})} className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all" placeholder="admin@agakhan.com" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Admin Full Name</label>
-                                    <input required type="text" value={newTenant.admin_full_name} onChange={e => setNewTenant({...newTenant, admin_full_name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none" placeholder="Jane Mwangi" />
+                                    <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Admin Full Name</label>
+                                    <input required type="text" value={newTenant.admin_full_name} onChange={e => setNewTenant({...newTenant, admin_full_name: e.target.value})} className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all" placeholder="Jane Mwangi" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Theme Color</label>
-                                    <select value={newTenant.theme_color} onChange={e => setNewTenant({...newTenant, theme_color: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none">
+                                    <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Theme Color</label>
+                                    <select value={newTenant.theme_color} onChange={e => setNewTenant({...newTenant, theme_color: e.target.value})} className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all">
                                         <option value="blue">Blue (Default)</option>
                                         <option value="emerald">Emerald</option>
                                         <option value="rose">Rose</option>
@@ -384,16 +377,16 @@ export default function TenantsManager() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Subscription Tier</label>
-                                    <select value={newTenant.is_premium} onChange={e => setNewTenant({...newTenant, is_premium: e.target.value === 'true'})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none">
+                                    <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Subscription Tier</label>
+                                    <select value={newTenant.is_premium} onChange={e => setNewTenant({...newTenant, is_premium: e.target.value === 'true'})} className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all">
                                         <option value="false">Standard (Basic Modules)</option>
                                         <option value="true">Premium (All Modules)</option>
                                     </select>
                                 </div>
                             </div>
-                            <div className="mt-6 pt-6 border-t border-slate-800 flex justify-end gap-3">
-                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-slate-400 hover:text-white transition-colors">Cancel</button>
-                                <button type="submit" className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold shadow-lg shadow-amber-500/20 transition-colors">Deploy Database Instance</button>
+                            <div className="mt-6 pt-5 border-t border-white/5 flex justify-end gap-2">
+                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-ink-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
+                                <button type="submit" className="px-5 py-2 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-white rounded-lg text-sm font-semibold shadow-glow transition-all">Deploy database instance</button>
                             </div>
                         </form>
                     </div>

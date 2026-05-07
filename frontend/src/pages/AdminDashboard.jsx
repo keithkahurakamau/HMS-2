@@ -675,7 +675,7 @@ export default function AdminDashboard() {
             {isStaffModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsStaffModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
+                    <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-slate-100 bg-slate-900 text-white shrink-0 flex justify-between items-center">
                             <div>
                                 <h2 className="text-xl font-bold flex items-center gap-2"><UserPlus size={24} className="text-brand-400" /> Provision Account</h2>
@@ -710,7 +710,7 @@ export default function AdminDashboard() {
             {isPricingModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsPricingModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+                    <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
                         <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">{pricingForm.catalog_id ? "Edit Service Package" : "Create Service Package"}</h2>
@@ -759,7 +759,7 @@ export default function AdminDashboard() {
             {isEditRoleModalOpen && selectedUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsEditRoleModalOpen(false)}></div>
-                    <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+                    <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
                         <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">Edit RBAC Access</h2>

@@ -68,12 +68,13 @@ export default function PlatformBilling() {
     const KES = (n) => `KES ${(n || 0).toLocaleString('en-KE')}`;
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="space-y-6 animate-fade-in">
             <div>
-                <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                    <CreditCard className="text-emerald-400" /> Billing &amp; Subscriptions
+                <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-400">Console</span>
+                <h1 className="text-2xl font-semibold text-white tracking-tight mt-1 flex items-center gap-2">
+                    <CreditCard size={22} className="text-accent-400" /> Billing &amp; Subscriptions
                 </h1>
-                <p className="text-slate-400 mt-1">Track platform revenue, manage tenant subscription tiers, and project growth.</p>
+                <p className="text-sm text-ink-400 mt-1">Track platform revenue, manage tenant subscription tiers, and project growth.</p>
             </div>
 
             {/* KPI Cards */}
@@ -127,78 +128,73 @@ export default function PlatformBilling() {
             </div>
 
             {/* Tenant subscription table */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
-                <div className="p-4 border-b border-slate-800 flex flex-wrap justify-between items-center gap-3 bg-slate-900/50">
-                    <h2 className="text-sm font-bold text-white">Tenant Subscriptions</h2>
+            <div className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl overflow-hidden">
+                <div className="p-4 border-b border-white/5 flex flex-wrap justify-between items-center gap-3">
+                    <h2 className="text-sm font-semibold text-white tracking-tight">Tenant subscriptions</h2>
                     <div className="relative">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
                         <input
-                            type="text"
-                            placeholder="Search tenants..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500 w-64"
+                            type="text" placeholder="Search tenants…"
+                            value={search} onChange={(e) => setSearch(e.target.value)}
+                            className="bg-ink-900/60 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-sm text-white placeholder-ink-500 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 w-64 transition-all"
                         />
                     </div>
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-950 border-b border-slate-800 text-slate-500 text-xs uppercase font-black tracking-wider">
+                        <thead className="bg-white/[0.02] text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
                             <tr>
                                 <th className="px-6 py-3">Tenant</th>
                                 <th className="px-6 py-3">Tier</th>
-                                <th className="px-6 py-3">Monthly Fee</th>
+                                <th className="px-6 py-3">Monthly fee</th>
                                 <th className="px-6 py-3">Status</th>
                                 <th className="px-6 py-3 text-right">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800 text-slate-300">
+                        <tbody className="divide-y divide-white/5 text-ink-300">
                             {isLoading ? (
-                                <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-500"><Activity size={16} className="inline animate-spin mr-2" />Loading…</td></tr>
+                                <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500"><Activity size={16} className="inline animate-spin mr-2" />Loading…</td></tr>
                             ) : filtered.length === 0 ? (
-                                <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-500">No tenants match your filter.</td></tr>
+                                <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500">No tenants match your filter.</td></tr>
                             ) : filtered.map(tenant => (
-                                <tr key={tenant.id} className="hover:bg-slate-800/40">
+                                <tr key={tenant.id} className="hover:bg-white/[0.03] transition-colors">
                                     <td className="px-6 py-3">
                                         <div className="flex items-center gap-2">
-                                            <Building2 size={16} className="text-slate-500" />
+                                            <Building2 size={16} className="text-ink-500" />
                                             <div>
-                                                <p className="font-bold text-white">{tenant.name}</p>
-                                                <p className="text-xs text-slate-500 font-mono">{tenant.domain}</p>
+                                                <p className="font-semibold text-white">{tenant.name}</p>
+                                                <p className="text-xs text-ink-500 font-mono">{tenant.domain}</p>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-3">
                                         {tenant.is_premium ? (
-                                            <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                                            <span className="bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/30 px-2.5 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wider inline-flex items-center gap-1">
                                                 <Crown size={10} /> Premium
                                             </span>
                                         ) : (
-                                            <span className="bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                            <span className="bg-white/5 text-ink-400 ring-1 ring-white/10 px-2.5 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wider">
                                                 Standard
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-3 font-mono text-xs text-slate-400">
+                                    <td className="px-6 py-3 font-mono text-xs text-ink-400">
                                         {KES(tenant.is_premium ? TIER_PRICING.Premium : TIER_PRICING.Standard)}
                                     </td>
                                     <td className="px-6 py-3">
-                                        <span className="inline-flex items-center gap-1.5 text-emerald-400 text-xs font-bold">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <span className="inline-flex items-center gap-1.5 text-accent-400 text-xs font-semibold">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse-soft"></span>
                                             Active
                                         </span>
                                     </td>
                                     <td className="px-6 py-3 text-right">
-                                        <button
-                                            onClick={() => toggleTier(tenant)}
-                                            disabled={updatingId === tenant.id}
-                                            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 ml-auto ${
+                                        <button onClick={() => toggleTier(tenant)} disabled={updatingId === tenant.id}
+                                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ml-auto ${
                                                 tenant.is_premium
-                                                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                                                    : 'bg-amber-600 hover:bg-amber-500 text-white'
-                                            } disabled:opacity-50`}
-                                        >
+                                                    ? 'bg-white/5 hover:bg-white/10 text-ink-300 ring-1 ring-white/10'
+                                                    : 'bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-white shadow-soft'
+                                            } disabled:opacity-50`}>
                                             {tenant.is_premium ? (<><ArrowDownRight size={12} /> Downgrade</>) : (<><ArrowUpRight size={12} /> Upgrade</>)}
                                         </button>
                                     </td>
@@ -209,9 +205,8 @@ export default function PlatformBilling() {
                 </div>
             </div>
 
-            <div className="text-xs text-slate-500 flex items-center gap-2 px-2">
-                <ShieldCheck size={14} className="text-slate-600" /> Tier pricing is configured in the platform settings file.
-                Tier changes are written to the master tenant registry and take effect on next billing cycle.
+            <div className="text-xs text-ink-500 flex items-start gap-2 px-2 leading-relaxed">
+                <ShieldCheck size={14} className="text-ink-600 shrink-0 mt-0.5" /> Tier pricing is configured in the platform settings file. Tier changes are written to the master tenant registry and take effect on next billing cycle.
             </div>
         </div>
     );
@@ -219,13 +214,13 @@ export default function PlatformBilling() {
 
 function KpiCard({ icon, label, value, sub, accent }) {
     return (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
-            <div className="flex justify-between items-start mb-2">
-                <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">{label}</div>
+        <div className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl p-5">
+            <div className="flex justify-between items-start mb-3">
+                <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-400">{label}</div>
                 {icon}
             </div>
-            <div className="text-3xl font-black text-white">{value}</div>
-            {sub && <div className="text-xs text-slate-500 mt-1">{sub}</div>}
+            <div className="text-2xl font-semibold text-white tracking-tight">{value}</div>
+            {sub && <div className="text-xs text-ink-500 mt-1">{sub}</div>}
         </div>
     );
 }
@@ -233,17 +228,17 @@ function KpiCard({ icon, label, value, sub, accent }) {
 function PricingCard({ tier, price, seats, features, accent }) {
     const isAmber = accent === 'amber';
     return (
-        <div className={`rounded-xl border ${isAmber ? 'border-amber-500/40 bg-gradient-to-br from-amber-900/10 to-slate-900' : 'border-slate-800 bg-slate-900'} p-5 shadow-lg`}>
+        <div className={`rounded-2xl ring-1 backdrop-blur-md p-5 ${isAmber ? 'ring-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-900/5' : 'ring-white/10 bg-white/[0.04]'}`}>
             <div className="flex justify-between items-start mb-3">
-                <h3 className={`font-black text-lg ${isAmber ? 'text-amber-300' : 'text-white'}`}>{tier}</h3>
+                <h3 className={`text-lg font-semibold tracking-tight ${isAmber ? 'text-amber-300' : 'text-white'}`}>{tier}</h3>
                 {isAmber && <Crown size={18} className="text-amber-400" />}
             </div>
-            <div className="text-3xl font-black text-white mb-1">{price}<span className="text-sm font-bold text-slate-500">/mo</span></div>
-            <div className="text-xs text-slate-500 mb-4">{seats} active subscriber{seats !== 1 ? 's' : ''}</div>
-            <ul className="space-y-1.5 text-xs text-slate-300">
+            <div className="text-2xl font-semibold text-white mb-1 tracking-tight">{price}<span className="text-sm font-medium text-ink-400">/mo</span></div>
+            <div className="text-xs text-ink-500 mb-4">{seats} active subscriber{seats !== 1 ? 's' : ''}</div>
+            <ul className="space-y-1.5 text-xs text-ink-200">
                 {features.map(f => (
                     <li key={f} className="flex gap-2">
-                        <span className={isAmber ? 'text-amber-400' : 'text-emerald-400'}>✓</span>
+                        <span className={isAmber ? 'text-amber-400' : 'text-accent-400'}>✓</span>
                         {f}
                     </li>
                 ))}
