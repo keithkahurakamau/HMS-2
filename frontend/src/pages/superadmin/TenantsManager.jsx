@@ -100,131 +100,125 @@ export default function TenantsManager() {
     const filteredTenants = tenants.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.domain.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="space-y-6 animate-fade-in">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">Tenant Fleet Manager</h1>
-                    <p className="text-slate-400 mt-1">Regulate hospital instances, database connections, and subscriptions.</p>
+                    <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-400">Console</span>
+                    <h1 className="text-2xl font-semibold text-white tracking-tight mt-1">Tenant Fleet Manager</h1>
+                    <p className="text-sm text-ink-400 mt-1">Regulate hospital instances, database connections, and subscriptions.</p>
                 </div>
-                <button 
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-colors"
-                >
-                    <Plus size={18} /> Provision New Tenant
+                <button onClick={() => setIsAddModalOpen(true)}
+                    className="inline-flex items-center gap-2 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-glow transition-all">
+                    <Plus size={15} /> Provision new tenant
                 </button>
             </div>
 
             {/* Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="text-slate-400 text-sm font-bold uppercase tracking-wider">Active Tenants</div>
-                        <Building2 size={18} className="text-blue-500" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                    { label: 'Active tenants',         value: tenants.length, icon: Building2, ring: 'bg-blue-500/10 ring-blue-500/20 text-blue-400' },
+                    { label: 'Premium subscriptions',  value: tenants.filter(t => t.is_premium).length, icon: ShieldAlert, ring: 'bg-amber-500/10 ring-amber-500/20 text-amber-400' },
+                    { label: 'Database nodes',         value: tenants.length, icon: Database, ring: 'bg-accent-500/10 ring-accent-500/20 text-accent-400' },
+                ].map(({ label, value, icon: Icon, ring }) => (
+                    <div key={label} className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl p-5">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ring-1 ring-inset ${ring}`}>
+                                <Icon size={18} />
+                            </div>
+                        </div>
+                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-400">{label}</p>
+                        <p className="text-2xl font-semibold text-white mt-1 tracking-tight">{value}</p>
                     </div>
-                    <div className="text-3xl font-black text-white">{tenants.length}</div>
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="text-slate-400 text-sm font-bold uppercase tracking-wider">Premium Subscriptions</div>
-                        <ShieldAlert size={18} className="text-amber-500" />
+                ))}
+                <div className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl p-5">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center ring-1 ring-inset bg-indigo-500/10 ring-indigo-500/20 text-indigo-400">
+                            <Server size={18} />
+                        </div>
                     </div>
-                    <div className="text-3xl font-black text-white">{tenants.filter(t => t.is_premium).length}</div>
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="text-slate-400 text-sm font-bold uppercase tracking-wider">Database Nodes</div>
-                        <Database size={18} className="text-emerald-500" />
-                    </div>
-                    <div className="text-3xl font-black text-white">{tenants.length}</div>
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="text-slate-400 text-sm font-bold uppercase tracking-wider">Server Status</div>
-                        <Server size={18} className="text-indigo-500" />
-                    </div>
-                    <div className="text-lg font-black text-emerald-400 flex items-center gap-2 mt-1">
-                        <CheckCircle2 size={18} /> Operational
-                    </div>
+                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-400">Server status</p>
+                    <p className="text-base font-semibold text-accent-400 mt-1 flex items-center gap-2">
+                        <CheckCircle2 size={16} /> Operational
+                    </p>
                 </div>
             </div>
 
             {/* Data Table */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
-                <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+            <div className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl overflow-hidden">
+                <div className="p-4 border-b border-white/5 flex justify-between items-center">
                     <div className="relative">
-                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input 
-                            type="text" 
-                            placeholder="Filter tenants..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:outline-none focus:border-amber-500 w-72 transition-colors"
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
+                        <input
+                            type="text" placeholder="Filter tenants…"
+                            value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                            className="bg-ink-900/60 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-ink-500 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 w-72 transition-all"
                         />
                     </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-950 border-b border-slate-800 text-slate-500 text-xs uppercase font-black tracking-wider">
+                        <thead className="bg-white/[0.02] text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
                             <tr>
-                                <th className="px-6 py-4">Tenant / Hospital Name</th>
-                                <th className="px-6 py-4">Domain Routing</th>
-                                <th className="px-6 py-4">Database Node</th>
-                                <th className="px-6 py-4">Subscription Tier</th>
-                                <th className="px-6 py-4 text-center">Actions</th>
+                                <th className="px-6 py-3">Tenant</th>
+                                <th className="px-6 py-3">Domain routing</th>
+                                <th className="px-6 py-3">Database node</th>
+                                <th className="px-6 py-3">Subscription tier</th>
+                                <th className="px-6 py-3 text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800 text-slate-300">
+                        <tbody className="divide-y divide-white/5 text-ink-300">
                             {isLoading ? (
-                                <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">Loading global registry...</td></tr>
-                            ) : filteredTenants.map(tenant => (
-                                <tr key={tenant.id} className="hover:bg-slate-800/50 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center border border-${tenant.theme_color}-500/30 bg-${tenant.theme_color}-500/10 text-${tenant.theme_color}-400`}>
-                                                <Building2 size={16} />
+                                <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500">Loading global registry…</td></tr>
+                            ) : filteredTenants.map(tenant => {
+                                const themeRing = {
+                                    blue:    'border-blue-500/30 bg-blue-500/10 text-blue-400',
+                                    emerald: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+                                    teal:    'border-brand-500/30 bg-brand-500/10 text-brand-300',
+                                    rose:    'border-rose-500/30 bg-rose-500/10 text-rose-400',
+                                    indigo:  'border-indigo-500/30 bg-indigo-500/10 text-indigo-400',
+                                }[tenant.theme_color] || 'border-blue-500/30 bg-blue-500/10 text-blue-400';
+                                return (
+                                    <tr key={tenant.id} className="hover:bg-white/[0.03] transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${themeRing}`}>
+                                                    <Building2 size={16} />
+                                                </div>
+                                                <span className="font-semibold text-white group-hover:text-amber-300 transition-colors">{tenant.name}</span>
                                             </div>
-                                            <span className="font-bold text-white group-hover:text-amber-400 transition-colors">{tenant.name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-mono text-xs text-slate-400">{tenant.domain}</td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <Database size={14} className="text-slate-500" />
-                                            <span className="font-mono text-xs text-emerald-400">{tenant.db_name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {tenant.is_premium ? (
-                                            <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Premium</span>
-                                        ) : (
-                                            <span className="bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Standard</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <div className="flex items-center justify-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => openEdit(tenant)}
-                                                aria-label={`Edit ${tenant.name}`}
-                                                className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
-                                                title="Edit Configuration"
-                                            ><Edit2 size={16} /></button>
-                                            <button
-                                                onClick={() => handleSuspendToggle(tenant)}
-                                                aria-label={(tenant.is_active ?? true) ? `Suspend ${tenant.name}` : `Reactivate ${tenant.name}`}
-                                                className={`p-1.5 rounded transition-colors ${
-                                                    (tenant.is_active ?? true)
-                                                        ? 'text-slate-400 hover:bg-rose-500/20 hover:text-rose-500'
-                                                        : 'text-emerald-400 hover:bg-emerald-500/20'
-                                                }`}
-                                                title={(tenant.is_active ?? true) ? 'Suspend Instance' : 'Reactivate Instance'}
-                                            >
-                                                {(tenant.is_active ?? true) ? <Power size={16} /> : <Zap size={16} />}
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                        <td className="px-6 py-4 font-mono text-xs text-ink-400">{tenant.domain}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <Database size={13} className="text-ink-500" />
+                                                <span className="font-mono text-xs text-accent-400">{tenant.db_name}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {tenant.is_premium ? (
+                                                <span className="bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20 px-2.5 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wider">Premium</span>
+                                            ) : (
+                                                <span className="bg-white/5 text-ink-400 ring-1 ring-white/10 px-2.5 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wider">Standard</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => openEdit(tenant)} aria-label={`Edit ${tenant.name}`}
+                                                    className="p-2 hover:bg-white/10 rounded-lg text-ink-400 hover:text-white transition-colors" title="Edit configuration">
+                                                    <Edit2 size={15} />
+                                                </button>
+                                                <button onClick={() => handleSuspendToggle(tenant)}
+                                                    aria-label={(tenant.is_active ?? true) ? `Suspend ${tenant.name}` : `Reactivate ${tenant.name}`}
+                                                    className={`p-2 rounded-lg transition-colors ${(tenant.is_active ?? true) ? 'text-ink-400 hover:bg-rose-500/20 hover:text-rose-400' : 'text-accent-400 hover:bg-accent-500/20'}`}
+                                                    title={(tenant.is_active ?? true) ? 'Suspend instance' : 'Reactivate instance'}>
+                                                    {(tenant.is_active ?? true) ? <Power size={15} /> : <Zap size={15} />}
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

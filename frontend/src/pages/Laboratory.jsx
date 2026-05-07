@@ -133,22 +133,22 @@ export default function Laboratory() {
     const getFlag = (val, min, max) => {
         if (!val) return null;
         const num = parseFloat(val);
-        if (num < min) return <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">LOW</span>;
-        if (num > max) return <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">HIGH</span>;
-        return <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">NORMAL</span>;
+        if (num < min) return <span className="badge-info">Low</span>;
+        if (num > max) return <span className="badge-danger">High</span>;
+        return <span className="badge-success">Normal</span>;
     };
 
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
-            
+
             {/* LIS HEADER & TABS */}
-            <div className="bg-white border border-slate-200 rounded-xl p-2 shadow-sm flex items-center justify-between shrink-0">
-                <div className="flex bg-slate-100 p-1 rounded-lg w-full max-w-md">
-                    <button onClick={() => setActiveTab('queue')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-bold transition-all ${activeTab === 'queue' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                        <Microscope size={18} /> Lab Operations
+            <div className="card p-2 flex items-center justify-between shrink-0">
+                <div role="tablist" aria-label="Laboratory mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
+                    <button role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                        <Microscope size={16} className={activeTab === 'queue' ? 'text-brand-600' : 'text-ink-400'} /> Lab Operations
                     </button>
-                    <button onClick={() => setActiveTab('catalog')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-bold transition-all ${activeTab === 'catalog' ? 'bg-white text-accent-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                        <FileDigit size={18} /> Test Catalog (Admin)
+                    <button role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                        <FileDigit size={16} className={activeTab === 'catalog' ? 'text-accent-600' : 'text-ink-400'} /> Test Catalog
                     </button>
                 </div>
             </div>
@@ -159,42 +159,43 @@ export default function Laboratory() {
             {activeTab === 'queue' && (
                 <>
                     {/* COLLAPSIBLE QUEUE */}
-                    <div className="bg-white border border-slate-200 rounded-xl shadow-sm shrink-0 flex flex-col z-30">
-                        <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-slate-50 hover:bg-brand-50 transition-colors rounded-t-xl focus:outline-none">
+                    <div className="card shrink-0 flex flex-col z-20">
+                        <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
                             <div className="flex items-center gap-3">
-                                <TestTube className="text-brand-600" size={20} />
-                                <h2 className="font-bold text-slate-800 text-lg">Pending Lab Orders</h2>
-                                <span className="bg-brand-100 text-brand-700 text-xs font-bold px-2.5 py-1 rounded-full">{queue.length} Tests</span>
+                                <TestTube className="text-brand-600" size={18} />
+                                <h2 className="font-semibold text-ink-900 text-base tracking-tight">Pending lab orders</h2>
+                                <span className="badge-brand">{queue.length} Tests</span>
                             </div>
-                            <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-                                {isQueueOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                            </div>
+                            <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                         </button>
 
                         {isQueueOpen && (
-                            <div className="border-t border-slate-100 p-4 bg-white rounded-b-xl">
+                            <div className="border-t border-ink-100 p-4 bg-white rounded-b-2xl">
                                 {isLoading ? (
-                                    <div className="text-center py-6 text-slate-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" /> Syncing Orders...</div>
+                                    <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Syncing orders&hellip;</div>
                                 ) : queue.length === 0 ? (
-                                    <div className="text-center py-6 text-slate-400">No pending lab tests in queue.</div>
+                                    <div className="text-center py-6 text-ink-400">No pending lab tests in queue.</div>
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                                        {queue.map((order) => (
-                                            <div key={order.test_id} onClick={() => handleTestSelect(order)} className={`p-3 rounded-lg border cursor-pointer transition-all ${activeTest?.test_id === order.test_id ? 'bg-brand-50 border-brand-500 shadow-sm ring-1 ring-brand-500' : 'bg-white hover:border-brand-300'}`}>
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h3 className="font-bold text-sm text-slate-900 line-clamp-1">{order.test_name}</h3>
-                                                    {order.priority === 'STAT' && <AlertCircle size={14} className="text-red-500 animate-pulse shrink-0" />}
-                                                </div>
-                                                <div className="flex justify-between items-center text-xs text-slate-500 mb-2">
-                                                    <span className="font-semibold text-slate-700">{order.patient}</span>
-                                                    <span className="font-mono text-slate-400">ID: {order.test_id}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className={`px-2 py-0.5 rounded font-bold ${order.status === 'Pending Collection' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>{order.status}</span>
-                                                    <span className="text-slate-400 flex items-center gap-1"><Clock size={10} /> {new Date(order.requested_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                        {queue.map((order) => {
+                                            const active = activeTest?.test_id === order.test_id;
+                                            return (
+                                                <button key={order.test_id} type="button" onClick={() => handleTestSelect(order)} className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white border-ink-200 hover:border-brand-300 hover:-translate-y-0.5'}`}>
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h3 className="font-semibold text-sm text-ink-900 line-clamp-1">{order.test_name}</h3>
+                                                        {order.priority === 'STAT' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft shrink-0" />}
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-xs text-ink-500 mb-2">
+                                                        <span className="font-medium text-ink-800">{order.patient}</span>
+                                                        <span className="font-mono text-2xs text-ink-400">#{order.test_id}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className={order.status === 'Pending Collection' ? 'badge-warn' : 'badge-info'}>{order.status}</span>
+                                                        <span className="text-ink-400 flex items-center gap-1"><Clock size={10} /> {new Date(order.requested_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -202,28 +203,28 @@ export default function Laboratory() {
                     </div>
 
                     {/* LAB WORKSPACE */}
-                    <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col z-10 relative">
+                    <div className="flex-1 card overflow-hidden flex flex-col z-10 relative">
                         {!activeTest ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50">
-                                <FlaskConical size={64} className="mb-4 text-slate-300" strokeWidth={1.5} />
-                                <h3 className="text-lg font-semibold text-slate-600 mb-1">Laboratory Workbench</h3>
+                            <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40">
+                                <FlaskConical size={56} className="mb-4 text-ink-300" strokeWidth={1.5} />
+                                <h3 className="text-base font-semibold text-ink-600 mb-1">Laboratory workbench</h3>
                                 <p className="text-sm">Select a pending test from the queue to process specimens and enter results.</p>
                             </div>
                         ) : (
                             <>
                                 {/* Workbench Header */}
-                                <div className="shrink-0 p-5 border-b border-slate-200 bg-white flex justify-between items-center shadow-[0_2px_4px_rgba(0,0,0,0.02)] z-10">
-                                    <div className="flex gap-4 items-center">
-                                        <div className="w-12 h-12 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center border border-brand-100">
-                                            <Microscope size={24} />
+                                <div className="shrink-0 p-5 border-b border-ink-100 bg-white flex justify-between items-center z-10">
+                                    <div className="flex gap-4 items-center flex-1 min-w-0">
+                                        <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100">
+                                            <Microscope size={20} />
                                         </div>
-                                        <div className="flex-1">
+                                        <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <h1 className="text-xl font-bold text-slate-900">{activeTest.test_name}</h1>
-                                                {activeTest.priority === 'STAT' && <span className="bg-red-100 text-red-700 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">STAT / Urgent</span>}
+                                                <h1 className="text-lg font-semibold text-ink-900 tracking-tight truncate">{activeTest.test_name}</h1>
+                                                {activeTest.priority === 'STAT' && <span className="badge-danger animate-pulse-soft">STAT</span>}
                                             </div>
-                                            <p className="text-sm font-medium text-slate-500">
-                                                Patient: <span className="text-slate-700">{activeTest.patient}</span> • Ordered by: <span className="text-slate-700">{activeTest.doctor}</span> • Order ID: {activeTest.test_id}
+                                            <p className="text-xs font-medium text-ink-500 truncate">
+                                                Patient: <span className="text-ink-700">{activeTest.patient}</span> &middot; Ordered by: <span className="text-ink-700">{activeTest.doctor}</span> &middot; #{activeTest.test_id}
                                             </p>
                                         </div>
                                         {(activeTest.status === 'Completed' || activeTest.result_summary) && (
@@ -234,67 +235,65 @@ export default function Laboratory() {
                                                     performedBy: { full_name: activeTest.performed_by_name },
                                                     orderedBy: { full_name: activeTest.doctor },
                                                 })}
-                                                className="ml-auto px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 flex items-center gap-2"
-                                                title="Print Lab Report"
+                                                className="btn-secondary shrink-0"
+                                                title="Print lab report"
                                             >
-                                                <Printer size={16}/> Print Report
+                                                <Printer size={15} /> Print report
                                             </button>
                                         )}
                                     </div>
                                 </div>
 
                                 {/* Scrolling Workspace Body */}
-                                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
-                                    
+                                <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 custom-scrollbar">
+
                                     {activeTest.status === 'Pending Collection' ? (
-                                        <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm text-center py-12">
-                                            <TestTube size={48} className="mx-auto text-slate-300 mb-4" />
-                                            <h3 className="text-lg font-bold text-slate-800 mb-2">Awaiting Specimen Collection</h3>
-                                            <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">Please collect the required specimen from the patient. Generate a barcode label to track the sample through the analyzers.</p>
-                                            <div className="flex justify-center gap-4">
-                                                <button onClick={() => { setActiveTest(null); setIsQueueOpen(true); }} className="px-6 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-bold flex items-center gap-2">
-                                                    <XCircle size={18} /> Reject / No Show
+                                        <div className="card p-6 text-center py-12">
+                                            <TestTube size={44} className="mx-auto text-ink-300 mb-4" />
+                                            <h3 className="text-base font-semibold text-ink-800 mb-1">Awaiting specimen collection</h3>
+                                            <p className="text-sm text-ink-500 mb-6 max-w-md mx-auto">Please collect the required specimen from the patient. Generate a barcode label to track the sample through the analyzers.</p>
+                                            <div className="flex flex-wrap justify-center gap-3">
+                                                <button onClick={() => { setActiveTest(null); setIsQueueOpen(true); }} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
+                                                    <XCircle size={16} /> Reject / no-show
                                                 </button>
-                                                <button onClick={handleAcknowledgeSpecimen} className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
-                                                    <Printer size={18} /> Print Barcode & Receive Specimen
+                                                <button onClick={handleAcknowledgeSpecimen} className="btn-primary">
+                                                    <Printer size={16} /> Print barcode & receive specimen
                                                 </button>
                                             </div>
                                         </div>
                                     ) : (
                                         <>
-                                            {/* STEP 1: Discrete Data Resulting */}
-                                            <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm animate-in fade-in slide-in-from-bottom-4">
-                                                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2 border-b border-slate-100 pb-3">
-                                                    <Activity className="text-brand-600" size={18} /> Enter Discrete Results
+                                            <div className="card-flush p-5 sm:p-6 animate-fade-in">
+                                                <h3 className="section-eyebrow mb-5 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                                    <Activity className="text-brand-600" size={16} /> Enter discrete results
                                                 </h3>
 
-                                                {/* Fallback to simple qualitative input if not a specialized discrete test */}
                                                 {activeTest.test_name.includes('CBC') || activeTest.test_name.includes('Blood') ? (
-                                                    <div className="space-y-4 overflow-x-auto pb-4">
-                                                        <div className="grid grid-cols-12 gap-4 items-center bg-slate-50 p-3 rounded-lg border border-slate-100 font-semibold text-xs text-slate-500 uppercase tracking-wider min-w-[600px]">
+                                                    <div className="space-y-3 overflow-x-auto pb-2">
+                                                        <div className="grid grid-cols-12 gap-3 items-center bg-ink-50 p-3 rounded-xl ring-1 ring-ink-100 text-2xs font-semibold text-ink-500 uppercase tracking-wider min-w-[600px]">
                                                             <div className="col-span-4">Parameter</div>
-                                                            <div className="col-span-3">Result Value</div>
+                                                            <div className="col-span-3">Result value</div>
                                                             <div className="col-span-2">Unit</div>
-                                                            <div className="col-span-2">Ref. Range</div>
+                                                            <div className="col-span-2">Ref. range</div>
                                                             <div className="col-span-1 text-center">Flag</div>
                                                         </div>
 
                                                         {[
-                                                            { key: 'wbc', name: 'White Blood Cells (WBC)', unit: 'x10^9/L', min: 4.0, max: 11.0 },
-                                                            { key: 'hgb', name: 'Hemoglobin (HGB)', unit: 'g/dL', min: 12.0, max: 16.0 },
+                                                            { key: 'wbc', name: 'White Blood Cells (WBC)', unit: 'x10⁹/L', min: 4.0, max: 11.0 },
+                                                            { key: 'hgb', name: 'Hemoglobin (HGB)',         unit: 'g/dL',   min: 12.0, max: 16.0 },
                                                         ].map(param => (
-                                                            <div key={param.key} className="grid grid-cols-12 gap-4 items-center border-b border-slate-50 pb-2 min-w-[600px]">
-                                                                <div className="col-span-4 font-bold text-sm text-slate-700">{param.name}</div>
+                                                            <div key={param.key} className="grid grid-cols-12 gap-3 items-center border-b border-ink-100 pb-2 min-w-[600px]">
+                                                                <div className="col-span-4 font-medium text-sm text-ink-700">{param.name}</div>
                                                                 <div className="col-span-3">
-                                                                    <input 
+                                                                    <input
                                                                         type="number" step="0.1"
                                                                         value={results[param.key] || ''}
                                                                         onChange={(e) => setResults({...results, [param.key]: e.target.value})}
-                                                                        className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
+                                                                        className="input"
                                                                     />
                                                                 </div>
-                                                                <div className="col-span-2 text-sm text-slate-500">{param.unit}</div>
-                                                                <div className="col-span-2 text-xs font-mono text-slate-400">{param.min} - {param.max}</div>
+                                                                <div className="col-span-2 text-sm text-ink-500">{param.unit}</div>
+                                                                <div className="col-span-2 text-xs font-mono text-ink-400">{param.min} – {param.max}</div>
                                                                 <div className="col-span-1 flex justify-center">
                                                                     {getFlag(results[param.key], param.min, param.max)}
                                                                 </div>
@@ -303,69 +302,60 @@ export default function Laboratory() {
                                                     </div>
                                                 ) : (
                                                     <div>
-                                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Qualitative Result / Impression</label>
-                                                        <textarea 
-                                                            rows="3" 
+                                                        <label className="label">Qualitative result / impression</label>
+                                                        <textarea
+                                                            rows="3"
                                                             value={results.qualitative || ''}
                                                             onChange={(e) => setResults({ qualitative: e.target.value })}
-                                                            className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
-                                                            placeholder="Enter qualitative findings..."
-                                                        ></textarea>
+                                                            className="input resize-none"
+                                                            placeholder="Enter qualitative findings…"
+                                                        />
                                                     </div>
                                                 )}
-                                                
+
                                                 <div className="mt-4">
-                                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Technician Notes (Optional)</label>
-                                                    <input type="text" value={techNotes} onChange={(e) => setTechNotes(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-slate-50" placeholder="Methodology notes..." />
+                                                    <label className="label">Technician notes (optional)</label>
+                                                    <input type="text" value={techNotes} onChange={(e) => setTechNotes(e.target.value)} className="input" placeholder="Methodology notes…" />
                                                 </div>
                                             </div>
 
-                                            {/* STEP 2: INVENTORY CONSUMPTION TRACKER */}
-                                            <div className="bg-white border-l-4 border-orange-400 rounded-r-xl border-y border-r border-slate-200 p-6 shadow-sm">
-                                                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-                                                    <Package className="text-orange-500" size={18} /> Reagents & Consumables Used
+                                            <div className="card-flush p-5 sm:p-6 border-l-4 border-l-amber-400">
+                                                <h3 className="section-eyebrow mb-4 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                                    <Package className="text-amber-500" size={16} /> Reagents &amp; consumables used
                                                 </h3>
-                                                
-                                                <div className="flex gap-3 mb-4">
-                                                    <select 
-                                                        value={selectedBatchId} 
-                                                        onChange={(e) => setSelectedBatchId(e.target.value)}
-                                                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
-                                                    >
-                                                        <option value="">Select item from Lab Store...</option>
+
+                                                <div className="flex flex-wrap gap-2 mb-4">
+                                                    <select value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)} className="input flex-1 min-w-[12rem]">
+                                                        <option value="">Select item from lab store…</option>
                                                         {labInventory.map(item => (
                                                             <option key={item.batch_id} value={item.batch_id}>
-                                                                {item.name} (Batch {item.batch_no}) - {item.stock} {item.unit} avail.
+                                                                {item.name} (Batch {item.batch_no}) – {item.stock} {item.unit} avail.
                                                             </option>
                                                         ))}
                                                     </select>
-                                                    <input 
-                                                        type="number" min="1" placeholder="Qty" 
-                                                        value={consumeQty} onChange={(e) => setConsumeQty(e.target.value)}
-                                                        className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
-                                                    />
-                                                    <button onClick={addConsumedItem} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-900 flex items-center gap-1">
-                                                        <Plus size={16}/> Add
+                                                    <input type="number" min="1" placeholder="Qty" value={consumeQty} onChange={(e) => setConsumeQty(e.target.value)} className="input w-24" />
+                                                    <button onClick={addConsumedItem} className="btn bg-ink-800 text-white hover:bg-ink-900">
+                                                        <Plus size={15} /> Add
                                                     </button>
                                                 </div>
 
                                                 {consumedItems.length > 0 && (
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg overflow-x-auto">
-                                                        <table className="w-full text-left text-sm text-slate-600 min-w-[400px]">
-                                                            <thead className="bg-slate-100 text-slate-500 text-xs uppercase font-bold border-b border-slate-200">
+                                                    <div className="card-flush overflow-x-auto">
+                                                        <table className="table-clean min-w-[400px]">
+                                                            <thead>
                                                                 <tr>
-                                                                    <th className="px-4 py-2">Item Name & Batch</th>
-                                                                    <th className="px-4 py-2">Qty Used</th>
-                                                                    <th className="px-4 py-2"></th>
+                                                                    <th>Item &amp; batch</th>
+                                                                    <th>Qty used</th>
+                                                                    <th></th>
                                                                 </tr>
                                                             </thead>
-                                                            <tbody className="divide-y divide-slate-100">
+                                                            <tbody>
                                                                 {consumedItems.map(item => (
                                                                     <tr key={item.batch_id}>
-                                                                        <td className="px-4 py-2 font-medium text-slate-900">{item.name} <span className="text-xs text-slate-500">({item.batch_no})</span></td>
-                                                                        <td className="px-4 py-2 font-bold">{item.quantity} {item.unit}</td>
-                                                                        <td className="px-4 py-2 text-right">
-                                                                            <button onClick={() => removeConsumedItem(item.batch_id)} className="text-slate-400 hover:text-red-500"><Trash2 size={16}/></button>
+                                                                        <td className="font-medium text-ink-900">{item.name} <span className="text-xs text-ink-500">({item.batch_no})</span></td>
+                                                                        <td className="font-semibold">{item.quantity} {item.unit}</td>
+                                                                        <td className="text-right">
+                                                                            <button onClick={() => removeConsumedItem(item.batch_id)} aria-label="Remove" className="text-ink-400 hover:text-rose-600"><Trash2 size={15} /></button>
                                                                         </td>
                                                                     </tr>
                                                                 ))}
@@ -373,7 +363,7 @@ export default function Laboratory() {
                                                         </table>
                                                     </div>
                                                 )}
-                                                {consumedItems.length === 0 && <p className="text-xs text-slate-400 italic">No consumables logged. Reagents must be logged to maintain accurate stock levels.</p>}
+                                                {consumedItems.length === 0 && <p className="text-xs text-ink-400 italic">No consumables logged. Reagents must be logged to maintain accurate stock levels.</p>}
                                             </div>
                                         </>
                                     )}
@@ -381,15 +371,12 @@ export default function Laboratory() {
 
                                 {/* Workbench Footer Actions */}
                                 {activeTest.status === 'In Progress' && (
-                                    <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)] z-10">
-                                        <button
-                                            onClick={handleRejectSample}
-                                            className="px-5 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 flex items-center gap-2 transition-colors"
-                                        >
-                                            <XCircle size={18} /> Reject Sample
+                                    <div className="p-4 border-t border-ink-100 bg-white flex justify-end gap-2 shrink-0 z-10">
+                                        <button onClick={handleRejectSample} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
+                                            <XCircle size={16} /> Reject sample
                                         </button>
-                                        <button onClick={handleReleaseResults} className="px-6 py-2.5 bg-accent-600 hover:bg-accent-700 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-colors">
-                                            <Send size={18} /> Verify, Release & Deduct Stock
+                                        <button onClick={handleReleaseResults} className="btn-success">
+                                            <Send size={16} /> Verify, release &amp; deduct stock
                                         </button>
                                     </div>
                                 )}
@@ -403,39 +390,40 @@ export default function Laboratory() {
             {/* MODE 2: ADMIN TEST CATALOG (READ-ONLY)    */}
             {/* ========================================= */}
             {activeTab === 'catalog' && (
-                <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <div className="flex-1 card flex flex-col overflow-hidden">
+                    <div className="p-5 border-b border-ink-100 bg-ink-50/40 flex justify-between items-center">
                         <div>
-                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                <Settings className="text-slate-400" size={20} /> Managed Test Directory
+                            <span className="section-eyebrow">Admin</span>
+                            <h2 className="text-base font-semibold text-ink-900 mt-1 flex items-center gap-2 tracking-tight">
+                                <Settings className="text-ink-400" size={18} /> Managed test directory
                             </h2>
-                            <p className="text-sm text-slate-500 mt-1">This catalog is managed by Hospital Administration and determines what Doctors can order.</p>
+                            <p className="text-sm text-ink-500 mt-1">This catalog is managed by hospital administration and determines what doctors can order.</p>
                         </div>
                     </div>
-                    
+
                     <div className="flex-1 overflow-auto">
-                        <table className="w-full text-left text-sm text-slate-600 min-w-[500px]">
-                            <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
+                        <table className="table-clean min-w-[500px]">
+                            <thead>
                                 <tr>
-                                    <th className="px-6 py-4">Test Code & Name</th>
-                                    <th className="px-6 py-4">Category</th>
-                                    <th className="px-6 py-4">Description / Specimen</th>
+                                    <th>Test code &amp; name</th>
+                                    <th>Category</th>
+                                    <th>Description / specimen</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody>
                                 {isLoading ? (
-                                    <tr><td colSpan="3" className="text-center py-8">Loading Catalog...</td></tr>
+                                    <tr><td colSpan="3" className="text-center py-8 text-ink-400">Loading catalog…</td></tr>
                                 ) : catalog.length === 0 ? (
-                                    <tr><td colSpan="3" className="text-center py-8 text-slate-500">No Laboratory packages found in Admin Pricing Catalog.</td></tr>
+                                    <tr><td colSpan="3" className="text-center py-8 text-ink-500">No laboratory packages found in admin pricing catalog.</td></tr>
                                 ) : catalog.map((test) => (
-                                    <tr key={test.catalog_id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-900">{test.test_name}</div>
-                                            <div className="text-xs font-mono text-slate-500 mt-0.5">PKG-LAB-{String(test.catalog_id).padStart(4, '0')}</div>
+                                    <tr key={test.catalog_id}>
+                                        <td>
+                                            <div className="font-semibold text-ink-900">{test.test_name}</div>
+                                            <div className="text-xs font-mono text-ink-500 mt-0.5">PKG-LAB-{String(test.catalog_id).padStart(4, '0')}</div>
                                         </td>
-                                        <td className="px-6 py-4 font-medium text-slate-700">{test.category}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-xs font-semibold">{test.default_specimen_type || 'General'}</span>
+                                        <td className="font-medium text-ink-700">{test.category}</td>
+                                        <td>
+                                            <span className="badge-neutral">{test.default_specimen_type || 'General'}</span>
                                         </td>
                                     </tr>
                                 ))}

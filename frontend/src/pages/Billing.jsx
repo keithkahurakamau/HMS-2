@@ -145,60 +145,59 @@ export default function Billing() {
         <div className="space-y-6 pb-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Billing & Finance</h1>
-                    <p className="text-sm text-slate-500 mt-1">Manage patient invoices, consultation fees, and accept payments.</p>
+                    <span className="section-eyebrow">Cashier</span>
+                    <h1 className="section-title mt-1">Billing &amp; Finance</h1>
+                    <p className="section-sub">Manage patient invoices, consultation fees, and accept payments.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 flex-wrap">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                            type="text" placeholder="Search invoices..." 
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" size={16} />
+                        <input
+                            type="text" placeholder="Search invoices…"
                             value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none w-64 shadow-sm"
+                            className="input pl-9 w-64"
                         />
                     </div>
-                    <button onClick={openLedger} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-green-700 transition-colors">
-                        <Smartphone size={16} /> M-Pesa Ledger
+                    <button onClick={openLedger} className="btn-success">
+                        <Smartphone size={15} /> M-Pesa Ledger
                     </button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                 {/* Billing Queue List */}
-                <div className="md:col-span-1 space-y-4">
-                    <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center justify-between">
-                        Pending Invoices <span className="bg-brand-100 text-brand-700 py-0.5 px-2 rounded-full">{queue.length}</span>
+                <div className="md:col-span-1 space-y-3">
+                    <h3 className="section-eyebrow flex items-center justify-between">
+                        Pending invoices <span className="badge-brand">{queue.length}</span>
                     </h3>
-                    
+
                     {isLoading ? (
-                        <div className="text-center py-12 text-slate-400"><Activity className="animate-spin mx-auto mb-2" /></div>
+                        <div className="card text-center py-12 text-ink-400"><Activity className="animate-spin mx-auto mb-2" size={20} /></div>
                     ) : filteredQueue.length === 0 ? (
-                        <div className="bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm">
-                            <Receipt className="mx-auto text-slate-300 mb-3" size={32} />
-                            <p className="text-slate-500 text-sm font-medium">No pending invoices.</p>
+                        <div className="card p-8 text-center">
+                            <Receipt className="mx-auto text-ink-300 mb-3" size={28} />
+                            <p className="text-ink-500 text-sm font-medium">No pending invoices.</p>
                         </div>
                     ) : (
-                        <div className="space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
-                            {filteredQueue.map(inv => (
-                                <div 
-                                    key={inv.invoice_id}
-                                    onClick={() => setActiveInvoice(inv)}
-                                    className={`bg-white border p-4 rounded-xl cursor-pointer transition-all ${activeInvoice?.invoice_id === inv.invoice_id ? 'border-brand-500 ring-2 ring-brand-500/20 shadow-md' : 'border-slate-200 hover:border-brand-300 shadow-sm'}`}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                                            inv.status === 'Pending M-Pesa' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                                        }`}>{inv.status}</span>
-                                        <span className="text-xs font-bold text-slate-400">INV-{inv.invoice_id}</span>
-                                    </div>
-                                    <h4 className="font-bold text-slate-900 text-sm mb-1">{inv.patient_name}</h4>
-                                    <p className="text-xs text-slate-500 mb-3">{inv.patient_opd}</p>
-                                    <div className="flex justify-between items-center border-t border-slate-100 pt-3">
-                                        <span className="text-xs text-slate-500">Balance Due</span>
-                                        <span className="font-black text-brand-600">KES {(inv.total_amount - inv.amount_paid).toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar pr-1">
+                            {filteredQueue.map(inv => {
+                                const active = activeInvoice?.invoice_id === inv.invoice_id;
+                                return (
+                                    <button key={inv.invoice_id} type="button" onClick={() => setActiveInvoice(inv)}
+                                        className={`w-full text-left card p-4 transition-all duration-150 ${active ? 'border-brand-400 ring-2 ring-brand-500/15 shadow-elevated' : 'hover:-translate-y-0.5 hover:shadow-elevated'}`}>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className={inv.status === 'Pending M-Pesa' ? 'badge-success' : 'badge-warn'}>{inv.status}</span>
+                                            <span className="text-2xs font-mono text-ink-400">INV-{inv.invoice_id}</span>
+                                        </div>
+                                        <h4 className="font-semibold text-ink-900 text-sm">{inv.patient_name}</h4>
+                                        <p className="text-xs text-ink-500 mb-3">{inv.patient_opd}</p>
+                                        <div className="flex justify-between items-center border-t border-ink-100 pt-3">
+                                            <span className="text-xs text-ink-500">Balance due</span>
+                                            <span className="font-semibold text-brand-700">KES {(inv.total_amount - inv.amount_paid).toFixed(2)}</span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -206,53 +205,52 @@ export default function Billing() {
                 {/* Main Cashier Workspace */}
                 <div className="md:col-span-3">
                     {activeInvoice ? (
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[60vh] md:h-[calc(100vh-140px)]">
-                            <div className="p-6 bg-slate-900 text-white shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="card overflow-hidden flex flex-col min-h-[60vh] md:h-[calc(100vh-160px)]">
+                            <div className="p-5 sm:p-6 bg-gradient-to-br from-ink-900 to-ink-950 text-white shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
-                                    <h2 className="text-2xl font-black mb-1">{activeInvoice.patient_name}</h2>
-                                    <p className="text-slate-400 font-medium">{activeInvoice.patient_opd} • Invoice #{activeInvoice.invoice_id}</p>
+                                    <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">{activeInvoice.patient_name}</h2>
+                                    <p className="text-ink-400 text-sm mt-1">{activeInvoice.patient_opd} &middot; Invoice #{activeInvoice.invoice_id}</p>
                                 </div>
-                                <div className="text-right flex items-center gap-4">
-                                    <div>
-                                        <p className="text-slate-400 text-xs font-bold uppercase mb-1">Total Balance Due</p>
-                                        <p className="text-3xl font-black text-green-400">KES {(activeInvoice.total_amount - activeInvoice.amount_paid).toFixed(2)}</p>
+                                <div className="flex items-center gap-3">
+                                    <div className="text-right">
+                                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-400">Balance due</p>
+                                        <p className="text-2xl sm:text-3xl font-semibold text-accent-400 tracking-tight">KES {(activeInvoice.total_amount - activeInvoice.amount_paid).toFixed(2)}</p>
                                     </div>
-                                    <button onClick={() => printInvoice(activeInvoice)} className="ml-4 p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700 no-print flex items-center gap-2 px-3" title="Print Invoice / Receipt">
-                                        <Printer size={18} />
-                                        <span className="text-xs font-bold">Print</span>
+                                    <button onClick={() => printInvoice(activeInvoice)} className="p-2 bg-white/10 hover:bg-white/15 text-white rounded-lg transition-colors ring-1 ring-white/10 no-print flex items-center gap-2 px-3" title="Print invoice / receipt">
+                                        <Printer size={16} />
+                                        <span className="text-xs font-semibold">Print</span>
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
-                                {/* Bill Breakdown */}
+                            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 bg-ink-50/40 custom-scrollbar">
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Itemized Breakdown</h3>
-                                    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden overflow-x-auto shadow-sm">
-                                        <table className="w-full text-left text-sm text-slate-600 min-w-[500px]">
-                                            <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500">
+                                    <h3 className="section-eyebrow mb-3 border-b border-ink-100 pb-2">Itemized breakdown</h3>
+                                    <div className="card-flush overflow-hidden overflow-x-auto">
+                                        <table className="table-clean min-w-[500px]">
+                                            <thead>
                                                 <tr>
-                                                    <th className="px-4 py-3">Description</th>
-                                                    <th className="px-4 py-3">Category</th>
-                                                    <th className="px-4 py-3 text-right">Amount (KES)</th>
+                                                    <th>Description</th>
+                                                    <th>Category</th>
+                                                    <th className="text-right">Amount (KES)</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-100">
+                                            <tbody>
                                                 {activeInvoice.items.map(item => (
                                                     <tr key={item.id}>
-                                                        <td className="px-4 py-3 font-medium text-slate-900">{item.description}</td>
-                                                        <td className="px-4 py-3"><span className="px-2 py-1 bg-slate-100 rounded text-xs">{item.item_type}</span></td>
-                                                        <td className="px-4 py-3 text-right font-bold">{item.amount.toFixed(2)}</td>
+                                                        <td className="font-medium text-ink-900">{item.description}</td>
+                                                        <td><span className="badge-neutral">{item.item_type}</span></td>
+                                                        <td className="text-right font-semibold">{item.amount.toFixed(2)}</td>
                                                     </tr>
                                                 ))}
-                                                <tr className="bg-slate-50 font-bold">
-                                                    <td colSpan="2" className="px-4 py-3 text-right text-slate-700">Subtotal</td>
-                                                    <td className="px-4 py-3 text-right text-slate-900">{activeInvoice.total_amount.toFixed(2)}</td>
+                                                <tr className="bg-ink-50 font-semibold">
+                                                    <td colSpan="2" className="text-right text-ink-700">Subtotal</td>
+                                                    <td className="text-right text-ink-900">{activeInvoice.total_amount.toFixed(2)}</td>
                                                 </tr>
                                                 {activeInvoice.amount_paid > 0 && (
-                                                    <tr className="bg-green-50 font-bold text-green-700">
-                                                        <td colSpan="2" className="px-4 py-3 text-right">Already Paid</td>
-                                                        <td className="px-4 py-3 text-right">-{activeInvoice.amount_paid.toFixed(2)}</td>
+                                                    <tr className="bg-accent-50 font-semibold text-accent-700">
+                                                        <td colSpan="2" className="text-right">Already paid</td>
+                                                        <td className="text-right">&minus;{activeInvoice.amount_paid.toFixed(2)}</td>
                                                     </tr>
                                                 )}
                                             </tbody>
@@ -260,70 +258,67 @@ export default function Billing() {
                                     </div>
                                 </div>
 
-                                {/* Payment Processing */}
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Receive Payment</h3>
-                                    <form onSubmit={handleProcessPayment} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                            {/* Payment Methods */}
-                                            <div 
-                                                onClick={() => setPaymentMethod('Cash')}
-                                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 ${paymentMethod === 'Cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500 hover:border-brand-300'}`}
-                                            >
-                                                <Banknote size={24} />
-                                                <span className="font-bold text-sm">Cash</span>
-                                            </div>
-                                            <div 
-                                                onClick={() => setPaymentMethod('M-Pesa')}
-                                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 ${paymentMethod === 'M-Pesa' ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-200 text-slate-500 hover:border-green-300'}`}
-                                            >
-                                                <Smartphone size={24} />
-                                                <span className="font-bold text-sm">M-Pesa (STK)</span>
-                                            </div>
-                                            <div 
-                                                onClick={() => setPaymentMethod('Card')}
-                                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 ${paymentMethod === 'Card' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-500 hover:border-purple-300'}`}
-                                            >
-                                                <CreditCard size={24} />
-                                                <span className="font-bold text-sm">Credit Card</span>
-                                            </div>
+                                    <h3 className="section-eyebrow mb-3 border-b border-ink-100 pb-2">Receive payment</h3>
+                                    <form onSubmit={handleProcessPayment} className="card p-5 sm:p-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+                                            {[
+                                                { key: 'Cash',   icon: Banknote,   label: 'Cash',          accent: 'brand'  },
+                                                { key: 'M-Pesa', icon: Smartphone, label: 'M-Pesa (STK)',  accent: 'accent' },
+                                                { key: 'Card',   icon: CreditCard, label: 'Credit card',   accent: 'purple' },
+                                            ].map(({ key, icon: Icon, label, accent }) => {
+                                                const isActive = paymentMethod === key;
+                                                const accentMap = {
+                                                    brand:  isActive ? 'border-brand-500 bg-brand-50 text-brand-700 ring-2 ring-brand-500/15' : '',
+                                                    accent: isActive ? 'border-accent-500 bg-accent-50 text-accent-700 ring-2 ring-accent-500/15' : '',
+                                                    purple: isActive ? 'border-purple-500 bg-purple-50 text-purple-700 ring-2 ring-purple-500/15' : '',
+                                                };
+                                                return (
+                                                    <button type="button" key={key} onClick={() => setPaymentMethod(key)}
+                                                        className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${isActive ? accentMap[accent] : 'border-ink-200 text-ink-500 hover:border-ink-300 hover:bg-ink-50'}`}>
+                                                        <Icon size={22} />
+                                                        <span className="font-semibold text-sm">{label}</span>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
 
                                         {paymentMethod === 'M-Pesa' && (
-                                            <div className="mb-6">
-                                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Patient Phone Number for STK Push</label>
-                                                <input 
-                                                    type="text" 
+                                            <div className="mb-5 animate-fade-in">
+                                                <label className="label">Patient phone number for STK push</label>
+                                                <input
+                                                    type="text"
                                                     required={paymentMethod === 'M-Pesa'}
-                                                    value={mpesaPhone} 
+                                                    value={mpesaPhone}
                                                     onChange={e => setMpesaPhone(e.target.value)}
-                                                    placeholder="e.g. 254712345678" 
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none" 
+                                                    placeholder="e.g. 254712345678"
+                                                    className="input"
                                                 />
                                             </div>
                                         )}
 
-                                            <button 
-                                                type="submit" 
-                                                disabled={isProcessing}
-                                                className={`w-full py-4 rounded-xl font-black text-white text-lg flex items-center justify-center gap-2 transition-colors shadow-md ${
-                                                    mpesaStatus === 'waiting' ? 'bg-orange-500 hover:bg-orange-600 animate-pulse' :
-                                                    paymentMethod === 'M-Pesa' ? 'bg-green-600 hover:bg-green-700' :
-                                                    paymentMethod === 'Card' ? 'bg-purple-600 hover:bg-purple-700' :
-                                                    'bg-brand-600 hover:bg-brand-700'
-                                                } disabled:opacity-80 cursor-pointer disabled:cursor-not-allowed`}
-                                            >
-                                                {mpesaStatus === 'waiting' ? <Smartphone className="animate-bounce" size={24}/> : isProcessing ? <Activity className="animate-spin" size={24}/> : <CheckCircle2 size={24} />}
-                                                {mpesaStatus === 'waiting' ? 'Awaiting PIN from Patient...' : paymentMethod === 'M-Pesa' ? 'Trigger M-Pesa STK Push' : 'Confirm Payment & Close Bill'}
-                                            </button>
+                                        <button
+                                            type="submit"
+                                            disabled={isProcessing}
+                                            className={`w-full py-3.5 rounded-xl font-semibold text-white text-base flex items-center justify-center gap-2 transition-all shadow-soft ${
+                                                mpesaStatus === 'waiting' ? 'bg-amber-500 hover:bg-amber-600 animate-pulse-soft' :
+                                                paymentMethod === 'M-Pesa' ? 'bg-gradient-to-b from-accent-500 to-accent-600 hover:from-accent-500 hover:to-accent-700' :
+                                                paymentMethod === 'Card'   ? 'bg-gradient-to-b from-purple-500 to-purple-600 hover:from-purple-500 hover:to-purple-700' :
+                                                                              'bg-gradient-to-b from-brand-500 to-brand-600 hover:from-brand-500 hover:to-brand-700'
+                                            } disabled:opacity-80 disabled:cursor-not-allowed`}
+                                        >
+                                            {mpesaStatus === 'waiting' ? <Smartphone className="animate-pulse" size={20} /> : isProcessing ? <Activity className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
+                                            {mpesaStatus === 'waiting' ? 'Awaiting PIN from patient…' : paymentMethod === 'M-Pesa' ? 'Trigger M-Pesa STK Push' : 'Confirm payment & close bill'}
+                                        </button>
                                     </form>
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <div className="h-[calc(100vh-140px)] flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-slate-400">
-                            <Receipt size={64} className="mb-4 text-slate-300" />
-                            <p className="text-lg font-bold text-slate-500">Select an invoice to process payment</p>
+                        <div className="h-[calc(100vh-160px)] flex flex-col items-center justify-center border-2 border-dashed border-ink-200 rounded-2xl bg-white text-ink-400">
+                            <Receipt size={56} className="mb-4 text-ink-300" />
+                            <p className="text-base font-semibold text-ink-600">Select an invoice to process payment</p>
+                            <p className="text-xs text-ink-400 mt-1">Pick from the queue on the left.</p>
                         </div>
                     )}
                 </div>
@@ -332,41 +327,41 @@ export default function Billing() {
             {/* --- M-PESA LEDGER MODAL --- */}
             {isLedgerOpen && (
                 <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsLedgerOpen(false)}></div>
-                    <div className="relative w-full max-w-4xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
-                        <div className="p-6 border-b border-slate-100 bg-slate-900 text-white shrink-0 flex justify-between items-center">
+                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsLedgerOpen(false)}></div>
+                    <div className="relative w-full max-w-4xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-ink-900 to-ink-950 text-white shrink-0 flex justify-between items-center">
                             <div>
-                                <h2 className="text-xl font-bold flex items-center gap-2"><Smartphone size={24} className="text-green-400" /> M-Pesa Receipts Ledger</h2>
-                                <p className="text-sm text-slate-400 mt-1">Verify real-time STK Push statuses and Daraja receipt codes.</p>
+                                <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2"><Smartphone size={20} className="text-accent-400" /> M-Pesa Receipts Ledger</h2>
+                                <p className="text-sm text-ink-400 mt-1">Verify real-time STK push statuses and Daraja receipt codes.</p>
                             </div>
-                            <button onClick={() => setIsLedgerOpen(false)} className="text-slate-400 hover:text-white"><X size={24}/></button>
+                            <button onClick={() => setIsLedgerOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-400 hover:text-white hover:bg-white/10 transition-colors"><X size={20} /></button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
-                            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                                <table className="w-full text-left text-sm text-slate-600 min-w-[800px]">
-                                    <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500 sticky top-0">
+                        <div className="flex-1 overflow-y-auto p-6 bg-ink-50/40 custom-scrollbar">
+                            <div className="card overflow-hidden">
+                                <table className="table-clean min-w-[800px]">
+                                    <thead className="sticky top-0">
                                         <tr>
-                                            <th className="px-6 py-4">Timestamp</th>
-                                            <th className="px-6 py-4">Phone Number</th>
-                                            <th className="px-6 py-4">Invoice #</th>
-                                            <th className="px-6 py-4">Amount (KES)</th>
-                                            <th className="px-6 py-4">Receipt Details</th>
-                                            <th className="px-6 py-4 text-right">Status</th>
+                                            <th>Timestamp</th>
+                                            <th>Phone</th>
+                                            <th>Invoice</th>
+                                            <th>Amount (KES)</th>
+                                            <th>Receipt details</th>
+                                            <th className="text-right">Status</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                                    <tbody className="font-mono text-xs">
                                         {mpesaLogs.length === 0 ? (
-                                            <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400 font-sans">No M-Pesa transactions found.</td></tr>
+                                            <tr><td colSpan="6" className="px-6 py-12 text-center text-ink-400 font-sans">No M-Pesa transactions found.</td></tr>
                                         ) : (
                                             mpesaLogs.map((log) => (
-                                                <tr key={log.id} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-4 text-slate-500">{new Date(log.created_at).toLocaleString()}</td>
-                                                    <td className="px-6 py-4 font-bold text-slate-800">{log.phone_number}</td>
-                                                    <td className="px-6 py-4 font-bold text-brand-700">INV-{log.invoice_id}</td>
-                                                    <td className="px-6 py-4 font-black text-slate-900">{log.amount ? log.amount.toFixed(2) : '-'}</td>
-                                                    <td className="px-6 py-4 text-slate-500 max-w-xs truncate">{log.receipt_number || log.result_desc || 'Waiting for Callback...'}</td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <span className={`px-2.5 py-1 rounded text-xs font-bold inline-block ${log.status === 'Success' ? 'bg-green-100 text-green-700' : log.status === 'Failed' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700 animate-pulse'}`}>
+                                                <tr key={log.id}>
+                                                    <td className="text-ink-500">{new Date(log.created_at).toLocaleString()}</td>
+                                                    <td className="font-semibold text-ink-800">{log.phone_number}</td>
+                                                    <td className="font-semibold text-brand-700">INV-{log.invoice_id}</td>
+                                                    <td className="font-semibold text-ink-900">{log.amount ? log.amount.toFixed(2) : '-'}</td>
+                                                    <td className="text-ink-500 max-w-xs truncate">{log.receipt_number || log.result_desc || 'Waiting for callback…'}</td>
+                                                    <td className="text-right">
+                                                        <span className={log.status === 'Success' ? 'badge-success' : log.status === 'Failed' ? 'badge-danger' : 'badge-warn animate-pulse-soft'}>
                                                             {log.status}
                                                         </span>
                                                     </td>

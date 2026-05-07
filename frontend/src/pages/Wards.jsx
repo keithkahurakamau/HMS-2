@@ -152,95 +152,100 @@ export default function Wards() {
         <div className="space-y-6 pb-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Ward & Bed Management</h1>
-                    <p className="text-sm text-slate-500 mt-1">Monitor hospital capacity, manage admissions, and track clinical inventory.</p>
+                    <span className="section-eyebrow">Inpatient</span>
+                    <h1 className="section-title mt-1">Ward &amp; Bed Management</h1>
+                    <p className="section-sub">Monitor hospital capacity, manage admissions, and track clinical inventory.</p>
                 </div>
-                <div className="flex gap-3">
-                    <button onClick={() => setIsAdmitModalOpen(true)} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm">
-                        <UserPlus size={18} /> Admit Patient
-                    </button>
-                </div>
+                <button onClick={() => setIsAdmitModalOpen(true)} className="btn-primary">
+                    <UserPlus size={16} /> Admit patient
+                </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="stat-tile">
+                    <div className="flex justify-between items-start">
+                        <div className="stat-icon bg-blue-50 ring-blue-100 text-blue-600"><Activity size={20} /></div>
+                    </div>
                     <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Occupancy</p>
-                        <div className="flex items-baseline gap-2">
-                            <p className="text-2xl font-black text-slate-900">{occupancyRate}%</p>
-                            <p className="text-sm font-medium text-slate-500">({occupiedBeds} / {totalBeds})</p>
+                        <h3 className="stat-label">Total occupancy</h3>
+                        <div className="flex items-baseline gap-2 mt-1">
+                            <p className="stat-value">{occupancyRate}%</p>
+                            <p className="text-sm font-medium text-ink-500">({occupiedBeds} / {totalBeds})</p>
                         </div>
                     </div>
-                    <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center"><Activity size={24} /></div>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-green-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-green-600 uppercase tracking-wider mb-1">Available Capacity</p>
-                        <p className="text-2xl font-black text-green-700">{availableBeds}</p>
+                <div className="stat-tile">
+                    <div className="flex justify-between items-start">
+                        <div className="stat-icon bg-accent-50 ring-accent-100 text-accent-600"><Bed size={20} /></div>
                     </div>
-                    <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center"><Bed size={24} /></div>
+                    <div>
+                        <h3 className="stat-label">Available capacity</h3>
+                        <p className="stat-value mt-1 text-accent-700">{availableBeds}</p>
+                    </div>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-orange-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">Sanitation / Maintenance</p>
-                        <p className="text-2xl font-black text-orange-700">{totalBeds - occupiedBeds - availableBeds}</p>
+                <div className="stat-tile">
+                    <div className="flex justify-between items-start">
+                        <div className="stat-icon bg-amber-50 ring-amber-100 text-amber-600"><AlertCircle size={20} /></div>
                     </div>
-                    <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center animate-pulse"><AlertCircle size={24} /></div>
+                    <div>
+                        <h3 className="stat-label">Sanitation / maintenance</h3>
+                        <p className="stat-value mt-1 text-amber-700">{totalBeds - occupiedBeds - availableBeds}</p>
+                    </div>
                 </div>
             </div>
 
             {/* BED BOARD GRID */}
-            <div className="space-y-8">
+            <div className="space-y-6">
                 {isLoading ? (
-                    <div className="text-center py-12 text-slate-400"><Activity className="animate-spin mx-auto mb-2" /> Resolving allocations...</div>
+                    <div className="card text-center py-12 text-ink-400"><Activity className="animate-spin mx-auto mb-2" size={20} /> Resolving allocations…</div>
                 ) : wards.map(ward => (
-                    <div key={ward.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                        <div className="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
-                            <h2 className="text-lg font-bold text-slate-800">{ward.name}</h2>
-                            <span className="text-sm font-semibold text-slate-500">Capacity limit: {ward.capacity}</span>
+                    <div key={ward.id} className="card overflow-hidden">
+                        <div className="bg-ink-50/60 border-b border-ink-100 p-4 flex justify-between items-center">
+                            <h2 className="text-base font-semibold text-ink-900 tracking-tight">{ward.name}</h2>
+                            <span className="text-xs font-medium text-ink-500">Capacity limit: <span className="text-ink-800 font-semibold">{ward.capacity}</span></span>
                         </div>
-                        
-                        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                            {ward.beds.map(bed => (
-                                <div 
-                                    key={bed.id} 
-                                    onClick={() => bed.status === 'Occupied' ? setActiveBed({ ...bed, wardName: ward.name }) : null}
-                                    className={`relative flex flex-col p-4 rounded-xl border-2 transition-all ${
-                                        bed.status === 'Available' ? 'bg-white border-green-200' :
-                                        bed.status === 'Occupied' ? 'bg-blue-50 border-blue-300 hover:border-blue-500 cursor-pointer shadow-sm' :
-                                        bed.status === 'Cleaning' ? 'bg-purple-50 border-purple-200' :
-                                        'bg-orange-50 border-orange-200' 
-                                    }`}
-                                >
-                                    <div className={`absolute top-3 right-3 w-3 h-3 rounded-full ${
-                                        bed.status === 'Available' ? 'bg-green-500' :
-                                        bed.status === 'Occupied' ? 'bg-blue-500 animate-pulse' :
-                                        bed.status === 'Cleaning' ? 'bg-purple-500' : 'bg-orange-500'
-                                    }`}></div>
 
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Bed size={20} className={bed.status === 'Occupied' ? 'text-blue-600' : 'text-slate-400'} />
-                                        <span className="font-bold text-slate-800">{bed.number}</span>
-                                    </div>
-
-                                    {bed.status === 'Occupied' ? (
-                                        <div className="flex-1 flex flex-col justify-between">
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-900 line-clamp-1">{bed.patient}</p>
-                                                <p className="text-xs font-semibold text-blue-700 mt-1 line-clamp-1">{bed.diagnosis}</p>
+                        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                            {ward.beds.map(bed => {
+                                const variantBg = {
+                                    Available: 'bg-white border-accent-200',
+                                    Occupied:  'bg-blue-50/60 border-blue-200 hover:border-blue-400 cursor-pointer hover:-translate-y-0.5',
+                                    Cleaning:  'bg-purple-50 border-purple-200',
+                                }[bed.status] || 'bg-amber-50 border-amber-200';
+                                const dotBg = {
+                                    Available: 'bg-accent-500',
+                                    Occupied:  'bg-blue-500 animate-pulse-soft',
+                                    Cleaning:  'bg-purple-500',
+                                }[bed.status] || 'bg-amber-500';
+                                const txt = {
+                                    Available: 'text-accent-700',
+                                    Cleaning:  'text-purple-700',
+                                }[bed.status] || 'text-amber-700';
+                                return (
+                                    <button key={bed.id} type="button"
+                                        onClick={() => bed.status === 'Occupied' ? setActiveBed({ ...bed, wardName: ward.name }) : null}
+                                        className={`relative text-left flex flex-col p-3.5 rounded-xl border transition-all duration-150 ${variantBg}`}>
+                                        <span className={`absolute top-3 right-3 w-2 h-2 rounded-full ${dotBg}`} />
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Bed size={16} className={bed.status === 'Occupied' ? 'text-blue-600' : 'text-ink-400'} />
+                                            <span className="font-semibold text-ink-900 text-sm">{bed.number}</span>
+                                        </div>
+                                        {bed.status === 'Occupied' ? (
+                                            <div className="flex-1 flex flex-col justify-between">
+                                                <div>
+                                                    <p className="text-xs font-semibold text-ink-900 line-clamp-1">{bed.patient}</p>
+                                                    <p className="text-2xs font-medium text-blue-700 mt-1 line-clamp-1">{bed.diagnosis}</p>
+                                                </div>
+                                                <p className="text-2xs font-semibold text-ink-400 uppercase tracking-wider mt-2">Init: {bed.admission_date}</p>
                                             </div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3">Init: {bed.admission_date}</p>
-                                        </div>
-                                    ) : (
-                                        <div className="flex-1 flex flex-col justify-center items-center">
-                                            <p className={`text-sm font-bold ${
-                                                bed.status === 'Available' ? 'text-green-600' : 
-                                                bed.status === 'Cleaning' ? 'text-purple-600' : 'text-orange-600'
-                                            }`}>{bed.status}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                        ) : (
+                                            <div className="flex-1 flex items-center justify-center">
+                                                <p className={`text-xs font-semibold ${txt}`}>{bed.status}</p>
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 ))}
@@ -249,20 +254,21 @@ export default function Wards() {
             {/* ADMISSION MODAL */}
             {isAdmitModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAdmitModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
-                        <div className="p-6 border-b border-slate-100 bg-brand-700 text-white shrink-0">
-                            <h2 className="text-xl font-bold flex items-center gap-2"><UserPlus size={24} className="text-brand-200" /> Admit Patient</h2>
-                            <p className="text-sm text-brand-100 mt-1">Allocate a bed and create a new inpatient admission record.</p>
+                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsAdmitModalOpen(false)}></div>
+                    <div className="relative w-full max-w-md bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-brand-600 to-brand-700 text-white shrink-0">
+                            <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-200">New admission</span>
+                            <h2 className="text-lg font-semibold mt-1 flex items-center gap-2"><UserPlus size={20} className="text-brand-200" /> Admit patient</h2>
+                            <p className="text-sm text-brand-100/90 mt-1">Allocate a bed and create a new inpatient admission record.</p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
-                            <form id="admitForm" onSubmit={handleAdmit} className="space-y-6">
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <div className="flex-1 overflow-y-auto p-5 sm:p-6 bg-ink-50/40 custom-scrollbar">
+                            <form id="admitForm" onSubmit={handleAdmit}>
+                                <div className="card p-5 space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Select Patient</label>
-                                        <select required value={admitForm.patient_id} onChange={(e) => setAdmitForm({...admitForm, patient_id: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                                            <option value="">Choose a registered patient...</option>
+                                        <label className="label">Select patient</label>
+                                        <select required value={admitForm.patient_id} onChange={(e) => setAdmitForm({...admitForm, patient_id: e.target.value})} className="input">
+                                            <option value="">Choose a registered patient…</option>
                                             {patients.map(p => (
                                                 <option key={p.patient_id} value={p.patient_id}>
                                                     {p.surname}, {p.other_names} ({p.outpatient_no})
@@ -271,9 +277,9 @@ export default function Wards() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Select Available Bed</label>
-                                        <select required value={admitForm.bed_id} onChange={(e) => setAdmitForm({...admitForm, bed_id: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                                            <option value="">Assign a bed...</option>
+                                        <label className="label">Select available bed</label>
+                                        <select required value={admitForm.bed_id} onChange={(e) => setAdmitForm({...admitForm, bed_id: e.target.value})} className="input">
+                                            <option value="">Assign a bed…</option>
                                             {wards.map(ward => (
                                                 <optgroup key={ward.id} label={ward.name}>
                                                     {ward.beds.filter(b => b.status === 'Available').map(bed => (
@@ -284,18 +290,16 @@ export default function Wards() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Primary Diagnosis (Reason for Admission)</label>
-                                        <input required type="text" value={admitForm.diagnosis} onChange={(e) => setAdmitForm({...admitForm, diagnosis: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="e.g. Severe Malaria" />
+                                        <label className="label">Primary diagnosis (reason for admission)</label>
+                                        <input required type="text" value={admitForm.diagnosis} onChange={(e) => setAdmitForm({...admitForm, diagnosis: e.target.value})} className="input" placeholder="e.g. Severe Malaria" />
                                     </div>
                                 </div>
                             </form>
                         </div>
 
-                        <div className="p-6 border-t border-slate-200 bg-white flex gap-3 shrink-0">
-                            <button type="button" onClick={() => setIsAdmitModalOpen(false)} className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 w-1/3 transition-colors">Cancel</button>
-                            <button type="submit" form="admitForm" className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-lg font-bold shadow-sm flex items-center justify-center gap-2 transition-colors">
-                                Allocate & Admit
-                            </button>
+                        <div className="p-5 border-t border-ink-100 bg-white flex gap-3 shrink-0">
+                            <button type="button" onClick={() => setIsAdmitModalOpen(false)} className="btn-secondary">Cancel</button>
+                            <button type="submit" form="admitForm" className="btn-primary flex-1">Allocate &amp; admit</button>
                         </div>
                     </div>
                 </div>
@@ -304,67 +308,59 @@ export default function Wards() {
             {/* SLIDE-OVER: INPATIENT CHART & AUDIT INVENTORY */}
             {activeBed && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActiveBed(null)}></div>
-                    <div className="relative w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
-                        
-                        <div className="p-6 border-b border-slate-100 bg-blue-600 text-white shrink-0">
-                            <div className="flex justify-between items-start mb-4">
+                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setActiveBed(null)}></div>
+                    <div className="relative w-full max-w-2xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
+
+                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-blue-600 to-blue-700 text-white shrink-0">
+                            <div className="flex justify-between items-start">
                                 <div>
-                                    <h2 className="text-2xl font-bold">{activeBed.patient}</h2>
-                                    <p className="text-blue-200 mt-1 font-medium">{activeBed.wardName} • Vector {activeBed.number}</p>
+                                    <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-blue-200">Inpatient chart</span>
+                                    <h2 className="text-xl font-semibold mt-1 tracking-tight">{activeBed.patient}</h2>
+                                    <p className="text-sm text-blue-100/90 mt-1 font-medium">{activeBed.wardName} &middot; Bed {activeBed.number}</p>
                                 </div>
-                                <button onClick={() => {setActiveBed(null); setCart([]);}} className="text-blue-200 hover:text-white p-1 bg-blue-700 rounded-full"><X size={20}/></button>
+                                <button onClick={() => {setActiveBed(null); setCart([]);}} aria-label="Close" className="text-blue-100 hover:text-white p-2 hover:bg-white/10 rounded-lg"><X size={18}/></button>
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
-                            
-                            {/* WARD INVENTORY CONSUMPTION TRACKER */}
-                            <div className="bg-white border-l-4 border-accent-500 rounded-r-xl border-y border-r border-slate-200 p-5 shadow-sm">
-                                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
-                                    <Package size={18} className="text-accent-600" /> Administer Ward Inventory
+                        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 custom-scrollbar">
+
+                            <div className="card-flush p-5 border-l-4 border-l-accent-500">
+                                <h3 className="section-eyebrow mb-4 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                    <Package size={16} className="text-accent-600" /> Administer ward inventory
                                 </h3>
-                                
-                                <div className="flex gap-2 mb-4">
-                                    <select 
-                                        value={selectedBatchId} 
-                                        onChange={(e) => setSelectedBatchId(e.target.value)}
-                                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500"
-                                    >
-                                        <option value="">Select available ward stock...</option>
+
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    <select value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)} className="input flex-1 min-w-[12rem]">
+                                        <option value="">Select available ward stock…</option>
                                         {wardInventory.map(item => (
                                             <option key={item.batch_id} value={item.batch_id}>
-                                                {item.name} (Batch {item.batch_number}) - {item.quantity} available
+                                                {item.name} (Batch {item.batch_number}) – {item.quantity} available
                                             </option>
                                         ))}
                                     </select>
-                                    <input 
-                                        type="number" min="1" placeholder="Qty" 
-                                        value={consumeQty} onChange={(e) => setConsumeQty(e.target.value)}
-                                        className="w-20 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500" 
-                                    />
-                                    <button onClick={handleAddToCart} className="bg-slate-200 text-slate-800 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-300 flex items-center gap-1 transition-colors">
-                                        <Plus size={16}/> Add
+                                    <input type="number" min="1" placeholder="Qty" value={consumeQty} onChange={(e) => setConsumeQty(e.target.value)} className="input w-20" />
+                                    <button onClick={handleAddToCart} className="btn bg-ink-100 text-ink-800 hover:bg-ink-200">
+                                        <Plus size={15} /> Add
                                     </button>
                                 </div>
 
                                 {cart.length > 0 && (
-                                    <div className="mb-4 bg-slate-50 border border-slate-200 rounded-lg overflow-x-auto">
-                                        <table className="w-full text-left text-sm text-slate-600 min-w-[400px]">
-                                            <thead className="bg-white border-b border-slate-200 text-xs uppercase font-bold">
+                                    <div className="mb-4 card-flush overflow-x-auto">
+                                        <table className="table-clean min-w-[400px]">
+                                            <thead>
                                                 <tr>
-                                                    <th className="px-4 py-2">Item to Administer</th>
-                                                    <th className="px-4 py-2">Qty</th>
-                                                    <th className="px-4 py-2"></th>
+                                                    <th>Item to administer</th>
+                                                    <th>Qty</th>
+                                                    <th></th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-100">
+                                            <tbody>
                                                 {cart.map(item => (
                                                     <tr key={item.batch_id}>
-                                                        <td className="px-4 py-2 font-medium">{item.name} <span className="text-[10px] text-slate-400 block">{item.batch_number}</span></td>
-                                                        <td className="px-4 py-2 font-bold">{item.qty}</td>
-                                                        <td className="px-4 py-2 text-right">
-                                                            <button onClick={() => setCart(cart.filter(c => c.batch_id !== item.batch_id))} className="text-slate-400 hover:text-red-500"><Trash2 size={16}/></button>
+                                                        <td className="font-medium">{item.name} <span className="text-2xs text-ink-400 block">{item.batch_number}</span></td>
+                                                        <td className="font-semibold">{item.qty}</td>
+                                                        <td className="text-right">
+                                                            <button onClick={() => setCart(cart.filter(c => c.batch_id !== item.batch_id))} aria-label="Remove" className="text-ink-400 hover:text-rose-600"><Trash2 size={15}/></button>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -373,36 +369,27 @@ export default function Wards() {
                                     </div>
                                 )}
 
-                                <button 
-                                    onClick={handleConsumeStock}
-                                    disabled={cart.length === 0 || isConsuming}
-                                    className="w-full bg-accent-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-accent-700 disabled:opacity-50 flex justify-center items-center gap-2 transition-colors"
-                                >
-                                    <CheckCircle2 size={18} /> {isConsuming ? 'Processing...' : 'Administer & Log to Audit Trail'}
+                                <button onClick={handleConsumeStock} disabled={cart.length === 0 || isConsuming} className="btn-success w-full">
+                                    <CheckCircle2 size={16} /> {isConsuming ? 'Processing…' : 'Administer & log to audit trail'}
                                 </button>
                             </div>
 
-                            {/* Standard Clinical Log */}
-                            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-                                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Clinical Log</h3>
+                            <div className="card-flush p-5">
+                                <h3 className="section-eyebrow mb-4 border-b border-ink-100 pb-3">Clinical log</h3>
                                 <textarea
                                     rows="3"
                                     value={clinicalNote}
                                     onChange={(e) => setClinicalNote(e.target.value)}
-                                    className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none mb-3"
-                                    placeholder="Append observation parameters... (e.g. vitals, medication response, mood)"
+                                    className="input resize-none mb-3"
+                                    placeholder="Append observation parameters… (e.g. vitals, medication response, mood)"
                                 />
-                                <button
-                                    onClick={handleSaveClinicalNote}
-                                    disabled={isSavingNote || !clinicalNote.trim()}
-                                    className="w-full bg-slate-800 text-white py-2 rounded-lg text-sm font-bold hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isSavingNote ? 'Saving…' : 'Commit Observation'}
+                                <button onClick={handleSaveClinicalNote} disabled={isSavingNote || !clinicalNote.trim()} className="btn bg-ink-800 text-white hover:bg-ink-900 w-full disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {isSavingNote ? 'Saving…' : 'Commit observation'}
                                 </button>
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-slate-200 bg-white shrink-0 space-y-2">
+                        <div className="p-5 border-t border-ink-100 bg-white shrink-0 space-y-2">
                             <button
                                 onClick={() => printAdmissionSlip({
                                     patient: { full_name: activeBed.patient, outpatient_no: activeBed.op_no, inpatient_no: activeBed.inpatient_no, age: activeBed.age, sex: activeBed.sex, blood_group: activeBed.blood_group },
@@ -416,12 +403,12 @@ export default function Wards() {
                                     },
                                     doctor: { full_name: activeBed.doctor },
                                 })}
-                                className="w-full bg-white border border-slate-200 text-slate-700 py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors"
+                                className="btn-secondary w-full"
                             >
-                                <Printer size={18} /> Print Admission Slip
+                                <Printer size={15} /> Print admission slip
                             </button>
-                            <button onClick={handleDischarge} className="w-full bg-red-50 border border-red-200 text-red-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
-                                <LogOut size={20} /> Execute Discharge Protocol
+                            <button onClick={handleDischarge} className="btn-danger w-full bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 shadow-none">
+                                <LogOut size={16} /> Execute discharge protocol
                             </button>
                         </div>
                     </div>

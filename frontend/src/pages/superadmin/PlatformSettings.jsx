@@ -108,44 +108,41 @@ export default function PlatformSettings() {
     ];
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="space-y-6 animate-fade-in">
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                        <Settings className="text-indigo-400" /> Platform Settings
+                    <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-400">Console</span>
+                    <h1 className="text-2xl font-semibold text-white tracking-tight mt-1 flex items-center gap-2">
+                        <Settings size={22} className="text-indigo-400" /> Platform Settings
                     </h1>
-                    <p className="text-slate-400 mt-1">Runtime configuration snapshot. Edit your `.env` and rolling-restart workers to change values.</p>
+                    <p className="text-sm text-ink-400 mt-1">Runtime configuration snapshot. Edit your <code className="text-ink-200 bg-white/5 px-1 py-0.5 rounded text-xs">.env</code> and rolling-restart workers to change values.</p>
                 </div>
                 {isLoading ? (
-                    <span className="text-slate-500 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" /> Probing</span>
+                    <span className="text-ink-500 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" /> Probing</span>
                 ) : (
-                    <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                        <Server size={14} /> Operational
+                    <span className="bg-accent-500/10 ring-1 ring-accent-500/30 text-accent-400 px-3 py-1.5 rounded-full text-2xs font-semibold uppercase tracking-wider flex items-center gap-2">
+                        <Server size={13} /> Operational
                     </span>
                 )}
             </div>
 
             {sections.map(({ title, icon: Icon, rows }) => (
-                <section key={title} className="bg-slate-900 border border-slate-800 rounded-xl shadow-lg overflow-hidden">
-                    <div className="px-5 py-3 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2">
-                        <Icon size={16} className="text-slate-400" />
-                        <h2 className="font-bold text-white text-sm">{title}</h2>
+                <section key={title} className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 border-b border-white/5 bg-white/[0.02] flex items-center gap-2">
+                        <Icon size={15} className="text-ink-400" />
+                        <h2 className="font-semibold text-white text-sm tracking-tight">{title}</h2>
                     </div>
-                    <ul className="divide-y divide-slate-800">
+                    <ul className="divide-y divide-white/5">
                         {rows.map(({ label, value, badge, mono, hint }) => (
                             <li key={label} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                                 <div>
-                                    <p className="text-sm text-slate-300 font-medium">{label}</p>
-                                    {hint && <p className="text-xs text-slate-500 mt-0.5">{hint}</p>}
+                                    <p className="text-sm text-ink-200 font-medium">{label}</p>
+                                    {hint && <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">{hint}</p>}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                    <span className={`text-sm ${mono ? 'font-mono text-emerald-400 text-xs' : 'text-white font-bold'}`}>{value}</span>
-                                    {badge === 'success' && (
-                                        <CheckCircle2 size={14} className="text-emerald-400" aria-label="Active" />
-                                    )}
-                                    {badge === 'warning' && (
-                                        <AlertTriangle size={14} className="text-amber-400" aria-label="Attention" />
-                                    )}
+                                    <span className={mono ? 'font-mono text-accent-400 text-xs' : 'text-white font-semibold text-sm'}>{value}</span>
+                                    {badge === 'success' && (<CheckCircle2 size={14} className="text-accent-400" aria-label="Active" />)}
+                                    {badge === 'warning' && (<AlertTriangle size={14} className="text-amber-400" aria-label="Attention" />)}
                                 </div>
                             </li>
                         ))}
@@ -153,9 +150,9 @@ export default function PlatformSettings() {
                 </section>
             ))}
 
-            <div className="text-xs text-slate-500 px-2">
-                For a complete env reference see <code className="text-slate-300">docs/DEPLOYMENT.md</code>.
-                Sensitive values (SECRET_KEY, ENCRYPTION_KEY, MPESA secrets) are deliberately not displayed.
+            <div className="text-xs text-ink-500 px-2 leading-relaxed">
+                For a complete env reference see <code className="text-ink-200 bg-white/5 px-1 py-0.5 rounded">docs/DEPLOYMENT.md</code>.
+                Sensitive values (<code className="text-ink-300">SECRET_KEY</code>, <code className="text-ink-300">ENCRYPTION_KEY</code>, M-Pesa secrets) are deliberately not displayed.
             </div>
         </div>
     );

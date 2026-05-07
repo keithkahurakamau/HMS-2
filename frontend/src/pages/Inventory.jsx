@@ -168,40 +168,31 @@ export default function Inventory() {
             {/* PAGE HEADER */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Central Logistics Hub</h1>
-                    <p className="text-sm text-slate-500 mt-1">Manage global procurement and departmental distribution.</p>
+                    <span className="section-eyebrow">Logistics</span>
+                    <h1 className="section-title mt-1">Central Logistics Hub</h1>
+                    <p className="section-sub">Manage global procurement and departmental distribution.</p>
                 </div>
-                <div className="flex gap-3">
-                    <button 
-                        onClick={() => setIsTransferModalOpen(true)}
-                        className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm"
-                    >
-                        <ArrowRightLeft size={18} /> Internal Transfer
+                <div className="flex gap-2 flex-wrap">
+                    <button onClick={() => setIsTransferModalOpen(true)} className="btn-secondary">
+                        <ArrowRightLeft size={15} /> Internal transfer
                     </button>
-                    <button 
-                        onClick={() => setIsProcurementModalOpen(true)}
-                        className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm"
-                    >
-                        <Truck size={18} /> External Procurement
+                    <button onClick={() => setIsProcurementModalOpen(true)} className="btn-primary">
+                        <Truck size={15} /> External procurement
                     </button>
                 </div>
             </div>
 
             {/* DEPARTMENT TABS (HUB & SPOKE) */}
-            <div className="bg-white border border-slate-200 rounded-xl p-1 shadow-sm flex overflow-x-auto custom-scrollbar">
+            <div className="card p-1.5 flex overflow-x-auto custom-scrollbar gap-1">
                 {locations.map((loc) => {
                     const Icon = loc.icon;
+                    const isActive = activeLocation.id === loc.id;
                     return (
-                        <button 
-                            key={loc.id}
-                            onClick={() => setActiveLocation(loc)}
-                            className={`flex items-center gap-2 py-3 px-6 rounded-lg text-sm font-bold whitespace-nowrap transition-all flex-1 justify-center ${
-                                activeLocation.id === loc.id 
-                                ? 'bg-slate-800 text-white shadow-md' 
-                                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                            }`}
-                        >
-                            <Icon size={18} /> {loc.name}
+                        <button key={loc.id} onClick={() => setActiveLocation(loc)}
+                            className={`flex items-center gap-2 py-2.5 px-5 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex-1 justify-center ${
+                                isActive ? 'bg-ink-900 text-white shadow-soft' : 'text-ink-600 hover:text-ink-900 hover:bg-ink-50'
+                            }`}>
+                            <Icon size={16} className={isActive ? 'text-brand-300' : 'text-ink-400'} /> {loc.name}
                         </button>
                     );
                 })}
@@ -209,85 +200,75 @@ export default function Inventory() {
 
             {/* KPI DASHBOARD */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="stat-tile">
+                    <div className="flex justify-between items-start"><div className="stat-icon bg-ink-100 ring-ink-200 text-ink-700"><Package size={20} /></div></div>
                     <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{activeLocation.name} Valuation</p>
-                        <p className="text-2xl font-black text-slate-900">KES {totalInventoryValue.toLocaleString()}</p>
+                        <h3 className="stat-label">{activeLocation.name} valuation</h3>
+                        <p className="stat-value mt-1">KES {totalInventoryValue.toLocaleString()}</p>
                     </div>
-                    <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center"><Package size={24} /></div>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-orange-200 shadow-sm flex items-center justify-between">
+                <div className="stat-tile">
+                    <div className="flex justify-between items-start"><div className="stat-icon bg-amber-50 ring-amber-100 text-amber-600"><AlertTriangle size={20} /></div></div>
                     <div>
-                        <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">Global Restock Alerts</p>
-                        <p className="text-2xl font-black text-orange-700">{alerts.low_stock} Items</p>
+                        <h3 className="stat-label">Global restock alerts</h3>
+                        <p className="stat-value mt-1 text-amber-700">{alerts.low_stock} Items</p>
                     </div>
-                    <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center"><AlertTriangle size={24} /></div>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-red-200 shadow-sm flex items-center justify-between">
+                <div className="stat-tile">
+                    <div className="flex justify-between items-start"><div className="stat-icon bg-rose-50 ring-rose-100 text-rose-600"><CalendarClock size={20} /></div></div>
                     <div>
-                        <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Expiring &lt; 90 Days</p>
-                        <p className="text-2xl font-black text-red-700">{alerts.expiring} Batches</p>
+                        <h3 className="stat-label">Expiring &lt; 90 days</h3>
+                        <p className="stat-value mt-1 text-rose-700">{alerts.expiring} Batches</p>
                     </div>
-                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center"><CalendarClock size={24} /></div>
                 </div>
             </div>
 
             {/* INVENTORY DATA TABLE */}
-            <div className="bg-white rounded-xl shadow-soft border border-slate-100 overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50">
+            <div className="card overflow-hidden flex flex-col">
+                <div className="p-4 border-b border-ink-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-ink-50/40">
                     <div className="relative w-full max-w-md">
-                        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input type="text" placeholder={`Search ${activeLocation.name} stock...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm transition-all" />
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+                        <input type="text" placeholder={`Search ${activeLocation.name} stock…`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="input pl-10" />
                     </div>
                     <div className="flex items-center gap-2">
-                        <Filter size={16} className="text-slate-400" aria-hidden="true" />
-                        <select
-                            value={categoryFilter}
-                            onChange={(e) => setCategoryFilter(e.target.value)}
-                            aria-label="Filter by category"
-                            className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        >
+                        <Filter size={14} className="text-ink-400" aria-hidden="true" />
+                        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} aria-label="Filter by category" className="input">
                             <option value="All">All categories</option>
                             {availableCategories.map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}
                         </select>
                         {categoryFilter !== 'All' && (
-                            <button
-                                onClick={() => setCategoryFilter('All')}
-                                className="text-xs font-bold text-slate-500 hover:text-slate-800"
-                            >
-                                Clear
-                            </button>
+                            <button onClick={() => setCategoryFilter('All')} className="text-xs font-semibold text-ink-500 hover:text-ink-900">Clear</button>
                         )}
                     </div>
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-slate-600 min-w-[600px]">
-                        <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200">
+                    <table className="table-clean min-w-[600px]">
+                        <thead>
                             <tr>
-                                <th className="px-6 py-4">Item Details</th>
-                                <th className="px-6 py-4">Category</th>
-                                <th className="px-6 py-4">Stock Quantity</th>
-                                <th className="px-6 py-4 text-right">Unit Price</th>
+                                <th>Item details</th>
+                                <th>Category</th>
+                                <th>Stock quantity</th>
+                                <th className="text-right">Unit price</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody>
                             {isLoading ? (
-                                <tr><td colSpan="4" className="px-6 py-12 text-center text-slate-400"><Activity className="animate-spin mx-auto mb-2" /> Loading stock...</td></tr>
+                                <tr><td colSpan="4" className="px-6 py-12 text-center text-ink-400"><Activity className="animate-spin mx-auto mb-2" size={20} /> Loading stock…</td></tr>
                             ) : displayedInventory.length === 0 ? (
-                                <tr><td colSpan="4" className="px-6 py-12 text-center text-slate-400">No items found in {activeLocation.name}.</td></tr>
+                                <tr><td colSpan="4" className="px-6 py-12 text-center text-ink-400">No items found in {activeLocation.name}.</td></tr>
                             ) : (
                                 displayedInventory.map((item) => (
-                                    <tr key={item.item_id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-900">{item.name}</div>
-                                            <div className="text-xs text-slate-500 mt-0.5">Code: {item.item_code}</div>
+                                    <tr key={item.item_id}>
+                                        <td>
+                                            <div className="font-semibold text-ink-900">{item.name}</div>
+                                            <div className="text-xs font-mono text-ink-500 mt-0.5">{item.item_code}</div>
                                         </td>
-                                        <td className="px-6 py-4 font-medium text-slate-700">{item.category}</td>
-                                        <td className="px-6 py-4 font-black text-slate-900 text-base">{item.quantity || item.stock_level || 0}</td>
-                                        <td className="px-6 py-4 text-right font-bold text-slate-700">KES {item.unit_price}</td>
+                                        <td><span className="badge-neutral">{item.category}</span></td>
+                                        <td className="font-semibold text-ink-900 text-base">{item.quantity || item.stock_level || 0}</td>
+                                        <td className="text-right font-semibold text-ink-700">KES {item.unit_price}</td>
                                     </tr>
                                 ))
                             )}
@@ -299,19 +280,19 @@ export default function Inventory() {
             {/* INTERNAL STOCK TRANSFER MODAL */}
             {isTransferModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsTransferModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
-                        <div className="p-6 border-b border-slate-100 bg-slate-800 text-white shrink-0">
+                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsTransferModalOpen(false)}></div>
+                    <div className="relative w-full max-w-md bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-ink-800 to-ink-900 text-white shrink-0">
                             <h2 className="text-xl font-bold flex items-center gap-2"><ArrowRightLeft size={24} className="text-brand-400" /> Internal Transfer</h2>
                             <p className="text-sm text-slate-300 mt-1">Move stock from {activeLocation.name} to another department.</p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
-                            <form id="transferForm" onSubmit={handleTransfer} className="space-y-6">
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-ink-50/40 custom-scrollbar">
+                            <form id="transferForm" onSubmit={handleTransfer} className="space-y-5">
+                                <div className="card p-5 space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Destination Department</label>
-                                        <select required value={transferForm.to_loc_id} onChange={(e) => setTransferForm({...transferForm, to_loc_id: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+                                        <label className="label">Destination Department</label>
+                                        <select required value={transferForm.to_loc_id} onChange={(e) => setTransferForm({...transferForm, to_loc_id: e.target.value})} className="input">
                                             <option value="">Select Destination...</option>
                                             {locations.filter(l => l.id !== activeLocation.id).map(loc => (
                                                 <option key={loc.id} value={loc.id}>{loc.name}</option>
@@ -320,10 +301,10 @@ export default function Inventory() {
                                     </div>
                                 </div>
 
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                                <div className="card p-5 space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Select Item Batch to Transfer</label>
-                                        <select required value={transferForm.batch_id} onChange={(e) => setTransferForm({...transferForm, batch_id: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                                        <label className="label">Select Item Batch to Transfer</label>
+                                        <select required value={transferForm.batch_id} onChange={(e) => setTransferForm({...transferForm, batch_id: e.target.value})} className="input">
                                             <option value="">Select Item from {activeLocation.name}...</option>
                                             
                                             {/* DYNAMIC INVENTORY MAPPING */}
@@ -336,20 +317,20 @@ export default function Inventory() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Transfer Quantity</label>
-                                        <input required type="number" min="1" value={transferForm.quantity} onChange={(e) => setTransferForm({...transferForm, quantity: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Enter quantity..." />
+                                        <label className="label">Transfer Quantity</label>
+                                        <input required type="number" min="1" value={transferForm.quantity} onChange={(e) => setTransferForm({...transferForm, quantity: e.target.value})} className="input" placeholder="Enter quantity..." />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Authorization Notes</label>
-                                        <input type="text" value={transferForm.notes} onChange={(e) => setTransferForm({...transferForm, notes: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Requisition # or reason..." />
+                                        <label className="label">Authorization Notes</label>
+                                        <input type="text" value={transferForm.notes} onChange={(e) => setTransferForm({...transferForm, notes: e.target.value})} className="input" placeholder="Requisition # or reason..." />
                                     </div>
                                 </div>
                             </form>
                         </div>
 
-                        <div className="p-6 border-t border-slate-200 bg-white flex gap-3 shrink-0">
-                            <button type="button" onClick={() => setIsTransferModalOpen(false)} className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 w-1/3 transition-colors">Cancel</button>
-                            <button type="submit" form="transferForm" disabled={isTransferring} className="flex-1 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white py-2.5 rounded-lg font-bold shadow-sm flex items-center justify-center gap-2 transition-colors">
+                        <div className="p-5 border-t border-ink-100 bg-white flex gap-3 shrink-0">
+                            <button type="button" onClick={() => setIsTransferModalOpen(false)} className="btn-secondary">Cancel</button>
+                            <button type="submit" form="transferForm" disabled={isTransferring} className="btn flex-1 bg-ink-800 text-white hover:bg-ink-900 shadow-soft">
                                 {isTransferring ? 'Processing...' : 'Execute Transfer'}
                             </button>
                         </div>
@@ -360,28 +341,29 @@ export default function Inventory() {
             {/* EXTERNAL PROCUREMENT MODAL */}
             {isProcurementModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsProcurementModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
-                        <div className="p-6 border-b border-slate-100 bg-brand-700 text-white shrink-0">
-                            <h2 className="text-xl font-bold flex items-center gap-2"><Truck size={24} className="text-brand-200" /> External Procurement</h2>
-                            <p className="text-sm text-brand-100 mt-1">Receive new stock batches from suppliers into {activeLocation.name}.</p>
+                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsProcurementModalOpen(false)}></div>
+                    <div className="relative w-full max-w-md bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-brand-600 to-brand-700 text-white shrink-0">
+                            <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-200">Receive stock</span>
+                            <h2 className="text-lg font-semibold mt-1 flex items-center gap-2"><Truck size={20} className="text-brand-200" /> External procurement</h2>
+                            <p className="text-sm text-brand-100/90 mt-1">Receive new stock batches from suppliers into {activeLocation.name}.</p>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
                             <form id="procurementForm" onSubmit={handleProcurement} className="space-y-6">
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                                        <h3 className="text-sm font-bold text-slate-800">Item Details</h3>
-                                        <label className="flex items-center gap-2 text-xs font-bold text-brand-600 cursor-pointer">
-                                            <input type="checkbox" checked={procurementForm.isNewItem} onChange={e => setProcurementForm({...procurementForm, isNewItem: e.target.checked})} className="rounded border-slate-300" />
-                                            Add as New Catalog Item
+                                <div className="card p-5 space-y-4">
+                                    <div className="flex items-center justify-between pb-3 border-b border-ink-100">
+                                        <h3 className="text-sm font-semibold text-ink-800">Item details</h3>
+                                        <label className="flex items-center gap-2 text-xs font-semibold text-brand-700 cursor-pointer">
+                                            <input type="checkbox" checked={procurementForm.isNewItem} onChange={e => setProcurementForm({...procurementForm, isNewItem: e.target.checked})} className="rounded border-ink-300 text-brand-600 focus:ring-brand-500" />
+                                            Add as new catalog item
                                         </label>
                                     </div>
 
                                     {!procurementForm.isNewItem ? (
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1.5">Catalog Item</label>
-                                            <select required value={procurementForm.item_id} onChange={(e) => setProcurementForm({...procurementForm, item_id: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                                            <label className="label">Catalog Item</label>
+                                            <select required value={procurementForm.item_id} onChange={(e) => setProcurementForm({...procurementForm, item_id: e.target.value})} className="input">
                                                 <option value="">Select Item from Catalog...</option>
                                                 {catalogItems.map(item => (
                                                     <option key={item.item_id} value={item.item_id}>
@@ -393,12 +375,12 @@ export default function Inventory() {
                                     ) : (
                                         <div className="grid grid-cols-2 gap-4 bg-brand-50/50 p-4 rounded-lg border border-brand-100">
                                             <div className="col-span-2">
-                                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Item Name</label>
-                                                <input required type="text" value={procurementForm.new_item_name} onChange={e => setProcurementForm({...procurementForm, new_item_name: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" placeholder="e.g. Paracetamol 500mg" />
+                                                <label className="label">Item Name</label>
+                                                <input required type="text" value={procurementForm.new_item_name} onChange={e => setProcurementForm({...procurementForm, new_item_name: e.target.value})} className="input" placeholder="e.g. Paracetamol 500mg" />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Category</label>
-                                                <select required value={procurementForm.new_item_category} onChange={e => setProcurementForm({...procurementForm, new_item_category: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                                <label className="label">Category</label>
+                                                <select required value={procurementForm.new_item_category} onChange={e => setProcurementForm({...procurementForm, new_item_category: e.target.value})} className="input">
                                                     <option>Drug</option>
                                                     <option>Consumable</option>
                                                     <option>Reagent</option>
@@ -406,42 +388,42 @@ export default function Inventory() {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Unit Cost (KES)</label>
-                                                <input required type="number" min="0" value={procurementForm.new_item_unit_cost} onChange={e => setProcurementForm({...procurementForm, new_item_unit_cost: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" placeholder="e.g. 30" />
+                                                <label className="label">Unit Cost (KES)</label>
+                                                <input required type="number" min="0" value={procurementForm.new_item_unit_cost} onChange={e => setProcurementForm({...procurementForm, new_item_unit_cost: e.target.value})} className="input" placeholder="e.g. 30" />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Unit Selling Price (KES)</label>
-                                                <input required type="number" min="0" value={procurementForm.new_item_unit_price} onChange={e => setProcurementForm({...procurementForm, new_item_unit_price: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" placeholder="e.g. 50" />
+                                                <label className="label">Unit Selling Price (KES)</label>
+                                                <input required type="number" min="0" value={procurementForm.new_item_unit_price} onChange={e => setProcurementForm({...procurementForm, new_item_unit_price: e.target.value})} className="input" placeholder="e.g. 50" />
                                             </div>
                                         </div>
                                     )}
 
                                     <div className="grid grid-cols-2 gap-4 pt-2">
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1.5">Supplier Name</label>
-                                            <input required type="text" value={procurementForm.supplier_name} onChange={(e) => setProcurementForm({...procurementForm, supplier_name: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="e.g. MedKEM Logistics" />
+                                            <label className="label">Supplier Name</label>
+                                            <input required type="text" value={procurementForm.supplier_name} onChange={(e) => setProcurementForm({...procurementForm, supplier_name: e.target.value})} className="input" placeholder="e.g. MedKEM Logistics" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1.5">Supplier Batch Number</label>
-                                            <input required type="text" value={procurementForm.batch_number} onChange={(e) => setProcurementForm({...procurementForm, batch_number: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="e.g. BATCH-2024-X1" />
+                                            <label className="label">Supplier Batch Number</label>
+                                            <input required type="text" value={procurementForm.batch_number} onChange={(e) => setProcurementForm({...procurementForm, batch_number: e.target.value})} className="input" placeholder="e.g. BATCH-2024-X1" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1.5">Quantity Received</label>
-                                            <input required type="number" min="1" value={procurementForm.quantity} onChange={(e) => setProcurementForm({...procurementForm, quantity: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Qty" />
+                                            <label className="label">Quantity Received</label>
+                                            <input required type="number" min="1" value={procurementForm.quantity} onChange={(e) => setProcurementForm({...procurementForm, quantity: e.target.value})} className="input" placeholder="Qty" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1.5">Expiry Date</label>
-                                            <input required type="date" value={procurementForm.expiry_date} onChange={(e) => setProcurementForm({...procurementForm, expiry_date: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                                            <label className="label">Expiry Date</label>
+                                            <input required type="date" value={procurementForm.expiry_date} onChange={(e) => setProcurementForm({...procurementForm, expiry_date: e.target.value})} className="input" />
                                         </div>
                                     </div>
                                 </div>
                             </form>
                         </div>
 
-                        <div className="p-6 border-t border-slate-200 bg-white flex gap-3 shrink-0">
-                            <button type="button" onClick={() => setIsProcurementModalOpen(false)} className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 w-1/3 transition-colors">Cancel</button>
-                            <button type="submit" form="procurementForm" disabled={isProcuring} className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-bold shadow-sm flex items-center justify-center gap-2 transition-colors">
-                                {isProcuring ? 'Processing...' : 'Confirm Delivery'}
+                        <div className="p-5 border-t border-ink-100 bg-white flex gap-3 shrink-0">
+                            <button type="button" onClick={() => setIsProcurementModalOpen(false)} className="btn-secondary">Cancel</button>
+                            <button type="submit" form="procurementForm" disabled={isProcuring} className="btn-primary flex-1">
+                                {isProcuring ? 'Processing…' : 'Confirm delivery'}
                             </button>
                         </div>
                     </div>

@@ -173,62 +173,59 @@ export default function MedicalHistory() {
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
             {/* Header */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm shrink-0">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="card p-4 shrink-0">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center border border-brand-100">
-                            <FileText size={22} />
+                        <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100">
+                            <FileText size={20} />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-slate-900">Medical History</h1>
-                            <p className="text-sm text-slate-500">Full patient medical chart · KDPA 2019 Compliant</p>
+                            <span className="section-eyebrow">Patient chart</span>
+                            <h1 className="text-lg font-semibold text-ink-900 tracking-tight">Medical History</h1>
+                            <p className="text-xs text-ink-500">Full patient medical chart &middot; KDPA 2019 compliant</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full text-xs font-bold text-green-700">
-                        <ShieldCheck size={14} /> Kenya Data Protection Act 2019
+                    <div className="badge-success">
+                        <ShieldCheck size={12} /> Kenya Data Protection Act 2019
                     </div>
                 </div>
             </div>
 
             {/* Patient Search */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm shrink-0 overflow-visible relative z-20">
-                <form onSubmit={handleSearch} className="flex gap-3 relative">
-                    <div className="relative flex-1">
-                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <div className="card p-4 shrink-0 overflow-visible relative z-20">
+                <form onSubmit={handleSearch} className="flex gap-2 relative flex-wrap">
+                    <div className="relative flex-1 min-w-[16rem]">
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                         <input
-                            type="text" placeholder="Search Patient by Name, ID, or Phone to load their Medical Chart..."
-                            value={searchInput} 
+                            type="text" placeholder="Search patient by name, ID, or phone to load their medical chart…"
+                            value={searchInput}
                             onChange={e => { setSearchInput(e.target.value); setShowSuggestions(true); }}
                             onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
                             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                            className="input pl-10"
                         />
-                        {/* Autocomplete Dropdown */}
                         {showSuggestions && suggestions.length > 0 && (
-                            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-64 overflow-y-auto top-full left-0">
+                            <div className="absolute z-30 w-full mt-1 bg-white border border-ink-200 rounded-xl shadow-elevated max-h-64 overflow-y-auto top-full left-0 custom-scrollbar">
                                 {suggestions.map(patient => (
-                                    <div 
-                                        key={patient.patient_id}
+                                    <button type="button" key={patient.patient_id}
                                         onMouseDown={() => {
                                             setSearchInput(`${patient.surname} ${patient.other_names}`);
                                             setShowSuggestions(false);
                                             fetchChart(patient.patient_id);
                                         }}
-                                        className="px-4 py-3 hover:bg-brand-50 cursor-pointer border-b border-slate-100 last:border-0 transition-colors"
+                                        className="w-full text-left px-4 py-3 hover:bg-brand-50 border-b border-ink-100 last:border-0 transition-colors"
                                     >
-                                        <div className="font-bold text-slate-900">{patient.surname}, {patient.other_names}</div>
-                                        <div className="text-xs text-slate-500 mt-0.5">OPD: {patient.outpatient_no} • Phone: {patient.telephone_1}</div>
-                                    </div>
+                                        <div className="font-semibold text-ink-900">{patient.surname}, {patient.other_names}</div>
+                                        <div className="text-xs text-ink-500 mt-0.5">OPD: <span className="font-mono">{patient.outpatient_no}</span> &middot; Phone: {patient.telephone_1}</div>
+                                    </button>
                                 ))}
                             </div>
                         )}
                     </div>
-                    <button type="submit" className="px-5 py-2.5 bg-brand-600 text-white text-sm font-bold rounded-lg hover:bg-brand-700 shadow-sm">
-                        Search Chart
-                    </button>
+                    <button type="submit" className="btn-primary">Search chart</button>
                     {chart && (
-                        <button type="button" onClick={openAddModal} className="flex items-center gap-2 px-5 py-2.5 bg-accent-600 text-white text-sm font-bold rounded-lg hover:bg-accent-700 shadow-sm">
-                            <Plus size={16} /> Add Entry
+                        <button type="button" onClick={openAddModal} className="btn-success">
+                            <Plus size={15} /> Add entry
                         </button>
                     )}
                 </form>
@@ -237,68 +234,64 @@ export default function MedicalHistory() {
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar">
                 {isLoading && (
-                    <div className="bg-white rounded-xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-400">
-                        <Activity className="animate-spin mb-3 text-brand-500" size={28} />
-                        <p className="font-medium">Loading patient chart... Access is being logged.</p>
+                    <div className="card p-12 flex flex-col items-center justify-center text-ink-400">
+                        <Activity className="animate-spin mb-3 text-brand-500" size={26} />
+                        <p className="font-medium">Loading patient chart… Access is being logged.</p>
                     </div>
                 )}
 
                 {!isLoading && !chart && (
-                    <div className="bg-white rounded-xl border border-slate-200 p-16 flex flex-col items-center justify-center text-slate-400">
-                        <FileText size={56} className="mb-4 text-slate-200" strokeWidth={1.5} />
-                        <h3 className="text-lg font-semibold text-slate-500">No Chart Loaded</h3>
-                        <p className="text-sm mt-1">Enter a Patient ID above to view their complete medical history.</p>
+                    <div className="card p-16 flex flex-col items-center justify-center text-ink-400 border-dashed">
+                        <FileText size={48} className="mb-4 text-ink-200" strokeWidth={1.5} />
+                        <h3 className="text-base font-semibold text-ink-500">No chart loaded</h3>
+                        <p className="text-sm mt-1">Search for a patient above to view their complete medical history.</p>
                     </div>
                 )}
 
                 {chart && (
                     <>
                         {/* Patient Header Card */}
-                        <div className="bg-gradient-to-r from-brand-600 to-brand-700 rounded-xl p-5 text-white shadow-md">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="bg-brand-gradient rounded-2xl p-5 sm:p-6 text-white shadow-elevated relative overflow-hidden">
+                            <div className="absolute inset-0 bg-aurora opacity-30 pointer-events-none" />
+                            <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div>
-                                    <p className="text-brand-200 text-xs font-bold uppercase tracking-wider mb-1">Patient Chart</p>
-                                    <h2 className="text-2xl font-black">{chart.patient_name}</h2>
-                                    <p className="text-brand-200 text-sm mt-1">{chart.opd_number}</p>
+                                    <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-100">Patient chart</span>
+                                    <h2 className="text-xl sm:text-2xl font-semibold mt-1 tracking-tight">{chart.patient_name}</h2>
+                                    <p className="text-brand-100/90 text-sm mt-1 font-mono">{chart.opd_number}</p>
                                     <button
                                         onClick={() => printMedicalHistory({
-                                            patient: {
-                                                full_name: chart.patient_name,
-                                                outpatient_no: chart.opd_number,
-                                                date_of_birth: chart.date_of_birth,
-                                                sex: chart.sex,
-                                            },
+                                            patient: { full_name: chart.patient_name, outpatient_no: chart.opd_number, date_of_birth: chart.date_of_birth, sex: chart.sex },
                                             entries: chart.entries || [],
                                             consents: chart.consents || [],
                                         })}
-                                        className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-bold transition-colors"
+                                        className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/15 ring-1 ring-white/15 rounded-lg text-xs font-semibold transition-colors"
                                     >
-                                        <Printer size={14} /> Print Summary
+                                        <Printer size={13} /> Print summary
                                     </button>
                                 </div>
-                                <div className="flex flex-wrap gap-3">
-                                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-center">
-                                        <p className="text-[10px] text-brand-200 uppercase font-bold">Blood Group</p>
-                                        <p className="text-lg font-black text-white">{chart.blood_group || '—'}</p>
+                                <div className="flex flex-wrap gap-2">
+                                    <div className="bg-white/10 backdrop-blur-sm ring-1 ring-white/15 rounded-xl px-4 py-2 text-center">
+                                        <p className="text-2xs text-brand-100 uppercase font-semibold tracking-[0.14em]">Blood group</p>
+                                        <p className="text-base font-semibold text-white mt-1">{chart.blood_group || '—'}</p>
                                     </div>
-                                    <div className="bg-red-500/20 border border-red-300/30 rounded-lg px-4 py-2">
-                                        <p className="text-[10px] text-red-200 uppercase font-bold mb-1">Allergies</p>
-                                        <p className="text-xs text-red-100 font-semibold">{chart.baseline_allergies || 'None on record'}</p>
+                                    <div className="bg-rose-500/20 ring-1 ring-rose-300/30 rounded-xl px-4 py-2 max-w-xs">
+                                        <p className="text-2xs text-rose-100 uppercase font-semibold tracking-[0.14em] mb-1">Allergies</p>
+                                        <p className="text-xs text-rose-50 font-medium leading-snug">{chart.baseline_allergies || 'None on record'}</p>
                                     </div>
-                                    <div className="bg-white/10 border border-white/20 rounded-lg px-4 py-2">
-                                        <p className="text-[10px] text-brand-200 uppercase font-bold mb-1">Chronic Conditions</p>
-                                        <p className="text-xs text-white font-semibold">{chart.baseline_conditions || 'None on record'}</p>
+                                    <div className="bg-white/10 ring-1 ring-white/15 rounded-xl px-4 py-2 max-w-xs">
+                                        <p className="text-2xs text-brand-100 uppercase font-semibold tracking-[0.14em] mb-1">Chronic conditions</p>
+                                        <p className="text-xs text-white font-medium leading-snug">{chart.baseline_conditions || 'None on record'}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* KDPA Compliance Notice */}
-                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                            <Lock size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                        <div className="bg-amber-50 ring-1 ring-amber-100 rounded-xl p-4 flex items-start gap-3">
+                            <Lock size={16} className="text-amber-600 shrink-0 mt-0.5" />
                             <div className="text-sm">
-                                <p className="font-bold text-amber-800">KDPA 2019 Compliance Active</p>
-                                <p className="text-amber-700 mt-0.5">Your access to this chart has been logged per Section 26 of the Kenya Data Protection Act. Sensitive records (Mental Health, Obstetric) are redacted based on your role. All modifications are permanently recorded in the audit trail.</p>
+                                <p className="font-semibold text-amber-800">KDPA 2019 compliance active</p>
+                                <p className="text-amber-700 mt-0.5 leading-relaxed text-xs">Your access to this chart has been logged per Section 26 of the Kenya Data Protection Act. Sensitive records (mental health, obstetric) are redacted based on your role. All modifications are permanently recorded in the audit trail.</p>
                             </div>
                         </div>
 
@@ -308,20 +301,18 @@ export default function MedicalHistory() {
                             const isOpen = expandedSections[type.key];
                             const colorClass = colorMap[type.color];
                             return (
-                                <div key={type.key} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                                <div key={type.key} className="card overflow-hidden">
                                     <button
                                         onClick={() => toggleSection(type.key)}
-                                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                                        className="w-full flex items-center justify-between p-4 hover:bg-ink-50/50 transition-colors"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold ${colorClass}`}>
+                                            <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${colorClass}`}>
                                                 {type.icon} {type.label}
                                             </span>
-                                            <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full">
-                                                {entries.length}
-                                            </span>
+                                            <span className="badge-neutral">{entries.length}</span>
                                         </div>
-                                        {isOpen ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
+                                        {isOpen ? <ChevronDown size={16} className="text-ink-400" /> : <ChevronRight size={16} className="text-ink-400" />}
                                     </button>
 
                                     {isOpen && (

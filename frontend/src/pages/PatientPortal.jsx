@@ -8,10 +8,10 @@ import {
 } from 'lucide-react';
 
 const TABS = [
-    { key: 'profile', label: 'Profile', icon: HeartPulse },
+    { key: 'profile',      label: 'Profile',      icon: HeartPulse },
     { key: 'appointments', label: 'Appointments', icon: CalendarDays },
-    { key: 'billing', label: 'Billing', icon: Receipt },
-    { key: 'history', label: 'History', icon: ClipboardList },
+    { key: 'billing',      label: 'Billing',      icon: Receipt },
+    { key: 'history',      label: 'History',      icon: ClipboardList },
 ];
 
 export default function PatientPortal() {
@@ -30,12 +30,10 @@ export default function PatientPortal() {
     const handleLookup = async (e) => {
         e.preventDefault();
         if (!verifyForm.outpatient_no || !verifyForm.date_of_birth || !verifyForm.phone_last4) {
-            toast.error('All three fields are required.');
-            return;
+            return toast.error('All three fields are required.');
         }
         if (!/^\d{4}$/.test(verifyForm.phone_last4)) {
-            toast.error('Phone suffix must be exactly 4 digits.');
-            return;
+            return toast.error('Phone suffix must be exactly 4 digits.');
         }
         setSubmitting(true);
         try {
@@ -77,7 +75,6 @@ export default function PatientPortal() {
         setVerifyForm({ outpatient_no: '', date_of_birth: '', phone_last4: '' });
     };
 
-    // Try to resume an existing portal session on mount.
     useEffect(() => {
         (async () => {
             try {
@@ -92,77 +89,57 @@ export default function PatientPortal() {
 
     if (!authed) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-brand-50 dark:from-slate-950 dark:to-slate-900 flex flex-col items-center justify-center p-4">
-                <div className="max-w-md w-full">
+            <div className="min-h-screen bg-ink-50 bg-mesh flex flex-col items-center justify-center p-4">
+                <div className="max-w-md w-full animate-slide-up">
                     <div className="text-center mb-6">
-                        <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl shadow-lg mb-4">
-                            <HeartPulse size={32} className="text-white" aria-hidden="true" />
+                        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-gradient shadow-glow">
+                            <HeartPulse size={26} className="text-white" />
                         </div>
-                        <h1 className="text-2xl font-black text-slate-900 dark:text-white">Patient Portal</h1>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{tenantName}</p>
+                        <h1 className="mt-5 text-2xl font-semibold text-ink-900 tracking-tight">Patient Portal</h1>
+                        <p className="text-sm text-ink-500 mt-1">{tenantName}</p>
                     </div>
 
-                    <form
-                        onSubmit={handleLookup}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-soft p-6 space-y-4"
-                    >
-                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 rounded-lg p-3 text-xs text-amber-900 dark:text-amber-200 flex gap-2">
-                            <AlertCircle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
-                            <p>This portal is read-only. To verify, enter the details on your patient card and the last 4 digits of your registered phone number.</p>
+                    <form onSubmit={handleLookup} className="card p-6 space-y-4">
+                        <div className="bg-amber-50 ring-1 ring-amber-100 rounded-xl p-3 text-xs text-amber-900 flex gap-2">
+                            <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                            <p className="leading-relaxed">This portal is read-only. To verify, enter the details on your patient card and the last 4 digits of your registered phone number.</p>
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">OP Number</label>
+                            <label className="label">OP Number</label>
                             <input
-                                required
-                                type="text"
+                                required type="text"
                                 value={verifyForm.outpatient_no}
                                 onChange={(e) => setVerifyForm({ ...verifyForm, outpatient_no: e.target.value.toUpperCase() })}
                                 placeholder="OP-2026-0001"
-                                className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                className="input font-mono"
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Date of Birth</label>
-                            <input
-                                required
-                                type="date"
-                                value={verifyForm.date_of_birth}
+                            <label className="label">Date of birth</label>
+                            <input required type="date" value={verifyForm.date_of_birth}
                                 onChange={(e) => setVerifyForm({ ...verifyForm, date_of_birth: e.target.value })}
-                                className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-                            />
+                                className="input" />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Last 4 digits of phone</label>
+                            <label className="label">Last 4 digits of phone</label>
                             <input
-                                required
-                                type="text"
-                                inputMode="numeric"
-                                pattern="\d{4}"
-                                maxLength={4}
+                                required type="text" inputMode="numeric" pattern="\d{4}" maxLength={4}
                                 value={verifyForm.phone_last4}
                                 onChange={(e) => setVerifyForm({ ...verifyForm, phone_last4: e.target.value.replace(/\D/g, '') })}
                                 placeholder="••••"
-                                className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 dark:text-white font-mono tracking-[0.4em] text-center focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                className="input font-mono tracking-[0.4em] text-center"
                             />
                         </div>
-                        <button
-                            type="submit"
-                            disabled={submitting}
-                            className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-bold text-sm shadow-sm disabled:opacity-50"
-                        >
-                            {submitting ? 'Verifying...' : 'Open my portal'}
+                        <button type="submit" disabled={submitting} className="btn-primary w-full py-3">
+                            {submitting ? 'Verifying…' : 'Open my portal'}
                         </button>
 
-                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                            <button
-                                type="button"
-                                onClick={() => navigate('/')}
-                                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 font-bold"
-                            >
+                        <div className="pt-2 border-t border-ink-100 flex items-center justify-between text-xs">
+                            <button type="button" onClick={() => navigate('/')} className="text-ink-500 hover:text-ink-900 flex items-center gap-1 font-semibold">
                                 <ArrowLeft size={12} /> Back
                             </button>
-                            <span className="text-slate-400 flex items-center gap-1">
+                            <span className="text-ink-400 flex items-center gap-1">
                                 <ShieldCheck size={12} /> Read-only access
                             </span>
                         </div>
@@ -173,38 +150,33 @@ export default function PatientPortal() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-            <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+        <div className="min-h-screen bg-ink-50">
+            <header className="bg-white/80 backdrop-blur-md border-b border-ink-200/70 sticky top-0 z-30">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shrink-0">
-                            <HeartPulse size={20} className="text-white" aria-hidden="true" />
+                        <div className="w-10 h-10 rounded-xl bg-brand-gradient flex items-center justify-center shrink-0 shadow-glow">
+                            <HeartPulse size={18} className="text-white" />
                         </div>
                         <div>
-                            <p className="font-black text-slate-900 dark:text-white">{profile?.full_name || 'Loading...'}</p>
-                            <p className="text-xs text-slate-500 font-mono">{profile?.outpatient_no}</p>
+                            <p className="font-semibold text-ink-900 tracking-tight">{profile?.full_name || 'Loading…'}</p>
+                            <p className="text-xs text-ink-500 font-mono">{profile?.outpatient_no}</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
-                    >
-                        <LogOut size={16} aria-hidden="true" /> Sign out
+                    <button onClick={handleLogout} className="flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-rose-600 px-3 py-2 rounded-lg hover:bg-rose-50 transition-colors">
+                        <LogOut size={15} /> Sign out
                     </button>
                 </div>
-                <nav className="max-w-5xl mx-auto px-4 sm:px-6 flex gap-1 border-t border-slate-100 dark:border-slate-800 overflow-x-auto" aria-label="Portal sections">
+                <nav className="max-w-5xl mx-auto px-4 sm:px-6 flex gap-1 border-t border-ink-100 overflow-x-auto" aria-label="Portal sections">
                     {TABS.map(({ key, label, icon: Icon }) => (
-                        <button
-                            key={key}
-                            onClick={() => setActiveTab(key)}
+                        <button key={key} onClick={() => setActiveTab(key)}
                             aria-current={activeTab === key ? 'page' : undefined}
-                            className={`px-3 py-2.5 text-sm font-bold border-b-2 transition-colors flex items-center gap-1.5 ${
+                            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
                                 activeTab === key
-                                    ? 'border-brand-600 text-brand-700 dark:text-brand-400'
-                                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                    ? 'border-brand-600 text-brand-700'
+                                    : 'border-transparent text-ink-500 hover:text-ink-900'
                             }`}
                         >
-                            <Icon size={14} aria-hidden="true" /> {label}
+                            <Icon size={14} /> {label}
                         </button>
                     ))}
                 </nav>
@@ -212,62 +184,60 @@ export default function PatientPortal() {
 
             <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
                 {!profile ? (
-                    <div className="flex items-center gap-2 text-slate-400">
-                        <Activity className="animate-spin" size={16} /> Loading...
+                    <div className="flex items-center gap-2 text-ink-400">
+                        <Activity className="animate-spin" size={16} /> Loading…
                     </div>
                 ) : activeTab === 'profile' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in">
                         {[
-                            ['Full name', profile.full_name],
-                            ['Outpatient number', profile.outpatient_no],
-                            ['Date of birth', profile.date_of_birth],
-                            ['Sex', profile.sex],
-                            ['Blood group', profile.blood_group],
-                            ['Allergies', profile.allergies],
-                            ['Chronic conditions', profile.chronic_conditions],
-                            ['Phone', profile.telephone_1_masked],
+                            ['Full name',           profile.full_name],
+                            ['Outpatient number',   profile.outpatient_no],
+                            ['Date of birth',       profile.date_of_birth],
+                            ['Sex',                 profile.sex],
+                            ['Blood group',         profile.blood_group],
+                            ['Allergies',           profile.allergies],
+                            ['Chronic conditions',  profile.chronic_conditions],
+                            ['Phone',               profile.telephone_1_masked],
                         ].map(([k, v]) => (
-                            <div key={k} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{k}</p>
-                                <p className="text-sm font-bold text-slate-900 dark:text-white mt-1">{v || '—'}</p>
+                            <div key={k} className="card p-4">
+                                <p className="stat-label">{k}</p>
+                                <p className="text-sm font-semibold text-ink-900 mt-1">{v || '—'}</p>
                             </div>
                         ))}
                     </div>
                 ) : activeTab === 'appointments' ? (
                     appointments.length === 0 ? (
-                        <p className="text-sm text-slate-400">No appointments on file.</p>
+                        <p className="text-sm text-ink-400">No appointments on file.</p>
                     ) : (
-                        <ul className="space-y-2">
+                        <ul className="space-y-2 animate-fade-in">
                             {appointments.map(a => (
-                                <li key={a.appointment_id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex justify-between items-center">
+                                <li key={a.appointment_id} className="card p-4 flex justify-between items-center">
                                     <div>
-                                        <p className="font-bold text-slate-900 dark:text-white text-sm">{new Date(a.appointment_date).toLocaleString()}</p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{a.doctor_name}</p>
-                                        {a.notes && <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{a.notes}</p>}
+                                        <p className="font-semibold text-ink-900 text-sm">{new Date(a.appointment_date).toLocaleString()}</p>
+                                        <p className="text-xs text-ink-500 mt-0.5">{a.doctor_name}</p>
+                                        {a.notes && <p className="text-xs text-ink-600 mt-1">{a.notes}</p>}
                                     </div>
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                                        {a.status}
-                                    </span>
+                                    <span className="badge-neutral">{a.status}</span>
                                 </li>
                             ))}
                         </ul>
                     )
                 ) : activeTab === 'billing' ? (
                     invoices.length === 0 ? (
-                        <p className="text-sm text-slate-400">No invoices on file.</p>
+                        <p className="text-sm text-ink-400">No invoices on file.</p>
                     ) : (
-                        <ul className="space-y-2">
+                        <ul className="space-y-2 animate-fade-in">
                             {invoices.map(i => (
-                                <li key={i.invoice_id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex justify-between items-center">
+                                <li key={i.invoice_id} className="card p-4 flex justify-between items-center">
                                     <div>
-                                        <p className="font-bold text-slate-900 dark:text-white text-sm">Invoice INV-{i.invoice_id}</p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{i.billing_date ? new Date(i.billing_date).toLocaleDateString() : '—'}</p>
+                                        <p className="font-semibold text-ink-900 text-sm">Invoice INV-{i.invoice_id}</p>
+                                        <p className="text-xs text-ink-500 mt-0.5">{i.billing_date ? new Date(i.billing_date).toLocaleDateString() : '—'}</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className={`text-base font-black ${i.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                        <p className={`text-base font-semibold ${i.balance > 0 ? 'text-rose-600' : 'text-accent-600'}`}>
                                             KES {i.balance.toFixed(2)}
                                         </p>
-                                        <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{i.status}</p>
+                                        <p className="text-2xs uppercase tracking-wider font-semibold text-ink-400 mt-0.5">{i.status}</p>
                                     </div>
                                 </li>
                             ))}
@@ -275,15 +245,15 @@ export default function PatientPortal() {
                     )
                 ) : activeTab === 'history' ? (
                     history.length === 0 ? (
-                        <p className="text-sm text-slate-400">No history entries on file.</p>
+                        <p className="text-sm text-ink-400">No history entries on file.</p>
                     ) : (
-                        <ul className="space-y-2">
+                        <ul className="space-y-2 animate-fade-in">
                             {history.map(h => (
-                                <li key={h.entry_id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{h.type.replace(/_/g, ' ')}</p>
-                                    <p className="font-bold text-slate-900 dark:text-white text-sm mt-1">{h.title}</p>
-                                    {h.description && <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{h.description}</p>}
-                                    <p className="text-[10px] text-slate-400 mt-2">{h.event_date}</p>
+                                <li key={h.entry_id} className="card p-4">
+                                    <p className="text-2xs font-semibold uppercase tracking-wider text-ink-400">{h.type.replace(/_/g, ' ')}</p>
+                                    <p className="font-semibold text-ink-900 text-sm mt-1">{h.title}</p>
+                                    {h.description && <p className="text-xs text-ink-600 mt-1 leading-relaxed">{h.description}</p>}
+                                    <p className="text-2xs text-ink-400 mt-2">{h.event_date}</p>
                                 </li>
                             ))}
                         </ul>
