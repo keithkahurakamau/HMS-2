@@ -27,7 +27,11 @@ services:
     rootDir: backend
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: ./render-start.sh
+    # Invoke via `bash` explicitly so the executable bit on the file isn't
+    # required (git mode bits get lost on Windows checkouts and mode-stripping
+    # archive uploads). Render's working directory is set by `rootDir` above,
+    # so this resolves to backend/render-start.sh.
+    startCommand: bash render-start.sh
     healthCheckPath: /
     autoDeploy: true
     envVars:
