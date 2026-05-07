@@ -12,11 +12,18 @@ const CATEGORY_ICONS = {
     critical: AlertCircle,
 };
 
-const CATEGORY_COLORS = {
-    info: 'text-blue-500',
-    success: 'text-emerald-500',
-    warning: 'text-amber-500',
-    critical: 'text-rose-500',
+// Map each category to a tinted icon container — the rail/icon colour is the
+// only place categories should differ. Cards themselves stay neutral so the
+// overall inbox doesn't feel like a Christmas tree.
+const CATEGORY_STYLE = {
+    info:     { ring: 'bg-blue-50 ring-blue-100 text-blue-600',
+                rail: 'bg-blue-500',     label: 'text-blue-700' },
+    success:  { ring: 'bg-accent-50 ring-accent-100 text-accent-600',
+                rail: 'bg-accent-500',   label: 'text-accent-700' },
+    warning:  { ring: 'bg-amber-50 ring-amber-100 text-amber-600',
+                rail: 'bg-amber-500',    label: 'text-amber-700' },
+    critical: { ring: 'bg-rose-50 ring-rose-100 text-rose-600',
+                rail: 'bg-rose-500',     label: 'text-rose-700' },
 };
 
 export default function NotificationBell() {
@@ -36,15 +43,12 @@ export default function NotificationBell() {
         }
     }, []);
 
-    // Initial fetch + light polling. WebSocket fan-out covers the live case;
-    // polling is a fallback in case the socket is closed or proxied away.
     useEffect(() => {
         fetchNotifications();
         const id = setInterval(fetchNotifications, POLL_INTERVAL_MS);
         return () => clearInterval(id);
     }, [fetchNotifications]);
 
-    // Click-outside handler
     useEffect(() => {
         if (!open) return;
         const handler = (e) => {
@@ -86,12 +90,12 @@ export default function NotificationBell() {
                 aria-label={`Notifications, ${unreadCount} unread`}
                 aria-expanded={open}
                 aria-haspopup="true"
-                className="relative p-2 text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="relative p-2 text-ink-500 hover:text-ink-900 dark:text-ink-300 dark:hover:text-white rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800 transition-colors"
             >
                 <Bell size={20} aria-hidden="true" />
                 {unreadCount > 0 && (
                     <span
-                        className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center"
+                        className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white dark:ring-ink-900"
                         aria-hidden="true"
                     >
                         {unreadCount > 99 ? '99+' : unreadCount}
@@ -99,21 +103,34 @@ export default function NotificationBell() {
                 )}
             </button>
 
+            {/* Backdrop — closes the panel when clicking the page content */}
+            {open && (
+                <div
+                    className="fixed inset-0 z-[60] bg-transparent"
+                    onClick={() => setOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
+
             {open && (
                 <div
                     role="dialog"
                     aria-label="Notification inbox"
-                    className="absolute right-0 mt-2 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50"
+                    className="absolute right-0 mt-2 w-96 max-w-[calc(100vw-2rem)]
+                               bg-white dark:bg-ink-900
+                               border border-ink-200/70 dark:border-ink-700
+                               rounded-2xl shadow-elevated overflow-hidden
+                               z-[70] animate-slide-in-right"
                 >
-                    <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/50">
+                    <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between bg-ink-50/60 dark:bg-ink-950/40">
                         <div>
-                            <h3 className="font-bold text-slate-900 dark:text-white text-sm">Notifications</h3>
-                            <p className="text-xs text-slate-500">{unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}</p>
+                            <h3 className="font-semibold text-ink-900 dark:text-white text-sm tracking-tight">Notifications</h3>
+                            <p className="text-xs text-ink-500 mt-0.5">{unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}</p>
                         </div>
                         {unreadCount > 0 && (
                             <button
                                 onClick={markAllRead}
-                                className="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+                                className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-brand-50 transition-colors"
                             >
                                 <CheckCheck size={14} /> Mark all read
                             </button>
@@ -122,45 +139,48 @@ export default function NotificationBell() {
 
                     <div className="max-h-96 overflow-y-auto custom-scrollbar">
                         {notifications.length === 0 ? (
-                            <div className="px-4 py-8 text-center text-slate-400 text-sm">
+                            <div className="px-4 py-12 text-center text-ink-400 text-sm">
+                                <Bell size={28} className="mx-auto mb-2 opacity-40" />
                                 No notifications yet.
                             </div>
                         ) : (
-                            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                            <ul className="divide-y divide-ink-100 dark:divide-ink-800">
                                 {notifications.map((n) => {
                                     const Icon = CATEGORY_ICONS[n.category] || Info;
+                                    const style = CATEGORY_STYLE[n.category] || CATEGORY_STYLE.info;
                                     return (
                                         <li
                                             key={n.notification_id}
-                                            className={`group ${!n.is_read ? 'bg-brand-50/40 dark:bg-brand-900/10' : ''}`}
+                                            className={`group relative ${!n.is_read ? 'bg-brand-50/30 dark:bg-brand-900/10' : ''}`}
                                         >
-                                            <button
-                                                onClick={() => handleClick(n)}
-                                                className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex gap-3"
-                                            >
-                                                <Icon
-                                                    size={18}
-                                                    className={`shrink-0 mt-0.5 ${CATEGORY_COLORS[n.category] || 'text-slate-500'}`}
+                                            {!n.is_read && (
+                                                <span
+                                                    className={`absolute left-0 top-3 bottom-3 w-1 rounded-r ${style.rail}`}
                                                     aria-hidden="true"
                                                 />
+                                            )}
+                                            <button
+                                                onClick={() => handleClick(n)}
+                                                className="w-full text-left px-4 py-3 hover:bg-ink-50/60 dark:hover:bg-ink-800/50 transition-colors flex gap-3"
+                                            >
+                                                <span
+                                                    className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ring-1 ring-inset ${style.ring}`}
+                                                    aria-hidden="true"
+                                                >
+                                                    <Icon size={16} />
+                                                </span>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <p className={`text-sm ${n.is_read ? 'text-slate-700 dark:text-slate-300' : 'font-bold text-slate-900 dark:text-white'} truncate`}>
+                                                        <p className={`text-sm truncate ${n.is_read ? 'text-ink-700 dark:text-ink-300' : 'font-semibold text-ink-900 dark:text-white'}`}>
                                                             {n.title}
                                                         </p>
-                                                        {!n.is_read && (
-                                                            <span
-                                                                className="w-2 h-2 rounded-full bg-brand-500 shrink-0"
-                                                                aria-label="Unread"
-                                                            />
-                                                        )}
                                                     </div>
                                                     {n.body && (
-                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
+                                                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 line-clamp-2 leading-relaxed">
                                                             {n.body}
                                                         </p>
                                                     )}
-                                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-wider font-bold">
+                                                    <p className="text-2xs text-ink-400 dark:text-ink-500 mt-1.5 uppercase tracking-wider font-semibold">
                                                         {new Date(n.created_at).toLocaleString()}
                                                     </p>
                                                 </div>
@@ -176,7 +196,7 @@ export default function NotificationBell() {
                                                                 markRead(n.notification_id);
                                                             }
                                                         }}
-                                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 cursor-pointer text-slate-400 hover:text-brand-600"
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 cursor-pointer text-ink-400 hover:text-brand-600 self-start mt-1"
                                                     >
                                                         <Check size={14} />
                                                     </span>

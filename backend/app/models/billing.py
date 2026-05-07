@@ -39,9 +39,3 @@ class Payment(Base):
     payment_method = Column(String(50), nullable=False)
     transaction_reference = Column(String(100), unique=True, index=True, nullable=True) # M-Pesa Receipt No
     payment_date = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-
-class IdempotencyKey(Base):
-    __tablename__ = "idempotency_keys"
-    key = Column(String(36), primary_key=True) # UUID string
-    response_body = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -205,33 +205,39 @@ export default function AdminDashboard() {
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
             
-            {/* HEADER & TABS */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 shadow-sm flex flex-col md:flex-row items-center justify-between shrink-0 gap-2">
-                <div className="flex flex-wrap bg-slate-800 p-1 rounded-lg w-full max-w-4xl gap-1">
-                    <button onClick={() => setActiveTab('overview')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:text-white'}`}>
-                        <LayoutDashboard size={16} /> Overview
-                    </button>
-                    <button onClick={() => setActiveTab('staff')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'staff' ? 'bg-brand-500 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
-                        <Users size={16} /> Directory
-                    </button>
-                    <button onClick={() => setActiveTab('pricing')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'pricing' ? 'bg-green-500 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
-                        <Tag size={16} /> Pricing & Catalog
-                    </button>
-                    <button onClick={() => setActiveTab('roles')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'roles' ? 'bg-accent-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
-                        <Key size={16} /> Permissions
-                    </button>
-                    <button onClick={() => setActiveTab('audit')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'audit' ? 'bg-red-500 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
-                        <ShieldAlert size={16} /> Audit
-                    </button>
-                    <button onClick={() => setActiveTab('mpesa')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'mpesa' ? 'bg-green-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
-                        <CheckCircle2 size={16} /> Daraja Settings
-                    </button>
-                    <button onClick={() => setActiveTab('mpesa_logs')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-bold transition-all ${activeTab === 'mpesa_logs' ? 'bg-green-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}>
-                        <Activity size={16} /> M-Pesa Logs
-                    </button>
+            {/* HEADER & TABS — unified pill row, single accent for active state */}
+            <div className="card p-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between shrink-0 gap-2">
+                <div role="tablist" aria-label="Admin sections" className="flex flex-wrap bg-ink-100/70 p-1 rounded-xl w-full lg:w-auto lg:flex-1 gap-1">
+                    {[
+                        { key: 'overview',   label: 'Overview',         icon: LayoutDashboard },
+                        { key: 'staff',      label: 'Directory',        icon: Users },
+                        { key: 'pricing',    label: 'Pricing',          icon: Tag },
+                        { key: 'roles',      label: 'Permissions',      icon: Key },
+                        { key: 'audit',      label: 'Audit',            icon: ShieldAlert },
+                        { key: 'mpesa',      label: 'Daraja Settings',  icon: CheckCircle2 },
+                        { key: 'mpesa_logs', label: 'M-Pesa Logs',      icon: Activity },
+                    ].map(({ key, label, icon: Icon }) => {
+                        const isActive = activeTab === key;
+                        return (
+                            <button
+                                key={key}
+                                role="tab"
+                                aria-selected={isActive}
+                                onClick={() => setActiveTab(key)}
+                                className={`flex-1 min-w-[7rem] flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all
+                                            ${isActive
+                                                ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70'
+                                                : 'text-ink-600 hover:text-ink-900 hover:bg-white/60'}`}
+                            >
+                                <Icon size={15} className={isActive ? 'text-brand-600' : 'text-ink-400'} />
+                                {label}
+                            </button>
+                        );
+                    })}
                 </div>
-                <div className="text-right px-4 text-sm font-bold text-slate-400 flex items-center gap-2 shrink-0">
-                    <ShieldCheck size={18} className="text-green-400"/> Root Access Active
+                <div className="px-3 py-1 text-xs font-semibold text-ink-500 flex items-center gap-2 shrink-0 self-center">
+                    <ShieldCheck size={16} className="text-accent-500" />
+                    Root Access Active
                 </div>
             </div>
 
@@ -239,35 +245,43 @@ export default function AdminDashboard() {
             {activeTab === 'overview' && (
                 <div className="space-y-6 overflow-y-auto custom-scrollbar pr-2">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><Users size={24} /></div>
-                                <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">Live</span>
+                        <div className="stat-tile">
+                            <div className="flex justify-between items-start">
+                                <div className="stat-icon bg-blue-50 ring-blue-100 text-blue-600"><Users size={20} /></div>
+                                <span className="badge-success">Live</span>
                             </div>
-                            <h3 className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-1">Total Registered Patients</h3>
-                            <p className="text-3xl font-black text-slate-900">{metrics.total_patients.toLocaleString()}</p>
+                            <div>
+                                <h3 className="stat-label">Total Registered Patients</h3>
+                                <p className="stat-value mt-1">{metrics.total_patients.toLocaleString()}</p>
+                            </div>
                         </div>
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-brand-50 text-brand-600 rounded-xl flex items-center justify-center"><TrendingUp size={24} /></div>
+                        <div className="stat-tile">
+                            <div className="flex justify-between items-start">
+                                <div className="stat-icon bg-brand-50 ring-brand-100 text-brand-600"><TrendingUp size={20} /></div>
                             </div>
-                            <h3 className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-1">Today's Billed Revenue</h3>
-                            <p className="text-3xl font-black text-slate-900">KES {metrics.daily_revenue.toLocaleString()}</p>
+                            <div>
+                                <h3 className="stat-label">Today's Billed Revenue</h3>
+                                <p className="stat-value mt-1">KES {metrics.daily_revenue.toLocaleString()}</p>
+                            </div>
                         </div>
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center"><Activity size={24} /></div>
+                        <div className="stat-tile">
+                            <div className="flex justify-between items-start">
+                                <div className="stat-icon bg-purple-50 ring-purple-100 text-purple-600"><Activity size={20} /></div>
                             </div>
-                            <h3 className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-1">Active Inpatient Admissions</h3>
-                            <p className="text-3xl font-black text-slate-900">{metrics.active_admissions}</p>
+                            <div>
+                                <h3 className="stat-label">Active Inpatient Admissions</h3>
+                                <p className="stat-value mt-1">{metrics.active_admissions}</p>
+                            </div>
                         </div>
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center"><AlertCircle size={24} /></div>
-                                {metrics.low_stock_alerts > 0 && <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse">Action Required</span>}
+                        <div className="stat-tile">
+                            <div className="flex justify-between items-start">
+                                <div className="stat-icon bg-amber-50 ring-amber-100 text-amber-600"><AlertCircle size={20} /></div>
+                                {metrics.low_stock_alerts > 0 && <span className="badge-danger animate-pulse-soft">Action</span>}
                             </div>
-                            <h3 className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-1">Low Stock Alerts</h3>
-                            <p className="text-3xl font-black text-slate-900">{metrics.low_stock_alerts}</p>
+                            <div>
+                                <h3 className="stat-label">Low Stock Alerts</h3>
+                                <p className="stat-value mt-1">{metrics.low_stock_alerts}</p>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -23,10 +23,15 @@ from app.models.clinical import Appointment, PatientQueue, MedicalRecord
 from app.models.laboratory import LabTestCatalog, LabTestRequiredItem, LabTest
 from app.models.inventory import Location, InventoryItem, StockBatch, StockTransfer, DispenseLog, InventoryUsageLog
 from app.models.wards import Ward, Bed, AdmissionRecord
-from app.models.billing import Invoice, InvoiceItem, Payment, IdempotencyKey
+from app.models.billing import Invoice, InvoiceItem, Payment
+from app.models.idempotency import IdempotencyKey
 from app.models.audit import AuditLog
 from app.models.medical_history import MedicalHistoryEntry, DataAccessLog, ConsentRecord
 from app.models.mpesa import MpesaConfig, MpesaTransaction
+from app.models.radiology import RadiologyRequest, RadiologyResult
+from app.models.auth_tokens import RefreshToken, PasswordResetToken
+from app.models.breach import BreachIncident
+from app.models.notification import Notification
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

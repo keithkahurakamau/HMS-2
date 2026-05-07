@@ -114,7 +114,7 @@ export default function MainLayout() {
 
             {/* Main column */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                <header className="h-16 bg-white/80 dark:bg-ink-900/70 backdrop-blur-md border-b border-ink-200/70 dark:border-ink-800 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10">
+                <header className="relative h-16 bg-white/80 dark:bg-ink-900/70 backdrop-blur-md border-b border-ink-200/70 dark:border-ink-800 flex items-center justify-between px-4 sm:px-6 shrink-0 z-40">
                     <div className="flex items-center gap-3 min-w-0">
                         <button
                             className="md:hidden p-2 -ml-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-ink-800 transition-colors"

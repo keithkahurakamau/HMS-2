@@ -23,15 +23,38 @@
     letter-spacing: -0.015em;
   }
 
-  /* Subtle, refined form controls */
+  /* Subtle, refined form controls (applies even on pages that don't use .input) */
   input[type="text"], input[type="email"], input[type="password"],
   input[type="number"], input[type="tel"], input[type="search"],
-  input[type="date"], input[type="time"], select, textarea {
+  input[type="date"], input[type="time"], input[type="datetime-local"],
+  select, textarea {
     transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
   }
   input::placeholder, textarea::placeholder {
     color: #94a3b8;
   }
+
+  /* Unify focus across the app — any input/select/textarea/button gets the
+     same teal ring instead of the browser's default. */
+  input:focus, select:focus, textarea:focus, button:focus {
+    outline: none;
+  }
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    border-color: #14b88e;
+    box-shadow: 0 0 0 4px rgba(20, 184, 142, 0.15);
+  }
+
+  /* Tables — gentle defaults so module pages without `.table-clean` still match */
+  table { border-collapse: separate; border-spacing: 0; }
+  thead th {
+    background-color: rgba(241, 245, 249, 0.6);
+    color: #475569;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.6875rem;
+  }
+  tbody tr { transition: background-color 120ms ease; }
 }
 
 /* ---------------------------------------------------------------------
