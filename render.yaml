@@ -14,11 +14,24 @@
 #        straight to uvicorn.
 #
 # Required environment variables (set as secrets in the Render dashboard):
-#   DATABASE_URL              — managed Postgres connection string
-#   SECRET_KEY                — JWT signing key
+#   DATABASE_URL              — auto-wired from the managed Postgres below
+#                               when applying this blueprint via "Apply Blueprint".
+#                               If you created the service manually, paste the
+#                               internal connection string from the database
+#                               dashboard into this var.
+#   SECRET_KEY                — JWT signing key (auto-generated on first boot)
 #   SEED_SUPERADMIN_EMAIL     — optional, defaults to superadmin@hms.co.ke
 #   SEED_SUPERADMIN_PASSWORD  — optional, defaults to SuperAdmin@2026
 #                               (override at least once for production!)
+
+databases:
+  # Render-managed Postgres. The seed creates `hms_master` inside this server
+  # via `CREATE DATABASE hms_master`, and tenant DBs are added the same way at
+  # runtime by the /api/public/hospitals provisioning flow.
+  - name: hms-postgres
+    plan: free            # bump to `starter` or higher when you outgrow free tier
+    databaseName: hms     # initial DB on this server (renderDB itself)
+    user: hms
 
 services:
   - type: web
@@ -37,8 +50,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
+      # Auto-injected from the managed Postgres declared above. The service
+      # restarts automatically when the DB is provisioned/rotated.
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: hms-postgres
+          property: connectionString
       - key: SECRET_KEY
         generateValue: true
       - key: SEED_SUPERADMIN_EMAIL
