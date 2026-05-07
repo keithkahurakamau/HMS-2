@@ -1,5 +1,21 @@
 import axios from 'axios';
 
+// Endpoints served by the platform router that the superadmin Bearer token
+// authenticates against. Any URL matching these prefixes is treated as a
+// "superadmin call" — both for header injection and for token-expiry handling.
+const SUPERADMIN_PATH_PREFIXES = ['/public/superadmin', '/public/hospitals'];
+
+const isSuperAdminPath = (url) => {
+    if (!url) return false;
+    return SUPERADMIN_PATH_PREFIXES.some((p) => url.startsWith(p) || url.includes(p));
+};
+
+const clearSuperAdminLocal = () => {
+    localStorage.removeItem('hms_superadmin_token');
+    localStorage.removeItem('hms_superadmin_name');
+    localStorage.removeItem('hms_superadmin_expires_at');
+};
+
 export const apiClient = axios.create({
     baseURL: '/api',
     withCredentials: true, // CRITICAL: This ensures the secure cookies are sent with every request
@@ -10,11 +26,27 @@ export const apiClient = axios.create({
     }
 });
 
-// Inject Tenant ID into every request
+// Inject Tenant ID into every request, plus the superadmin Bearer token when
+// the operator is signed in to the platform console. The Bearer header is only
+// attached to platform paths so a 401 from a tenant endpoint (e.g. /users/me on
+// app boot) cannot be misread as "superadmin token expired".
 apiClient.interceptors.request.use((config) => {
     const tenantId = localStorage.getItem('hms_tenant_id');
     if (tenantId) {
         config.headers['X-Tenant-ID'] = tenantId;
+    }
+
+    if (isSuperAdminPath(config.url)) {
+        const superAdminToken = localStorage.getItem('hms_superadmin_token');
+        const expiresAt = parseInt(localStorage.getItem('hms_superadmin_expires_at') || '0', 10);
+        if (superAdminToken) {
+            // Drop tokens we already know are expired to avoid an unnecessary 401.
+            if (expiresAt && Date.now() >= expiresAt) {
+                clearSuperAdminLocal();
+            } else if (!config.headers['Authorization']) {
+                config.headers['Authorization'] = `Bearer ${superAdminToken}`;
+            }
+        }
     }
     return config;
 }, (error) => {
@@ -46,6 +78,17 @@ apiClient.interceptors.response.use(
             return Promise.reject(error);
         }
         if (SKIP_REFRESH_PATHS.some((p) => original.url?.includes(p))) {
+            return Promise.reject(error);
+        }
+
+        // Superadmin tokens don't participate in the cookie-based refresh dance.
+        // Only platform-prefixed URLs use the Bearer token — a 401 there means
+        // the bearer expired, so wipe it and let SuperAdminProtectedRoute kick
+        // the user back to /superadmin/login on the next render.
+        if (isSuperAdminPath(original.url)) {
+            if (localStorage.getItem('hms_superadmin_token')) {
+                clearSuperAdminLocal();
+            }
             return Promise.reject(error);
         }
 

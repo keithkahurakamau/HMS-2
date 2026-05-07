@@ -22,6 +22,7 @@ import string
 from typing import Optional, Tuple
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from app.config.database import Base, get_tenant_engine
@@ -183,8 +184,9 @@ def provision_tenant(
 ) -> Tuple[Tenant, str]:
     """
     Returns (tenant_row, temp_admin_password). Raises ValueError on validation
-    failure or RuntimeError on infra failure (with the master row rolled back
-    and the half-built tenant database dropped).
+    failure (duplicate domain/db_name, malformed input) or RuntimeError on
+    infra failure (with the master row rolled back and the half-built tenant
+    database dropped).
 
     The caller is responsible for surfacing the temp password to the operator
     over a secure channel and discarding it afterwards. We do not persist it.
@@ -195,23 +197,38 @@ def provision_tenant(
     if not (3 <= len(db_name) <= 63):
         raise ValueError("db_name must be 3–63 characters long.")
 
+    # Normalize the comparison fields so casing/whitespace can't slip a
+    # "duplicate" past the pre-flight check.
+    domain_norm = (domain or "").strip().lower()
+    db_name_norm = (db_name or "").strip().lower()
+
     # 2. Reserve the master row first so a duplicate request fails fast.
     existing = master_db.query(Tenant).filter(
-        (Tenant.db_name == db_name) | (Tenant.domain == domain)
+        (Tenant.db_name == db_name_norm) | (Tenant.domain == domain_norm)
     ).first()
     if existing:
-        raise ValueError("A tenant with this database name or domain already exists.")
+        if existing.domain == domain_norm:
+            raise ValueError(f"A tenant with domain '{domain_norm}' already exists.")
+        raise ValueError(f"A tenant with database name '{db_name_norm}' already exists.")
 
     tenant = Tenant(
         name=name,
-        domain=domain,
-        db_name=db_name,
+        domain=domain_norm,
+        db_name=db_name_norm,
         theme_color=theme_color,
         is_premium=is_premium,
         is_active=True,
     )
     master_db.add(tenant)
-    master_db.flush()  # gets us tenant_id without committing yet
+    try:
+        master_db.flush()  # gets us tenant_id without committing yet
+    except IntegrityError as exc:
+        # Lost a race against a concurrent provisioning request, or the
+        # pre-flight read missed a row committed since this session opened.
+        master_db.rollback()
+        raise ValueError(
+            "A tenant with this database name or domain already exists."
+        ) from exc
 
     temp_password = _generate_temp_password()
 

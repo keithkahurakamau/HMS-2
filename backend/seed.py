@@ -24,9 +24,6 @@ from app.models.radiology import RadiologyRequest, RadiologyResult
 from app.models.auth_tokens import RefreshToken, PasswordResetToken
 from app.models.breach import BreachIncident
 from app.models.notification import Notification
-from app.models.mpesa import MpesaConfig, MpesaTransaction
-from app.models.idempotency import IdempotencyKey
-
 
 def reset_database(target_engine):
     """
@@ -785,32 +782,6 @@ def seed_database(target_engine, hospital_name="General Hospital", staff_domain=
                          title="M-Pesa payment pending",
                          body="Ali Mohammed invoice awaiting STK push confirmation.",
                          link="/app/billing"),
-        ])
-        db.flush()
-
-        # ==========================================
-        # 8f. M-PESA TRANSACTIONS — STK push history for the Daraja Logs tab
-        # ==========================================
-        print("   -> Seeding M-Pesa transaction history...")
-        db.add_all([
-            MpesaTransaction(
-                invoice_id=inv1.invoice_id, phone_number="254712345678", amount=4000.00,
-                merchant_request_id="MR-29991", checkout_request_id="CR-AAA-001",
-                receipt_number="QKT11AB22C", status="Success",
-                result_desc="The service request is processed successfully.",
-            ),
-            MpesaTransaction(
-                invoice_id=inv3.invoice_id, phone_number="254733445566", amount=3100.00,
-                merchant_request_id="MR-30012", checkout_request_id="CR-AAA-002",
-                receipt_number=None, status="Pending",
-                result_desc="Awaiting customer confirmation on phone.",
-            ),
-            MpesaTransaction(
-                invoice_id=inv2.invoice_id, phone_number="254723456789", amount=3000.00,
-                merchant_request_id="MR-30030", checkout_request_id="CR-AAA-003",
-                receipt_number=None, status="Failed",
-                result_desc="Request cancelled by user.",
-            ),
         ])
         db.flush()
 

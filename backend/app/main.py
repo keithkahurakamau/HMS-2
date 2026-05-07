@@ -109,8 +109,13 @@ async def csrf_middleware(request: Request, call_next):
             )
         return response
     
-    # Exclude login and webhooks/public endpoints from CSRF check
-    if request.url.path.startswith("/api/auth/login") or request.url.path.startswith("/public"):
+    # Exclude login and webhooks/public endpoints from CSRF check.
+    # The public router lives under /api/public (the prior /public prefix was a
+    # typo that left the superadmin login unreachable from a fresh tab).
+    if (
+        request.url.path.startswith("/api/auth/login")
+        or request.url.path.startswith("/api/public/")
+    ):
         return await call_next(request)
 
     # Validate Double Submit Cookie for state-changing methods

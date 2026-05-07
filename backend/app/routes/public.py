@@ -1,10 +1,15 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from jose import jwt
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import List, Optional
 import re
 
 from app.config.database import get_master_db
+from app.config.settings import settings
+from app.core.dependencies import require_superadmin
 from app.models.master import Tenant, SuperAdmin
 from app.core.security import get_password_hash, verify_password, create_tokens
 from app.services.tenant_provisioning import provision_tenant
@@ -47,7 +52,7 @@ class TenantCreate(BaseModel):
         return v
 
 
-@router.post("/hospitals")
+@router.post("/hospitals", dependencies=[Depends(require_superadmin)])
 def provision_hospital(tenant: TenantCreate, db: Session = Depends(get_master_db)):
     """
     Provisions a brand-new hospital tenant end-to-end:
@@ -71,7 +76,11 @@ def provision_hospital(tenant: TenantCreate, db: Session = Depends(get_master_db
             is_premium=tenant.is_premium,
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        # 409 for "already exists" so the UI can show a clean conflict message
+        # rather than the generic 500 the global handler would produce.
+        msg = str(e)
+        code = status.HTTP_409_CONFLICT if "already exists" in msg else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=msg)
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -96,7 +105,7 @@ class TenantUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
-@router.patch("/hospitals/{tenant_id}")
+@router.patch("/hospitals/{tenant_id}", dependencies=[Depends(require_superadmin)])
 def update_tenant(tenant_id: int, payload: TenantUpdate, db: Session = Depends(get_master_db)):
     """Updates a tenant's display attributes or suspension state. Identifier
     fields (db_name) are intentionally not editable — renaming a database
@@ -132,13 +141,25 @@ def superadmin_login(payload: SuperAdminLogin, db: Session = Depends(get_master_
     admin = db.query(SuperAdmin).filter(SuperAdmin.email == payload.email).first()
     if not admin or not verify_password(payload.password, admin.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid superadmin credentials")
+    if admin.is_active is False:
+        raise HTTPException(status_code=403, detail="Superadmin account disabled")
 
-    from app.config.settings import settings
-    from datetime import datetime, timedelta
-    import jwt
+    # Platform sessions are short-lived by design — superadmin tokens carry the
+    # power to provision/suspend tenants, so we cap the bearer at 20 minutes.
+    ttl = timedelta(minutes=20)
+    expire = datetime.now(timezone.utc) + ttl
     token = jwt.encode(
-        {"user_id": admin.admin_id, "role": "superadmin", "exp": datetime.utcnow() + timedelta(hours=4)},
+        {
+            "user_id": admin.admin_id,
+            "role": "superadmin",
+            "type": "access",
+            "exp": expire,
+        },
         settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM
+        algorithm=settings.ALGORITHM,
     )
-    return {"access_token": token, "full_name": admin.full_name}
+    return {
+        "access_token": token,
+        "full_name": admin.full_name,
+        "expires_in": int(ttl.total_seconds()),
+    }

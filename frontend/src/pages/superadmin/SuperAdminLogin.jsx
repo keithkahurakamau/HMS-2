@@ -8,12 +8,23 @@ import toast from 'react-hot-toast';
 
 const TOKEN_KEY = 'hms_superadmin_token';
 const NAME_KEY = 'hms_superadmin_name';
+const EXPIRES_KEY = 'hms_superadmin_expires_at';
 
-export const isSuperAdminAuthenticated = () => Boolean(localStorage.getItem(TOKEN_KEY));
+export const isSuperAdminAuthenticated = () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return false;
+    const expiresAt = parseInt(localStorage.getItem(EXPIRES_KEY) || '0', 10);
+    if (expiresAt && Date.now() >= expiresAt) {
+        clearSuperAdminSession();
+        return false;
+    }
+    return true;
+};
 
 export const clearSuperAdminSession = () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(NAME_KEY);
+    localStorage.removeItem(EXPIRES_KEY);
 };
 
 export default function SuperAdminLogin() {
@@ -34,10 +45,14 @@ export default function SuperAdminLogin() {
         setIsSubmitting(true);
         try {
             const res = await apiClient.post('/public/superadmin/login', { email, password });
-            const { access_token, full_name } = res.data || {};
+            const { access_token, full_name, expires_in } = res.data || {};
             if (!access_token) throw new Error('Missing token');
             localStorage.setItem(TOKEN_KEY, access_token);
             if (full_name) localStorage.setItem(NAME_KEY, full_name);
+            // Server tells us the TTL — record absolute expiry so the guard can
+            // pre-empt 401s when the operator returns to the tab later.
+            const ttlSeconds = typeof expires_in === 'number' ? expires_in : 20 * 60;
+            localStorage.setItem(EXPIRES_KEY, String(Date.now() + ttlSeconds * 1000));
             toast.success('Superadmin authenticated');
             const next = location.state?.from?.pathname || '/superadmin/dashboard';
             navigate(next, { replace: true });

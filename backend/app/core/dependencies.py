@@ -1,9 +1,48 @@
 from fastapi import Depends, HTTPException, Request, status
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
-from app.config.database import get_db
+from app.config.database import get_db, get_master_db
 from app.config.settings import settings
+from app.models.master import SuperAdmin
 from app.models.user import User, Role
+
+
+def require_superadmin(request: Request, db: Session = Depends(get_master_db)) -> dict:
+    """Authenticates a platform-level superadmin via Bearer token.
+
+    Superadmin tokens are not tenant-scoped: they're issued by
+    POST /api/public/superadmin/login and carry role='superadmin'. The token
+    arrives in the Authorization header (the front-office UI keeps it in
+    localStorage rather than the HttpOnly tenant cookie used by hospital users).
+    """
+    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+    if not auth_header or not auth_header.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Superadmin authentication required",
+        )
+    token = auth_header.split(" ", 1)[1].strip()
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired superadmin token",
+        )
+
+    if payload.get("role") != "superadmin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superadmin role required")
+
+    admin_id = payload.get("user_id")
+    if admin_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Malformed superadmin token")
+
+    admin = db.query(SuperAdmin).filter(SuperAdmin.admin_id == admin_id).first()
+    if not admin or admin.is_active is False:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Superadmin account not found or disabled")
+
+    return {"admin_id": admin.admin_id, "email": admin.email, "full_name": admin.full_name}
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
     """
