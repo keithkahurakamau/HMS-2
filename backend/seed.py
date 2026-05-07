@@ -68,7 +68,11 @@ def seed_database(target_engine, hospital_name="General Hospital", staff_domain=
             "users:manage", "clinical:write", "clinical:read",
             "patients:read", "patients:write", "history:read", "history:manage",
             "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read",
-            "wards:manage", "billing:read", "billing:manage", "radiology:manage"
+            "wards:manage", "billing:read", "billing:manage",
+            "radiology:manage", "radiology:read",
+            "appointments:read", "appointments:manage",
+            "inventory:read", "inventory:manage",
+            "notifications:read"
         ]
         
         perms = {}
@@ -80,18 +84,45 @@ def seed_database(target_engine, hospital_name="General Hospital", staff_domain=
 
         # 2b. Create Roles and Map Permissions to them
         roles_config = {
-            "Admin": [
-                "users:manage", "clinical:write", "clinical:read",
-                "patients:read", "patients:write", "history:read", "history:manage",
-                "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read",
-                "wards:manage", "billing:read", "billing:manage", "radiology:manage"
+            "Admin": permissions_data,  # Admin gets every permission by default
+            "Doctor": [
+                "clinical:write", "clinical:read",
+                "patients:read", "patients:write",
+                "pharmacy:read", "laboratory:read", "radiology:read",
+                "history:read", "history:manage",
+                "appointments:read", "appointments:manage",
+                "notifications:read",
             ],
-            "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write", "pharmacy:read", "laboratory:read", "history:read", "history:manage"],
-            "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read"],
-            "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read"],
-            "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read"],
-            "Radiologist": ["radiology:manage", "clinical:read", "patients:read"],
-            "Receptionist": ["patients:read", "patients:write", "billing:read", "billing:manage"]
+            "Nurse": [
+                "clinical:read", "patients:read", "wards:manage",
+                "pharmacy:read", "laboratory:read", "radiology:read",
+                "history:read",
+                "appointments:read",
+                "notifications:read",
+            ],
+            "Pharmacist": [
+                "pharmacy:manage", "pharmacy:read",
+                "inventory:read", "inventory:manage",
+                "patients:read",
+                "notifications:read",
+            ],
+            "Lab Technician": [
+                "laboratory:manage", "laboratory:read",
+                "inventory:read",
+                "patients:read",
+                "notifications:read",
+            ],
+            "Radiologist": [
+                "radiology:manage", "radiology:read",
+                "clinical:read", "patients:read",
+                "notifications:read",
+            ],
+            "Receptionist": [
+                "patients:read", "patients:write",
+                "billing:read", "billing:manage",
+                "appointments:read", "appointments:manage",
+                "notifications:read",
+            ],
         }
 
         roles = {}
@@ -267,34 +298,53 @@ def seed_database(target_engine, hospital_name="General Hospital", staff_domain=
         # ==========================================
         print("   -> Seeding Master Inventory & Batches...")
         items_data = [
-            {"code": "DRG-001", "name": "Amoxicillin 625mg", "cat": "Medication", "cost": 100, "price": 150},
-            {"code": "DRG-002", "name": "Paracetamol 500mg IV", "cat": "Medication", "cost": 300, "price": 450},
-            {"code": "RGT-001", "name": "CBC Reagent Pack", "cat": "Reagents", "cost": 4000, "price": 5000},
-            {"code": "CNS-001", "name": "Surgical Gloves (Box)", "cat": "Consumables", "cost": 500, "price": 800}
+            {"code": "DRG-001", "name": "Amoxicillin 625mg",      "cat": "Medication",  "cost": 100,  "price": 150,  "rx": True,  "form": "tablet", "strength": "625mg", "generic": "Amoxicillin"},
+            {"code": "DRG-002", "name": "Paracetamol 500mg IV",   "cat": "Medication",  "cost": 300,  "price": 450,  "rx": True,  "form": "vial",   "strength": "500mg", "generic": "Paracetamol"},
+            {"code": "DRG-003", "name": "Metformin 500mg",        "cat": "Medication",  "cost": 50,   "price": 80,   "rx": True,  "form": "tablet", "strength": "500mg", "generic": "Metformin HCl"},
+            {"code": "DRG-004", "name": "Salbutamol Inhaler",     "cat": "Medication",  "cost": 600,  "price": 950,  "rx": True,  "form": "inhaler","strength": "100mcg","generic": "Salbutamol"},
+            {"code": "DRG-005", "name": "Ibuprofen 400mg",        "cat": "Medication",  "cost": 30,   "price": 60,   "rx": False, "form": "tablet", "strength": "400mg", "generic": "Ibuprofen"},
+            {"code": "RGT-001", "name": "CBC Reagent Pack",       "cat": "Reagents",    "cost": 4000, "price": 5000},
+            {"code": "RGT-002", "name": "Glucose Strips (50)",    "cat": "Reagents",    "cost": 1200, "price": 1800},
+            {"code": "CNS-001", "name": "Surgical Gloves (Box)",  "cat": "Consumables", "cost": 500,  "price": 800},
+            {"code": "CNS-002", "name": "5ml Syringe (Box)",      "cat": "Consumables", "cost": 350,  "price": 550},
         ]
-        
+
         catalog = {}
         for i in items_data:
-            item = InventoryItem(item_code=i["code"], name=i["name"], category=i["cat"], unit_cost=i["cost"], unit_price=i["price"])
+            item = InventoryItem(
+                item_code=i["code"], name=i["name"], category=i["cat"],
+                unit_cost=i["cost"], unit_price=i["price"],
+                requires_prescription=i.get("rx", False),
+                dosage_form=i.get("form"), strength=i.get("strength"), generic_name=i.get("generic"),
+                reorder_threshold=10,
+            )
             db.add(item)
             catalog[i["name"]] = item
         db.flush()
 
         batches = [
-            {"item": "Amoxicillin 625mg", "loc": "Pharmacy", "batch": "AMOX-01", "qty": 1000, "supplier": "MedKEM Logistics"},
-            {"item": "Paracetamol 500mg IV", "loc": "Wards", "batch": "PARA-IV-99", "qty": 150, "supplier": "Global Pharma"},
-            {"item": "Surgical Gloves (Box)", "loc": "Wards", "batch": "GLV-22", "qty": 20, "supplier": "Surgical Supplies Ltd"},
-            {"item": "CBC Reagent Pack", "loc": "Laboratory", "batch": "RGT-CBC-01", "qty": 15, "supplier": "LabTech Diagnostics"},
-            {"item": "Amoxicillin 625mg", "loc": "Main Store", "batch": "AMOX-02", "qty": 5000, "supplier": "MedKEM Logistics"}
+            {"item": "Amoxicillin 625mg",      "loc": "Pharmacy",    "batch": "AMOX-01",   "qty": 1000, "supplier": "MedKEM Logistics",       "expiry_days": 365},
+            {"item": "Paracetamol 500mg IV",   "loc": "Wards",       "batch": "PARA-IV-99","qty": 150,  "supplier": "Global Pharma",          "expiry_days": 240},
+            {"item": "Metformin 500mg",        "loc": "Pharmacy",    "batch": "MET-77",    "qty": 800,  "supplier": "Cosmos Pharma",          "expiry_days": 540},
+            {"item": "Salbutamol Inhaler",     "loc": "Pharmacy",    "batch": "SAL-INH-04","qty": 60,   "supplier": "Glaxo East Africa",      "expiry_days": 720},
+            {"item": "Ibuprofen 400mg",        "loc": "Pharmacy",    "batch": "IBU-08",    "qty": 5,    "supplier": "Beta Healthcare",        "expiry_days": 90},   # LOW STOCK ⚠
+            {"item": "Surgical Gloves (Box)",  "loc": "Wards",       "batch": "GLV-22",    "qty": 20,   "supplier": "Surgical Supplies Ltd",  "expiry_days": 720},
+            {"item": "5ml Syringe (Box)",      "loc": "Main Store",  "batch": "SYR-05",    "qty": 4,    "supplier": "Surgical Supplies Ltd",  "expiry_days": 540},  # LOW STOCK ⚠
+            {"item": "CBC Reagent Pack",       "loc": "Laboratory",  "batch": "RGT-CBC-01","qty": 15,   "supplier": "LabTech Diagnostics",    "expiry_days": 180},
+            {"item": "Glucose Strips (50)",    "loc": "Laboratory",  "batch": "GLU-STR-12","qty": 8,    "supplier": "Roche Diagnostics",      "expiry_days": 200},  # LOW STOCK ⚠
+            {"item": "Amoxicillin 625mg",      "loc": "Main Store",  "batch": "AMOX-02",   "qty": 5000, "supplier": "MedKEM Logistics",       "expiry_days": 365},
         ]
 
+        batch_lookup = {}
         for b in batches:
             batch = StockBatch(
                 item_id=catalog[b["item"]].item_id, location_id=locations[b["loc"]].location_id,
-                batch_number=b["batch"], quantity=b["qty"], expiry_date=datetime.now() + timedelta(days=365),
+                batch_number=b["batch"], quantity=b["qty"],
+                expiry_date=datetime.now() + timedelta(days=b["expiry_days"]),
                 supplier_name=b["supplier"]
             )
             db.add(batch)
+            batch_lookup[b["batch"]] = batch
         db.flush()
 
         # ==========================================
@@ -522,6 +572,220 @@ def seed_database(target_engine, hospital_name="General Hospital", staff_domain=
         db.flush()
 
         # ==========================================
+        # 8b. RADIOLOGY — requests + one completed result
+        # ==========================================
+        print("   -> Seeding Radiology Requests & Results...")
+        rad_requests = [
+            RadiologyRequest(
+                patient_id=p1.patient_id, requested_by=staff[f"dr.kahura@{staff_domain}"].user_id,
+                exam_type="Chest X-Ray", clinical_notes="R/o pneumonia secondary to severe malaria. Bilateral views.",
+                status="Completed",
+            ),
+            RadiologyRequest(
+                patient_id=p4.patient_id, requested_by=staff[f"dr.kahura@{staff_domain}"].user_id,
+                exam_type="Brain CT (non-contrast)", clinical_notes="Hypertensive emergency. R/o intracranial bleed.",
+                status="In Progress",
+            ),
+            RadiologyRequest(
+                patient_id=db_patients[6].patient_id, requested_by=staff[f"dr.kahura@{staff_domain}"].user_id,
+                exam_type="MRI Knee (Right)", clinical_notes="Athlete — recurrent knee pain post-training.",
+                status="Pending",
+            ),
+            RadiologyRequest(
+                patient_id=db_patients[3].patient_id, requested_by=staff[f"dr.omondi@{staff_domain}"].user_id,
+                exam_type="Abdominal Ultrasound", clinical_notes="Routine renal function follow-up.",
+                status="Pending",
+            ),
+        ]
+        db.add_all(rad_requests)
+        db.flush()
+
+        # One completed result attached to the first request
+        db.add(RadiologyResult(
+            request_id=rad_requests[0].request_id,
+            performed_by=staff[f"rad.mwangi@{staff_domain}"].user_id,
+            findings=("Lung fields appear clear bilaterally with no focal consolidation. "
+                      "No pleural effusion or pneumothorax. Cardiac silhouette is within normal limits. "
+                      "Costophrenic angles are sharp."),
+            conclusion="Normal chest radiograph. No acute cardiopulmonary process identified.",
+            image_url="/static/seed/cxr-001.jpg",
+        ))
+        db.flush()
+
+        # ==========================================
+        # 8c. PHARMACY — dispense logs (links to clinical encounters)
+        # ==========================================
+        print("   -> Seeding Pharmacy Dispense Logs...")
+        amox_batch = batch_lookup["AMOX-01"]
+        met_batch  = batch_lookup["MET-77"]
+        sal_batch  = batch_lookup["SAL-INH-04"]
+
+        dispense_entries = [
+            # P1 — Severe malaria, given Amoxicillin co-treatment
+            DispenseLog(
+                item_id=catalog["Amoxicillin 625mg"].item_id, batch_id=amox_batch.batch_id,
+                patient_id=p1.patient_id, record_id=rec1.record_id,
+                quantity_dispensed=21, total_cost=21 * 150,
+                dispensed_by=staff[f"pharm.keith@{staff_domain}"].user_id,
+                notes="7-day course, 1 TDS post-meals.",
+            ),
+            # P2 — Asthma exacerbation
+            DispenseLog(
+                item_id=catalog["Salbutamol Inhaler"].item_id, batch_id=sal_batch.batch_id,
+                patient_id=p2.patient_id, record_id=rec2.record_id,
+                quantity_dispensed=1, total_cost=950,
+                dispensed_by=staff[f"pharm.keith@{staff_domain}"].user_id,
+                notes="2 puffs PRN. Counsel on spacer technique.",
+            ),
+            # P3 — Diabetes follow-up
+            DispenseLog(
+                item_id=catalog["Metformin 500mg"].item_id, batch_id=met_batch.batch_id,
+                patient_id=p3.patient_id, record_id=rec3.record_id,
+                quantity_dispensed=60, total_cost=60 * 80,
+                dispensed_by=staff[f"pharm.keith@{staff_domain}"].user_id,
+                notes="1 BD with meals — 30-day supply.",
+            ),
+        ]
+        db.add_all(dispense_entries)
+
+        # Decrement batch quantities to reflect dispensed stock
+        amox_batch.quantity -= 21
+        sal_batch.quantity  -= 1
+        met_batch.quantity  -= 60
+
+        # Lab consumed a CBC reagent for test1 (internal usage log)
+        db.add(InventoryUsageLog(
+            item_id=catalog["CBC Reagent Pack"].item_id,
+            batch_id=batch_lookup["RGT-CBC-01"].batch_id,
+            location_id=locations["Laboratory"].location_id,
+            quantity_used=1, used_by_user_id=staff[f"lab.alice@{staff_domain}"].user_id,
+            reference_type="LabTest", reference_id=test1.test_id,
+        ))
+        batch_lookup["RGT-CBC-01"].quantity -= 1
+        db.flush()
+
+        # ==========================================
+        # 8d. APPOINTMENTS — calendar coverage (today + next 7 days)
+        # ==========================================
+        print("   -> Seeding upcoming Appointments calendar...")
+        now = datetime.now(timezone.utc)
+        upcoming_appts = [
+            # Today, later
+            Appointment(patient_id=db_patients[1].patient_id, doctor_id=staff[f"dr.omondi@{staff_domain}"].user_id,
+                        appointment_date=now + timedelta(hours=3), status="Scheduled",
+                        notes="Asthma follow-up. Bring peak-flow diary."),
+            Appointment(patient_id=db_patients[4].patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                        appointment_date=now + timedelta(hours=5), status="Confirmed",
+                        notes="Routine pre-deployment checkup."),
+            # Tomorrow
+            Appointment(patient_id=db_patients[6].patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                        appointment_date=now + timedelta(days=1, hours=2), status="Scheduled",
+                        notes="Sports physical — knee MRI review."),
+            Appointment(patient_id=db_patients[7].patient_id, doctor_id=staff[f"dr.omondi@{staff_domain}"].user_id,
+                        appointment_date=now + timedelta(days=1, hours=4), status="Scheduled",
+                        notes="Annual checkup."),
+            # Day +3
+            Appointment(patient_id=db_patients[8].patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                        appointment_date=now + timedelta(days=3, hours=1), status="Scheduled",
+                        notes="PCOS hormonal workup follow-up."),
+            # Day +5 — cancelled (covers the 'Cancelled' status pill)
+            Appointment(patient_id=db_patients[9].patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                        appointment_date=now + timedelta(days=5, hours=2), status="Cancelled",
+                        notes="Cancelled by patient — to reschedule."),
+            # Day +7
+            Appointment(patient_id=db_patients[2].patient_id, doctor_id=staff[f"dr.kahura@{staff_domain}"].user_id,
+                        appointment_date=now + timedelta(days=7, hours=3), status="Scheduled",
+                        notes="Diabetes 1-week follow-up. Bring glucose log."),
+            # No-show in the past (yesterday)
+            Appointment(patient_id=db_patients[7].patient_id, doctor_id=staff[f"dr.omondi@{staff_domain}"].user_id,
+                        appointment_date=now - timedelta(days=1, hours=4), status="No-Show",
+                        notes="Patient did not arrive."),
+        ]
+        db.add_all(upcoming_appts)
+        db.flush()
+
+        # ==========================================
+        # 8e. NOTIFICATIONS — populate the bell inbox per role
+        # ==========================================
+        print("   -> Seeding in-app Notifications inbox...")
+        admin_id    = staff[f"admin@{staff_domain}"].user_id
+        kahura_id   = staff[f"dr.kahura@{staff_domain}"].user_id
+        omondi_id   = staff[f"dr.omondi@{staff_domain}"].user_id
+        nurse_id    = staff[f"nurse.joy@{staff_domain}"].user_id
+        pharm_id    = staff[f"pharm.keith@{staff_domain}"].user_id
+        lab_id      = staff[f"lab.alice@{staff_domain}"].user_id
+        rad_id      = staff[f"rad.mwangi@{staff_domain}"].user_id
+        rec_id      = staff[f"rec.brian@{staff_domain}"].user_id
+
+        db.add_all([
+            # Admin — system + low-stock alerts
+            Notification(user_id=admin_id, category="warning",
+                         title="Low stock: Ibuprofen 400mg",
+                         body="Pharmacy stock for Ibuprofen 400mg has fallen below the reorder threshold (5 units left).",
+                         link="/app/inventory"),
+            Notification(user_id=admin_id, category="warning",
+                         title="Low stock: 5ml Syringe (Box)",
+                         body="Main Store has only 4 boxes of 5ml syringes remaining.",
+                         link="/app/inventory"),
+            Notification(user_id=admin_id, category="info",
+                         title="3 audit events overnight",
+                         body="Review the audit ledger for newly created medical records and invoices.",
+                         link="/app/admin"),
+            # Doctor Kahura — labs ready, new admission
+            Notification(user_id=kahura_id, category="success",
+                         title="CBC result ready: David Kamau",
+                         body="WBC 12.4, Hb 9.1 g/dL — anaemia noted. Click to view full report.",
+                         link="/app/laboratory"),
+            Notification(user_id=kahura_id, category="critical",
+                         title="ICU admission: Grace Wanjiru",
+                         body="Hypertensive emergency. Patient transferred to ICU bed ICU-01.",
+                         link="/app/wards"),
+            Notification(user_id=kahura_id, category="info",
+                         title="2 appointments today",
+                         body="You have 2 confirmed appointments later today.",
+                         link="/app/appointments"),
+            # Doctor Omondi — paeds queue
+            Notification(user_id=omondi_id, category="info",
+                         title="Paediatric queue: 1 patient waiting",
+                         body="Faith Mutua is in the paediatric queue (acuity 3).",
+                         link="/app/clinical"),
+            # Nurse Joy
+            Notification(user_id=nurse_id, category="info",
+                         title="Bed GMW-01 occupied",
+                         body="Patient David Kamau admitted under Dr. Kahura.",
+                         link="/app/wards"),
+            # Pharmacist
+            Notification(user_id=pharm_id, category="warning",
+                         title="Reorder needed: Ibuprofen 400mg",
+                         body="Pharmacy batch IBU-08 has only 5 units left.",
+                         link="/app/pharmacy"),
+            Notification(user_id=pharm_id, category="info",
+                         title="3 prescriptions dispensed today",
+                         body="Amoxicillin x21, Salbutamol x1, Metformin x60.",
+                         link="/app/pharmacy"),
+            # Lab
+            Notification(user_id=lab_id, category="info",
+                         title="New lab order: Urine Full Analysis",
+                         body="Sarah Achieng — pending sample collection.",
+                         link="/app/laboratory"),
+            # Radiologist
+            Notification(user_id=rad_id, category="info",
+                         title="2 imaging requests pending",
+                         body="MRI Knee (Right) and Abdominal Ultrasound awaiting your review.",
+                         link="/app/radiology"),
+            # Receptionist
+            Notification(user_id=rec_id, category="success",
+                         title="Invoice #INV paid",
+                         body="David Kamau's invoice settled in full (KES 4,000).",
+                         link="/app/billing"),
+            Notification(user_id=rec_id, category="warning",
+                         title="M-Pesa payment pending",
+                         body="Ali Mohammed invoice awaiting STK push confirmation.",
+                         link="/app/billing"),
+        ])
+        db.flush()
+
+        # ==========================================
         # 9. AUDIT LOGS (Seed a realistic trail)
         # ==========================================
         print("   -> Seeding Audit Trail...")
@@ -550,15 +814,21 @@ def seed_database(target_engine, hospital_name="General Hospital", staff_domain=
         print(f"   │  nurse.joy@{staff_domain:26s} → Nurse              │")
         print(f"   │  pharm.keith@{staff_domain:24s} → Pharmacist         │")
         print(f"   │  lab.alice@{staff_domain:26s} → Lab Technician     │")
+        print(f"   │  rad.mwangi@{staff_domain:25s} → Radiologist        │")
         print(f"   │  rec.brian@{staff_domain:26s} → Receptionist       │")
         print(f"   └─────────────────────────────────────────────────┘")
         print("")
         print("   🏥 Test Scenarios Ready:")
-        print("   • Patient 1 (Kamau)     — Admitted GMW, CBC Completed, Invoice PAID ✅")
-        print("   • Patient 2 (Achieng)   — Outpatient, Lab Pending Collection, Invoice Pending 🟡")
-        print("   • Patient 3 (Mohammed)  — Outpatient, Lab Done, Invoice Pending M-Pesa 📱")
-        print("   • Patient 4 (Wanjiru)   — ICU Admitted, Hypertensive Emergency 🔴")
+        print("   • Patient 1 (Kamau)     — Admitted GMW, CBC Done, CXR reported, Invoice PAID, Amoxicillin dispensed ✅")
+        print("   • Patient 2 (Achieng)   — Outpatient, Urinalysis pending collection, Salbutamol dispensed, Invoice Pending 🟡")
+        print("   • Patient 3 (Mohammed)  — Outpatient, Glucose high, Metformin dispensed, Invoice Pending M-Pesa 📱")
+        print("   • Patient 4 (Wanjiru)   — ICU Admitted, CT Brain in progress, Hypertensive Emergency 🔴")
         print("   • Patient 5 (Mutua)     — In Paediatric Queue, Appointment booked 🟢")
+        print("")
+        print("   📅 Calendar: 7 upcoming appointments + 1 cancelled + 1 no-show across the next 7 days")
+        print("   🔔 Notifications: 14 inbox items seeded across all role inboxes")
+        print("   📦 Inventory: 9 items, 10 batches — 3 below reorder threshold (Ibuprofen, Syringes, Glucose Strips)")
+        print("   🩻 Radiology: 4 requests (1 completed with full report, 1 in progress, 2 pending)")
 
 
 
