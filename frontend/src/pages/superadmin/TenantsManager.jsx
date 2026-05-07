@@ -3,6 +3,36 @@ import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import { Building2, Server, Database, Plus, Search, MoreVertical, Edit2, ShieldAlert, Power, CheckCircle2, X, ZapOff, Zap } from 'lucide-react';
 
+// Normalize whatever the backend (or network) returned into a single readable
+// string. FastAPI 422s come back as a list of {loc, msg, type}; HTTPException
+// uses {detail: "..."}; network failures don't have a response at all.
+const formatApiError = (err, fallback = 'Request failed.') => {
+    if (!err) return fallback;
+    if (!err.response) {
+        return err.message ? `${fallback} (${err.message})` : fallback;
+    }
+    const detail = err.response.data?.detail;
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (Array.isArray(detail)) {
+        return detail
+            .map((d) => {
+                const where = Array.isArray(d.loc) ? d.loc.slice(1).join('.') : '';
+                return where ? `${where}: ${d.msg}` : d.msg;
+            })
+            .filter(Boolean)
+            .join(' · ') || fallback;
+    }
+    if (detail && typeof detail === 'object' && detail.msg) return detail.msg;
+    return fallback;
+};
+
+const showApiError = (err, fallback) => {
+    const msg = formatApiError(err, fallback);
+    // Pin server-provided messages a bit longer so the operator can read them.
+    const duration = err?.response?.data?.detail ? 6000 : 4000;
+    toast.error(msg, { duration });
+};
+
 export default function TenantsManager() {
     const [tenants, setTenants] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -45,7 +75,7 @@ export default function TenantsManager() {
             setEditing(null);
             fetchTenants();
         } catch (err) {
-            toast.error(err.response?.data?.detail || 'Update failed.');
+            showApiError(err, `Could not update ${editing.name}.`);
         } finally {
             setSavingEdit(false);
         }
@@ -61,7 +91,7 @@ export default function TenantsManager() {
             toast.success(`${tenant.name} ${nextActive ? 'reactivated' : 'suspended'}.`);
             fetchTenants();
         } catch (err) {
-            toast.error(err.response?.data?.detail || 'Action failed.');
+            showApiError(err, `Could not ${nextActive ? 'reactivate' : 'suspend'} ${tenant.name}.`);
         }
     };
 
@@ -77,23 +107,33 @@ export default function TenantsManager() {
             const res = await apiClient.get('/public/hospitals');
             setTenants(res.data);
         } catch (error) {
-            toast.error("Failed to load global tenant registry");
+            showApiError(error, 'Failed to load global tenant registry.');
         } finally {
             setIsLoading(false);
         }
     };
 
+    const [isProvisioning, setIsProvisioning] = useState(false);
+
     const handleProvisionTenant = async (e) => {
         e.preventDefault();
+        if (isProvisioning) return; // guard against double-submit (which the backend now also handles, but UX wise we want one toast)
+        setIsProvisioning(true);
         try {
             const res = await apiClient.post('/public/hospitals', newTenant);
-            toast.success("Tenant provisioned: database, schema, and admin account ready.");
+            toast.success('Tenant provisioned: database, schema, and admin account ready.');
             setIsAddModalOpen(false);
             setProvisionResult(res.data);
             setNewTenant({ name: '', domain: '', db_name: '', admin_email: '', admin_full_name: '', theme_color: 'blue', is_premium: false });
             fetchTenants();
         } catch (error) {
-            toast.error(error.response?.data?.detail || "Failed to provision tenant.");
+            // 409 = duplicate domain/db_name; 400 = validation; 401/403 = auth.
+            const fallback = error?.response?.status === 409
+                ? 'A tenant with that domain or database name already exists.'
+                : 'Failed to provision tenant.';
+            showApiError(error, fallback);
+        } finally {
+            setIsProvisioning(false);
         }
     };
 
@@ -386,7 +426,7 @@ export default function TenantsManager() {
                             </div>
                             <div className="mt-6 pt-5 border-t border-white/5 flex justify-end gap-2">
                                 <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-ink-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
-                                <button type="submit" className="px-5 py-2 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-white rounded-lg text-sm font-semibold shadow-glow transition-all">Deploy database instance</button>
+                                <button type="submit" disabled={isProvisioning} className="px-5 py-2 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-white rounded-lg text-sm font-semibold shadow-glow transition-all disabled:opacity-60 disabled:cursor-not-allowed">{isProvisioning ? 'Provisioning…' : 'Deploy database instance'}</button>
                             </div>
                         </form>
                     </div>
