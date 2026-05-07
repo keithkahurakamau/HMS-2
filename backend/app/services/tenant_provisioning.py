@@ -25,8 +25,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
-from app.config.database import Base, get_tenant_engine
-from app.config.settings import settings
+from app.config.database import DATABASE_URL, Base, get_tenant_engine
+from app.config.settings import settings  # noqa: F401 — kept for forward-compat
 from app.core.security import get_password_hash
 from app.models.master import Tenant
 from app.models.user import User, Role, Permission
@@ -92,7 +92,7 @@ def _generate_temp_password(length: int = 14) -> str:
 
 def _create_database_if_missing(db_name: str) -> None:
     """CREATE DATABASE has to live outside a transaction; use AUTOCOMMIT."""
-    base_url = settings.DATABASE_URL.rsplit('/', 1)[0]
+    base_url = DATABASE_URL.rsplit('/', 1)[0]
     admin_engine = create_engine(f"{base_url}/postgres", isolation_level="AUTOCOMMIT")
     try:
         with admin_engine.connect() as conn:
@@ -111,7 +111,7 @@ def _create_database_if_missing(db_name: str) -> None:
 
 def _drop_database_silently(db_name: str) -> None:
     """Best-effort cleanup when post-CREATE steps fail."""
-    base_url = settings.DATABASE_URL.rsplit('/', 1)[0]
+    base_url = DATABASE_URL.rsplit('/', 1)[0]
     admin_engine = create_engine(f"{base_url}/postgres", isolation_level="AUTOCOMMIT")
     try:
         with admin_engine.connect() as conn:

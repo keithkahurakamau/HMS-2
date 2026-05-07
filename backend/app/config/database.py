@@ -21,6 +21,33 @@ from fastapi import Request
 from app.config.settings import settings
 
 
+def _normalize_db_url(raw: str) -> str:
+    """Coerce a raw DATABASE_URL into a form SQLAlchemy 2.x accepts.
+
+    Common gotchas this catches:
+      * Render/Heroku hand out URLs starting with ``postgres://`` — SQLAlchemy
+        2.x rejects that scheme with "Can't load plugin: postgres". Rewrite
+        to ``postgresql://``.
+      * If someone pastes the *dashboard* URL by mistake (``https://...``),
+        fail loudly with a useful error instead of the cryptic
+        "Can't load plugin: https".
+    """
+    if not raw:
+        raise RuntimeError("DATABASE_URL is empty — set it on the host environment.")
+    if raw.startswith("postgres://"):
+        return "postgresql://" + raw[len("postgres://"):]
+    if raw.startswith(("postgresql://", "postgresql+")):
+        return raw
+    raise RuntimeError(
+        "DATABASE_URL must start with postgresql:// (or postgres://). "
+        f"Got scheme: {raw.split('://', 1)[0]!r}. "
+        "Did you paste the dashboard/web URL instead of the connection string?"
+    )
+
+
+DATABASE_URL = _normalize_db_url(settings.DATABASE_URL)
+
+
 def _engine_kwargs() -> dict:
     return {
         "pool_size": settings.DB_POOL_SIZE,
@@ -31,10 +58,10 @@ def _engine_kwargs() -> dict:
 
 
 # --- Default + Master engines (always-on) -----------------------------
-default_engine = create_engine(settings.DATABASE_URL, **_engine_kwargs())
+default_engine = create_engine(DATABASE_URL, **_engine_kwargs())
 DefaultSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=default_engine)
 
-_master_db_url = settings.DATABASE_URL.rsplit('/', 1)[0] + "/hms_master"
+_master_db_url = DATABASE_URL.rsplit('/', 1)[0] + "/hms_master"
 master_engine = create_engine(_master_db_url, **_engine_kwargs())
 MasterSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=master_engine)
 
@@ -76,7 +103,7 @@ def get_tenant_engine(tenant_db_name: str):
             tenant_engines.move_to_end(tenant_db_name)
             return tenant_engines[tenant_db_name]
 
-        base_url = settings.DATABASE_URL.rsplit('/', 1)[0]
+        base_url = DATABASE_URL.rsplit('/', 1)[0]
         db_url = f"{base_url}/{tenant_db_name}"
 
         engine = create_engine(db_url, **_engine_kwargs())
@@ -96,7 +123,7 @@ def get_db(request: Request = None):
 
     tenant_db_name = request.headers.get("X-Tenant-ID")
     if not tenant_db_name:
-        tenant_db_name = settings.DATABASE_URL.rsplit('/', 1)[1]
+        tenant_db_name = DATABASE_URL.rsplit('/', 1)[1]
 
     engine = get_tenant_engine(tenant_db_name)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

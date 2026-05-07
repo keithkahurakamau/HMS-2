@@ -26,7 +26,7 @@ import sys
 from sqlalchemy import create_engine, MetaData, text
 from sqlalchemy.orm import sessionmaker
 
-from app.config.settings import settings
+from app.config.database import DATABASE_URL
 from app.core.security import get_password_hash
 from app.models.master import SuperAdmin, Tenant  # noqa: F401 — Tenant table needs to exist
 
@@ -37,12 +37,12 @@ MASTER_DB = "hms_master"
 def _admin_engine():
     """AUTOCOMMIT engine bound to the cluster's `postgres` DB so we can
     CREATE/DROP databases (which cannot run inside a transaction)."""
-    base_url = settings.DATABASE_URL.rsplit("/", 1)[0]
+    base_url = DATABASE_URL.rsplit("/", 1)[0]
     return create_engine(f"{base_url}/postgres", isolation_level="AUTOCOMMIT")
 
 
 def _master_engine():
-    base_url = settings.DATABASE_URL.rsplit("/", 1)[0]
+    base_url = DATABASE_URL.rsplit("/", 1)[0]
     return create_engine(f"{base_url}/{MASTER_DB}")
 
 
