@@ -57,10 +57,16 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await apiClient.post('/auth/logout');
-            setUser(null);
-            toast.success('Logged out securely');
         } catch (error) {
-            toast.error('Logout failed');
+            // Even if the server call fails, proceed to clear local state
+            // so a stuck session can't trap the user.
+        } finally {
+            setUser(null);
+            localStorage.removeItem('hms_tenant_id');
+            localStorage.removeItem('hms_tenant_name');
+            toast.success('Logged out securely');
+            // Hard redirect to the welcome/Portal page so all in-memory state is wiped.
+            window.location.href = '/';
         }
     };
 

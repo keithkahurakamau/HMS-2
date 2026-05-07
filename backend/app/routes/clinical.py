@@ -11,6 +11,7 @@ from app.models.user import User
 from app.schemas.clinical import MedicalRecordCreate, MedicalRecordResponse
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
+from app.utils.consent import require_active_consent
 
 router = APIRouter(prefix="/api/clinical", tags=["Clinical Desk"])
 
@@ -71,7 +72,12 @@ def submit_consultation(record_in: dict, request: Request, db: Session = Depends
     try:
         # Extract queue_id as it doesn't belong in the MedicalRecord table
         queue_id = record_in.pop("queue_id", None)
-        
+
+        # KDPA S.30: cannot record clinical findings without active patient consent.
+        patient_id = record_in.get("patient_id")
+        if patient_id is not None:
+            require_active_consent(db, patient_id, consent_type="Treatment")
+
         # Create the record using the remaining dictionary items
         new_record = MedicalRecord(**record_in, doctor_id=current_user["user_id"])
         db.add(new_record)

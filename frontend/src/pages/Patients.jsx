@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
-import { 
-    Search, UserPlus, X, Activity, Clock, ShieldCheck, 
-    MapPin, Phone, Briefcase, HeartPulse, FileText, 
+import {
+    Search, UserPlus, X, Activity, Clock, ShieldCheck,
+    MapPin, Phone, Briefcase, HeartPulse, FileText,
     MoreVertical, Stethoscope, TestTube, AlertCircle, UserMinus,
-    Pill, Bed, CreditCard
+    Pill, Bed, CreditCard, Printer, Download, Trash
 } from 'lucide-react';
+import { printPatientCard } from '../utils/printTemplates';
 
 export default function Patients() {
     const [patients, setPatients] = useState([]);
@@ -90,7 +91,7 @@ export default function Patients() {
     // --- Action: Deactivate Patient ---
     const deactivatePatient = async (patientId) => {
         if (!window.confirm("Are you sure you want to deactivate this patient record?")) return;
-        
+
         try {
             await apiClient.delete(`/patients/${patientId}`);
             toast.success("Patient record deactivated.");
@@ -98,6 +99,47 @@ export default function Patients() {
             fetchPatients();
         } catch (error) {
             toast.error("Failed to deactivate patient.");
+        }
+    };
+
+    // --- Action: Export Patient Data (KDPA S.26 Subject Access Request) ---
+    const exportPatientData = async (patient) => {
+        setActiveDropdown(null);
+        try {
+            const res = await apiClient.get(`/privacy/patients/${patient.patient_id}/export`);
+            const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `patient_${patient.outpatient_no}_export.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast.success('Patient data export ready.');
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Export failed.');
+        }
+    };
+
+    // --- Action: Right to Erasure (KDPA S.40 Anonymization) ---
+    const erasePatient = async (patient) => {
+        setActiveDropdown(null);
+        const confirmation = window.prompt(
+            `KDPA Right to Erasure — this will anonymize "${patient.surname}, ${patient.other_names}". `
+            + `Clinical records remain (Health Act 2017 retention). To confirm, retype the OP number: ${patient.outpatient_no}`
+        );
+        if (!confirmation) return;
+        const reason = window.prompt('Reason for erasure (auditable):', 'Subject request');
+        if (!reason) return;
+
+        try {
+            await apiClient.post(`/privacy/patients/${patient.patient_id}/erase`, {
+                reason,
+                confirm_outpatient_no: confirmation,
+            });
+            toast.success('Patient anonymized per KDPA S.40.');
+            fetchPatients();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Erasure failed.');
         }
     };
 
@@ -222,8 +264,17 @@ export default function Patients() {
                                                     <button onClick={() => viewHistory(patient.patient_id)} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
                                                         <Clock size={16} className="text-slate-500" /> View History
                                                     </button>
+                                                    <button onClick={() => { printPatientCard(patient); setActiveDropdown(null); }} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                        <Printer size={16} className="text-slate-500" /> Print Card
+                                                    </button>
+                                                    <button onClick={() => exportPatientData(patient)} className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                        <Download size={16} className="text-slate-500" /> Export Data (KDPA)
+                                                    </button>
                                                     <button onClick={() => deactivatePatient(patient.patient_id)} className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
                                                         <UserMinus size={16} /> Deactivate
+                                                    </button>
+                                                    <button onClick={() => erasePatient(patient)} className="w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center gap-2 font-bold">
+                                                        <Trash size={16} /> Erase (KDPA S.40)
                                                     </button>
                                                 </div>
                                             )}

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { 
-    Bed, Activity, Search, Filter, UserPlus, 
-    LogOut, Pill, FileText, AlertCircle, X, Package, Plus, Trash2, CheckCircle2
+import {
+    Bed, Activity, Search, Filter, UserPlus,
+    LogOut, Pill, FileText, AlertCircle, X, Package, Plus, Trash2, CheckCircle2, Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { printAdmissionSlip } from '../utils/printTemplates';
 
 export default function Wards() {
     const [wards, setWards] = useState([]);
@@ -367,7 +368,24 @@ export default function Wards() {
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-slate-200 bg-white shrink-0">
+                        <div className="p-6 border-t border-slate-200 bg-white shrink-0 space-y-2">
+                            <button
+                                onClick={() => printAdmissionSlip({
+                                    patient: { full_name: activeBed.patient, outpatient_no: activeBed.op_no, inpatient_no: activeBed.inpatient_no, age: activeBed.age, sex: activeBed.sex, blood_group: activeBed.blood_group },
+                                    admission: {
+                                        admission_id: activeBed.admission_id,
+                                        ward_name: activeBed.wardName,
+                                        bed_number: activeBed.number,
+                                        admission_date: activeBed.admission_date,
+                                        primary_diagnosis: activeBed.diagnosis,
+                                        status: 'Active',
+                                    },
+                                    doctor: { full_name: activeBed.doctor },
+                                })}
+                                className="w-full bg-white border border-slate-200 text-slate-700 py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors"
+                            >
+                                <Printer size={18} /> Print Admission Slip
+                            </button>
                             <button onClick={handleDischarge} className="w-full bg-red-50 border border-red-200 text-red-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
                                 <LogOut size={20} /> Execute Discharge Protocol
                             </button>

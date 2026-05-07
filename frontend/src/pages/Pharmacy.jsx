@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { 
-    Search, Pill, CheckCircle2, AlertCircle, Clock, 
-    ChevronDown, ChevronUp, Package, Printer, XCircle, 
+import {
+    Search, Pill, CheckCircle2, AlertCircle, Clock,
+    ChevronDown, ChevronUp, Package, Printer, XCircle,
     FileWarning, ShoppingCart, Plus, Minus, Trash2, CreditCard, Store, Activity
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { printPrescription } from '../utils/printTemplates';
 
 export default function Pharmacy() {
     // --- APP STATE ---
@@ -259,6 +260,18 @@ export default function Pharmacy() {
                                 </div>
 
                                 <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 shrink-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
+                                    <button
+                                        onClick={() => printPrescription({
+                                            patient: { full_name: activeOrder.patient, outpatient_no: activeOrder.op_no, allergies: activeOrder.allergies },
+                                            doctor: { full_name: activeOrder.doctor, license_number: activeOrder.doctor_license },
+                                            items: (activeOrder.prescriptions || []).map(p => ({ drug_name: p.drug, dosage: p.dosage, frequency: p.frequency, duration: p.duration, route: p.route || p.notes })),
+                                            notes: activeOrder.clinical_notes,
+                                            recordId: activeOrder.id,
+                                        })}
+                                        className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 flex items-center gap-2"
+                                    >
+                                        <Printer size={16}/> Print Rx
+                                    </button>
                                     <button className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 flex items-center gap-2"><XCircle size={16}/> Return to Doctor</button>
                                     <button onClick={handleRxDispense} disabled={isProcessing} className="px-6 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
                                         <CheckCircle2 size={18}/> {isProcessing ? 'Processing...' : 'Dispense & Close'}

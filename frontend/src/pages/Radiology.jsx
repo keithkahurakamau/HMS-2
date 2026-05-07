@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { 
-    Radio, Activity, CheckCircle2, 
+import {
+    Radio, Activity, CheckCircle2,
     XCircle, Bone, FileText, ChevronDown, ChevronUp,
-    Send, User, Clock, Image as ImageIcon, FileSearch
+    Send, User, Clock, Image as ImageIcon, FileSearch, Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { printRadiologyReport } from '../utils/printTemplates';
 
 export default function Radiology() {
     const [isQueueOpen, setIsQueueOpen] = useState(true);
@@ -156,7 +157,7 @@ export default function Radiology() {
                                 <div className="w-12 h-12 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center border border-brand-100">
                                     <Bone size={24} />
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-1">
                                         <h1 className="text-xl font-bold text-slate-900">{activeRequest.exam_type}</h1>
                                     </div>
@@ -164,6 +165,25 @@ export default function Radiology() {
                                         Patient ID: <span className="text-slate-700">{activeRequest.patient_id}</span> • Ordered by: <span className="text-slate-700">Dr. #{activeRequest.requested_by}</span>
                                     </p>
                                 </div>
+                                <button
+                                    onClick={() => printRadiologyReport({
+                                        patient: { full_name: activeRequest.patient_name, outpatient_no: activeRequest.patient_opd },
+                                        request: {
+                                            request_id: activeRequest.request_id,
+                                            modality: activeRequest.modality || activeRequest.exam_type,
+                                            body_part: activeRequest.body_part,
+                                            clinical_indication: activeRequest.clinical_notes,
+                                            status: activeRequest.status,
+                                            created_at: activeRequest.created_at,
+                                        },
+                                        result: (findings || conclusion) ? { findings, impression: conclusion } : null,
+                                        radiologist: { full_name: activeRequest.radiologist_name },
+                                    })}
+                                    className="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 flex items-center gap-2"
+                                    title="Print Radiology Report"
+                                >
+                                    <Printer size={16} /> Print
+                                </button>
                             </div>
                         </div>
 

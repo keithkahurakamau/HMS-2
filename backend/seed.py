@@ -21,6 +21,9 @@ from app.models.billing import Invoice, InvoiceItem, Payment
 from app.models.audit import AuditLog
 from app.models.medical_history import ConsentRecord, MedicalHistoryEntry
 from app.models.radiology import RadiologyRequest, RadiologyResult
+from app.models.auth_tokens import RefreshToken, PasswordResetToken
+from app.models.breach import BreachIncident
+from app.models.notification import Notification
 
 def reset_database(target_engine):
     """

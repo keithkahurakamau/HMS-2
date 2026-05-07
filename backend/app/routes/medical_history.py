@@ -31,6 +31,7 @@ from app.schemas.medical_history import (
 )
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
+from app.utils.consent import require_active_consent
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/medical-history", tags=["Medical History (KDPA Compliant)"])
@@ -165,6 +166,9 @@ def add_history_entry(
     patient = db.query(Patient).filter(Patient.patient_id == entry_in.patient_id, Patient.is_active == True).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found.")
+
+    # KDPA S.30: a clinician cannot record new health data without active consent.
+    require_active_consent(db, entry_in.patient_id, consent_type="Treatment")
 
     new_entry = MedicalHistoryEntry(
         **entry_in.model_dump(),

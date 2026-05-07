@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { 
-    LayoutDashboard, Users, Stethoscope, TestTube, 
+import {
+    LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X, ShieldCheck,
-    ClipboardList, Radio
+    ClipboardList, Radio, CalendarDays
 } from 'lucide-react';
+import NotificationBell from '../NotificationBell';
+import ThemeToggle from '../ThemeToggle';
 
 export default function MainLayout() {
     const { user, logout } = useAuth();
@@ -24,6 +26,7 @@ export default function MainLayout() {
         { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={20} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'] },
         { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={20} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'] },
         { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={20} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'] },
+        { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={20} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'] },
         { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={20} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'] },
         { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={20} />,         allowedRoles: ['Admin', 'Receptionist'] },
     ];
@@ -32,12 +35,12 @@ export default function MainLayout() {
     const handleNavClick = () => setIsMobileMenuOpen(false);
 
     return (
-        <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
+        <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans overflow-hidden">
             {isMobileMenuOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
             )}
 
-            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <aside aria-label="Primary navigation" className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="h-16 flex items-center justify-between px-6 bg-slate-950/50 border-b border-slate-800 shrink-0">
                     <div className="flex items-center gap-2 font-black text-white text-xl tracking-tight overflow-hidden">
                         <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center shrink-0">
@@ -75,27 +78,39 @@ export default function MainLayout() {
             </aside>
 
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10">
+                <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10">
                     <div className="flex items-center gap-4">
-                        <button className="md:hidden text-slate-500 hover:text-slate-800" onClick={() => setIsMobileMenuOpen(true)}><Menu size={24} /></button>
-                        <h2 className="text-lg font-bold text-slate-800 hidden sm:block">
+                        <button
+                            className="md:hidden text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            aria-label="Open navigation menu"
+                        >
+                            <Menu size={24} aria-hidden="true" />
+                        </button>
+                        <h2 className="text-lg font-bold text-slate-800 dark:text-white hidden sm:block">
                             {filteredNav.find(n => location.pathname.startsWith(n.path))?.name || 'Dashboard'}
                         </h2>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                            <span className="text-xs font-bold text-green-700 uppercase tracking-wider">System Online</span>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/40 rounded-full">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" aria-hidden="true"></div>
+                            <span className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">System Online</span>
                         </div>
-                        <button onClick={logout} className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-red-600 transition-colors px-3 py-2 rounded-lg hover:bg-red-50">
-                            <LogOut size={18} />
+                        <NotificationBell />
+                        <ThemeToggle compact />
+                        <button
+                            onClick={logout}
+                            aria-label="Sign out"
+                            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 transition-colors px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                            <LogOut size={18} aria-hidden="true" />
                             <span className="hidden sm:block">Sign Out</span>
                         </button>
                     </div>
                 </header>
 
-                <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 custom-scrollbar">
+                <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950 p-4 sm:p-6 custom-scrollbar">
                     <Outlet />
                 </main>
             </div>

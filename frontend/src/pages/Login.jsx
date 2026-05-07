@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShieldAlert, Activity } from 'lucide-react';
 import ChangePassword from './ChangePassword';
 
@@ -77,9 +77,14 @@ export default function Login() {
                             </div>
                         </div>
 
-                        <div className="flex items-center text-sm text-slate-500">
-                            <ShieldAlert size={16} className="mr-2 text-brand-500" />
-                            Secured via HttpOnly JWT
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center text-slate-500">
+                                <ShieldAlert size={16} className="mr-2 text-brand-500" />
+                                Secured via HttpOnly JWT
+                            </div>
+                            <Link to="/forgot-password" className="text-brand-600 hover:text-brand-700 font-medium">
+                                Forgot password?
+                            </Link>
                         </div>
 
                         <div>

@@ -1,12 +1,15 @@
 import time
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 import secrets
 from app.core.limiter import limiter
+from app.core.websocket import manager as ws_manager
 
 from app.config.settings import settings
 
@@ -31,6 +34,9 @@ import app.routes.medical_history as medical_history_module
 import app.routes.public as public_module
 import app.routes.mpesa_admin as mpesa_admin_module
 import app.routes.mpesa_payment as mpesa_payment_module
+import app.routes.privacy as privacy_module
+import app.routes.notifications as notifications_module
+import app.routes.patient_portal as patient_portal_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -39,26 +45,40 @@ logger = logging.getLogger(__name__)
 # 2. Setup SlowAPI Rate Limiter (Imported from app.core.limiter)
 
 # 3. Initialize FastAPI Application
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Boot: warm up the WebSocket Redis backend if configured.
+    await ws_manager.init_redis()
+    if not settings.REDIS_URL:
+        logger.warning("REDIS_URL not configured. WebSocket broadcasts will not span workers.")
+    try:
+        yield
+    finally:
+        await ws_manager.shutdown()
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Enterprise Hospital Management System API"
+    description="Enterprise Hospital Management System API",
+    lifespan=lifespan,
 )
 
-# 4. Attach Rate Limiter to App
+# 4. Attach Rate Limiter to App.
+# SlowAPIMiddleware applies the limiter's default_limits globally to every route,
+# so unauthenticated bots cannot flood data-heavy reads. Routes with explicit
+# `@limiter.limit("...")` decorators still get their stricter per-route limits.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # 5. Configure CORS (Must be added BEFORE custom http middlewares)
+# Allowed origins are sourced from settings.CORS_ORIGINS so production deployments
+# can lock the list down to a closed set of trusted domains via the environment.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",    
-        "http://127.0.0.1:5173",    
-        "http://localhost:3000",
-        "https://mayoclinic-erp.vercel.app"
-    ],
-    allow_credentials=True, 
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -135,6 +155,9 @@ app.include_router(medical_history_module.router)
 app.include_router(public_module.router)
 app.include_router(mpesa_admin_module.router)
 app.include_router(mpesa_payment_module.router)
+app.include_router(privacy_module.router)
+app.include_router(notifications_module.router)
+app.include_router(patient_portal_module.router)
 
 # 9. Health Check Route
 @app.get("/")

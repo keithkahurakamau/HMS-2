@@ -2,24 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------
+   Accessibility baselines
+   --------------------------------------------------------------------- */
+
+/* Honor user motion preferences globally. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High-contrast keyboard focus ring on every interactive element. Mouse users
+   keep the original hover styles; only keyboard navigation triggers this. */
+:focus-visible {
+  outline: 2px solid #14b8a6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip-to-content target for screen readers */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-bottom-right-radius: 6px;
+  z-index: 9999;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* Tailwind's `class` darkmode strategy lets us scope theme overrides */
+html.dark body {
+  color-scheme: dark;
+  background-color: #020617;
+  color: #e2e8f0;
+}
+
+/* ---------------------------------------------------------------------
+   Print rules — mostly delegated to per-document templates now
+   --------------------------------------------------------------------- */
 @media print {
   body {
     background-color: white !important;
     margin: 0;
     padding: 0;
   }
-  
+
   aside, nav, header, button, .no-print {
     display: none !important;
   }
-  
+
   main, .print-container {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     box-shadow: none !important;
   }
-  
+
   .print-page-break {
     page-break-after: always;
   }

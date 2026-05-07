@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { 
+import {
     Receipt, Search, Filter, CreditCard, Banknote, Smartphone, CheckCircle2,
-    Activity, ArrowRight, FileText, X
+    Activity, ArrowRight, FileText, X, Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { printInvoice } from '../utils/printTemplates';
 
 export default function Billing() {
     const [queue, setQueue] = useState([]);
@@ -216,8 +217,9 @@ export default function Billing() {
                                         <p className="text-slate-400 text-xs font-bold uppercase mb-1">Total Balance Due</p>
                                         <p className="text-3xl font-black text-green-400">KES {(activeInvoice.total_amount - activeInvoice.amount_paid).toFixed(2)}</p>
                                     </div>
-                                    <button onClick={() => window.print()} className="ml-4 p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700 no-print" title="Print Invoice">
-                                        <FileText size={20} />
+                                    <button onClick={() => printInvoice(activeInvoice)} className="ml-4 p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700 no-print flex items-center gap-2 px-3" title="Print Invoice / Receipt">
+                                        <Printer size={18} />
+                                        <span className="text-xs font-bold">Print</span>
                                     </button>
                                 </div>
                             </div>

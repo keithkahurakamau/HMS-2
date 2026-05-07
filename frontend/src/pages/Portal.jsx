@@ -128,7 +128,16 @@ export default function Portal() {
                     )}
                 </div>
                 
-                <p className="mt-8 text-slate-500 text-sm">Powered by Advanced Agentic Cloud Infrastructure</p>
+                <div className="mt-8 flex flex-col items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => navigate('/patient')}
+                        className="text-sm text-brand-400 hover:text-brand-300 font-bold underline-offset-4 hover:underline"
+                    >
+                        Are you a patient? Open the Patient Portal →
+                    </button>
+                    <p className="text-slate-500 text-sm">Powered by Advanced Agentic Cloud Infrastructure</p>
+                </div>
             </div>
         </div>
     );

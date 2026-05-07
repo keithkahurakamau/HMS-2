@@ -20,3 +20,46 @@ apiClient.interceptors.request.use((config) => {
 }, (error) => {
     return Promise.reject(error);
 });
+
+// =====================================================================
+// Silent token refresh.
+//
+// When a request fails with 401 because the access token expired, we attempt
+// /auth/refresh exactly once. If the refresh succeeds, the original request is
+// replayed transparently. We coalesce concurrent refresh attempts via a shared
+// promise so a burst of 401s only triggers a single /auth/refresh round-trip.
+// =====================================================================
+let refreshInFlight = null;
+
+const SKIP_REFRESH_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout', '/auth/forgot-password', '/auth/reset-password'];
+
+apiClient.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const original = error.config;
+        const status = error.response?.status;
+
+        if (!original || status !== 401) {
+            return Promise.reject(error);
+        }
+        if (original._retried) {
+            return Promise.reject(error);
+        }
+        if (SKIP_REFRESH_PATHS.some((p) => original.url?.includes(p))) {
+            return Promise.reject(error);
+        }
+
+        try {
+            if (!refreshInFlight) {
+                refreshInFlight = apiClient.post('/auth/refresh').finally(() => {
+                    refreshInFlight = null;
+                });
+            }
+            await refreshInFlight;
+            original._retried = true;
+            return apiClient(original);
+        } catch (refreshError) {
+            return Promise.reject(error);
+        }
+    }
+);

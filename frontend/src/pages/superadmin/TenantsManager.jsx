@@ -11,12 +11,18 @@ export default function TenantsManager() {
     
     // New Tenant Form State
     const [newTenant, setNewTenant] = useState({
-        name: '', domain: '', db_name: '', theme_color: 'blue', is_premium: false
+        name: '', domain: '', db_name: '', admin_email: '', admin_full_name: '',
+        theme_color: 'blue', is_premium: false
     });
+
+    // Surface the one-time temp password returned by the backend.
+    const [provisionResult, setProvisionResult] = useState(null);
 
     useEffect(() => {
         fetchTenants();
     }, []);
+
+    
 
     const fetchTenants = async () => {
         setIsLoading(true);
@@ -33,13 +39,14 @@ export default function TenantsManager() {
     const handleProvisionTenant = async (e) => {
         e.preventDefault();
         try {
-            await apiClient.post('/public/hospitals', newTenant);
-            toast.success("Tenant database provisioned successfully!");
+            const res = await apiClient.post('/public/hospitals', newTenant);
+            toast.success("Tenant provisioned: database, schema, and admin account ready.");
             setIsAddModalOpen(false);
-            setNewTenant({ name: '', domain: '', db_name: '', theme_color: 'blue', is_premium: false });
+            setProvisionResult(res.data);
+            setNewTenant({ name: '', domain: '', db_name: '', admin_email: '', admin_full_name: '', theme_color: 'blue', is_premium: false });
             fetchTenants();
         } catch (error) {
-            toast.error("Failed to provision tenant.");
+            toast.error(error.response?.data?.detail || "Failed to provision tenant.");
         }
     };
 
@@ -160,6 +167,49 @@ export default function TenantsManager() {
                 </div>
             </div>
 
+            {/* One-time provisioning result — shows admin temp password */}
+            {provisionResult && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-amber-500/50 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-800 bg-amber-500/10">
+                            <h2 className="text-lg font-black text-amber-400">Tenant ready — admin temporary password</h2>
+                            <p className="text-xs text-amber-300/80 mt-1">Shown once. Deliver to the admin via a secure channel.</p>
+                        </div>
+                        <div className="p-6 space-y-4 text-sm">
+                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
+                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tenant</div>
+                                <div className="text-white font-bold">{provisionResult.db_name}</div>
+                            </div>
+                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
+                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Admin email</div>
+                                <div className="text-white font-mono text-xs break-all">{provisionResult.admin_email}</div>
+                            </div>
+                            <div className="bg-slate-950 border border-amber-500/30 rounded-lg p-4">
+                                <div className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">Temporary password</div>
+                                <code className="text-emerald-300 font-mono text-base break-all select-all">{provisionResult.admin_temp_password}</code>
+                                <button
+                                    onClick={() => { navigator.clipboard.writeText(provisionResult.admin_temp_password); toast.success('Copied'); }}
+                                    className="mt-3 text-xs text-amber-400 hover:text-amber-300 font-bold"
+                                >
+                                    Copy to clipboard
+                                </button>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                                The admin will be forced to choose a new password on first login.
+                            </p>
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    onClick={() => setProvisionResult(null)}
+                                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold"
+                                >
+                                    I've saved it — close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Provision Modal */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -181,6 +231,16 @@ export default function TenantsManager() {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Database Name</label>
                                     <input required type="text" value={newTenant.db_name} onChange={e => setNewTenant({...newTenant, db_name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none font-mono text-sm" placeholder="e.g. agakhan_db" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Bootstrap Admin Email</label>
+                                    <input required type="email" value={newTenant.admin_email} onChange={e => setNewTenant({...newTenant, admin_email: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none" placeholder="admin@agakhan.com" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Admin Full Name</label>
+                                    <input required type="text" value={newTenant.admin_full_name} onChange={e => setNewTenant({...newTenant, admin_full_name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none" placeholder="Jane Mwangi" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">

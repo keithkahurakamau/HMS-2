@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { 
-    Microscope, Search, Clock, AlertCircle, CheckCircle2, 
+import {
+    Microscope, Search, Clock, AlertCircle, CheckCircle2,
     Printer, XCircle, TestTube, FileDigit, ChevronDown, ChevronUp,
     Settings, Activity, FlaskConical, Send, Package, Plus, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { printLabReport } from '../utils/printTemplates';
 
 export default function Laboratory() {
     const [activeTab, setActiveTab] = useState('queue');
@@ -199,7 +200,7 @@ export default function Laboratory() {
                                         <div className="w-12 h-12 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center border border-brand-100">
                                             <Microscope size={24} />
                                         </div>
-                                        <div>
+                                        <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <h1 className="text-xl font-bold text-slate-900">{activeTest.test_name}</h1>
                                                 {activeTest.priority === 'STAT' && <span className="bg-red-100 text-red-700 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">STAT / Urgent</span>}
@@ -208,6 +209,20 @@ export default function Laboratory() {
                                                 Patient: <span className="text-slate-700">{activeTest.patient}</span> • Ordered by: <span className="text-slate-700">{activeTest.doctor}</span> • Order ID: {activeTest.test_id}
                                             </p>
                                         </div>
+                                        {(activeTest.status === 'Completed' || activeTest.result_summary) && (
+                                            <button
+                                                onClick={() => printLabReport({
+                                                    patient: { full_name: activeTest.patient, outpatient_no: activeTest.op_no },
+                                                    test: activeTest,
+                                                    performedBy: { full_name: activeTest.performed_by_name },
+                                                    orderedBy: { full_name: activeTest.doctor },
+                                                })}
+                                                className="ml-auto px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 flex items-center gap-2"
+                                                title="Print Lab Report"
+                                            >
+                                                <Printer size={16}/> Print Report
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

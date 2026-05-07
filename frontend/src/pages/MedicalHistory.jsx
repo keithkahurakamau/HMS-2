@@ -6,8 +6,9 @@ import {
     Search, ShieldCheck, AlertCircle, Clock, Activity,
     Plus, X, ChevronDown, ChevronRight, FileText,
     Syringe, Users, Heart, Brain, Baby, Cigarette,
-    Trash2, Edit, Save, Lock
+    Trash2, Edit, Save, Lock, Printer
 } from 'lucide-react';
+import { printMedicalHistory } from '../utils/printTemplates';
 
 const ENTRY_TYPES = [
     { key: 'SURGICAL_HISTORY', label: 'Surgical History', icon: <FileText size={16} />, color: 'blue' },
@@ -259,6 +260,21 @@ export default function MedicalHistory() {
                                     <p className="text-brand-200 text-xs font-bold uppercase tracking-wider mb-1">Patient Chart</p>
                                     <h2 className="text-2xl font-black">{chart.patient_name}</h2>
                                     <p className="text-brand-200 text-sm mt-1">{chart.opd_number}</p>
+                                    <button
+                                        onClick={() => printMedicalHistory({
+                                            patient: {
+                                                full_name: chart.patient_name,
+                                                outpatient_no: chart.opd_number,
+                                                date_of_birth: chart.date_of_birth,
+                                                sex: chart.sex,
+                                            },
+                                            entries: chart.entries || [],
+                                            consents: chart.consents || [],
+                                        })}
+                                        className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-bold transition-colors"
+                                    >
+                                        <Printer size={14} /> Print Summary
+                                    </button>
                                 </div>
                                 <div className="flex flex-wrap gap-3">
                                     <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-center">

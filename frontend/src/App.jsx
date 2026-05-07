@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Activity } from 'lucide-react';
 
 // Page Imports
@@ -17,6 +18,10 @@ import Radiology from './pages/Radiology';
 import MedicalHistory from './pages/MedicalHistory';
 import Billing from './pages/Billing';
 import Portal from './pages/Portal';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import Appointments from './pages/Appointments';
+import PatientPortal from './pages/PatientPortal';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
@@ -74,12 +79,16 @@ const PagePlaceholder = ({ title }) => (
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Toaster position="top-right" />
-        <Routes>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Toaster position="top-right" />
+          <a href="#main-content" className="skip-link">Skip to main content</a>
+          <Routes>
           <Route path="/" element={<Portal />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Super Admin Back-Office (Isolated from Hospital Workspaces) */}
           <Route path="/superadmin" element={<SuperAdminLayout />}>
@@ -103,13 +112,17 @@ export default function App() {
             <Route path="inventory" element={<Inventory />} />
             <Route path="medical-history" element={<MedicalHistory />} />
             
-            <Route path="appointments" element={<PagePlaceholder title="Appointments" />} />
+            <Route path="appointments" element={<Appointments />} />
             <Route path="billing" element={<Billing />} />
           </Route>
 
+          {/* Patient self-service portal — no staff auth required */}
+          <Route path="/patient" element={<PatientPortal />} />
+
           <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
