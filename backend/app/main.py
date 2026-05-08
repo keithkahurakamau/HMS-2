@@ -37,6 +37,7 @@ import app.routes.mpesa_payment as mpesa_payment_module
 import app.routes.privacy as privacy_module
 import app.routes.notifications as notifications_module
 import app.routes.patient_portal as patient_portal_module
+import app.routes.messaging as messaging_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -163,6 +164,7 @@ app.include_router(mpesa_payment_module.router)
 app.include_router(privacy_module.router)
 app.include_router(notifications_module.router)
 app.include_router(patient_portal_module.router)
+app.include_router(messaging_module.router)
 
 # 9. Health Check Route
 @app.get("/")

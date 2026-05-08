@@ -47,6 +47,8 @@ from app.models import auth_tokens as _auth_tokens  # noqa: F401
 from app.models import idempotency as _idempotency  # noqa: F401
 from app.models import mpesa as _mpesa  # noqa: F401
 from app.models import breach as _breach  # noqa: F401
+from app.models import notification as _notification  # noqa: F401
+from app.models import messaging as _messaging  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -57,17 +59,28 @@ PERMISSIONS = [
     "patients:read", "patients:write", "history:read", "history:manage",
     "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read",
     "wards:manage", "billing:read", "billing:manage", "radiology:manage",
+    # Internal staff messaging — every role gets read/write by default so the
+    # whole hospital can chat. Department + custom-role administration is
+    # admin-only.
+    "messaging:read", "messaging:write",
+    "departments:manage", "roles:manage",
 ]
+
+# Baseline grants applied to every staff role so messaging works out of the box.
+_MESSAGING_BASE = ["messaging:read", "messaging:write"]
 
 ROLE_GRANTS = {
     "Admin": PERMISSIONS,
     "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write",
-               "pharmacy:read", "laboratory:read", "history:read", "history:manage"],
-    "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read"],
-    "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read"],
-    "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read"],
-    "Radiologist": ["radiology:manage", "clinical:read", "patients:read"],
-    "Receptionist": ["patients:read", "patients:write", "billing:read", "billing:manage"],
+               "pharmacy:read", "laboratory:read", "history:read", "history:manage",
+               *_MESSAGING_BASE],
+    "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read",
+              *_MESSAGING_BASE],
+    "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read", *_MESSAGING_BASE],
+    "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read", *_MESSAGING_BASE],
+    "Radiologist": ["radiology:manage", "clinical:read", "patients:read", *_MESSAGING_BASE],
+    "Receptionist": ["patients:read", "patients:write", "billing:read", "billing:manage",
+                     *_MESSAGING_BASE],
 }
 
 

@@ -32,6 +32,10 @@ from app.models.radiology import RadiologyRequest, RadiologyResult
 from app.models.auth_tokens import RefreshToken, PasswordResetToken
 from app.models.breach import BreachIncident
 from app.models.notification import Notification
+from app.models.messaging import (
+    Department, DepartmentMember,
+    Conversation, ConversationParticipant, Message,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

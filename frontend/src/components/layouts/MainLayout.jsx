@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
     LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X, ShieldCheck,
-    ClipboardList, Radio, CalendarDays
+    ClipboardList, Radio, CalendarDays, MessageSquare
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -17,21 +17,35 @@ export default function MainLayout() {
     // Get the dynamic hospital name from the portal selection
     const tenantName = localStorage.getItem('hms_tenant_name') || 'HMS Enterprise';
 
+    // Each module declares both legacy `allowedRoles` and a `requiredPermission`.
+    // We prefer permissions so admin-created custom roles light up modules they
+    // have access to, and fall back to role-name matching for users on builds
+    // where a permission codename hasn't been seeded yet.
     const NAVIGATION = [
-        { name: 'Command Center',    path: '/app/admin',           icon: <LayoutDashboard size={18} />, allowedRoles: ['Admin'] },
-        { name: 'Patient Registry',  path: '/app/patients',        icon: <Users size={18} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'] },
-        { name: 'Medical History',   path: '/app/medical-history', icon: <ClipboardList size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse'] },
-        { name: 'Clinical Desk',     path: '/app/clinical',        icon: <Stethoscope size={18} />,     allowedRoles: ['Admin', 'Doctor'] },
-        { name: 'Laboratory',        path: '/app/laboratory',      icon: <TestTube size={18} />,        allowedRoles: ['Admin', 'Lab Technician', 'Doctor'] },
-        { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={18} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'] },
-        { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={18} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'] },
-        { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={18} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'] },
-        { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'] },
-        { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'] },
-        { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={18} />,         allowedRoles: ['Admin', 'Receptionist'] },
+        { name: 'Command Center',    path: '/app/admin',           icon: <LayoutDashboard size={18} />, allowedRoles: ['Admin'],                                          requiredPermission: 'users:manage' },
+        { name: 'Messages',          path: '/app/messages',        icon: <MessageSquare size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Receptionist'], requiredPermission: 'messaging:read' },
+        { name: 'Patient Registry',  path: '/app/patients',        icon: <Users size={18} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'patients:read' },
+        { name: 'Medical History',   path: '/app/medical-history', icon: <ClipboardList size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse'],                       requiredPermission: 'history:read' },
+        { name: 'Clinical Desk',     path: '/app/clinical',        icon: <Stethoscope size={18} />,     allowedRoles: ['Admin', 'Doctor'],                                requiredPermission: 'clinical:read' },
+        { name: 'Laboratory',        path: '/app/laboratory',      icon: <TestTube size={18} />,        allowedRoles: ['Admin', 'Lab Technician', 'Doctor'],              requiredPermission: 'laboratory:read' },
+        { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={18} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'],                 requiredPermission: 'radiology:manage' },
+        { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={18} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'],                  requiredPermission: 'pharmacy:read' },
+        { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={18} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'wards:manage' },
+        { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'patients:read' },
+        { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'pharmacy:read' },
+        { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={18} />,         allowedRoles: ['Admin', 'Receptionist'],                          requiredPermission: 'billing:read' },
     ];
 
-    const filteredNav = NAVIGATION.filter(item => item.allowedRoles.includes(user?.role));
+    const userPerms = user?.permissions || [];
+    const userRole = user?.role;
+    const filteredNav = NAVIGATION.filter(item => {
+        // Permission-driven gating wins. If we don't have permissions data
+        // yet (older client/server build), fall back to the legacy role list.
+        if (userPerms.length > 0 && item.requiredPermission) {
+            return userPerms.includes(item.requiredPermission);
+        }
+        return item.allowedRoles.includes(userRole);
+    });
     const handleNavClick = () => setIsMobileMenuOpen(false);
     const currentSection = filteredNav.find(n => location.pathname.startsWith(n.path));
 

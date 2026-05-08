@@ -22,6 +22,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Appointments from './pages/Appointments';
 import PatientPortal from './pages/PatientPortal';
+import Messages from './pages/Messages';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
@@ -78,8 +79,11 @@ const RoleBasedRedirect = () => {
         case 'Lab Technician': return <Navigate to="/app/laboratory" replace />;
         case 'Radiologist': return <Navigate to="/app/radiology" replace />;
         case 'Receptionist': return <Navigate to="/app/patients" replace />;
-        default: 
-            return <Navigate to="/login" replace />;
+        default:
+            // Custom roles (admin-created) don't have a baked-in landing page,
+            // so we drop them on Messages — every role gets messaging:read by
+            // default, so the page is guaranteed to render something useful.
+            return <Navigate to="/app/messages" replace />;
     }
 };
 
@@ -123,6 +127,7 @@ export default function App() {
             
             <Route path="appointments" element={<Appointments />} />
             <Route path="billing" element={<Billing />} />
+            <Route path="messages" element={<Messages />} />
           </Route>
 
           {/* Patient self-service portal — no staff auth required */}

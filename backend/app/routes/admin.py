@@ -239,3 +239,176 @@ def update_role_permissions(role_name: str, payload: dict, request: Request, db:
 
     db.commit()
     return {"message": f"Permissions for {role_name} updated successfully."}
+
+# ==========================================
+# 6. CUSTOM ROLE MANAGEMENT
+# ==========================================
+# Admins can mint new roles beyond the seven baked-in ones (Doctor, Nurse, etc.)
+# so the system isn't capped to a fixed staff taxonomy. Each custom role picks
+# its own permission set from the catalogue. The seven baseline roles can have
+# their permissions edited but cannot be renamed or deleted — they're hard-wired
+# into the frontend's RoleBasedRedirect default-landing logic.
+PROTECTED_ROLE_NAMES = {
+    "Admin", "Doctor", "Nurse", "Pharmacist",
+    "Lab Technician", "Radiologist", "Receptionist",
+}
+
+
+class RoleCreateRequest(BaseModel):
+    name: str
+    description: str | None = None
+    permissions: list[str] = []
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        v = v.strip()
+        if not v:
+            raise ValueError("Role name cannot be empty.")
+        if len(v) > 50:
+            raise ValueError("Role name must be 50 characters or fewer.")
+        return v
+
+
+class RoleUpdateRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+
+
+@router.get("/permissions", dependencies=[Depends(RequirePermission("roles:manage"))])
+def list_permissions(db: Session = Depends(get_db)):
+    """Catalogue of every permission codename in the system (for the role editor UI)."""
+    perms = db.query(Permission).order_by(Permission.codename).all()
+    return [
+        {"codename": p.codename, "description": p.description}
+        for p in perms
+    ]
+
+
+@router.get("/roles", dependencies=[Depends(RequirePermission("roles:manage"))])
+def list_roles(db: Session = Depends(get_db)):
+    roles = db.query(Role).order_by(Role.name).all()
+    out = []
+    for r in roles:
+        user_count = db.query(func.count(User.user_id)).filter(User.role_id == r.role_id).scalar()
+        out.append({
+            "role_id": r.role_id,
+            "name": r.name,
+            "description": r.description,
+            "is_system": r.name in PROTECTED_ROLE_NAMES,
+            "user_count": int(user_count or 0),
+            "permissions": [p.codename for p in r.permissions],
+        })
+    return out
+
+
+@router.post("/roles", dependencies=[Depends(RequirePermission("roles:manage"))])
+def create_role(payload: RoleCreateRequest, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    if db.query(Role).filter(func.lower(Role.name) == payload.name.lower()).first():
+        raise HTTPException(status_code=409, detail=f"Role '{payload.name}' already exists.")
+
+    role = Role(name=payload.name, description=payload.description)
+    if payload.permissions:
+        perms = db.query(Permission).filter(Permission.codename.in_(payload.permissions)).all()
+        role.permissions = perms
+    db.add(role)
+    db.flush()
+
+    log_audit(
+        db=db, user_id=current_user["user_id"], action="CREATE",
+        entity_type="Role", entity_id=role.name, old_value=None,
+        new_value={"name": role.name, "permissions": [p.codename for p in role.permissions]},
+        ip_address=request.client.host,
+    )
+    db.commit()
+    db.refresh(role)
+    return {
+        "role_id": role.role_id,
+        "name": role.name,
+        "description": role.description,
+        "is_system": role.name in PROTECTED_ROLE_NAMES,
+        "permissions": [p.codename for p in role.permissions],
+    }
+
+
+@router.patch("/roles/{role_id}", dependencies=[Depends(RequirePermission("roles:manage"))])
+def update_role(role_id: int, payload: RoleUpdateRequest, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    role = db.query(Role).filter(Role.role_id == role_id).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found.")
+
+    if role.name in PROTECTED_ROLE_NAMES and payload.name and payload.name != role.name:
+        raise HTTPException(status_code=400, detail="Built-in role names cannot be changed.")
+
+    if payload.name and payload.name != role.name:
+        clash = db.query(Role).filter(func.lower(Role.name) == payload.name.lower(), Role.role_id != role_id).first()
+        if clash:
+            raise HTTPException(status_code=409, detail="Another role with this name already exists.")
+        old_name = role.name
+        role.name = payload.name.strip()
+        log_audit(
+            db=db, user_id=current_user["user_id"], action="UPDATE",
+            entity_type="Role", entity_id=str(role_id),
+            old_value={"name": old_name}, new_value={"name": role.name},
+            ip_address=request.client.host,
+        )
+
+    if payload.description is not None:
+        role.description = payload.description
+
+    db.commit()
+    db.refresh(role)
+    return {"role_id": role.role_id, "name": role.name, "description": role.description}
+
+
+@router.put("/roles/id/{role_id}/permissions", dependencies=[Depends(RequirePermission("roles:manage"))])
+def update_role_permissions_by_id(role_id: int, payload: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """ID-keyed counterpart to /roles/{role_name}/permissions for custom roles
+    that may not be safely addressable by name from the UI.
+    """
+    role = db.query(Role).filter(Role.role_id == role_id).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found.")
+    if role.name == "Admin":
+        raise HTTPException(status_code=400, detail="Admin permissions cannot be restricted.")
+
+    requested = payload.get("permissions", [])
+    valid_perms = db.query(Permission).filter(Permission.codename.in_(requested)).all()
+    old_perms = [p.codename for p in role.permissions]
+    role.permissions = valid_perms
+
+    log_audit(
+        db=db, user_id=current_user["user_id"], action="UPDATE",
+        entity_type="RolePermissions", entity_id=role.name,
+        old_value={"permissions": old_perms},
+        new_value={"permissions": [p.codename for p in valid_perms]},
+        ip_address=request.client.host,
+    )
+    db.commit()
+    return {"role_id": role.role_id, "name": role.name, "permissions": [p.codename for p in role.permissions]}
+
+
+@router.delete("/roles/{role_id}", dependencies=[Depends(RequirePermission("roles:manage"))])
+def delete_role(role_id: int, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    role = db.query(Role).filter(Role.role_id == role_id).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found.")
+    if role.name in PROTECTED_ROLE_NAMES:
+        raise HTTPException(status_code=400, detail="Built-in roles cannot be deleted.")
+
+    in_use = db.query(func.count(User.user_id)).filter(User.role_id == role_id).scalar()
+    if in_use:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete role: {in_use} user(s) still have it. Reassign them first.",
+        )
+
+    log_audit(
+        db=db, user_id=current_user["user_id"], action="DELETE",
+        entity_type="Role", entity_id=role.name,
+        old_value={"name": role.name, "permissions": [p.codename for p in role.permissions]},
+        new_value=None, ip_address=request.client.host,
+    )
+    db.delete(role)
+    db.commit()
+    return {"deleted": True}

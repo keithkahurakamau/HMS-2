@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { 
-    LayoutDashboard, Users, ShieldAlert, TrendingUp, Activity, 
+import {
+    LayoutDashboard, Users, ShieldAlert, TrendingUp, Activity,
     AlertCircle, Search, UserPlus, Lock, CheckCircle2,
-    X, ShieldCheck, Edit, Key, Save, Tag, PlusCircle
+    X, ShieldCheck, Edit, Key, Save, Tag, PlusCircle, Building2
 } from 'lucide-react';
+import DepartmentsManager from '../components/admin/DepartmentsManager';
+import RolesManager from '../components/admin/RolesManager';
 
 export default function AdminDashboard() {
     const { user: currentUser } = useAuth();
@@ -35,7 +37,13 @@ export default function AdminDashboard() {
     const [isMpesaConfigured, setIsMpesaConfigured] = useState(false);
 
     // --- ROLE PERMISSIONS STATE ---
-    const roles = ["Admin", "Doctor", "Nurse", "Pharmacist", "Lab Technician", "Radiologist", "Receptionist"];
+    // Built-in roles are always available even before /admin/roles loads. The
+    // staff-create + edit-role modals merge these with custom roles fetched
+    // from the API so admins can assign custom roles to staff.
+    const builtinRoles = ["Admin", "Doctor", "Nurse", "Pharmacist", "Lab Technician", "Radiologist", "Receptionist"];
+    const [allRoleNames, setAllRoleNames] = useState(builtinRoles);
+    // Kept for the legacy "Permissions" tab which addresses roles by name.
+    const roles = allRoleNames;
     const SYSTEM_PERMISSIONS = [
         "users:manage", "clinical:write", "clinical:read", 
         "patients:read", "patients:write", "history:read", "history:manage",
@@ -49,13 +57,28 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (activeTab === 'overview') fetchMetrics();
-        if (activeTab === 'staff') fetchStaff();
+        if (activeTab === 'staff') { fetchStaff(); fetchAllRoles(); }
         if (activeTab === 'audit') fetchAuditLogs();
         if (activeTab === 'pricing') fetchPricing();
         if (activeTab === 'roles') fetchRolePermissions(selectedRoleForPerms);
         if (activeTab === 'mpesa') fetchMpesaConfig();
         if (activeTab === 'mpesa_logs') fetchMpesaLogs();
     }, [activeTab]);
+
+    // Pull the current set of role names so create-staff + edit-role dropdowns
+    // include any custom roles the admin has created. Best-effort — falls back
+    // to the built-in seven if /admin/roles is not yet reachable.
+    const fetchAllRoles = async () => {
+        try {
+            const res = await apiClient.get('/admin/roles');
+            const names = (res.data || []).map((r) => r.name);
+            if (names.length > 0) {
+                setAllRoleNames(names);
+            }
+        } catch {
+            // Keep the built-in list; UI still works.
+        }
+    };
 
     useEffect(() => {
         if (activeTab === 'roles') {
@@ -209,13 +232,15 @@ export default function AdminDashboard() {
             <div className="card p-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Admin sections" className="flex flex-wrap bg-ink-100/70 p-1 rounded-xl w-full lg:w-auto lg:flex-1 gap-1">
                     {[
-                        { key: 'overview',   label: 'Overview',         icon: LayoutDashboard },
-                        { key: 'staff',      label: 'Directory',        icon: Users },
-                        { key: 'pricing',    label: 'Pricing',          icon: Tag },
-                        { key: 'roles',      label: 'Permissions',      icon: Key },
-                        { key: 'audit',      label: 'Audit',            icon: ShieldAlert },
-                        { key: 'mpesa',      label: 'Daraja Settings',  icon: CheckCircle2 },
-                        { key: 'mpesa_logs', label: 'M-Pesa Logs',      icon: Activity },
+                        { key: 'overview',    label: 'Overview',         icon: LayoutDashboard },
+                        { key: 'staff',       label: 'Directory',        icon: Users },
+                        { key: 'departments', label: 'Departments',      icon: Building2 },
+                        { key: 'roles_mgmt',  label: 'Roles',            icon: ShieldCheck },
+                        { key: 'pricing',     label: 'Pricing',          icon: Tag },
+                        { key: 'roles',       label: 'Permissions',      icon: Key },
+                        { key: 'audit',       label: 'Audit',            icon: ShieldAlert },
+                        { key: 'mpesa',       label: 'Daraja Settings',  icon: CheckCircle2 },
+                        { key: 'mpesa_logs',  label: 'M-Pesa Logs',      icon: Activity },
                     ].map(({ key, label, icon: Icon }) => {
                         const isActive = activeTab === key;
                         return (
@@ -375,6 +400,12 @@ export default function AdminDashboard() {
                     </div>
                 </div>
             )}
+
+            {/* TAB: DEPARTMENTS */}
+            {activeTab === 'departments' && <DepartmentsManager />}
+
+            {/* TAB: ROLE MANAGEMENT (custom roles + permissions editor) */}
+            {activeTab === 'roles_mgmt' && <RolesManager />}
 
             {/* TAB 3: MASTER PRICING CATALOG */}
             {activeTab === 'pricing' && (
