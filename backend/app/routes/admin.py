@@ -5,7 +5,7 @@ from typing import List
 from datetime import datetime, date
 
 from app.config.database import get_db
-from app.models.user import User, Role, Permission 
+from app.models.user import User, Role, Permission, UserPermissionOverride
 from app.models.patient import Patient
 from app.models.wards import AdmissionRecord
 from app.models.billing import Invoice
@@ -412,3 +412,166 @@ def delete_role(role_id: int, request: Request, db: Session = Depends(get_db), c
     db.delete(role)
     db.commit()
     return {"deleted": True}
+
+
+# ==========================================
+# 7. PER-USER PERMISSION OVERRIDES
+# ==========================================
+# Lets admins fine-tune a single user without minting a custom role just for
+# the exception. Each override row is either an explicit grant (force-on,
+# even if the role doesn't include it) or an explicit revoke (force-off,
+# even if the role does include it). resolve_effective_permissions() merges
+# role + grants − revokes when the user's permissions are queried.
+
+@router.get("/users/{user_id}/permissions", dependencies=[Depends(RequirePermission("roles:manage"))])
+def get_user_permissions(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    role_perms = [p.codename for p in user.role.permissions] if user.role else []
+    overrides = (
+        db.query(UserPermissionOverride, Permission.codename)
+        .join(Permission, Permission.permission_id == UserPermissionOverride.permission_id)
+        .filter(UserPermissionOverride.user_id == user_id)
+        .all()
+    )
+    grants = [c for ovr, c in overrides if ovr.granted]
+    revokes = [c for ovr, c in overrides if not ovr.granted]
+
+    role_set = set(role_perms)
+    effective = sorted((role_set | set(grants)) - set(revokes))
+    return {
+        "user_id": user.user_id,
+        "full_name": user.full_name,
+        "role": user.role.name if user.role else None,
+        "role_permissions": sorted(role_perms),
+        "granted": sorted(grants),
+        "revoked": sorted(revokes),
+        "effective_permissions": effective,
+    }
+
+
+@router.put("/users/{user_id}/permissions", dependencies=[Depends(RequirePermission("roles:manage"))])
+def set_user_permissions(
+    user_id: int,
+    payload: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Replace the user's override set with the supplied grant/revoke lists.
+
+    Body:
+        {
+            "granted":  ["perm:a", "perm:b"],   # force-on, even if role lacks
+            "revoked":  ["perm:c"]               # force-off, even if role has
+        }
+
+    Permissions absent from both lists revert to "inherit from role".
+    Anything in `granted` that the role already has, or in `revoked` that the
+    role doesn't have, is normalized away — they would have no effect.
+    Admin's own role can never be revoked-down (anti-lockout safeguard) — we
+    silently drop revokes that target the current user's role permissions
+    when target_user is the same caller.
+    """
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.role and user.role.name == "Admin":
+        raise HTTPException(
+            status_code=400,
+            detail="Admin permissions cannot be overridden — they are wildcard by design.",
+        )
+
+    requested_grants = set(payload.get("granted", []) or [])
+    requested_revokes = set(payload.get("revoked", []) or [])
+
+    # A permission can't be both granted and revoked. Caller error — fail loud
+    # rather than picking a winner silently.
+    conflict = requested_grants & requested_revokes
+    if conflict:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A permission cannot be both granted and revoked: {sorted(conflict)}",
+        )
+
+    # Resolve codenames against the catalogue so we don't insert junk.
+    catalog = {
+        p.codename: p.permission_id
+        for p in db.query(Permission).filter(
+            Permission.codename.in_(requested_grants | requested_revokes)
+        ).all()
+    }
+    unknown = (requested_grants | requested_revokes) - set(catalog.keys())
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown permissions: {sorted(unknown)}")
+
+    role_perms = {p.codename for p in user.role.permissions} if user.role else set()
+
+    # Normalize: drop redundancies that wouldn't change effective permissions.
+    grants_to_persist = requested_grants - role_perms
+    revokes_to_persist = requested_revokes & role_perms
+
+    # Anti-lockout: don't let an admin revoke users:manage from themselves.
+    if user_id == current_user["user_id"] and "users:manage" in revokes_to_persist:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot revoke your own users:manage permission.",
+        )
+
+    # Capture the prior state for the audit log before we wipe + re-seed.
+    prior = {
+        "granted": sorted([
+            c for ovr, c in
+            db.query(UserPermissionOverride, Permission.codename)
+            .join(Permission, Permission.permission_id == UserPermissionOverride.permission_id)
+            .filter(UserPermissionOverride.user_id == user_id)
+            .all()
+            if ovr.granted
+        ]),
+        "revoked": sorted([
+            c for ovr, c in
+            db.query(UserPermissionOverride, Permission.codename)
+            .join(Permission, Permission.permission_id == UserPermissionOverride.permission_id)
+            .filter(UserPermissionOverride.user_id == user_id)
+            .all()
+            if not ovr.granted
+        ]),
+    }
+
+    # Replace strategy: blow away existing overrides for this user, then
+    # insert the new set. Simpler than diffing and the table is tiny.
+    db.query(UserPermissionOverride).filter(
+        UserPermissionOverride.user_id == user_id
+    ).delete(synchronize_session=False)
+    for code in grants_to_persist:
+        db.add(UserPermissionOverride(
+            user_id=user_id, permission_id=catalog[code], granted=True
+        ))
+    for code in revokes_to_persist:
+        db.add(UserPermissionOverride(
+            user_id=user_id, permission_id=catalog[code], granted=False
+        ))
+
+    log_audit(
+        db=db, user_id=current_user["user_id"], action="UPDATE",
+        entity_type="UserPermissions", entity_id=str(user_id),
+        old_value=prior,
+        new_value={
+            "granted": sorted(grants_to_persist),
+            "revoked": sorted(revokes_to_persist),
+        },
+        ip_address=request.client.host,
+    )
+    db.commit()
+
+    # Return the recomputed effective set for the UI.
+    effective = sorted((role_perms | grants_to_persist) - revokes_to_persist)
+    return {
+        "user_id": user_id,
+        "role_permissions": sorted(role_perms),
+        "granted": sorted(grants_to_persist),
+        "revoked": sorted(revokes_to_persist),
+        "effective_permissions": effective,
+    }

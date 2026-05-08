@@ -17,7 +17,7 @@ from app.config.database import Base
 
 # 3. 🚨 CRITICAL: You MUST import every single model file here!
 # If a model isn't imported, Alembic won't know it exists and won't create the table.
-from app.models.user import User, Role, Permission, role_permissions
+from app.models.user import User, Role, Permission, role_permissions, UserPermissionOverride
 from app.models.patient import Patient
 from app.models.clinical import Appointment, PatientQueue, MedicalRecord
 from app.models.laboratory import LabTestCatalog, LabTestRequiredItem, LabTest

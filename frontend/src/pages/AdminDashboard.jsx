@@ -5,10 +5,11 @@ import toast from 'react-hot-toast';
 import {
     LayoutDashboard, Users, ShieldAlert, TrendingUp, Activity,
     AlertCircle, Search, UserPlus, Lock, CheckCircle2,
-    X, ShieldCheck, Edit, Key, Save, Tag, PlusCircle, Building2
+    X, ShieldCheck, Edit, Key, Save, Tag, PlusCircle, Building2, KeyRound
 } from 'lucide-react';
 import DepartmentsManager from '../components/admin/DepartmentsManager';
 import RolesManager from '../components/admin/RolesManager';
+import UserPermissionsEditor from '../components/admin/UserPermissionsEditor';
 
 export default function AdminDashboard() {
     const { user: currentUser } = useAuth();
@@ -25,6 +26,7 @@ export default function AdminDashboard() {
     const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
     const [isEditRoleModalOpen, setIsEditRoleModalOpen] = useState(false);
     const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+    const [permsEditorUser, setPermsEditorUser] = useState(null);
     
     const [selectedUser, setSelectedUser] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,31 +38,19 @@ export default function AdminDashboard() {
     const [mpesaConfig, setMpesaConfig] = useState({ paybill_number: '', consumer_key: '', consumer_secret: '', passkey: '', account_reference: 'HMS-BILLING', transaction_desc: 'Hospital Bill Payment', kcb_account_number: '' });
     const [isMpesaConfigured, setIsMpesaConfigured] = useState(false);
 
-    // --- ROLE PERMISSIONS STATE ---
-    // Built-in roles are always available even before /admin/roles loads. The
-    // staff-create + edit-role modals merge these with custom roles fetched
-    // from the API so admins can assign custom roles to staff.
+    // Built-in roles are available immediately, before /admin/roles loads, so
+    // the staff create + edit-role dropdowns work even on a cold render. As
+    // soon as the admin opens the Directory tab we replace this list with
+    // whatever the API returns (which includes any custom roles).
     const builtinRoles = ["Admin", "Doctor", "Nurse", "Pharmacist", "Lab Technician", "Radiologist", "Receptionist"];
     const [allRoleNames, setAllRoleNames] = useState(builtinRoles);
-    // Kept for the legacy "Permissions" tab which addresses roles by name.
     const roles = allRoleNames;
-    const SYSTEM_PERMISSIONS = [
-        "users:manage", "clinical:write", "clinical:read", 
-        "patients:read", "patients:write", "history:read", "history:manage",
-        "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read", 
-        "radiology:manage", "radiology:read", "wards:manage", 
-        "billing:read", "billing:manage"
-    ];
-    
-    const [selectedRoleForPerms, setSelectedRoleForPerms] = useState('Doctor');
-    const [currentRolePerms, setCurrentRolePerms] = useState([]);
 
     useEffect(() => {
         if (activeTab === 'overview') fetchMetrics();
         if (activeTab === 'staff') { fetchStaff(); fetchAllRoles(); }
         if (activeTab === 'audit') fetchAuditLogs();
         if (activeTab === 'pricing') fetchPricing();
-        if (activeTab === 'roles') fetchRolePermissions(selectedRoleForPerms);
         if (activeTab === 'mpesa') fetchMpesaConfig();
         if (activeTab === 'mpesa_logs') fetchMpesaLogs();
     }, [activeTab]);
@@ -79,12 +69,6 @@ export default function AdminDashboard() {
             // Keep the built-in list; UI still works.
         }
     };
-
-    useEffect(() => {
-        if (activeTab === 'roles') {
-            fetchRolePermissions(selectedRoleForPerms);
-        }
-    }, [selectedRoleForPerms]);
 
     const fetchMetrics = async () => { setIsLoading(true); try { const res = await apiClient.get('/admin/metrics'); setMetrics(res.data); } catch (e) {} finally { setIsLoading(false); } };
     const fetchStaff = async () => { setIsLoading(true); try { const res = await apiClient.get('/admin/users'); setStaffList(res.data || []); } catch (e) { toast.error("Failed to load staff"); } finally { setIsLoading(false); } };
@@ -110,23 +94,6 @@ export default function AdminDashboard() {
         } catch (e) { toast.error("Failed to load M-Pesa logs"); } finally { setIsLoading(false); }
     };
     
-    const fetchRolePermissions = async (roleName) => {
-        setIsLoading(true);
-        try {
-            if (roleName === 'Admin') {
-                setCurrentRolePerms(SYSTEM_PERMISSIONS); 
-            } else {
-                const res = await apiClient.get(`/admin/roles/${roleName}/permissions`);
-                setCurrentRolePerms(res.data || []);
-            }
-        } catch (e) {
-            toast.error(`Failed to load permissions for ${roleName}.`);
-            setCurrentRolePerms([]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const handleRegisterStaff = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -177,18 +144,6 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleSavePermissions = async () => {
-        setIsSubmitting(true);
-        try {
-            await apiClient.put(`/admin/roles/${selectedRoleForPerms}/permissions`, { permissions: currentRolePerms });
-            toast.success(`${selectedRoleForPerms} permissions updated successfully!`);
-        } catch (error) {
-            toast.error(error.response?.data?.detail || "Failed to update permissions.");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
     const handleSaveMpesaConfig = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -197,14 +152,6 @@ export default function AdminDashboard() {
             toast.success("M-Pesa configuration securely encrypted and saved.");
             fetchMpesaConfig();
         } catch (error) { toast.error(error.response?.data?.detail || "Failed to save M-Pesa settings."); } finally { setIsSubmitting(false); }
-    };
-
-    const togglePermission = (perm) => {
-        if (currentRolePerms.includes(perm)) {
-            setCurrentRolePerms(currentRolePerms.filter(p => p !== perm));
-        } else {
-            setCurrentRolePerms([...currentRolePerms, perm]);
-        }
     };
 
     const openEditRoleModal = (user) => {
@@ -237,7 +184,6 @@ export default function AdminDashboard() {
                         { key: 'departments', label: 'Departments',      icon: Building2 },
                         { key: 'roles_mgmt',  label: 'Roles',            icon: ShieldCheck },
                         { key: 'pricing',     label: 'Pricing',          icon: Tag },
-                        { key: 'roles',       label: 'Permissions',      icon: Key },
                         { key: 'audit',       label: 'Audit',            icon: ShieldAlert },
                         { key: 'mpesa',       label: 'Daraja Settings',  icon: CheckCircle2 },
                         { key: 'mpesa_logs',  label: 'M-Pesa Logs',      icon: Activity },
@@ -371,11 +317,19 @@ export default function AdminDashboard() {
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                                    <button 
+                                                    <button
                                                         onClick={() => openEditRoleModal(user)}
                                                         className="text-xs font-bold px-3 py-1.5 rounded border border-slate-200 text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-colors flex items-center gap-1"
                                                     >
-                                                        <Edit size={12}/> Edit Access
+                                                        <Edit size={12}/> Edit Role
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setPermsEditorUser(user)}
+                                                        disabled={user.role === 'Admin'}
+                                                        title={user.role === 'Admin' ? "Admin permissions can't be overridden" : 'Override individual permissions'}
+                                                        className="text-xs font-bold px-3 py-1.5 rounded border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    >
+                                                        <KeyRound size={12}/> Permissions
                                                     </button>
                                                     <button 
                                                         onClick={() => handleToggleAccountStatus(user.user_id, user.is_active)}
@@ -468,76 +422,6 @@ export default function AdminDashboard() {
                                 )}
                             </tbody>
                         </table>
-                    </div>
-                </div>
-            )}
-
-            {/* TAB 4: ROLE PERMISSIONS MATRIX */}
-            {activeTab === 'roles' && (
-                <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
-                    {/* Left Pane: Role Selector */}
-                    <div className="w-full md:w-64 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col shrink-0">
-                        <div className="p-4 border-b border-slate-100 bg-slate-50">
-                            <h2 className="font-bold text-slate-800">System Roles</h2>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                            {roles.map(r => (
-                                <button 
-                                    key={r}
-                                    onClick={() => setSelectedRoleForPerms(r)}
-                                    className={`w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-colors ${selectedRoleForPerms === r ? 'bg-accent-50 text-accent-700 border border-accent-200' : 'text-slate-600 hover:bg-slate-50 border border-transparent'}`}
-                                >
-                                    {r}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Right Pane: Permission Checkboxes */}
-                    <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
-                        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                            <div>
-                                <h2 className="font-bold text-slate-800">Permissions: <span className="text-accent-600">{selectedRoleForPerms}</span></h2>
-                                <p className="text-xs text-slate-500 mt-1">Select the exact database operations this role is authorized to perform.</p>
-                            </div>
-                            <button onClick={handleSavePermissions} disabled={isSubmitting || selectedRoleForPerms === 'Admin'} className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 shadow-sm transition-colors disabled:opacity-50">
-                                {isSubmitting ? <Activity className="animate-spin" size={16}/> : <Save size={16} />}
-                                Save Changes
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                            {selectedRoleForPerms === 'Admin' && (
-                                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm font-bold flex items-center gap-3">
-                                    <ShieldAlert size={20} />
-                                    Admin privileges are hardcoded to wildcard ("*") and cannot be restricted.
-                                </div>
-                            )}
-
-                            {isLoading ? (
-                                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                                    <Activity className="animate-spin mb-2 text-brand-500" size={24}/>
-                                    Loading permissions...
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {SYSTEM_PERMISSIONS.map(perm => (
-                                        <label key={perm} className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${currentRolePerms.includes(perm) ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'} ${selectedRoleForPerms === 'Admin' ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={currentRolePerms.includes(perm) || selectedRoleForPerms === 'Admin'}
-                                                onChange={() => togglePermission(perm)}
-                                                disabled={selectedRoleForPerms === 'Admin'}
-                                                className="w-5 h-5 text-brand-600 rounded border-slate-300 focus:ring-brand-500"
-                                            />
-                                            <div className="flex-1">
-                                                <div className="text-sm font-bold text-slate-800">{perm.split(':')[0].toUpperCase()}</div>
-                                                <div className="text-xs text-slate-500 capitalize">{perm.split(':')[1]} Access</div>
-                                            </div>
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                     </div>
                 </div>
             )}
@@ -817,6 +701,15 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* --- PER-USER PERMISSION OVERRIDES --- */}
+            {permsEditorUser && (
+                <UserPermissionsEditor
+                    user={permsEditorUser}
+                    onClose={() => setPermsEditorUser(null)}
+                    onSaved={() => setPermsEditorUser(null)}
+                />
             )}
         </div>
     );

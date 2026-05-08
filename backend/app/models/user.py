@@ -47,3 +47,29 @@ class User(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class UserPermissionOverride(Base):
+    """Per-user permission overrides layered on top of role permissions.
+
+    A row with `granted=True` means: explicitly grant this permission to the
+    user, even if their role does not have it. `granted=False` means:
+    explicitly revoke this permission, even if their role has it.
+
+    Effective permissions = (role.permissions ∪ grants) − revokes.
+    """
+    __tablename__ = "user_permission_overrides"
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    permission_id = Column(
+        Integer,
+        ForeignKey("permissions.permission_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    granted = Column(Boolean, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
