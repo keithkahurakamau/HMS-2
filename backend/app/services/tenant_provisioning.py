@@ -145,6 +145,36 @@ def _build_schema(db_name: str) -> None:
     Base.metadata.create_all(bind=engine)
 
 
+def _stamp_alembic_head(db_name: str) -> None:
+    """Mark the freshly-built tenant DB as fully migrated.
+
+    create_all builds the schema but doesn't populate alembic_version, which
+    leaves the tenant in the "legacy bootstrap" state — future migrations
+    would refuse to run because alembic thinks the DB is empty. Stamping at
+    head right after seed avoids the trap entirely: from this point on,
+    scripts/migrate_all_tenants.py just runs `alembic upgrade head` against
+    the tenant URL whenever a new revision is added.
+    """
+    import os
+    import subprocess
+    from pathlib import Path
+    backend_dir = Path(__file__).resolve().parent.parent.parent
+    alembic_bin = backend_dir / "venv" / "bin" / "alembic"
+    cmd = [str(alembic_bin) if alembic_bin.exists() else "alembic", "stamp", "head"]
+    base_url = DATABASE_URL.rsplit("/", 1)[0]
+    env = os.environ.copy()
+    env["DATABASE_URL"] = f"{base_url}/{db_name}"
+    result = subprocess.run(cmd, env=env, cwd=str(backend_dir), check=False)
+    if result.returncode != 0:
+        # Don't fail provisioning over a stamp failure — the migrate-all
+        # script will retry next deploy. Just log loudly so it's visible.
+        logger.warning(
+            "Could not stamp alembic_version for tenant '%s' (exit %d). "
+            "scripts/migrate_all_tenants.py will reconcile on next run.",
+            db_name, result.returncode,
+        )
+
+
 def _seed_baseline(db_name: str, admin_email: str, admin_full_name: str, temp_password: str) -> None:
     """Inserts roles, permissions, and the bootstrap Admin user with a temp password."""
     engine = get_tenant_engine(db_name)
@@ -255,6 +285,7 @@ def provision_tenant(
             admin_full_name=admin_full_name,
             temp_password=temp_password,
         )
+        _stamp_alembic_head(db_name)
     except Exception as exc:
         master_db.rollback()
         _drop_database_silently(db_name)
