@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, CreditCard, Settings,
-    ShieldAlert, LogOut, Search, Activity, Users
+    ShieldAlert, LogOut, Search, Activity, Users, LifeBuoy
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/SuperAdminLogin';
 
@@ -19,6 +19,7 @@ export default function SuperAdminLayout() {
         { name: 'Overview',                 path: '/superadmin/dashboard', icon: <LayoutDashboard size={18} /> },
         { name: 'Tenants & Hospitals',      path: '/superadmin/tenants',   icon: <Building2 size={18} /> },
         { name: 'Patients (read-only)',     path: '/superadmin/patients',  icon: <Users size={18} /> },
+        { name: 'Support Inbox',            path: '/superadmin/support',   icon: <LifeBuoy size={18} /> },
         { name: 'Billing & Subscriptions',  path: '/superadmin/billing',   icon: <CreditCard size={18} /> },
         { name: 'Platform Settings',        path: '/superadmin/settings',  icon: <Settings size={18} /> },
     ];
@@ -33,7 +34,7 @@ export default function SuperAdminLayout() {
                     </div>
                     <div>
                         <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300/80 leading-none">Platform</div>
-                        <div className="text-base font-semibold text-white tracking-tight leading-tight mt-0.5">HMS <span className="text-gradient-brand">Global</span></div>
+                        <div className="text-base font-semibold text-white tracking-tight leading-tight mt-0.5"><span className="text-gradient-brand">MediFleet</span> Console</div>
                     </div>
                 </div>
 

@@ -1,6 +1,6 @@
-# Frontend - Enterprise Hospital Management System (HMS)
+# MediFleet — Frontend
 
-This directory contains the React/Vite frontend for the HMS project. 
+This directory contains the React/Vite frontend for MediFleet, the multi-hospital management platform.
 
 > **Note:** For full project documentation, setup instructions, and details about the technology stack, please refer to the **[Main README in the project root](../README.md)**.
 

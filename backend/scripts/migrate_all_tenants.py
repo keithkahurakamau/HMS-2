@@ -80,6 +80,45 @@ MASTER_DB_PATCHES: list[str] = [
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS feature_flags TEXT;",
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS plan_limits TEXT;",
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS notes TEXT;",
+    # Support tickets — master DB only. Two tables, fully self-contained.
+    """
+    CREATE TABLE IF NOT EXISTS support_tickets (
+        ticket_id            SERIAL PRIMARY KEY,
+        tenant_id            INTEGER NOT NULL,
+        tenant_name          VARCHAR(255) NOT NULL,
+        submitter_email      VARCHAR(255) NOT NULL,
+        submitter_name       VARCHAR(255) NOT NULL,
+        submitter_user_id    INTEGER,
+        subject              VARCHAR(200) NOT NULL,
+        category             VARCHAR(40) NOT NULL DEFAULT 'Other',
+        priority             VARCHAR(20) NOT NULL DEFAULT 'Normal',
+        status               VARCHAR(40) NOT NULL DEFAULT 'Open',
+        assigned_to_admin_id INTEGER REFERENCES superadmins(admin_id) ON DELETE SET NULL,
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at           TIMESTAMPTZ,
+        first_response_at    TIMESTAMPTZ,
+        resolved_at          TIMESTAMPTZ
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_support_tickets_tenant_id        ON support_tickets (tenant_id);",
+    "CREATE INDEX IF NOT EXISTS ix_support_tickets_status           ON support_tickets (status);",
+    "CREATE INDEX IF NOT EXISTS ix_support_tickets_created_at       ON support_tickets (created_at);",
+    "CREATE INDEX IF NOT EXISTS ix_support_tickets_assigned_admin   ON support_tickets (assigned_to_admin_id);",
+    "CREATE INDEX IF NOT EXISTS idx_support_status_created          ON support_tickets (status, created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_support_tenant_status           ON support_tickets (tenant_id, status);",
+    """
+    CREATE TABLE IF NOT EXISTS support_messages (
+        message_id   SERIAL PRIMARY KEY,
+        ticket_id    INTEGER NOT NULL REFERENCES support_tickets(ticket_id) ON DELETE CASCADE,
+        author_kind  VARCHAR(20) NOT NULL,
+        author_name  VARCHAR(255) NOT NULL,
+        author_id    INTEGER,
+        body         TEXT NOT NULL,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_support_messages_ticket_id  ON support_messages (ticket_id);",
+    "CREATE INDEX IF NOT EXISTS ix_support_messages_created_at ON support_messages (created_at);",
 ]
 
 

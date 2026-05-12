@@ -98,7 +98,7 @@ DEFAULT_SETTINGS = [
     ("radiology", "report_signing_required", "Require radiologist sign-off", "", "boolean", "true", False, 2),
 
     ("notifications", "email_from", "Outbound email From:", "RFC-5321 address used by transactional mail.", "string", "no-reply@hospital.local", False, 1),
-    ("notifications", "sms_sender_id", "SMS sender ID", "Letterhead the SMS gateway shows on the patient's phone.", "string", "HMS", False, 2),
+    ("notifications", "sms_sender_id", "SMS sender ID", "Letterhead the SMS gateway shows on the patient's phone.", "string", "MEDIFLEET", False, 2),
     ("notifications", "remind_before_hours", "Appointment reminder (h)", "Hours before the appointment to send a reminder.", "number", "24", False, 3),
 
     ("privacy", "kdpa_dpo_email", "Data protection officer email", "Used in subject access response letters.", "string", "", False, 1),
@@ -123,6 +123,8 @@ PERMISSIONS = [
     "referrals:manage",
     # Cheque register: admin + receptionist manage; clinical staff read-only
     "cheques:read", "cheques:manage",
+    # Support tickets to the MediFleet platform team. Admin-only.
+    "support:manage",
 ]
 
 # Baseline grants applied to every staff role so messaging works out of the box.

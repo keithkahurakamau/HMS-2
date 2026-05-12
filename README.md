@@ -1,6 +1,6 @@
-# Enterprise Hospital Management System (HMS)
+# MediFleet — Multi-Hospital Management Platform
 
-A modern, comprehensive Hospital Management System designed to streamline healthcare operations, patient management, and facility administration. Built with a modular monolith architecture.
+MediFleet is a multi-tenant SaaS platform for running an entire fleet of hospitals from one codebase. Each hospital is fully isolated (own PostgreSQL database, own admin, own staff), while the MediFleet platform team manages the fleet itself from a dedicated superadmin console.
 
 ## 🚀 Features
 

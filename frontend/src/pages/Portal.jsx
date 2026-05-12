@@ -64,7 +64,7 @@ export default function Portal() {
                     </div>
                     <div>
                         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-                            HMS <span className="text-gradient-brand">Enterprise</span>
+                            <span className="text-gradient-brand">MediFleet</span>
                         </h1>
                         <p className="text-2xs sm:text-xs text-ink-400 font-semibold uppercase tracking-[0.18em] mt-0.5">
                             Multi-tenant cloud infrastructure

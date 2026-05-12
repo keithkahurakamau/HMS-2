@@ -1,5 +1,5 @@
 """
-End-to-end demo seed for the HMS platform.
+End-to-end demo seed for the MediFleet platform.
 
 This is the *opinionated* seed used for development, integration tests, and
 sales demos. It will:
@@ -513,13 +513,13 @@ def _ensure_settings() -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Seed the HMS demo tenant end-to-end.")
+    parser = argparse.ArgumentParser(description="Seed the MediFleet demo tenant end-to-end.")
     parser.add_argument("--reset", action="store_true",
                         help=f"Drop {TENANT_DB} (if it exists) and reseed from scratch.")
     args = parser.parse_args()
 
     print("=" * 64)
-    print("  HMS DEMO SEED")
+    print("  MEDIFLEET DEMO SEED")
     print("=" * 64)
 
     if args.reset:

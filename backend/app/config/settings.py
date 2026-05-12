@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "MayoClinic ERP"
+    PROJECT_NAME: str = "MediFleet"
     VERSION: str = "1.0.0"
 
     # Database

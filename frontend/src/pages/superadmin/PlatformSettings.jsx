@@ -38,7 +38,7 @@ export default function PlatformSettings() {
             title: 'Identity',
             icon: ShieldCheck,
             rows: [
-                { label: 'Platform name', value: health?.system || 'HMS Enterprise' },
+                { label: 'Platform name', value: health?.system || 'MediFleet' },
                 { label: 'Version', value: health?.version || '—', mono: true },
                 { label: 'Operational status', value: health?.status || 'Unknown', badge: 'success' },
             ],

@@ -17,7 +17,7 @@ export default function Login() {
     const { login, mustChangePassword, pendingUserId, clearMustChange } = useAuth();
     const navigate = useNavigate();
 
-    const tenantName = localStorage.getItem('hms_tenant_name') || 'HMS Enterprise';
+    const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
     const tenantId = localStorage.getItem('hms_tenant_id');
 
     // If the operator reached /login by typing the URL directly, we have no

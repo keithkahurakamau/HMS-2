@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Render start command for the HMS backend.
+# Render start command for the MediFleet backend.
 #
 # Boot sequence:
 #   1. Run seed_superadmin.py *if it still exists*. The seed is idempotent

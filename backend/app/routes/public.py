@@ -275,7 +275,7 @@ class SuperAdminLogin(BaseModel):
 
 @router.post("/superadmin/login")
 def superadmin_login(payload: SuperAdminLogin, db: Session = Depends(get_master_db)):
-    """Authenticates the HMS platform superadmin."""
+    """Authenticates the MediFleet platform superadmin."""
     admin = db.query(SuperAdmin).filter(SuperAdmin.email == payload.email).first()
     if not admin or not verify_password(payload.password, admin.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid superadmin credentials")

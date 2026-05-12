@@ -25,6 +25,7 @@ import PatientPortal from './pages/PatientPortal';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import Cheques from './pages/Cheques';
+import Support from './pages/Support';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
@@ -36,6 +37,7 @@ import TenantsManager from './pages/superadmin/TenantsManager';
 import PlatformBilling from './pages/superadmin/PlatformBilling';
 import PlatformSettings from './pages/superadmin/PlatformSettings';
 import SuperAdminPatients from './pages/superadmin/SuperAdminPatients';
+import SupportInbox from './pages/superadmin/SupportInbox';
 import SuperAdminLogin, { isSuperAdminAuthenticated } from './pages/superadmin/SuperAdminLogin';
 
 // Protection Wrapper
@@ -110,6 +112,7 @@ export default function App() {
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="tenants" element={<TenantsManager />} />
             <Route path="patients" element={<SuperAdminPatients />} />
+            <Route path="support" element={<SupportInbox />} />
             <Route path="billing" element={<PlatformBilling />} />
             <Route path="settings" element={<PlatformSettings />} />
             <Route path="*" element={<SuperAdminDashboard />} />
@@ -134,6 +137,7 @@ export default function App() {
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
             <Route path="cheques" element={<Cheques />} />
+            <Route path="support" element={<Support />} />
           </Route>
 
           {/* Patient self-service portal — no staff auth required */}

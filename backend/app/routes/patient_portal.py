@@ -93,6 +93,15 @@ async def portal_lookup(
     token via HttpOnly cookie. Always returns a generic 401 on mismatch — never
     leak which factor was wrong, lest the endpoint become an enumeration tool.
     """
+    # get_db now enforces X-Tenant-ID, but raise a more specific message here
+    # so the patient-portal UI can suggest "pick your hospital first" instead
+    # of the generic header-missing error.
+    if not request.headers.get("X-Tenant-ID"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No hospital selected. Pick your hospital from the portal first.",
+        )
+
     if not (payload.phone_last4.isdigit() and len(payload.phone_last4) == 4):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="phone_last4 must be 4 digits.")
 

@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
     LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X, ShieldCheck,
-    ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote
+    ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -15,7 +15,7 @@ export default function MainLayout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     // Get the dynamic hospital name from the portal selection
-    const tenantName = localStorage.getItem('hms_tenant_name') || 'HMS Enterprise';
+    const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
 
     // Each module declares both legacy `allowedRoles` and a `requiredPermission`.
     // We prefer permissions so admin-created custom roles light up modules they
@@ -35,6 +35,7 @@ export default function MainLayout() {
         { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'pharmacy:read' },
         { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={18} />,         allowedRoles: ['Admin', 'Receptionist'],                          requiredPermission: 'billing:read' },
         { name: 'Cheque Register',   path: '/app/cheques',         icon: <Banknote size={18} />,        allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'cheques:read' },
+        { name: 'MediFleet Support', path: '/app/support',         icon: <LifeBuoy size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'support:manage' },
         { name: 'Settings',          path: '/app/settings',        icon: <Settings size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'settings:read' },
     ];
 

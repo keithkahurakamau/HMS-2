@@ -11,7 +11,7 @@ export default function ForgotPassword() {
     const [devToken, setDevToken] = useState(null);
     const navigate = useNavigate();
 
-    const tenantName = localStorage.getItem('hms_tenant_name') || 'HMS Enterprise';
+    const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
 
     const handleSubmit = async (e) => {
         e.preventDefault();

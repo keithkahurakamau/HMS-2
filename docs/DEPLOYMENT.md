@@ -1,11 +1,11 @@
 # Production Deployment — Scaling Notes
 
-This file documents the infrastructure expectations for running the HMS
+This file documents the infrastructure expectations for running the MediFleet
 backend in production at scale (multi-tenant, multi-worker, multi-replica).
 
 ## 1. PostgreSQL connection pooling (PgBouncer)
 
-The HMS backend uses one SQLAlchemy engine per tenant, cached behind a
+The MediFleet backend uses one SQLAlchemy engine per tenant, cached behind a
 bounded LRU (`TENANT_ENGINE_CACHE_SIZE`, default 32). With 200 tenants and
 4 uvicorn workers, that's still up to `4 × 32 × DB_POOL_SIZE` = 640 pooled
 connections from the application alone — too many for a vanilla Postgres

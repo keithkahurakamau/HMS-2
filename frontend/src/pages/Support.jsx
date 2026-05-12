@@ -1,0 +1,291 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { apiClient } from '../api/client';
+import toast from 'react-hot-toast';
+import {
+    LifeBuoy, Plus, X, Send, Activity, RefreshCw, ChevronRight,
+    MessageSquare, Calendar, CheckCircle2, AlertCircle, Clock,
+} from 'lucide-react';
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Tenant-side support inbox.                                                */
+/*  Hospital admin raises tickets to the MediFleet platform team and tracks   */
+/*  responses. Tickets live in the master DB but the staff cookie auths us    */
+/*  in.                                                                       */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+const STATUS_META = {
+    'Open':                 { badge: 'badge-info',    icon: AlertCircle    },
+    'In Progress':          { badge: 'badge-warn',    icon: Activity       },
+    'Waiting on Customer':  { badge: 'badge-warn',    icon: Clock          },
+    'Resolved':             { badge: 'badge-success', icon: CheckCircle2   },
+    'Closed':               { badge: 'badge-neutral', icon: CheckCircle2   },
+};
+
+const CATEGORIES = ['Billing', 'Bug', 'Feature', 'Account', 'Onboarding', 'Other'];
+const PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'];
+
+export default function Support() {
+    const [tickets, setTickets] = useState([]);
+    const [activeTicket, setActiveTicket] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [statusFilter, setStatusFilter] = useState('');
+
+    const [isNewOpen, setIsNewOpen] = useState(false);
+    const [draft, setDraft] = useState({ subject: '', body: '', category: 'Other', priority: 'Normal' });
+    const [submitting, setSubmitting] = useState(false);
+
+    const [reply, setReply] = useState('');
+    const [sendingReply, setSendingReply] = useState(false);
+
+    useEffect(() => { fetchTickets(); }, [statusFilter]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+    const fetchTickets = async () => {
+        setIsLoading(true);
+        try {
+            const params = new URLSearchParams();
+            if (statusFilter) params.set('status', statusFilter);
+            const res = await apiClient.get(`/support/?${params.toString()}`);
+            setTickets(res.data || []);
+        } catch (e) {
+            toast.error(e.response?.data?.detail || 'Failed to load tickets.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const openTicket = async (id) => {
+        try {
+            const res = await apiClient.get(`/support/${id}`);
+            setActiveTicket(res.data);
+        } catch (e) {
+            toast.error(e.response?.data?.detail || 'Failed to load ticket.');
+        }
+    };
+
+    const submitNew = async (e) => {
+        e.preventDefault();
+        if (!draft.subject.trim() || !draft.body.trim()) return toast.error('Subject and details are required.');
+        setSubmitting(true);
+        try {
+            const res = await apiClient.post('/support/', draft);
+            toast.success('Ticket raised — the MediFleet team will respond shortly.');
+            setIsNewOpen(false);
+            setDraft({ subject: '', body: '', category: 'Other', priority: 'Normal' });
+            await fetchTickets();
+            setActiveTicket(res.data);
+        } catch (e) {
+            toast.error(e.response?.data?.detail || 'Could not raise ticket.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const sendReply = async () => {
+        if (!reply.trim() || !activeTicket) return;
+        setSendingReply(true);
+        try {
+            const res = await apiClient.post(`/support/${activeTicket.ticket_id}/reply`, { body: reply });
+            setActiveTicket(res.data);
+            setReply('');
+            fetchTickets();
+        } catch (e) {
+            toast.error(e.response?.data?.detail || 'Failed to send reply.');
+        } finally {
+            setSendingReply(false);
+        }
+    };
+
+    const closeTicket = async () => {
+        if (!activeTicket) return;
+        if (!window.confirm('Mark this ticket as closed?')) return;
+        try {
+            const res = await apiClient.post(`/support/${activeTicket.ticket_id}/close`);
+            setActiveTicket(res.data);
+            fetchTickets();
+            toast.success('Ticket closed.');
+        } catch (e) {
+            toast.error(e.response?.data?.detail || 'Failed to close ticket.');
+        }
+    };
+
+    const sortedTickets = useMemo(() => tickets, [tickets]);
+
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-start flex-wrap gap-3">
+                <div>
+                    <span className="section-eyebrow">Help</span>
+                    <h1 className="section-title mt-1 flex items-center gap-2">
+                        <LifeBuoy size={22} className="text-brand-600" /> MediFleet Support
+                    </h1>
+                    <p className="section-sub">Raise tickets to the MediFleet platform team. Bug reports, billing, feature requests, anything.</p>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={fetchTickets} className="btn-secondary"><RefreshCw size={15} /> Refresh</button>
+                    <button onClick={() => setIsNewOpen(true)} className="btn-primary"><Plus size={15} /> New ticket</button>
+                </div>
+            </div>
+
+            {/* Filter chips */}
+            <div className="card p-2 flex flex-wrap gap-1">
+                <button onClick={() => setStatusFilter('')}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${!statusFilter ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-50'}`}>
+                    All ({tickets.length})
+                </button>
+                {Object.keys(STATUS_META).map(s => (
+                    <button key={s} onClick={() => setStatusFilter(s)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === s ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-50'}`}>
+                        {s}
+                    </button>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-12 gap-4">
+                {/* List */}
+                <div className="col-span-12 lg:col-span-5 card overflow-hidden flex flex-col" style={{maxHeight: 'calc(100vh - 18rem)'}}>
+                    {isLoading ? (
+                        <div className="flex-1 flex items-center justify-center text-ink-400 p-10">
+                            <Activity className="animate-spin mr-2 text-brand-500" size={18} /> Loading…
+                        </div>
+                    ) : sortedTickets.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-ink-400 p-10 text-center">
+                            <LifeBuoy size={36} className="mb-3 text-ink-300" />
+                            <p className="text-sm">No tickets yet. Click "New ticket" to raise one.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-y-auto custom-scrollbar divide-y divide-ink-100">
+                            {sortedTickets.map(t => {
+                                const meta = STATUS_META[t.status] || {};
+                                const active = activeTicket?.ticket_id === t.ticket_id;
+                                return (
+                                    <button key={t.ticket_id} onClick={() => openTicket(t.ticket_id)}
+                                            className={`w-full p-4 text-left transition-colors ${active ? 'bg-brand-50/40' : 'hover:bg-ink-50/40'}`}>
+                                        <div className="flex justify-between items-start gap-2 mb-1">
+                                            <h3 className="font-semibold text-sm text-ink-900 line-clamp-1 flex-1">{t.subject}</h3>
+                                            <span className={meta.badge}>{t.status}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs text-ink-500 mt-1">
+                                            <span className="font-mono">#{t.ticket_id}</span>
+                                            <span>{t.category}</span>
+                                            <span>{t.priority}</span>
+                                            <span className="ml-auto flex items-center gap-1"><Calendar size={11} /> {new Date(t.created_at).toLocaleDateString()}</span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Thread */}
+                <div className="col-span-12 lg:col-span-7 card overflow-hidden flex flex-col" style={{maxHeight: 'calc(100vh - 18rem)'}}>
+                    {!activeTicket ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-ink-400 p-10 text-center">
+                            <MessageSquare size={36} className="mb-3 text-ink-300" />
+                            <p className="text-sm">Select a ticket to view the conversation.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="p-4 border-b border-ink-100 bg-ink-50/40">
+                                <div className="flex justify-between items-start gap-3 mb-1">
+                                    <div className="min-w-0">
+                                        <h2 className="text-base font-semibold text-ink-900 truncate">{activeTicket.subject}</h2>
+                                        <div className="flex items-center gap-3 text-xs text-ink-500 mt-1">
+                                            <span className="font-mono">#{activeTicket.ticket_id}</span>
+                                            <span>{activeTicket.category}</span>
+                                            <span>Priority: {activeTicket.priority}</span>
+                                        </div>
+                                    </div>
+                                    <span className={STATUS_META[activeTicket.status]?.badge}>{activeTicket.status}</span>
+                                </div>
+                                {activeTicket.status !== 'Closed' && (
+                                    <button onClick={closeTicket} className="text-xs text-rose-600 hover:underline mt-1">Mark as closed</button>
+                                )}
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                {(activeTicket.messages || []).map(m => {
+                                    const isPlatform = m.author_kind === 'platform';
+                                    return (
+                                        <div key={m.message_id} className={`flex ${isPlatform ? 'justify-start' : 'justify-end'}`}>
+                                            <div className={`max-w-[75%] rounded-2xl p-3 ${isPlatform ? 'bg-amber-50 ring-1 ring-amber-100' : 'bg-brand-50 ring-1 ring-brand-100'}`}>
+                                                <div className="flex items-baseline justify-between gap-3 mb-1">
+                                                    <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
+                                                        {isPlatform ? '🟡 MediFleet Team' : m.author_name}
+                                                    </span>
+                                                    <span className="text-2xs text-ink-400">{new Date(m.created_at).toLocaleString()}</span>
+                                                </div>
+                                                <p className="text-sm text-ink-800 whitespace-pre-wrap leading-relaxed">{m.body}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {activeTicket.status !== 'Closed' && (
+                                <div className="p-3 border-t border-ink-100 bg-white flex gap-2">
+                                    <textarea rows="2" className="input flex-1 resize-none" placeholder="Reply to MediFleet support…"
+                                              value={reply} onChange={e => setReply(e.target.value)} />
+                                    <button onClick={sendReply} disabled={sendingReply || !reply.trim()} className="btn-primary self-end disabled:opacity-50">
+                                        {sendingReply ? <Activity size={16} className="animate-spin" /> : <Send size={16} />}
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* New ticket modal */}
+            {isNewOpen && (
+                <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsNewOpen(false)} />
+                    <div className="relative w-full max-w-xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="flex justify-between items-center p-5 border-b border-ink-100">
+                            <h2 className="text-xl font-semibold flex items-center gap-2"><LifeBuoy size={20} className="text-brand-600" /> Raise a ticket</h2>
+                            <button onClick={() => setIsNewOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={submitNew} className="flex-1 overflow-y-auto p-5 bg-ink-50/60 space-y-4">
+                            <div>
+                                <label className="label">Subject *</label>
+                                <input required className="input" value={draft.subject} maxLength="200"
+                                       onChange={e => setDraft({ ...draft, subject: e.target.value })}
+                                       placeholder="Short summary of the issue" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="label">Category</label>
+                                    <select className="input" value={draft.category}
+                                            onChange={e => setDraft({ ...draft, category: e.target.value })}>
+                                        {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="label">Priority</label>
+                                    <select className="input" value={draft.priority}
+                                            onChange={e => setDraft({ ...draft, priority: e.target.value })}>
+                                        {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="label">What's going on? *</label>
+                                <textarea required rows="8" className="input resize-none" value={draft.body}
+                                          onChange={e => setDraft({ ...draft, body: e.target.value })}
+                                          placeholder="Describe the issue, what you expected, and what happened. Include steps, screenshots URLs, or error messages." />
+                            </div>
+                            <div className="flex justify-end gap-2 pt-3 border-t border-ink-100">
+                                <button type="button" onClick={() => setIsNewOpen(false)} className="btn-secondary">Cancel</button>
+                                <button type="submit" disabled={submitting} className="btn-primary">
+                                    {submitting ? <Activity size={15} className="animate-spin" /> : <Send size={15} />} Submit
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
