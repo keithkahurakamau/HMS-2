@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import PageHeader from '../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Hospital Settings                                                         */
@@ -128,22 +129,21 @@ export default function Settings() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <span className="section-eyebrow">Administration</span>
-                    <h1 className="section-title mt-1 flex items-center gap-2">
-                        <SettingsIcon size={22} className="text-brand-600" /> Hospital Settings
-                    </h1>
-                    <p className="section-sub">Branding, working hours, billing, lab/radiology defaults, notifications &amp; compliance.</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={fetchSettings} className="btn-secondary"><RefreshCcw size={15} /> Refresh</button>
-                    <button onClick={() => setShowCustomForm(true)} className="btn-secondary"><Plus size={15} /> Custom setting</button>
-                    <button onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50">
-                        {saving ? <Activity size={15} className="animate-spin" /> : <Save size={15} />} Save changes ({dirtyIds.length})
-                    </button>
-                </div>
-            </div>
+            <PageHeader
+                eyebrow="Administration"
+                icon={SettingsIcon}
+                title="Hospital Settings"
+                subtitle="Branding, working hours, billing, lab/radiology defaults, notifications & compliance."
+                actions={
+                    <>
+                        <button onClick={fetchSettings} className="btn-secondary cursor-pointer"><RefreshCcw size={15} /> Refresh</button>
+                        <button onClick={() => setShowCustomForm(true)} className="btn-secondary cursor-pointer"><Plus size={15} /> Custom setting</button>
+                        <button onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50 cursor-pointer">
+                            {saving ? <Activity size={15} className="animate-spin" /> : <Save size={15} />} Save changes ({dirtyIds.length})
+                        </button>
+                    </>
+                }
+            />
 
             {/* Branding Studio promo card — distinct from the flat key/value store. */}
             <Link

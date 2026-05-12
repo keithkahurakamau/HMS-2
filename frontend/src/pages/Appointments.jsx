@@ -5,6 +5,7 @@ import {
     CalendarDays, Plus, X, Filter, CheckCircle2, XCircle,
     UserRound, Stethoscope, Activity, RefreshCw,
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 
 const STATUS_BADGES = {
     Scheduled:  'badge-info',
@@ -120,23 +121,22 @@ export default function Appointments() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <span className="section-eyebrow">Calendar</span>
-                    <h1 className="section-title mt-1 flex items-center gap-2">
-                        <CalendarDays className="text-brand-600" size={22} /> Appointments
-                    </h1>
-                    <p className="section-sub">Schedule, confirm, and manage clinic appointments.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={fetchAppointments} className="btn-secondary" aria-label="Reload appointments">
-                        <RefreshCw size={15} /> Refresh
-                    </button>
-                    <button onClick={() => setIsFormOpen(true)} className="btn-primary">
-                        <Plus size={15} /> New appointment
-                    </button>
-                </div>
-            </div>
+            <PageHeader
+                eyebrow="Calendar"
+                icon={CalendarDays}
+                title="Appointments"
+                subtitle="Schedule, confirm, and manage clinic appointments."
+                actions={
+                    <>
+                        <button onClick={fetchAppointments} className="btn-secondary cursor-pointer" aria-label="Reload appointments">
+                            <RefreshCw size={15} /> Refresh
+                        </button>
+                        <button onClick={() => setIsFormOpen(true)} className="btn-primary cursor-pointer">
+                            <Plus size={15} /> New appointment
+                        </button>
+                    </>
+                }
+            />
 
             <div className="card p-4 flex flex-wrap gap-4 items-end">
                 <div className="flex flex-col gap-1">

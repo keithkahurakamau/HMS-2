@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printAdmissionSlip } from '../utils/printTemplates';
+import PageHeader from '../components/PageHeader';
 
 export default function Wards() {
     const [wards, setWards] = useState([]);
@@ -150,16 +151,17 @@ export default function Wards() {
 
     return (
         <div className="space-y-6 pb-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <span className="section-eyebrow">Inpatient</span>
-                    <h1 className="section-title mt-1">Ward &amp; Bed Management</h1>
-                    <p className="section-sub">Monitor hospital capacity, manage admissions, and track clinical inventory.</p>
-                </div>
-                <button onClick={() => setIsAdmitModalOpen(true)} className="btn-primary">
-                    <UserPlus size={16} /> Admit patient
-                </button>
-            </div>
+            <PageHeader
+                eyebrow="Inpatient"
+                icon={Bed}
+                title="Ward & Bed Management"
+                subtitle="Monitor hospital capacity, manage admissions, and track clinical inventory."
+                actions={
+                    <button onClick={() => setIsAdmitModalOpen(true)} className="btn-primary cursor-pointer">
+                        <UserPlus size={16} /> Admit patient
+                    </button>
+                }
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="stat-tile">

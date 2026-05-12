@@ -194,24 +194,17 @@ export default function MedicalHistory() {
 
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
-            {/* Header */}
-            <div className="card p-4 shrink-0">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100">
-                            <FileText size={20} />
-                        </div>
-                        <div>
-                            <span className="section-eyebrow">Patient chart</span>
-                            <h1 className="text-lg font-semibold text-ink-900 tracking-tight">Medical History</h1>
-                            <p className="text-xs text-ink-500">Full patient medical chart &middot; KDPA 2019 compliant</p>
-                        </div>
-                    </div>
-                    <div className="badge-success">
-                        <ShieldCheck size={12} /> Kenya Data Protection Act 2019
-                    </div>
-                </div>
-            </div>
+            <PageHeader
+                eyebrow="Patient chart"
+                icon={FileText}
+                title="Medical History"
+                subtitle="Full patient medical chart — KDPA 2019 compliant."
+                meta={
+                    <span className="badge-success">
+                        <ShieldCheck size={12} /> KDPA 2019
+                    </span>
+                }
+            />
 
             {/* Patient Search */}
             <div className="card p-4 shrink-0 overflow-visible relative z-20">

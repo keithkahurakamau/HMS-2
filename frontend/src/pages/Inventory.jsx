@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
-import { 
-    Search, Package, AlertTriangle, ArrowRightLeft, 
+import {
+    Search, Package, AlertTriangle, ArrowRightLeft,
     Plus, Truck, FileText, Filter, CalendarClock, Store, Microscope, Bed, Activity
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 
 // Each tenant defines its own location set in the DB. The API gives us
 // {location_id, name, description}; we map the well-known names to icons here
@@ -201,22 +202,22 @@ export default function Inventory() {
 
     return (
         <div className="space-y-6 pb-8">
-            {/* PAGE HEADER */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <span className="section-eyebrow">Logistics</span>
-                    <h1 className="section-title mt-1">Central Logistics Hub</h1>
-                    <p className="section-sub">Manage global procurement and departmental distribution.</p>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                    <button onClick={() => setIsTransferModalOpen(true)} className="btn-secondary">
-                        <ArrowRightLeft size={15} /> Internal transfer
-                    </button>
-                    <button onClick={() => setIsProcurementModalOpen(true)} className="btn-primary">
-                        <Truck size={15} /> External procurement
-                    </button>
-                </div>
-            </div>
+            <PageHeader
+                eyebrow="Logistics"
+                icon={Package}
+                title="Central Logistics Hub"
+                subtitle="Manage global procurement and departmental distribution."
+                actions={
+                    <>
+                        <button onClick={() => setIsTransferModalOpen(true)} className="btn-secondary cursor-pointer">
+                            <ArrowRightLeft size={15} /> Internal transfer
+                        </button>
+                        <button onClick={() => setIsProcurementModalOpen(true)} className="btn-primary cursor-pointer">
+                            <Truck size={15} /> External procurement
+                        </button>
+                    </>
+                }
+            />
 
             {/* DEPARTMENT TABS (HUB & SPOKE) */}
             <div className="card p-1.5 flex overflow-x-auto custom-scrollbar gap-1">

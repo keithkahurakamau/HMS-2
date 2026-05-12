@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import Logo, { TenantLogo } from '../components/Logo';
+import PageHeader from '../components/PageHeader';
 
 /**
  * Branding Studio — hospital admins customise their workspace identity.
@@ -113,26 +114,20 @@ export default function Branding() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                    <Link to="/app/settings" className="inline-flex items-center gap-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 hover:text-brand-700 transition-colors cursor-pointer">
-                        <ArrowLeft size={12} /> Settings
-                    </Link>
-                    <h1 className="mt-1 section-title flex items-center gap-2">
-                        <Palette size={22} className="text-brand-600" /> Branding Studio
-                    </h1>
-                    <p className="section-sub">
-                        Customise your workspace identity. Uploads are stored in the platform DB for now
-                        and will transparently migrate to Cloudinary later.
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    {isDirty && (
-                        <span className="badge-warn">
-                            <AlertTriangle size={11} /> Unsaved changes
-                        </span>
-                    )}
+            <Link to="/app/settings" className="inline-flex items-center gap-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 hover:text-brand-700 transition-colors cursor-pointer -mb-3">
+                <ArrowLeft size={12} /> Settings
+            </Link>
+            <PageHeader
+                eyebrow="Studio"
+                icon={Palette}
+                title="Branding Studio"
+                subtitle="Customise your workspace identity. Uploads are stored in the platform DB for now and will transparently migrate to Cloudinary later."
+                meta={isDirty && (
+                    <span className="badge-warn">
+                        <AlertTriangle size={11} /> Unsaved changes
+                    </span>
+                )}
+                actions={
                     <button
                         onClick={handleSave}
                         disabled={!isDirty || saving}
@@ -141,8 +136,8 @@ export default function Branding() {
                         {saving ? <Activity size={15} className="animate-spin" /> : <Save size={15} />}
                         Save branding
                     </button>
-                </div>
-            </div>
+                }
+            />
 
             <div className="grid grid-cols-12 gap-6">
                 {/* Logo */}

@@ -7,6 +7,7 @@ import {
     AlertCircle, Search, UserPlus, Lock, CheckCircle2,
     X, ShieldCheck, Edit, Key, Save, Tag, PlusCircle, Building2, KeyRound
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import DepartmentsManager from '../components/admin/DepartmentsManager';
 import RolesManager from '../components/admin/RolesManager';
 import UserPermissionsEditor from '../components/admin/UserPermissionsEditor';
@@ -174,7 +175,12 @@ export default function AdminDashboard() {
 
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
-            
+            <PageHeader
+                eyebrow="Administration"
+                icon={LayoutDashboard}
+                title="Command Center"
+                subtitle="Hospital operations cockpit — staff, roles, departments, audit, and payment integrations."
+            />
             {/* HEADER & TABS — unified pill row, single accent for active state */}
             <div className="card p-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Admin sections" className="flex flex-wrap bg-ink-100/70 p-1 rounded-xl w-full lg:w-auto lg:flex-1 gap-1">

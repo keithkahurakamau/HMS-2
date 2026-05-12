@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import {
-    Search, UserPlus, X, Activity, Clock, ShieldCheck,
+    Search, UserPlus, X, Activity, Clock, ShieldCheck, Users,
     MapPin, Phone, Briefcase, HeartPulse, FileText,
     MoreVertical, Stethoscope, TestTube, AlertCircle, UserMinus,
     Pill, Bed, CreditCard, Printer, Download, Trash
 } from 'lucide-react';
 import { printPatientCard } from '../utils/printTemplates';
+import PageHeader from '../components/PageHeader';
 
 export default function Patients() {
     const [patients, setPatients] = useState([]);
@@ -145,18 +146,17 @@ export default function Patients() {
 
     return (
         <div className="space-y-6 relative h-full">
-            {/* Page Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <span className="section-eyebrow">Front desk</span>
-                    <h1 className="section-title mt-1">Patient Directory</h1>
-                    <p className="section-sub">Manage comprehensive registrations, medical records, and departmental queues.</p>
-                </div>
-                <button onClick={() => setIsModalOpen(true)} className="btn-primary">
-                    <UserPlus size={16} />
-                    Register New Patient
-                </button>
-            </div>
+            <PageHeader
+                eyebrow="Front desk"
+                icon={Users}
+                title="Patient Directory"
+                subtitle="Manage comprehensive registrations, medical records, and departmental queues."
+                actions={
+                    <button onClick={() => setIsModalOpen(true)} className="btn-primary cursor-pointer">
+                        <UserPlus size={16} /> Register patient
+                    </button>
+                }
+            />
 
             {/* Toolbar */}
             <div className="card p-3 sm:p-4 flex items-center justify-between">
