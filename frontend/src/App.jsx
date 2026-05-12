@@ -24,6 +24,7 @@ import Appointments from './pages/Appointments';
 import PatientPortal from './pages/PatientPortal';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
+import Cheques from './pages/Cheques';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
@@ -132,6 +133,7 @@ export default function App() {
             <Route path="billing" element={<Billing />} />
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="cheques" element={<Cheques />} />
           </Route>
 
           {/* Patient self-service portal — no staff auth required */}

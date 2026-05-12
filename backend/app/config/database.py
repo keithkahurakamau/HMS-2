@@ -113,6 +113,22 @@ def get_tenant_engine(tenant_db_name: str):
 
 
 def get_db(request: Request = None):
+    """Yields a SQLAlchemy session bound to the caller's tenant DB.
+
+    Tenant routing is keyed off the ``X-Tenant-ID`` request header. Earlier
+    versions of this function silently fell back to the DB named in
+    ``DATABASE_URL`` (typically ``hms_master``) when the header was absent —
+    that defaulted unauthenticated requests to a database that has none of
+    the tenant tables, producing cryptic 500s like
+    ``relation "patients" does not exist``. The fallback is gone: requests
+    without ``X-Tenant-ID`` get a 400 with a clear message so the caller
+    can route through the hospital picker.
+
+    Background callers (CLI scripts, tests, lifespan tasks) pass
+    ``request=None`` and get the default session as before.
+    """
+    from fastapi import HTTPException, status
+
     if not request:
         db = DefaultSessionLocal()
         try:
@@ -123,7 +139,10 @@ def get_db(request: Request = None):
 
     tenant_db_name = request.headers.get("X-Tenant-ID")
     if not tenant_db_name:
-        tenant_db_name = DATABASE_URL.rsplit('/', 1)[1]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Tenant-ID header is required for this endpoint.",
+        )
 
     engine = get_tenant_engine(tenant_db_name)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -40,6 +40,7 @@ from app.models.referral import Referral
 from app.models.settings import HospitalSetting
 from app.models.radiology import RadiologyExamCatalog
 from app.models.laboratory import LabCatalogParameter
+from app.models.cheque import Cheque
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

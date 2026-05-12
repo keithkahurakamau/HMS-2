@@ -53,6 +53,7 @@ from app.models import notification as _notification  # noqa: F401
 from app.models import messaging as _messaging  # noqa: F401
 from app.models import settings as _settings  # noqa: F401
 from app.models import referral as _referral  # noqa: F401
+from app.models import cheque as _cheque  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,8 @@ PERMISSIONS = [
     "settings:read", "settings:manage",
     # Specialist referrals — clinical staff write, admin reads
     "referrals:manage",
+    # Cheque register: admin + receptionist manage; clinical staff read-only
+    "cheques:read", "cheques:manage",
 ]
 
 # Baseline grants applied to every staff role so messaging works out of the box.
@@ -131,14 +134,14 @@ ROLE_GRANTS = {
     "Admin": PERMISSIONS,
     "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write",
                "pharmacy:read", "laboratory:read", "history:read", "history:manage",
-               "referrals:manage", *_BASE],
+               "referrals:manage", "cheques:read", *_BASE],
     "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read",
-              *_BASE],
+              "cheques:read", *_BASE],
     "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read", *_BASE],
     "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read", *_BASE],
     "Radiologist": ["radiology:manage", "clinical:read", "patients:read", *_BASE],
     "Receptionist": ["patients:read", "patients:write", "billing:read", "billing:manage",
-                     *_BASE],
+                     "cheques:read", "cheques:manage", *_BASE],
 }
 
 

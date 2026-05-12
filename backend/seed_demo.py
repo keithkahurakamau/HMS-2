@@ -27,7 +27,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone  # noqa: F401 — timezone used in _ensure_cheques
 from decimal import Decimal
 
 from sqlalchemy import create_engine, text
@@ -47,6 +47,7 @@ from app.models.inventory import Location, InventoryItem, StockBatch
 from app.models.laboratory import LabTestCatalog, LabCatalogParameter
 from app.models.radiology import RadiologyExamCatalog
 from app.models.settings import HospitalSetting
+from app.models.cheque import Cheque
 from app.services.tenant_provisioning import provision_tenant, DEFAULT_SETTINGS
 
 # ── Demo tenant constants ───────────────────────────────────────────────────
@@ -425,6 +426,57 @@ def _ensure_inventory() -> None:
         session.close()
 
 
+def _ensure_cheques() -> None:
+    """Insert a handful of demo cheques spanning every lifecycle state."""
+    session = _tenant_session(TENANT_DB)
+    try:
+        admin = session.query(User).filter(User.email == BOOT_ADMIN_EMAIL).first()
+        if not admin:
+            print("   ⚠ admin user missing — skipping cheque seed.")
+            return
+        existing_numbers = {c.cheque_number for c in session.query(Cheque).all()}
+
+        demo_cheques = [
+            # number, drawer_name, drawer_type, bank, branch, amount, status, extras
+            ("CHQ-100001", "Jubilee Insurance Ltd", "Insurance", "KCB Bank",      "Upper Hill",  125000.00, "Received",  {}),
+            ("CHQ-100002", "Britam Insurance",      "Insurance", "Equity Bank",   "Westlands",    87500.00, "Deposited", {"deposit_account": "KCB 1180123456", "deposit_date_offset_days": -1}),
+            ("CHQ-100003", "Safaricom Ltd",         "Employer",  "Standard Chartered", "Chiromo", 45000.00, "Cleared",   {"deposit_account": "SCB 0102345678", "deposit_date_offset_days": -7, "clearance_date_offset_days": -3}),
+            ("CHQ-100004", "AAR Insurance",         "Insurance", "Co-op Bank",    "City Hall",    32000.00, "Bounced",   {"deposit_account": "Coop 0112345", "deposit_date_offset_days": -10, "bounce_reason": "Insufficient funds"}),
+            ("CHQ-100005", "Mary Njeri",            "Patient",   "ABSA Bank",     "Kileleshwa",   15000.00, "Cancelled", {"cancel_reason": "Issued in error — wrong amount"}),
+        ]
+
+        for number, drawer, dtype, bank, branch, amount, status, extras in demo_cheques:
+            if number in existing_numbers:
+                continue
+            cheque = Cheque(
+                cheque_number=number,
+                drawer_name=drawer,
+                drawer_type=dtype,
+                bank_name=bank,
+                bank_branch=branch,
+                amount=Decimal(str(amount)),
+                currency="KES",
+                status=status,
+                received_by=admin.user_id,
+                last_updated_by=admin.user_id,
+                notes=f"Demo seed entry — {status.lower()} state.",
+            )
+            if "deposit_date_offset_days" in extras:
+                cheque.deposit_account = extras["deposit_account"]
+                cheque.deposit_date = datetime.now(timezone.utc) + timedelta(days=extras["deposit_date_offset_days"])
+            if "clearance_date_offset_days" in extras:
+                cheque.clearance_date = datetime.now(timezone.utc) + timedelta(days=extras["clearance_date_offset_days"])
+            if "bounce_reason" in extras:
+                cheque.bounce_reason = extras["bounce_reason"]
+            if "cancel_reason" in extras:
+                cheque.cancel_reason = extras["cancel_reason"]
+            session.add(cheque)
+            print(f"   + cheque {number} ({status})")
+        session.commit()
+    finally:
+        session.close()
+
+
 def _ensure_settings() -> None:
     """Settings rows are inserted by provision_tenant on a fresh tenant. On
     re-seeds, top-up missing rows so newer defaults land without a migration."""
@@ -499,8 +551,11 @@ def main() -> int:
     print("[6/7] inventory (with reusable items)…")
     _ensure_inventory()
 
-    print("[7/7] hospital settings…")
+    print("[7/8] hospital settings…")
     _ensure_settings()
+
+    print("[8/8] cheque register (demo entries)…")
+    _ensure_cheques()
 
     print()
     print("Demo accounts (all use the same password):")

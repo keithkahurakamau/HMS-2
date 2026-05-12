@@ -40,6 +40,7 @@ import app.routes.patient_portal as patient_portal_module
 import app.routes.messaging as messaging_module
 import app.routes.referrals as referrals_module
 import app.routes.settings as settings_module
+import app.routes.cheques as cheques_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -192,6 +193,7 @@ app.include_router(patient_portal_module.router)
 app.include_router(messaging_module.router)
 app.include_router(referrals_module.router)
 app.include_router(settings_module.router)
+app.include_router(cheques_module.router)
 
 # 9. Health Check Route
 @app.get("/")
