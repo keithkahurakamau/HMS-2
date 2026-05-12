@@ -3,16 +3,19 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
     LayoutDashboard, Users, Stethoscope, TestTube,
-    Pill, Bed, Package, Receipt, LogOut, Menu, X, ShieldCheck,
+    Pill, Bed, Package, Receipt, LogOut, Menu, X,
     ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
+import { TenantLogo } from '../Logo';
+import { useBranding } from '../../context/BrandingContext';
 
 export default function MainLayout() {
     const { user, logout } = useAuth();
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const { branding } = useBranding();
 
     // Get the dynamic hospital name from the portal selection
     const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
@@ -72,14 +75,14 @@ export default function MainLayout() {
             >
                 {/* Brand block */}
                 <div className="h-16 flex items-center justify-between px-5 border-b border-white/5 shrink-0">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-9 h-9 rounded-xl bg-brand-gradient flex items-center justify-center shadow-glow shrink-0">
-                            <ShieldCheck size={18} className="text-white" />
-                        </div>
-                        <div className="min-w-0">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-300/80 leading-none">Hospital</div>
-                            <div className="text-sm font-semibold text-white truncate leading-tight mt-0.5" title={tenantName}>{tenantName}</div>
-                        </div>
+                    <div className="flex items-center overflow-hidden">
+                        <TenantLogo
+                            src={branding.logo_data_url}
+                            fallbackLabel={tenantName}
+                            sublabel="Hospital"
+                            size={36}
+                            tone="mono-light"
+                        />
                     </div>
                     <button
                         className="md:hidden text-ink-400 hover:text-white"

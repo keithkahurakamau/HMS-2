@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { BrandingProvider } from './context/BrandingContext';
 import { Activity } from 'lucide-react';
 
 // Page Imports
@@ -26,6 +27,8 @@ import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import Cheques from './pages/Cheques';
 import Support from './pages/Support';
+import Landing from './pages/Landing';
+import Branding from './pages/Branding';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
@@ -96,11 +99,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+        <BrandingProvider>
         <BrowserRouter>
           <Toaster position="top-right" />
           <a href="#main-content" className="skip-link">Skip to main content</a>
           <Routes>
-          <Route path="/" element={<Portal />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/portal" element={<Portal />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
@@ -136,6 +141,7 @@ export default function App() {
             <Route path="billing" element={<Billing />} />
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="branding" element={<Branding />} />
             <Route path="cheques" element={<Cheques />} />
             <Route path="support" element={<Support />} />
           </Route>
@@ -146,6 +152,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
           </Routes>
         </BrowserRouter>
+        </BrandingProvider>
       </AuthProvider>
     </ThemeProvider>
   );

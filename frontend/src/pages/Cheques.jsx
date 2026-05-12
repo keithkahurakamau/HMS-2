@@ -6,6 +6,7 @@ import {
     Filter, Banknote, TrendingUp, Calendar, Building2, RefreshCw,
     ArrowDownCircle, XCircle, Eye,
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Cheque Register                                                           */
@@ -152,19 +153,18 @@ export default function Cheques() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-start flex-wrap gap-3">
-                <div>
-                    <span className="section-eyebrow">Finance</span>
-                    <h1 className="section-title mt-1 flex items-center gap-2">
-                        <Banknote size={22} className="text-brand-600" /> Cheque Register
-                    </h1>
-                    <p className="section-sub">Track every cheque from receipt through clearance — including bounces.</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={fetchAll} className="btn-secondary"><RefreshCw size={15} /> Refresh</button>
-                    <button onClick={() => setIsNewOpen(true)} className="btn-primary"><Plus size={15} /> Record cheque</button>
-                </div>
-            </div>
+            <PageHeader
+                eyebrow="Finance"
+                icon={Banknote}
+                title="Cheque Register"
+                subtitle="Track every cheque from receipt through clearance — including bounces."
+                actions={
+                    <>
+                        <button onClick={fetchAll} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
+                        <button onClick={() => setIsNewOpen(true)} className="btn-primary cursor-pointer"><Plus size={15} /> Record cheque</button>
+                    </>
+                }
+            />
 
             {/* KPIs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

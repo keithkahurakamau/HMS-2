@@ -40,8 +40,8 @@
     outline: none;
   }
   input:focus-visible, select:focus-visible, textarea:focus-visible {
-    border-color: #14b88e;
-    box-shadow: 0 0 0 4px rgba(20, 184, 142, 0.15);
+    border-color: #06b6d4;
+    box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.18);
   }
 
   /* Tables — gentle defaults so module pages without `.table-clean` still match */
@@ -234,17 +234,24 @@
   }
   .bg-mesh {
     background-image:
-      radial-gradient(at 12% 8%, rgba(20, 184, 142, 0.12) 0px, transparent 50%),
-      radial-gradient(at 88% 92%, rgba(34, 197, 94, 0.10) 0px, transparent 50%),
-      radial-gradient(at 50% 50%, rgba(15, 117, 97, 0.06) 0px, transparent 60%);
+      radial-gradient(at 12% 8%, rgba(34, 211, 238, 0.14) 0px, transparent 50%),
+      radial-gradient(at 88% 92%, rgba(45, 212, 191, 0.12) 0px, transparent 50%),
+      radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.08) 0px, transparent 60%);
   }
 
-  /* Animated gradient text — used sparingly */
+  /* Animated gradient text — Cyan → Teal → Emerald sweep */
   .text-gradient-brand {
-    background-image: linear-gradient(135deg, #0d9477 0%, #14b88e 50%, #22c55e 100%);
+    background-image: linear-gradient(135deg, #0891b2 0%, #14b8a6 50%, #10b981 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  /* Tenant-uploaded background overlay (used on Login/Portal/Landing). */
+  .bg-tenant {
+    background-image: var(--tenant-bg, none);
+    background-size: cover;
+    background-position: center;
   }
 }
 
@@ -261,7 +268,7 @@
 }
 
 :focus-visible {
-  outline: 2px solid #14b88e;
+  outline: 2px solid #06b6d4;
   outline-offset: 2px;
   border-radius: 6px;
 }

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printInvoice } from '../utils/printTemplates';
+import PageHeader from '../components/PageHeader';
 
 export default function Billing() {
     const [queue, setQueue] = useState([]);
@@ -143,13 +144,13 @@ export default function Billing() {
 
     return (
         <div className="space-y-6 pb-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <span className="section-eyebrow">Cashier</span>
-                    <h1 className="section-title mt-1">Billing &amp; Finance</h1>
-                    <p className="section-sub">Manage patient invoices, consultation fees, and accept payments.</p>
-                </div>
-                <div className="flex gap-2 flex-wrap">
+            <PageHeader
+                eyebrow="Cashier"
+                icon={Receipt}
+                title="Billing & Finance"
+                subtitle="Manage patient invoices, consultation fees, and accept payments."
+                actions={
+                    <div className="flex gap-2 flex-wrap items-center">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" size={16} />
                         <input
@@ -158,11 +159,12 @@ export default function Billing() {
                             className="input pl-9 w-64"
                         />
                     </div>
-                    <button onClick={openLedger} className="btn-success">
+                    <button onClick={openLedger} className="btn-success cursor-pointer">
                         <Smartphone size={15} /> M-Pesa Ledger
                     </button>
-                </div>
-            </div>
+                    </div>
+                }
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                 {/* Billing Queue List */}

@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../api/client';
 import {
     Settings as SettingsIcon, Building2, Clock, Wallet, TestTube, Radio,
-    Bell, Shield, Save, RefreshCcw, Activity, Plus, X,
+    Bell, Shield, Save, RefreshCcw, Activity, Plus, X, Palette, ArrowRight,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import PageHeader from '../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Hospital Settings                                                         */
@@ -127,22 +129,46 @@ export default function Settings() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <span className="section-eyebrow">Administration</span>
-                    <h1 className="section-title mt-1 flex items-center gap-2">
-                        <SettingsIcon size={22} className="text-brand-600" /> Hospital Settings
-                    </h1>
-                    <p className="section-sub">Branding, working hours, billing, lab/radiology defaults, notifications &amp; compliance.</p>
+            <PageHeader
+                eyebrow="Administration"
+                icon={SettingsIcon}
+                title="Hospital Settings"
+                subtitle="Branding, working hours, billing, lab/radiology defaults, notifications & compliance."
+                actions={
+                    <>
+                        <button onClick={fetchSettings} className="btn-secondary cursor-pointer"><RefreshCcw size={15} /> Refresh</button>
+                        <button onClick={() => setShowCustomForm(true)} className="btn-secondary cursor-pointer"><Plus size={15} /> Custom setting</button>
+                        <button onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50 cursor-pointer">
+                            {saving ? <Activity size={15} className="animate-spin" /> : <Save size={15} />} Save changes ({dirtyIds.length})
+                        </button>
+                    </>
+                }
+            />
+
+            {/* Branding Studio promo card — distinct from the flat key/value store. */}
+            <Link
+                to="/app/branding"
+                className="block group relative overflow-hidden rounded-2xl bg-brand-gradient text-white p-6 shadow-soft hover:shadow-elevated transition-all cursor-pointer"
+            >
+                <div className="absolute inset-0 bg-aurora opacity-60 pointer-events-none" />
+                <div className="relative flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur ring-1 ring-white/20 flex items-center justify-center">
+                            <Palette size={20} />
+                        </div>
+                        <div>
+                            <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-white/80">New</p>
+                            <h2 className="text-lg font-semibold tracking-tight mt-0.5">Branding Studio</h2>
+                            <p className="text-sm text-white/85 mt-1">
+                                Upload your logo, set a sign-in background, override brand colours, configure print templates.
+                            </p>
+                        </div>
+                    </div>
+                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-brand-700 font-semibold text-sm group-hover:bg-ink-50 transition-colors">
+                        Open Studio <ArrowRight size={14} />
+                    </span>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={fetchSettings} className="btn-secondary"><RefreshCcw size={15} /> Refresh</button>
-                    <button onClick={() => setShowCustomForm(true)} className="btn-secondary"><Plus size={15} /> Custom setting</button>
-                    <button onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50">
-                        {saving ? <Activity size={15} className="animate-spin" /> : <Save size={15} />} Save changes ({dirtyIds.length})
-                    </button>
-                </div>
-            </div>
+            </Link>
 
             {isLoading ? (
                 <div className="card p-12 text-center text-ink-400">

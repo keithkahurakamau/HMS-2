@@ -5,6 +5,7 @@ import {
     ShieldAlert, Activity, Eye, EyeOff, Lock, ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Logo from '../../components/Logo';
 
 const TOKEN_KEY = 'hms_superadmin_token';
 const NAME_KEY = 'hms_superadmin_name';
@@ -73,16 +74,12 @@ export default function SuperAdminLogin() {
             </div>
 
             <div className="relative z-10 w-full max-w-md animate-slide-up">
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-glow">
-                        <ShieldAlert size={20} className="text-white" />
-                    </div>
-                    <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300/80 leading-none">Platform</div>
-                        <div className="text-base font-semibold text-white tracking-tight leading-tight mt-0.5">
-                            <span className="text-gradient-brand">MediFleet</span> Console
-                        </div>
-                    </div>
+                <div className="flex items-center justify-between mb-8">
+                    <Logo variant="full" size={36} label="MediFleet" sublabel="Platform Console" tone="mono-light" />
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 ring-1 ring-amber-400/30">
+                        <ShieldAlert size={11} className="text-amber-300" />
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-300">Restricted</span>
+                    </span>
                 </div>
 
                 <div className="bg-white/[0.04] backdrop-blur-2xl border border-white/10 rounded-3xl p-8 shadow-elevated">

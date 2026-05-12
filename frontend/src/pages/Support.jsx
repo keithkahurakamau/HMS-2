@@ -5,6 +5,7 @@ import {
     LifeBuoy, Plus, X, Send, Activity, RefreshCw, ChevronRight,
     MessageSquare, Calendar, CheckCircle2, AlertCircle, Clock,
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Tenant-side support inbox.                                                */
@@ -112,19 +113,18 @@ export default function Support() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-start flex-wrap gap-3">
-                <div>
-                    <span className="section-eyebrow">Help</span>
-                    <h1 className="section-title mt-1 flex items-center gap-2">
-                        <LifeBuoy size={22} className="text-brand-600" /> MediFleet Support
-                    </h1>
-                    <p className="section-sub">Raise tickets to the MediFleet platform team. Bug reports, billing, feature requests, anything.</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={fetchTickets} className="btn-secondary"><RefreshCw size={15} /> Refresh</button>
-                    <button onClick={() => setIsNewOpen(true)} className="btn-primary"><Plus size={15} /> New ticket</button>
-                </div>
-            </div>
+            <PageHeader
+                eyebrow="Help"
+                icon={LifeBuoy}
+                title="MediFleet Support"
+                subtitle="Raise tickets to the MediFleet platform team. Bug reports, billing, feature requests, anything."
+                actions={
+                    <>
+                        <button onClick={fetchTickets} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
+                        <button onClick={() => setIsNewOpen(true)} className="btn-primary cursor-pointer"><Plus size={15} /> New ticket</button>
+                    </>
+                }
+            />
 
             {/* Filter chips */}
             <div className="card p-2 flex flex-wrap gap-1">

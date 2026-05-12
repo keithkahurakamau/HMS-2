@@ -80,6 +80,14 @@ MASTER_DB_PATCHES: list[str] = [
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS feature_flags TEXT;",
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS plan_limits TEXT;",
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS notes TEXT;",
+    # Branding columns — uploaded logos, custom backgrounds, brand colours,
+    # and printed-document template configuration. All are nullable so the
+    # platform default applies when a tenant has not customised anything.
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS logo_data_url TEXT;",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS background_data_url TEXT;",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS brand_primary VARCHAR(16);",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS brand_accent VARCHAR(16);",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS print_templates TEXT;",
     # Support tickets — master DB only. Two tables, fully self-contained.
     """
     CREATE TABLE IF NOT EXISTS support_tickets (
