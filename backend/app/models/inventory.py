@@ -31,6 +31,12 @@ class InventoryItem(Base):
     reorder_threshold = Column(Integer, default=10)
     is_active = Column(Boolean, default=True)
 
+    # Reusable items (microscope slides, beakers, glassware) are logged on use
+    # but never decrement the stock count — they go back into circulation after
+    # cleaning. Setting this to True makes the lab UI skip the quantity prompt
+    # and the inventory usage logger skip the deduction step.
+    is_reusable = Column(Boolean, default=False, nullable=False)
+
 class StockBatch(Base):
     """Tracks physical quantities at specific locations with Expiry Dates (FEFO)."""
     __tablename__ = "stock_batches"
@@ -91,8 +97,11 @@ class InventoryUsageLog(Base):
     
     quantity_used = Column(Integer, nullable=False)
     used_by_user_id = Column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
-    
+
     reference_type = Column(String(50), nullable=False) # e.g., 'LabTest', 'WardProcedure'
     reference_id = Column(Integer, nullable=False)
+    # When True, this usage record is informational only: the corresponding
+    # StockBatch.quantity was NOT decremented because the item is reusable.
+    is_reusable_use = Column(Boolean, default=False, nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 

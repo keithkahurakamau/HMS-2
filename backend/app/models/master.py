@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
 from sqlalchemy.sql import func
 from app.config.database import Base
 
@@ -14,6 +14,16 @@ class Tenant(Base):
     theme_color = Column(String(50), default="blue")
     is_premium = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
+
+    # Flexible per-tenant configuration. Both columns hold JSON-encoded strings
+    # so we can add new flags without further migrations. The Tenants Manager
+    # UI surfaces them as toggles + numeric inputs.
+    #   feature_flags  → {"radiology": true, "telemedicine": false, ...}
+    #   plan_limits    → {"max_users": 50, "max_patients": 10000, "storage_gb": 100}
+    feature_flags = Column(Text, nullable=True)
+    plan_limits = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

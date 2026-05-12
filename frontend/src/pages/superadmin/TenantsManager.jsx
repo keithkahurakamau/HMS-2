@@ -50,10 +50,15 @@ export default function TenantsManager() {
 
     // Edit modal state.
     const [editing, setEditing] = useState(null);   // tenant being edited
-    const [editForm, setEditForm] = useState({ name: '', domain: '', theme_color: 'blue', is_premium: false });
+    const [editForm, setEditForm] = useState({
+        name: '', domain: '', theme_color: 'blue', is_premium: false,
+        feature_flags: {}, plan_limits: {}, notes: '',
+    });
+    const [flagDraft, setFlagDraft] = useState({ key: '', value: true });
+    const [limitDraft, setLimitDraft] = useState({ key: '', value: 0 });
     const [savingEdit, setSavingEdit] = useState(false);
 
-    const tenantNumericId = (t) => String(t.id || '').replace(/^tenant_/, '');
+    const tenantNumericId = (t) => String(t.id || t.tenant_id || '').replace(/^tenant_/, '');
 
     const openEdit = (tenant) => {
         setEditing(tenant);
@@ -62,6 +67,9 @@ export default function TenantsManager() {
             domain: tenant.domain || '',
             theme_color: tenant.theme_color || 'blue',
             is_premium: !!tenant.is_premium,
+            feature_flags: tenant.feature_flags || {},
+            plan_limits: tenant.plan_limits || {},
+            notes: tenant.notes || '',
         });
     };
 
@@ -104,7 +112,9 @@ export default function TenantsManager() {
     const fetchTenants = async () => {
         setIsLoading(true);
         try {
-            const res = await apiClient.get('/public/hospitals');
+            // Superadmin view should see suspended tenants too, so they can
+            // reactivate them — public picker callers omit this flag.
+            const res = await apiClient.get('/public/hospitals?include_inactive=true');
             setTenants(res.data);
         } catch (error) {
             showApiError(error, 'Failed to load global tenant registry.');
@@ -322,6 +332,121 @@ export default function TenantsManager() {
                             <div className="bg-white/[0.04] ring-1 ring-white/10 rounded-lg p-3 text-xs text-ink-400">
                                 Database name <code className="text-ink-200 font-mono">{editing.db_name}</code> is immutable.
                             </div>
+
+                            {/* Feature flags — arbitrary key/value boolean toggles */}
+                            <div className="bg-white/[0.04] ring-1 ring-white/10 rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div>
+                                        <p className="text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em]">Feature flags</p>
+                                        <p className="text-xs text-ink-500 mt-0.5">Toggle modules on/off for this tenant. Add any key.</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    {Object.keys(editForm.feature_flags || {}).length === 0 && (
+                                        <p className="text-xs text-ink-500 italic">No flags set. Add one below.</p>
+                                    )}
+                                    {Object.entries(editForm.feature_flags || {}).map(([k, v]) => (
+                                        <div key={k} className="flex items-center justify-between gap-2 text-sm">
+                                            <code className="text-ink-200 font-mono text-xs">{k}</code>
+                                            <div className="flex items-center gap-2">
+                                                <label className="inline-flex items-center cursor-pointer">
+                                                    <input type="checkbox" checked={!!v}
+                                                           onChange={(e) => setEditForm({
+                                                               ...editForm,
+                                                               feature_flags: { ...editForm.feature_flags, [k]: e.target.checked },
+                                                           })}
+                                                           className="sr-only peer" />
+                                                    <span className="w-9 h-5 bg-ink-700 rounded-full peer peer-checked:bg-accent-500 transition relative after:absolute after:left-0.5 after:top-0.5 after:bg-white after:rounded-full after:w-4 after:h-4 after:transition peer-checked:after:translate-x-4" />
+                                                </label>
+                                                <button type="button" onClick={() => {
+                                                    const next = { ...editForm.feature_flags };
+                                                    delete next[k];
+                                                    setEditForm({ ...editForm, feature_flags: next });
+                                                }} className="text-ink-500 hover:text-rose-400" aria-label={`Remove ${k}`}>
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2 mt-3">
+                                    <input type="text" placeholder="flag_key" value={flagDraft.key}
+                                           onChange={(e) => setFlagDraft({ ...flagDraft, key: e.target.value })}
+                                           className="flex-1 bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none" />
+                                    <select value={flagDraft.value ? 'true' : 'false'}
+                                            onChange={(e) => setFlagDraft({ ...flagDraft, value: e.target.value === 'true' })}
+                                            className="bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                                        <option value="true">On</option>
+                                        <option value="false">Off</option>
+                                    </select>
+                                    <button type="button" onClick={() => {
+                                        if (!flagDraft.key.trim()) return;
+                                        setEditForm({
+                                            ...editForm,
+                                            feature_flags: { ...editForm.feature_flags, [flagDraft.key.trim()]: flagDraft.value },
+                                        });
+                                        setFlagDraft({ key: '', value: true });
+                                    }} className="px-3 py-2 bg-white/10 hover:bg-white/15 text-white rounded-lg text-xs font-semibold">Add</button>
+                                </div>
+                            </div>
+
+                            {/* Plan limits */}
+                            <div className="bg-white/[0.04] ring-1 ring-white/10 rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div>
+                                        <p className="text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em]">Plan limits</p>
+                                        <p className="text-xs text-ink-500 mt-0.5">Numeric caps — max_users, storage_gb, max_patients…</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    {Object.keys(editForm.plan_limits || {}).length === 0 && (
+                                        <p className="text-xs text-ink-500 italic">No limits set.</p>
+                                    )}
+                                    {Object.entries(editForm.plan_limits || {}).map(([k, v]) => (
+                                        <div key={k} className="grid grid-cols-12 gap-2 items-center">
+                                            <code className="col-span-5 text-ink-200 font-mono text-xs">{k}</code>
+                                            <input type="number" value={v}
+                                                   onChange={(e) => setEditForm({
+                                                       ...editForm,
+                                                       plan_limits: { ...editForm.plan_limits, [k]: parseFloat(e.target.value) || 0 },
+                                                   })}
+                                                   className="col-span-6 bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none" />
+                                            <button type="button" onClick={() => {
+                                                const next = { ...editForm.plan_limits };
+                                                delete next[k];
+                                                setEditForm({ ...editForm, plan_limits: next });
+                                            }} className="col-span-1 text-ink-500 hover:text-rose-400" aria-label={`Remove ${k}`}>
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2 mt-3">
+                                    <input type="text" placeholder="limit_key" value={limitDraft.key}
+                                           onChange={(e) => setLimitDraft({ ...limitDraft, key: e.target.value })}
+                                           className="flex-1 bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none" />
+                                    <input type="number" placeholder="0" value={limitDraft.value}
+                                           onChange={(e) => setLimitDraft({ ...limitDraft, value: parseFloat(e.target.value) || 0 })}
+                                           className="w-24 bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
+                                    <button type="button" onClick={() => {
+                                        if (!limitDraft.key.trim()) return;
+                                        setEditForm({
+                                            ...editForm,
+                                            plan_limits: { ...editForm.plan_limits, [limitDraft.key.trim()]: limitDraft.value },
+                                        });
+                                        setLimitDraft({ key: '', value: 0 });
+                                    }} className="px-3 py-2 bg-white/10 hover:bg-white/15 text-white rounded-lg text-xs font-semibold">Add</button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-2xs font-semibold text-ink-300 uppercase tracking-[0.14em] mb-1.5">Operator notes</label>
+                                <textarea rows="3" value={editForm.notes}
+                                          onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                          className="w-full bg-ink-950/60 ring-1 ring-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none resize-none"
+                                          placeholder="Internal note. Not visible to the tenant." />
+                            </div>
+
                             <div className="mt-6 pt-5 border-t border-white/5 flex justify-end gap-2">
                                 <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-semibold text-ink-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
                                 <button type="submit" disabled={savingEdit}

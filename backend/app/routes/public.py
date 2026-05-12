@@ -1,37 +1,71 @@
 from datetime import datetime, timedelta, timezone
+import json
+import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session, sessionmaker
 from jose import jwt
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import re
 
-from app.config.database import get_master_db
+from app.config.database import get_master_db, get_tenant_engine
 from app.config.settings import settings
 from app.core.dependencies import require_superadmin
 from app.models.master import Tenant, SuperAdmin
+from app.models.patient import Patient
 from app.core.security import get_password_hash, verify_password, create_tokens
 from app.services.tenant_provisioning import provision_tenant
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/public", tags=["Public Portal"])
 
 
+def _decode_json(value: Optional[str], default):
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return default
+
+
+def _serialize_tenant(t: Tenant, *, include_flags: bool = True) -> Dict[str, Any]:
+    base = {
+        "id": f"tenant_{t.tenant_id}",
+        "tenant_id": t.tenant_id,
+        "name": t.name,
+        "domain": t.domain,
+        "db_name": t.db_name,
+        "theme_color": t.theme_color,
+        "is_premium": t.is_premium,
+        "is_active": t.is_active,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
+    if include_flags:
+        base["feature_flags"] = _decode_json(t.feature_flags, {})
+        base["plan_limits"] = _decode_json(t.plan_limits, {})
+        base["notes"] = t.notes
+    return base
+
+
 @router.get("/hospitals")
-def get_available_hospitals(db: Session = Depends(get_master_db)):
-    """Returns all active tenants from the master registry."""
-    tenants = db.query(Tenant).filter(Tenant.is_active == True).all()
-    return [
-        {
-            "id": f"tenant_{t.tenant_id}",
-            "name": t.name,
-            "domain": t.domain,
-            "db_name": t.db_name,
-            "theme_color": t.theme_color,
-            "is_premium": t.is_premium
-        }
-        for t in tenants
-    ]
+def get_available_hospitals(
+    include_inactive: bool = False,
+    db: Session = Depends(get_master_db),
+):
+    """Returns tenants from the master registry.
+
+    By default only active ones are listed (used by the public hospital
+    picker). Superadmins pass ``include_inactive=true`` to see suspended
+    rows from the Tenants Manager.
+    """
+    query = db.query(Tenant)
+    if not include_inactive:
+        query = query.filter(Tenant.is_active == True)
+    tenants = query.order_by(Tenant.name).all()
+    return [_serialize_tenant(t) for t in tenants]
 
 
 class TenantCreate(BaseModel):
@@ -103,31 +137,135 @@ class TenantUpdate(BaseModel):
     theme_color: Optional[str] = None
     is_premium: Optional[bool] = None
     is_active: Optional[bool] = None
+    feature_flags: Optional[Dict[str, Any]] = None
+    plan_limits: Optional[Dict[str, Any]] = None
+    notes: Optional[str] = None
 
 
 @router.patch("/hospitals/{tenant_id}", dependencies=[Depends(require_superadmin)])
 def update_tenant(tenant_id: int, payload: TenantUpdate, db: Session = Depends(get_master_db)):
-    """Updates a tenant's display attributes or suspension state. Identifier
-    fields (db_name) are intentionally not editable — renaming a database
-    is a destructive operation that requires data migration."""
+    """Updates a tenant's display attributes, suspension state, or flexible
+    config. ``db_name`` stays immutable — renaming a database is destructive
+    and requires explicit data migration.
+    """
     tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found.")
 
     update = payload.model_dump(exclude_unset=True)
     for field, value in update.items():
-        setattr(tenant, field, value)
+        if field in ("feature_flags", "plan_limits"):
+            setattr(tenant, field, json.dumps(value) if value is not None else None)
+        else:
+            setattr(tenant, field, value)
     db.commit()
     db.refresh(tenant)
+    return _serialize_tenant(tenant)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Superadmin read-only patient browser (cross-tenant)
+# ─────────────────────────────────────────────────────────────────────────────
+@router.get("/superadmin/patients", dependencies=[Depends(require_superadmin)])
+def list_patients_across_tenants(
+    tenant_id: Optional[int] = Query(default=None, description="Restrict to one tenant"),
+    search: Optional[str] = Query(default=None, description="Substring filter on name / OP# / phone"),
+    limit_per_tenant: int = Query(default=50, ge=1, le=500),
+    master_db: Session = Depends(get_master_db),
+):
+    """Aggregates a patient summary across every active tenant database.
+
+    Read-only: no mutation endpoints are exposed. Each tenant's DB is queried
+    in its own session so a single bad tenant can't poison the response.
+    Failures per tenant are reported in the response under ``errors``.
+    """
+    query = master_db.query(Tenant).filter(Tenant.is_active == True)
+    if tenant_id:
+        query = query.filter(Tenant.tenant_id == tenant_id)
+    tenants = query.all()
+
+    aggregated: List[Dict[str, Any]] = []
+    errors: List[Dict[str, str]] = []
+    needle = (search or "").strip().lower()
+
+    for t in tenants:
+        try:
+            engine = get_tenant_engine(t.db_name)
+            TenantSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+            session = TenantSession()
+            try:
+                q = session.query(Patient).filter(Patient.is_active == True)
+                if needle:
+                    q = q.filter(
+                        (Patient.surname.ilike(f"%{needle}%"))
+                        | (Patient.other_names.ilike(f"%{needle}%"))
+                        | (Patient.outpatient_no.ilike(f"%{needle}%"))
+                        | (Patient.telephone_1.ilike(f"%{needle}%"))
+                    )
+                rows = q.order_by(Patient.registered_on.desc()).limit(limit_per_tenant).all()
+                for p in rows:
+                    aggregated.append({
+                        "tenant_id": t.tenant_id,
+                        "tenant_name": t.name,
+                        "tenant_db": t.db_name,
+                        "patient_id": p.patient_id,
+                        "outpatient_no": p.outpatient_no,
+                        "surname": p.surname,
+                        "other_names": p.other_names,
+                        "sex": p.sex,
+                        "date_of_birth": p.date_of_birth.isoformat() if p.date_of_birth else None,
+                        "telephone_1": p.telephone_1,
+                        "town": p.town,
+                        "blood_group": p.blood_group,
+                        "registered_on": p.registered_on.isoformat() if p.registered_on else None,
+                    })
+            finally:
+                session.close()
+        except Exception as exc:
+            logger.warning("Failed to read patients from tenant %s: %s", t.db_name, exc)
+            errors.append({"tenant_id": str(t.tenant_id), "tenant_db": t.db_name, "error": str(exc)})
+
     return {
-        "id": f"tenant_{tenant.tenant_id}",
-        "name": tenant.name,
-        "domain": tenant.domain,
-        "db_name": tenant.db_name,
-        "theme_color": tenant.theme_color,
-        "is_premium": tenant.is_premium,
-        "is_active": tenant.is_active,
+        "patients": aggregated,
+        "count": len(aggregated),
+        "tenants_scanned": len(tenants),
+        "errors": errors,
     }
+
+
+@router.get("/superadmin/patients/{tenant_id}/{patient_id}", dependencies=[Depends(require_superadmin)])
+def get_patient_detail(
+    tenant_id: int,
+    patient_id: int,
+    master_db: Session = Depends(get_master_db),
+):
+    """Returns a single patient's full profile (read-only)."""
+    t = master_db.query(Tenant).filter(Tenant.tenant_id == tenant_id, Tenant.is_active == True).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Tenant not found or inactive.")
+
+    engine = get_tenant_engine(t.db_name)
+    TenantSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = TenantSession()
+    try:
+        p = session.query(Patient).filter(Patient.patient_id == patient_id).first()
+        if not p:
+            raise HTTPException(status_code=404, detail="Patient not found.")
+
+        # Hand back every column on Patient. Cross-tenant superadmin access
+        # is logged separately by the caller; this endpoint is read-only by
+        # design — no write paths exposed.
+        out: Dict[str, Any] = {
+            "tenant": _serialize_tenant(t, include_flags=False),
+        }
+        for col in p.__table__.columns.keys():
+            val = getattr(p, col, None)
+            if hasattr(val, "isoformat"):
+                val = val.isoformat()
+            out[col] = val
+        return out
+    finally:
+        session.close()
 
 
 class SuperAdminLogin(BaseModel):

@@ -70,6 +70,19 @@ logging.basicConfig(
 # are designed to run once per revision; re-importing them sideways risks
 # mutating their assumed-fresh state. These statements are guarded with
 # WHERE NOT EXISTS so re-running them on a fully-seeded DB is a no-op.
+# Master-DB-only schema patches. The ``tenants`` table lives in hms_master,
+# not in tenant DBs, and migrate_all_tenants.py only iterates tenant URLs —
+# so without these explicit DDLs the master schema would drift behind the
+# model. Every statement is idempotent (IF NOT EXISTS / WHERE NOT EXISTS),
+# so re-running on every deploy is a no-op once converged.
+MASTER_DB_PATCHES: list[str] = [
+    # c7a2e94d318f — tenant flexibility fields
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS feature_flags TEXT;",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS plan_limits TEXT;",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS notes TEXT;",
+]
+
+
 LEGACY_BOOTSTRAP_SEEDS: list[str] = [
     # f7a9c2d1e480_add_messaging_and_departments — permissions catalogue
     """
@@ -137,6 +150,28 @@ def _master_db_url(default_url: str) -> str:
 def _tenant_db_url(default_url: str, tenant_db_name: str) -> str:
     base = _normalize_db_url(default_url).rsplit("/", 1)[0]
     return f"{base}/{tenant_db_name}"
+
+
+def _apply_master_patches(master_url: str) -> None:
+    """Apply idempotent DDL statements to the master DB.
+
+    Tenant migrations don't reach hms_master (it has a different shape), so
+    any model change touching the ``tenants`` or ``superadmins`` tables must
+    be reflected here. Each statement is guarded with IF NOT EXISTS so
+    re-running on a converged master is a no-op.
+    """
+    if not MASTER_DB_PATCHES:
+        return
+    engine = create_engine(master_url)
+    try:
+        with engine.begin() as conn:
+            for stmt in MASTER_DB_PATCHES:
+                conn.execute(text(stmt))
+        LOG.info("master DB patched (%d statement%s applied).",
+                 len(MASTER_DB_PATCHES),
+                 "" if len(MASTER_DB_PATCHES) == 1 else "s")
+    finally:
+        engine.dispose()
 
 
 def _list_tenant_db_names(master_url: str) -> list[str]:
@@ -225,6 +260,15 @@ def main() -> int:
         return 2
 
     master_url = _master_db_url(default_url)
+
+    # 1. Patch the master DB first. Doing this before reading the tenant
+    #    registry means the SELECT below tolerates a master schema that hasn't
+    #    yet been extended — the SELECT only touches columns that always exist.
+    try:
+        _apply_master_patches(master_url)
+    except Exception as exc:
+        LOG.error("Master DB patching failed: %s", exc)
+        return 4
 
     try:
         tenant_db_names = _list_tenant_db_names(master_url)

@@ -23,6 +23,7 @@ import ResetPassword from './pages/ResetPassword';
 import Appointments from './pages/Appointments';
 import PatientPortal from './pages/PatientPortal';
 import Messages from './pages/Messages';
+import Settings from './pages/Settings';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
@@ -33,6 +34,7 @@ import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import TenantsManager from './pages/superadmin/TenantsManager';
 import PlatformBilling from './pages/superadmin/PlatformBilling';
 import PlatformSettings from './pages/superadmin/PlatformSettings';
+import SuperAdminPatients from './pages/superadmin/SuperAdminPatients';
 import SuperAdminLogin, { isSuperAdminAuthenticated } from './pages/superadmin/SuperAdminLogin';
 
 // Protection Wrapper
@@ -106,6 +108,7 @@ export default function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="tenants" element={<TenantsManager />} />
+            <Route path="patients" element={<SuperAdminPatients />} />
             <Route path="billing" element={<PlatformBilling />} />
             <Route path="settings" element={<PlatformSettings />} />
             <Route path="*" element={<SuperAdminDashboard />} />
@@ -128,6 +131,7 @@ export default function App() {
             <Route path="appointments" element={<Appointments />} />
             <Route path="billing" element={<Billing />} />
             <Route path="messages" element={<Messages />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
 
           {/* Patient self-service portal — no staff auth required */}

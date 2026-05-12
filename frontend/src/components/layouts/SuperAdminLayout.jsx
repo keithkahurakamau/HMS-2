@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, CreditCard, Settings,
-    ShieldAlert, LogOut, Search, Activity
+    ShieldAlert, LogOut, Search, Activity, Users
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/SuperAdminLogin';
 
@@ -18,6 +18,7 @@ export default function SuperAdminLayout() {
     const NAV = [
         { name: 'Overview',                 path: '/superadmin/dashboard', icon: <LayoutDashboard size={18} /> },
         { name: 'Tenants & Hospitals',      path: '/superadmin/tenants',   icon: <Building2 size={18} /> },
+        { name: 'Patients (read-only)',     path: '/superadmin/patients',  icon: <Users size={18} /> },
         { name: 'Billing & Subscriptions',  path: '/superadmin/billing',   icon: <CreditCard size={18} /> },
         { name: 'Platform Settings',        path: '/superadmin/settings',  icon: <Settings size={18} /> },
     ];

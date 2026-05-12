@@ -134,6 +134,20 @@ class ResetPasswordRequest(BaseModel):
 @router.post("/login")
 @limiter.limit("5/minute")
 async def login(request: Request, response: Response, payload: LoginRequest, db: Session = Depends(get_db)):
+    # ── Tenant routing must happen BEFORE any DB read ──────────────────────
+    # get_db() silently falls back to the DATABASE_URL default when the
+    # client forgets X-Tenant-ID. On most installs that default is the master
+    # registry DB (hms_master), which has no `users` table — leading to a
+    # cryptic 500 instead of a useful "you need to pick a hospital first"
+    # message. Fail fast with 400 so the frontend can route the operator
+    # back to /portal.
+    tenant_id = request.headers.get("X-Tenant-ID")
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Tenant-ID header is required. Pick a hospital before signing in.",
+        )
+
     user = db.query(User).filter(User.email == payload.email).first()
 
     if not user:
@@ -172,9 +186,7 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
             headers={"X-User-ID": str(user.user_id)}
         )
 
-    tenant_id = request.headers.get("X-Tenant-ID")
-    if not tenant_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-Tenant-ID header is required")
+    # tenant_id was already validated at the top of the handler.
 
     # Token generation with tenant binding + server-side refresh registry
     access_token, refresh_token, jti, expires_at = create_tokens(subject=user.user_id, tenant_id=tenant_id)

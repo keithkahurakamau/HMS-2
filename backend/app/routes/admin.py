@@ -64,6 +64,18 @@ class StaffCreateRequest(BaseModel):
     specialization: str | None = None
     license_number: str | None = None
 
+    @field_validator('specialization', 'license_number', mode='before')
+    @classmethod
+    def empty_string_to_none(cls, v):
+        # The frontend sends "" when the operator leaves the optional field
+        # blank. Two empty strings collide on the unique index over
+        # users.license_number, producing a 500 on the second insert. Treat
+        # blank/whitespace as NULL so the unique constraint behaves the way
+        # PostgreSQL does for actual NULLs (i.e. no collision).
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
     @field_validator('password')
     @classmethod
     def validate_password(cls, v):
@@ -91,15 +103,30 @@ def create_staff(payload: StaffCreateRequest, request: Request, db: Session = De
     if not role:
         raise HTTPException(status_code=400, detail="Invalid role specified.")
         
+    # Belt-and-suspenders: collapse blank strings to NULL even if the
+    # validator was bypassed by a non-conforming client. Keeps the unique
+    # index on license_number honest.
+    def _nullify(v):
+        return None if (isinstance(v, str) and not v.strip()) else v
+
+    license_number = _nullify(payload.license_number)
+    if license_number is not None:
+        clash = db.query(User).filter(User.license_number == license_number).first()
+        if clash:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Another user is already registered with license number '{license_number}'.",
+            )
+
     new_user = User(
         email=payload.email,
         full_name=payload.full_name,
         hashed_password=get_password_hash(payload.password),
         role_id=role.role_id,
-        specialization=payload.specialization,
-        license_number=payload.license_number,
+        specialization=_nullify(payload.specialization),
+        license_number=license_number,
         is_active=True,
-        must_change_password=True
+        must_change_password=True,
     )
     db.add(new_user)
     db.commit()
