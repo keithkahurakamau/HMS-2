@@ -8,30 +8,48 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Dr. Kahura Medical Teal — refined for clinical clarity
+        // MediFleet Cyan — blue-green clinical primary
         brand: {
-          50:  '#ecfdf7',
-          100: '#d1faec',
-          200: '#a4f3d8',
-          300: '#6de6bf',
-          400: '#34d4a4',
-          500: '#14b88e',
-          600: '#0d9477', // Primary action
-          700: '#0f7561', // Deep typography
-          800: '#115e51',
-          900: '#0f3d36',
-          950: '#062520',
+          50:  '#ecfeff',
+          100: '#cffafe',
+          200: '#a5f3fc',
+          300: '#67e8f9',
+          400: '#22d3ee',
+          500: '#06b6d4',
+          600: '#0891b2', // Primary action
+          700: '#0e7490',
+          800: '#155e75',
+          900: '#164e63',
+          950: '#083344',
         },
-        // Bright Emerald for success / confirmation
+        // Teal — secondary action / aurora bridge
+        teal: {
+          50:  '#f0fdfa',
+          100: '#ccfbf1',
+          200: '#99f6e4',
+          300: '#5eead4',
+          400: '#2dd4bf',
+          500: '#14b8a6',
+          600: '#0d9488',
+          700: '#0f766e',
+          800: '#115e59',
+          900: '#134e4a',
+          950: '#042f2e',
+        },
+        // Emerald — success / confirmation
         accent: {
-          50:  '#f0fdf4',
-          100: '#dcfce7',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
+          50:  '#ecfdf5',
+          100: '#d1fae5',
+          200: '#a7f3d0',
+          300: '#6ee7b7',
+          400: '#34d399',
+          500: '#10b981',
+          600: '#059669',
+          700: '#047857',
+          800: '#065f46',
+          900: '#064e3b',
         },
-        // Calm clinical neutrals
+        // Calm clinical neutrals (slate-based ink scale)
         ink: {
           50:  '#f8fafc',
           100: '#f1f5f9',
@@ -72,30 +90,37 @@ export default {
         '3xl': '1.5rem',
       },
       boxShadow: {
-        'soft':     '0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 4px 16px -4px rgba(15, 23, 42, 0.08)',
-        'elevated': '0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.12)',
-        'glow':     '0 0 0 1px rgba(20, 184, 142, 0.18), 0 8px 28px -6px rgba(20, 184, 142, 0.35)',
+        'soft':       '0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 4px 16px -4px rgba(15, 23, 42, 0.08)',
+        'elevated':   '0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.14)',
+        'glow':       '0 0 0 1px rgba(8, 145, 178, 0.18), 0 10px 32px -8px rgba(6, 182, 212, 0.45)',
+        'glow-teal':  '0 0 0 1px rgba(20, 184, 166, 0.18), 0 10px 32px -8px rgba(45, 212, 191, 0.40)',
         'inner-line': 'inset 0 0 0 1px rgba(255, 255, 255, 0.06)',
       },
       backgroundImage: {
-        'brand-gradient':  'linear-gradient(135deg, #0d9477 0%, #0f7561 50%, #115e51 100%)',
-        'aurora':          'radial-gradient(at 20% 0%, rgba(45, 212, 191, 0.18) 0px, transparent 50%), radial-gradient(at 80% 100%, rgba(34, 197, 94, 0.16) 0px, transparent 50%)',
+        // Cyan → Teal → Emerald — the signature MediFleet sweep
+        'brand-gradient':  'linear-gradient(135deg, #0891b2 0%, #0d9488 50%, #059669 100%)',
+        'brand-soft':      'linear-gradient(135deg, #67e8f9 0%, #5eead4 60%, #6ee7b7 100%)',
+        'aurora':          'radial-gradient(at 18% 8%, rgba(34, 211, 238, 0.22) 0px, transparent 50%), radial-gradient(at 82% 92%, rgba(45, 212, 191, 0.18) 0px, transparent 50%), radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.12) 0px, transparent 60%)',
         'grid-faint':      'linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px)',
       },
       backgroundSize: {
         'grid-faint': '32px 32px',
       },
       keyframes: {
-        'fade-in':       { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
-        'slide-up':      { '0%': { opacity: 0, transform: 'translateY(8px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } },
-        'slide-in-right':{ '0%': { opacity: 0, transform: 'translateX(16px)' }, '100%': { opacity: 1, transform: 'translateX(0)' } },
-        'pulse-soft':    { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.55 } },
+        'fade-in':        { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+        'slide-up':       { '0%': { opacity: 0, transform: 'translateY(8px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } },
+        'slide-in-right': { '0%': { opacity: 0, transform: 'translateX(16px)' }, '100%': { opacity: 1, transform: 'translateX(0)' } },
+        'pulse-soft':     { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.55 } },
+        'float':          { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-6px)' } },
+        'shimmer':        { '0%': { backgroundPosition: '-200% 0' }, '100%': { backgroundPosition: '200% 0' } },
       },
       animation: {
-        'fade-in':         'fade-in 200ms ease-out',
-        'slide-up':        'slide-up 240ms cubic-bezier(0.16, 1, 0.3, 1)',
-        'slide-in-right':  'slide-in-right 260ms cubic-bezier(0.16, 1, 0.3, 1)',
-        'pulse-soft':      'pulse-soft 2.4s ease-in-out infinite',
+        'fade-in':        'fade-in 200ms ease-out',
+        'slide-up':       'slide-up 240ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'slide-in-right': 'slide-in-right 260ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'pulse-soft':     'pulse-soft 2.4s ease-in-out infinite',
+        'float':          'float 6s ease-in-out infinite',
+        'shimmer':        'shimmer 3s linear infinite',
       },
     },
   },
