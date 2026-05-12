@@ -65,8 +65,9 @@ export const AuthProvider = ({ children }) => {
             localStorage.removeItem('hms_tenant_id');
             localStorage.removeItem('hms_tenant_name');
             toast.success('Logged out securely');
-            // Hard redirect to the welcome/Portal page so all in-memory state is wiped.
-            window.location.href = '/';
+            // Hard redirect to the portal so the user can pick a hospital again
+            // and all in-memory state is wiped.
+            window.location.href = '/portal';
         }
     };
 

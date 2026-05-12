@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import { Building2, Search, ArrowRight, ShieldCheck, Activity, Sparkles, HeartPulse } from 'lucide-react';
+import { Building2, Search, ArrowRight, Activity, Sparkles, HeartPulse, Home } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Logo from '../components/Logo';
 
 const THEME_RING = {
     blue:    'bg-blue-500/15 ring-blue-400/30 text-blue-300',
@@ -58,19 +59,22 @@ export default function Portal() {
 
             <div className="relative z-10 w-full max-w-5xl flex flex-col items-center animate-slide-up">
                 {/* Brand header */}
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="w-12 h-12 rounded-2xl bg-brand-gradient flex items-center justify-center shadow-glow">
-                        <ShieldCheck size={24} className="text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-                            <span className="text-gradient-brand">MediFleet</span>
-                        </h1>
-                        <p className="text-2xs sm:text-xs text-ink-400 font-semibold uppercase tracking-[0.18em] mt-0.5">
-                            Multi-tenant cloud infrastructure
-                        </p>
-                    </div>
+                <div className="mb-8">
+                    <Logo
+                        variant="full"
+                        size={48}
+                        label="MediFleet"
+                        sublabel="Multi-tenant clinical cloud"
+                        tone="mono-light"
+                    />
                 </div>
+                <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="absolute top-0 left-0 inline-flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.16em] text-ink-400 hover:text-brand-300 cursor-pointer transition-colors"
+                >
+                    <Home size={12} /> Back to landing
+                </button>
 
                 <div className="w-full bg-white/[0.04] backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-10 shadow-elevated">
                     <div className="text-center mb-8 sm:mb-10">

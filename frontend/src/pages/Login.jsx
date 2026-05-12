@@ -3,10 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-    ShieldAlert, Activity, ShieldCheck, Eye, EyeOff,
+    ShieldAlert, Activity, Eye, EyeOff,
     Stethoscope, HeartPulse, Lock, ArrowRight
 } from 'lucide-react';
 import ChangePassword from './ChangePassword';
+import { TenantLogo } from '../components/Logo';
+import { useBranding } from '../context/BrandingContext';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -16,9 +18,11 @@ export default function Login() {
 
     const { login, mustChangePassword, pendingUserId, clearMustChange } = useAuth();
     const navigate = useNavigate();
+    const { branding } = useBranding();
 
     const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
     const tenantId = localStorage.getItem('hms_tenant_id');
+    const hasTenantBg = !!branding.background_data_url;
 
     // If the operator reached /login by typing the URL directly, we have no
     // tenant context — the API client wouldn't attach X-Tenant-ID and the
@@ -27,7 +31,7 @@ export default function Login() {
     useEffect(() => {
         if (!tenantId) {
             toast('Pick your hospital first.', { icon: 'ℹ️' });
-            navigate('/', { replace: true });
+            navigate('/portal', { replace: true });
         }
     }, [tenantId, navigate]);
 
@@ -35,7 +39,7 @@ export default function Login() {
         e.preventDefault();
         if (!tenantId) {
             toast.error('No hospital selected. Choose one from the portal.');
-            navigate('/', { replace: true });
+            navigate('/portal', { replace: true });
             return;
         }
         setIsSubmitting(true);
@@ -54,6 +58,14 @@ export default function Login() {
         <div className="min-h-screen w-full grid lg:grid-cols-5 bg-ink-50">
             {/* ============== Brand panel (left, lg+) ============== */}
             <aside className="hidden lg:flex lg:col-span-2 relative overflow-hidden bg-brand-gradient text-white">
+                {/* Tenant background image, when uploaded — overlaid under the gradient. */}
+                {hasTenantBg && (
+                    <div
+                        className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-overlay pointer-events-none"
+                        style={{ backgroundImage: `url("${branding.background_data_url}")` }}
+                        aria-hidden="true"
+                    />
+                )}
                 {/* Decorative mesh + grid */}
                 <div className="absolute inset-0 bg-aurora opacity-80 pointer-events-none" />
                 <div className="absolute inset-0 bg-grid opacity-[0.07] pointer-events-none" />
@@ -62,15 +74,13 @@ export default function Login() {
 
                 <div className="relative z-10 flex flex-col justify-between w-full p-12 xl:p-16">
                     {/* Logo */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center ring-1 ring-white/25">
-                            <ShieldCheck size={22} className="text-white" />
-                        </div>
-                        <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70 leading-none">Hospital</div>
-                            <div className="text-base font-semibold text-white leading-tight mt-1">{tenantName}</div>
-                        </div>
-                    </div>
+                    <TenantLogo
+                        src={branding.logo_data_url}
+                        fallbackLabel={tenantName}
+                        sublabel="Hospital workspace"
+                        size={44}
+                        tone="mono-light"
+                    />
 
                     {/* Headline */}
                     <div className="max-w-md">
@@ -99,14 +109,14 @@ export default function Login() {
             {/* ============== Form panel (right) ============== */}
             <main className="lg:col-span-3 flex flex-col justify-center items-center px-6 py-12 sm:px-10 relative">
                 {/* Mobile brand bar */}
-                <div className="lg:hidden w-full max-w-md flex items-center gap-3 mb-10">
-                    <div className="w-10 h-10 rounded-xl bg-brand-gradient flex items-center justify-center shadow-glow">
-                        <ShieldCheck size={18} className="text-white" />
-                    </div>
-                    <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 leading-none">Hospital</div>
-                        <div className="text-sm font-semibold text-ink-900 mt-0.5">{tenantName}</div>
-                    </div>
+                <div className="lg:hidden w-full max-w-md mb-10">
+                    <TenantLogo
+                        src={branding.logo_data_url}
+                        fallbackLabel={tenantName}
+                        sublabel="Hospital workspace"
+                        size={40}
+                        tone="mono-dark"
+                    />
                 </div>
 
                 <div className="w-full max-w-md animate-slide-up">
@@ -115,7 +125,7 @@ export default function Login() {
                         <h2 className="mt-2 text-3xl font-semibold text-ink-900 tracking-tight">Sign in to your workspace</h2>
                         <p className="mt-2 text-sm text-ink-500">
                             Enter your credentials to continue. New here?{' '}
-                            <Link to="/" className="text-brand-600 font-semibold hover:text-brand-700">View hospitals</Link>.
+                            <Link to="/portal" className="text-brand-600 font-semibold hover:text-brand-700">View hospitals</Link>.
                         </p>
                     </div>
 

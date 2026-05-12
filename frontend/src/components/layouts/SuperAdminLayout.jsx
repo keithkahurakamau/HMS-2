@@ -5,6 +5,7 @@ import {
     ShieldAlert, LogOut, Search, Activity, Users, LifeBuoy
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/SuperAdminLogin';
+import Logo from '../Logo';
 
 export default function SuperAdminLayout() {
     const navigate = useNavigate();
@@ -29,13 +30,11 @@ export default function SuperAdminLayout() {
             {/* Sidebar */}
             <aside className="w-72 bg-gradient-to-b from-ink-900 via-ink-900 to-ink-950 border-r border-white/5 flex flex-col z-20">
                 <div className="h-16 flex items-center gap-3 px-5 border-b border-white/5 shrink-0">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-glow">
-                        <ShieldAlert size={18} className="text-white" />
-                    </div>
-                    <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300/80 leading-none">Platform</div>
-                        <div className="text-base font-semibold text-white tracking-tight leading-tight mt-0.5"><span className="text-gradient-brand">MediFleet</span> Console</div>
-                    </div>
+                    <Logo variant="full" size={32} label="MediFleet" sublabel="Platform" tone="mono-light" />
+                    <span className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/15 ring-1 ring-amber-400/30">
+                        <ShieldAlert size={11} className="text-amber-300" />
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-300">Console</span>
+                    </span>
                 </div>
 
                 <div className="px-5 py-4 border-b border-white/5">
