@@ -6,15 +6,26 @@ import {
     Plus, Truck, FileText, Filter, CalendarClock, Store, Microscope, Bed, Activity
 } from 'lucide-react';
 
+// Each tenant defines its own location set in the DB. The API gives us
+// {location_id, name, description}; we map the well-known names to icons here
+// and fall back to a generic Package icon for anything else.
+const LOCATION_ICON = {
+    'Main Store': Package,
+    Pharmacy: Store,
+    Laboratory: Microscope,
+    Wards: Bed,
+};
+
+const decorateLocation = (loc) => ({
+    id: loc.location_id,
+    name: loc.name,
+    icon: LOCATION_ICON[loc.name] || Package,
+});
+
 export default function Inventory() {
     // --- STATE ---
-    const [locations, setLocations] = useState([
-        { id: 1, name: 'Main Store', icon: Package },
-        { id: 2, name: 'Pharmacy', icon: Store },
-        { id: 3, name: 'Laboratory', icon: Microscope },
-        { id: 4, name: 'Wards', icon: Bed }
-    ]);
-    const [activeLocation, setActiveLocation] = useState(locations[0]);
+    const [locations, setLocations] = useState([]);
+    const [activeLocation, setActiveLocation] = useState(null);
     
     const [inventory, setInventory] = useState([]);
     const [catalogItems, setCatalogItems] = useState([]);
@@ -54,11 +65,25 @@ export default function Inventory() {
     // --- DATA FETCHING ---
     useEffect(() => {
         fetchCatalogData();
+        fetchLocations();
     }, []);
 
     useEffect(() => {
-        fetchInventoryData();
+        if (activeLocation) fetchInventoryData();
     }, [activeLocation]);
+
+    const fetchLocations = async () => {
+        try {
+            const response = await apiClient.get('/inventory/locations');
+            const decorated = (response.data || []).map(decorateLocation);
+            setLocations(decorated);
+            // Pick the first location as the active one — usually Main Store.
+            setActiveLocation((prev) => prev || decorated[0] || null);
+        } catch (error) {
+            console.error('Failed to fetch locations', error);
+            toast.error('Could not load inventory locations.');
+        }
+    };
 
     const fetchCatalogData = async () => {
         try {
@@ -162,6 +187,17 @@ export default function Inventory() {
     });
 
     const totalInventoryValue = inventory.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unit_cost || 0)), 0);
+
+    // Locations come from the API now, so render a brief shim while the list
+    // is in flight. Without this guard, every `activeLocation.id` access below
+    // would crash the page on first paint.
+    if (!activeLocation) {
+        return (
+            <div className="flex items-center justify-center py-16 text-ink-400">
+                <Activity className="animate-spin mr-2" /> Loading inventory locations…
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 pb-8">

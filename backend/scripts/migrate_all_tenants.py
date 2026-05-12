@@ -106,6 +106,19 @@ LEGACY_BOOTSTRAP_SEEDS: list[str] = [
           WHERE rp.role_id = r.role_id AND rp.permission_id = p.permission_id
       );
     """,
+    # d8b46e91527a_seed_default_inventory_locations — the four standard
+    # locations the Inventory page expects to exist by name.
+    """
+    INSERT INTO locations (name, description)
+    SELECT v.name, v.description
+    FROM (VALUES
+        ('Main Store', 'Central inventory store — receives all procurements'),
+        ('Pharmacy',   'Dispensing point for prescriptions and OTC sales'),
+        ('Laboratory', 'Reagents and consumables for diagnostic testing'),
+        ('Wards',      'Bedside consumables and PRN drug stock')
+    ) AS v(name, description)
+    WHERE NOT EXISTS (SELECT 1 FROM locations l WHERE l.name = v.name);
+    """,
 ]
 
 

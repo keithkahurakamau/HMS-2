@@ -30,6 +30,7 @@ from app.config.settings import settings  # noqa: F401 — kept for forward-comp
 from app.core.security import get_password_hash
 from app.models.master import Tenant
 from app.models.user import User, Role, Permission
+from app.models.inventory import Location
 
 # Re-import every model so Base.metadata is fully populated when we build the
 # tenant schema. SQLAlchemy collects table metadata at import time, and these
@@ -54,6 +55,15 @@ logger = logging.getLogger(__name__)
 
 
 # RBAC seed used for every new tenant. Mirrors what seed.py installs.
+# Default inventory locations every tenant ships with. Kept in lockstep with
+# the alembic migration d8b46e91527a so existing tenants get the same rows.
+DEFAULT_LOCATIONS = [
+    ("Main Store", "Central inventory store — receives all procurements"),
+    ("Pharmacy", "Dispensing point for prescriptions and OTC sales"),
+    ("Laboratory", "Reagents and consumables for diagnostic testing"),
+    ("Wards", "Bedside consumables and PRN drug stock"),
+]
+
 PERMISSIONS = [
     "users:manage", "clinical:write", "clinical:read",
     "patients:read", "patients:write", "history:read", "history:manage",
@@ -206,6 +216,13 @@ def _seed_baseline(db_name: str, admin_email: str, admin_full_name: str, temp_pa
             must_change_password=True,
         )
         db.add(admin)
+
+        # Seed the default inventory locations. The Inventory page expects
+        # these to exist by name; without them, adding a stock batch fails
+        # with a FK violation against `locations`.
+        for name, description in DEFAULT_LOCATIONS:
+            db.add(Location(name=name, description=description))
+
         db.commit()
     except Exception:
         db.rollback()

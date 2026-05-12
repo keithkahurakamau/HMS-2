@@ -40,6 +40,15 @@ def get_items(request: Request, db: Session = Depends(get_db)):
     """Retrieve all active inventory items."""
     return db.query(InventoryItem).filter(InventoryItem.is_active == True).all()
 
+
+@router.get("/locations", response_model=List[LocationResponse], dependencies=[Depends(RequirePermission("pharmacy:read"))])
+def get_locations(db: Session = Depends(get_db)):
+    """List the inventory locations (Main Store / Pharmacy / Laboratory / Wards
+    by default) so the UI can render them with the right `location_id` from the
+    DB rather than guessing.
+    """
+    return db.query(Location).order_by(Location.location_id).all()
+
 @router.get("/stock/{location_id}", dependencies=[Depends(RequirePermission("pharmacy:read"))])
 def get_location_stock(location_id: int, db: Session = Depends(get_db)):
     """Retrieve stock batches for a specific location, joined with item details."""

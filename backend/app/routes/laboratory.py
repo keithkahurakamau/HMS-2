@@ -22,9 +22,21 @@ class ConsumedItem(BaseModel):
     quantity: int
 
 class TestCompletionRequest(BaseModel):
-    result_data: Dict[str, Any] 
+    result_data: Dict[str, Any]
     tech_notes: Optional[str] = None
     consumed_items: List[ConsumedItem] = []
+
+
+class LabOrderItem(BaseModel):
+    catalog_id: int
+    clinical_notes: Optional[str] = None
+    priority: Optional[str] = "Routine"  # Routine | Urgent | STAT
+
+
+class LabOrderRequest(BaseModel):
+    patient_id: int
+    record_id: Optional[int] = None
+    tests: List[LabOrderItem]
 
 # ==========================================
 # 1. FETCH LAB QUEUE
@@ -97,6 +109,68 @@ def get_lab_inventory(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error fetching lab inventory: {e}")
         raise HTTPException(status_code=500, detail=f"Database schema mismatch error: {str(e)}")
+
+# ==========================================
+# 3.5. CREATE LAB ORDERS (DOCTOR-INITIATED)
+# ==========================================
+@router.post("/orders", dependencies=[Depends(RequirePermission("clinical:write"))])
+def create_lab_orders(
+    payload: LabOrderRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Create one or more lab tests for a patient in a single transaction.
+
+    Pricing is locked at order time (``billed_price``) so subsequent catalogue
+    edits never re-price an existing order. Status starts at ``Pending`` so the
+    lab tech sees it in the queue immediately.
+    """
+    if not payload.tests:
+        raise HTTPException(status_code=400, detail="At least one test is required.")
+
+    patient = db.query(Patient).filter(Patient.patient_id == payload.patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+
+    catalog_ids = [t.catalog_id for t in payload.tests]
+    catalog_rows = db.query(LabTestCatalog).filter(
+        LabTestCatalog.catalog_id.in_(catalog_ids),
+        LabTestCatalog.is_active == True,
+    ).all()
+    catalog_map = {c.catalog_id: c for c in catalog_rows}
+
+    missing = set(catalog_ids) - set(catalog_map.keys())
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Unknown or inactive catalog ids: {sorted(missing)}")
+
+    created = []
+    for item in payload.tests:
+        cat = catalog_map[item.catalog_id]
+        priority = item.priority if item.priority in ("Routine", "Urgent", "STAT") else "Routine"
+        test = LabTest(
+            patient_id=payload.patient_id,
+            record_id=payload.record_id,
+            ordered_by=current_user["user_id"],
+            catalog_id=cat.catalog_id,
+            test_name=cat.test_name,
+            clinical_notes=item.clinical_notes,
+            billed_price=cat.base_price,
+            specimen_type=cat.default_specimen_type,
+            status="Pending",
+            priority=priority,
+        )
+        db.add(test)
+        db.flush()
+        created.append({
+            "test_id": test.test_id,
+            "test_name": test.test_name,
+            "priority": test.priority,
+            "billed_price": float(test.billed_price),
+        })
+
+    db.commit()
+    return {"created": created, "count": len(created)}
+
 
 # ==========================================
 # 4. COMPLETE TEST & DEDUCT INVENTORY
