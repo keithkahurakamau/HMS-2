@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { BrandingProvider } from './context/BrandingContext';
 import { Activity } from 'lucide-react';
 
 // Page Imports
@@ -96,6 +97,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+        <BrandingProvider>
         <BrowserRouter>
           <Toaster position="top-right" />
           <a href="#main-content" className="skip-link">Skip to main content</a>
@@ -146,6 +148,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
           </Routes>
         </BrowserRouter>
+        </BrandingProvider>
       </AuthProvider>
     </ThemeProvider>
   );
