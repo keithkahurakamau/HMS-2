@@ -1,5 +1,5 @@
 """
-Comprehensive integration tests for the HMS API.
+Comprehensive integration tests for the MediFleet API.
 JWT tokens are generated directly (bypassing the 5/min login rate limit).
 Tests run against the live server at http://localhost:8000.
 """

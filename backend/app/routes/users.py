@@ -5,7 +5,7 @@ from typing import List
 from app.config.database import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse
-from app.core.dependencies import get_current_user, RequirePermission
+from app.core.dependencies import get_current_user, RequirePermission, resolve_effective_permissions
 from app.core.security import get_password_hash
 from app.utils.audit import log_audit
 
@@ -39,7 +39,7 @@ def get_my_permissions(current_user: dict = Depends(get_current_user), db: Sessi
     user = db.query(User).filter(User.user_id == current_user["user_id"]).first()
     if not user or not user.role:
         return []
-    return [p.codename for p in user.role.permissions]
+    return resolve_effective_permissions(db, user)
 
 # ==========================================
 # 2. USER MANAGEMENT (CRUD)

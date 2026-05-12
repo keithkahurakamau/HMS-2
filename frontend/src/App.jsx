@@ -22,6 +22,10 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Appointments from './pages/Appointments';
 import PatientPortal from './pages/PatientPortal';
+import Messages from './pages/Messages';
+import Settings from './pages/Settings';
+import Cheques from './pages/Cheques';
+import Support from './pages/Support';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
@@ -32,6 +36,8 @@ import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import TenantsManager from './pages/superadmin/TenantsManager';
 import PlatformBilling from './pages/superadmin/PlatformBilling';
 import PlatformSettings from './pages/superadmin/PlatformSettings';
+import SuperAdminPatients from './pages/superadmin/SuperAdminPatients';
+import SupportInbox from './pages/superadmin/SupportInbox';
 import SuperAdminLogin, { isSuperAdminAuthenticated } from './pages/superadmin/SuperAdminLogin';
 
 // Protection Wrapper
@@ -78,8 +84,11 @@ const RoleBasedRedirect = () => {
         case 'Lab Technician': return <Navigate to="/app/laboratory" replace />;
         case 'Radiologist': return <Navigate to="/app/radiology" replace />;
         case 'Receptionist': return <Navigate to="/app/patients" replace />;
-        default: 
-            return <Navigate to="/login" replace />;
+        default:
+            // Custom roles (admin-created) don't have a baked-in landing page,
+            // so we drop them on Messages — every role gets messaging:read by
+            // default, so the page is guaranteed to render something useful.
+            return <Navigate to="/app/messages" replace />;
     }
 };
 
@@ -102,6 +111,8 @@ export default function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="tenants" element={<TenantsManager />} />
+            <Route path="patients" element={<SuperAdminPatients />} />
+            <Route path="support" element={<SupportInbox />} />
             <Route path="billing" element={<PlatformBilling />} />
             <Route path="settings" element={<PlatformSettings />} />
             <Route path="*" element={<SuperAdminDashboard />} />
@@ -123,6 +134,10 @@ export default function App() {
             
             <Route path="appointments" element={<Appointments />} />
             <Route path="billing" element={<Billing />} />
+            <Route path="messages" element={<Messages />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="cheques" element={<Cheques />} />
+            <Route path="support" element={<Support />} />
           </Route>
 
           {/* Patient self-service portal — no staff auth required */}

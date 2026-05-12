@@ -80,7 +80,7 @@ export default function SuperAdminLogin() {
                     <div>
                         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300/80 leading-none">Platform</div>
                         <div className="text-base font-semibold text-white tracking-tight leading-tight mt-0.5">
-                            HMS <span className="text-gradient-brand">Global Console</span>
+                            <span className="text-gradient-brand">MediFleet</span> Console
                         </div>
                     </div>
                 </div>
@@ -159,7 +159,7 @@ export default function SuperAdminLogin() {
                 </div>
 
                 <p className="mt-8 text-center text-2xs text-ink-500 uppercase tracking-[0.18em]">
-                    HMS Enterprise &middot; Platform back-office
+                    MediFleet &middot; Platform back-office
                 </p>
             </div>
         </div>

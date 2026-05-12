@@ -37,6 +37,11 @@ import app.routes.mpesa_payment as mpesa_payment_module
 import app.routes.privacy as privacy_module
 import app.routes.notifications as notifications_module
 import app.routes.patient_portal as patient_portal_module
+import app.routes.messaging as messaging_module
+import app.routes.referrals as referrals_module
+import app.routes.settings as settings_module
+import app.routes.cheques as cheques_module
+import app.routes.support as support_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -45,9 +50,32 @@ logger = logging.getLogger(__name__)
 # 2. Setup SlowAPI Rate Limiter (Imported from app.core.limiter)
 
 # 3. Initialize FastAPI Application
+def _auto_migrate_on_boot() -> None:
+    """Apply pending schema patches to master + every tenant on startup.
+
+    Set HMS_AUTOMIGRATE=1 to enable (default: off). Render uses
+    render-start.sh which calls migrate_all_tenants.py directly; locally,
+    flipping the env var avoids the "I forgot to migrate" loop where uvicorn
+    boots fine but every request 500s on a missing column or table.
+    """
+    import os
+    if os.environ.get("HMS_AUTOMIGRATE", "0") != "1":
+        return
+    try:
+        from scripts.migrate_all_tenants import main as _migrate
+        rc = _migrate()
+        if rc != 0:
+            logger.warning("Auto-migrate finished with exit %d — investigate before retrying writes.", rc)
+        else:
+            logger.info("Auto-migrate completed cleanly.")
+    except Exception as exc:
+        logger.exception("Auto-migrate raised — continuing startup anyway: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Boot: warm up the WebSocket Redis backend if configured.
+    # Boot: optionally bring schemas up to head, then warm up WebSocket pubsub.
+    _auto_migrate_on_boot()
     await ws_manager.init_redis()
     if not settings.REDIS_URL:
         logger.warning("REDIS_URL not configured. WebSocket broadcasts will not span workers.")
@@ -163,6 +191,12 @@ app.include_router(mpesa_payment_module.router)
 app.include_router(privacy_module.router)
 app.include_router(notifications_module.router)
 app.include_router(patient_portal_module.router)
+app.include_router(messaging_module.router)
+app.include_router(referrals_module.router)
+app.include_router(settings_module.router)
+app.include_router(cheques_module.router)
+app.include_router(support_module.tenant_router)
+app.include_router(support_module.admin_router)
 
 # 9. Health Check Route
 @app.get("/")

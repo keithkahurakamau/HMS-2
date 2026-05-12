@@ -62,6 +62,28 @@ export default function MedicalHistory() {
         }
     }, [searchParams]);
 
+    // Deep-link target. The Clinical Desk's history toolbar passes ?entry_type=
+    // so a click on "Social Hx" lands the doctor on the right section. Scroll
+    // + highlight runs once the chart has rendered, hence the dependency on
+    // chart + searchParams together.
+    useEffect(() => {
+        const targetType = searchParams.get('entry_type');
+        if (!targetType || !chart) return;
+        // Collapse everything except the requested section so the doctor's eye
+        // lands on it immediately.
+        setExpandedSections(prev => {
+            const next = { ...prev };
+            ENTRY_TYPES.forEach(t => { next[t.key] = (t.key === targetType); });
+            return next;
+        });
+        // Defer the scroll so the DOM has the section rendered.
+        const id = setTimeout(() => {
+            const el = document.getElementById(`mh-section-${targetType}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 60);
+        return () => clearTimeout(id);
+    }, [searchParams, chart]);
+
     useEffect(() => {
         if (!searchInput || searchInput.trim().length === 0) {
             setSuggestions([]);
@@ -301,7 +323,7 @@ export default function MedicalHistory() {
                             const isOpen = expandedSections[type.key];
                             const colorClass = colorMap[type.color];
                             return (
-                                <div key={type.key} className="card overflow-hidden">
+                                <div key={type.key} id={`mh-section-${type.key}`} className="card overflow-hidden scroll-mt-20">
                                     <button
                                         onClick={() => toggleSection(type.key)}
                                         className="w-full flex items-center justify-between p-4 hover:bg-ink-50/50 transition-colors"

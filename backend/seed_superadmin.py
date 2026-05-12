@@ -1,9 +1,11 @@
 """
-Minimal bootstrap seed for the HMS platform.
+Minimal bootstrap seed for the MediFleet platform.
 
 Replaces the previous multi-hospital demo seed. Responsibilities:
 
-  1. (Re)create the central ``hms_master`` database.
+  1. (Re)create the central ``hms_master`` database (kept under the legacy
+     name so existing tenant databases and connection strings continue to
+     resolve without a destructive rename).
   2. Apply the master-only schema (Tenant + SuperAdmin tables).
   3. Insert exactly one platform-level superadmin row.
 
@@ -15,8 +17,8 @@ Usage:
     python seed_superadmin.py --reset        # DROP and recreate hms_master first
 
 Optional environment overrides:
-    SEED_SUPERADMIN_EMAIL      (default: superadmin@hms.co.ke)
-    SEED_SUPERADMIN_NAME       (default: HMS Platform Superadmin)
+    SEED_SUPERADMIN_EMAIL      (default: superadmin@medifleet.co.ke)
+    SEED_SUPERADMIN_NAME       (default: MediFleet Platform Superadmin)
     SEED_SUPERADMIN_PASSWORD   (default: SuperAdmin@2026)
 """
 import argparse
@@ -133,7 +135,7 @@ def seed_superadmin_row(email: str, full_name: str, password: str) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Seed the HMS platform superadmin.")
+    parser = argparse.ArgumentParser(description="Seed the MediFleet platform superadmin.")
     parser.add_argument(
         "--reset",
         action="store_true",
@@ -141,12 +143,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    email = os.environ.get("SEED_SUPERADMIN_EMAIL", "superadmin@hms.co.ke")
-    full_name = os.environ.get("SEED_SUPERADMIN_NAME", "HMS Platform Superadmin")
+    email = os.environ.get("SEED_SUPERADMIN_EMAIL", "superadmin@medifleet.co.ke")
+    full_name = os.environ.get("SEED_SUPERADMIN_NAME", "MediFleet Platform Superadmin")
     password = os.environ.get("SEED_SUPERADMIN_PASSWORD", "SuperAdmin@2026")
 
     print("=" * 60)
-    print("  HMS PLATFORM — SUPERADMIN BOOTSTRAP")
+    print("  MEDIFLEET — SUPERADMIN BOOTSTRAP")
     print("=" * 60)
 
     if args.reset and database_exists(MASTER_DB):

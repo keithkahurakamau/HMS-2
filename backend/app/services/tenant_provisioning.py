@@ -30,6 +30,8 @@ from app.config.settings import settings  # noqa: F401 — kept for forward-comp
 from app.core.security import get_password_hash
 from app.models.master import Tenant
 from app.models.user import User, Role, Permission
+from app.models.inventory import Location
+from app.models.settings import HospitalSetting
 
 # Re-import every model so Base.metadata is fully populated when we build the
 # tenant schema. SQLAlchemy collects table metadata at import time, and these
@@ -47,27 +49,101 @@ from app.models import auth_tokens as _auth_tokens  # noqa: F401
 from app.models import idempotency as _idempotency  # noqa: F401
 from app.models import mpesa as _mpesa  # noqa: F401
 from app.models import breach as _breach  # noqa: F401
+from app.models import notification as _notification  # noqa: F401
+from app.models import messaging as _messaging  # noqa: F401
+from app.models import settings as _settings  # noqa: F401
+from app.models import referral as _referral  # noqa: F401
+from app.models import cheque as _cheque  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
 
 # RBAC seed used for every new tenant. Mirrors what seed.py installs.
+# Default inventory locations every tenant ships with. Kept in lockstep with
+# the alembic migration d8b46e91527a so existing tenants get the same rows.
+DEFAULT_LOCATIONS = [
+    ("Main Store", "Central inventory store — receives all procurements"),
+    ("Pharmacy", "Dispensing point for prescriptions and OTC sales"),
+    ("Laboratory", "Reagents and consumables for diagnostic testing"),
+    ("Wards", "Bedside consumables and PRN drug stock"),
+]
+
+
+# Default hospital_settings rows new tenants get out of the box. Mirrored in
+# alembic revision b27f4e91d563 for existing tenants.
+DEFAULT_SETTINGS = [
+    ("branding", "hospital_name", "Hospital name", "Displayed on every print-out and dashboard.", "string", "", False, 1),
+    ("branding", "tagline", "Tagline", "Short subtitle below the hospital name on letterheads.", "string", "", False, 2),
+    ("branding", "primary_color", "Primary brand color", "Hex code used for UI accents.", "string", "#2563eb", False, 3),
+    ("branding", "logo_url", "Logo URL", "Public URL of the hospital logo (PNG/SVG).", "string", "", False, 4),
+
+    ("working_hours", "weekday_open", "Weekday opening", "Front-desk opens (24-hour, HH:MM).", "string", "08:00", False, 1),
+    ("working_hours", "weekday_close", "Weekday closing", "Front-desk closes (24-hour, HH:MM).", "string", "17:00", False, 2),
+    ("working_hours", "saturday_open", "Saturday opening", "", "string", "09:00", False, 3),
+    ("working_hours", "saturday_close", "Saturday closing", "", "string", "13:00", False, 4),
+    ("working_hours", "sunday_open", "Sunday opening", "Leave blank if closed.", "string", "", False, 5),
+    ("working_hours", "sunday_close", "Sunday closing", "Leave blank if closed.", "string", "", False, 6),
+    ("working_hours", "appointment_slot_minutes", "Appointment slot (min)", "", "number", "30", False, 7),
+
+    ("billing", "currency", "Currency code", "ISO 4217 (KES, USD…).", "string", "KES", False, 1),
+    ("billing", "tax_rate_pct", "VAT / tax rate (%)", "Applied on taxable invoices.", "number", "16", False, 2),
+    ("billing", "invoice_prefix", "Invoice prefix", "Goes on every printed invoice number.", "string", "INV-", False, 3),
+    ("billing", "lock_pricing_on_order", "Lock pricing on order", "Once a lab/imaging order is placed, the price won't change.", "boolean", "true", False, 4),
+
+    ("laboratory", "default_turnaround_hours", "Default turnaround (h)", "Used when a catalog entry doesn't specify its own.", "number", "24", False, 1),
+    ("laboratory", "barcode_default", "Barcode by default", "Default value for the catalog 'Requires barcode' checkbox.", "boolean", "false", False, 2),
+    ("laboratory", "critical_value_notify", "Notify critical values", "Auto-DM the ordering doctor for out-of-range flags.", "boolean", "true", False, 3),
+
+    ("radiology", "default_modality", "Default modality", "Pre-selects this modality in new exam dialogs.", "string", "X-Ray", False, 1),
+    ("radiology", "report_signing_required", "Require radiologist sign-off", "", "boolean", "true", False, 2),
+
+    ("notifications", "email_from", "Outbound email From:", "RFC-5321 address used by transactional mail.", "string", "no-reply@hospital.local", False, 1),
+    ("notifications", "sms_sender_id", "SMS sender ID", "Letterhead the SMS gateway shows on the patient's phone.", "string", "MEDIFLEET", False, 2),
+    ("notifications", "remind_before_hours", "Appointment reminder (h)", "Hours before the appointment to send a reminder.", "number", "24", False, 3),
+
+    ("privacy", "kdpa_dpo_email", "Data protection officer email", "Used in subject access response letters.", "string", "", False, 1),
+    ("privacy", "breach_notify_minutes", "Breach window (minutes)", "KDPA Section 43 default is 72 hours = 4320.", "number", "4320", False, 2),
+]
+
 PERMISSIONS = [
     "users:manage", "clinical:write", "clinical:read",
     "patients:read", "patients:write", "history:read", "history:manage",
     "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read",
-    "wards:manage", "billing:read", "billing:manage", "radiology:manage",
+    "wards:manage", "billing:read", "billing:manage",
+    "radiology:manage",
+    # Internal staff messaging — every role gets read/write by default so the
+    # whole hospital can chat. Department + custom-role administration is
+    # admin-only.
+    "messaging:read", "messaging:write",
+    "departments:manage", "roles:manage",
+    # Hospital-wide settings: every role can read so the UI can react to
+    # branding/hours/etc, but only Admin can write.
+    "settings:read", "settings:manage",
+    # Specialist referrals — clinical staff write, admin reads
+    "referrals:manage",
+    # Cheque register: admin + receptionist manage; clinical staff read-only
+    "cheques:read", "cheques:manage",
+    # Support tickets to the MediFleet platform team. Admin-only.
+    "support:manage",
 ]
+
+# Baseline grants applied to every staff role so messaging works out of the box.
+_MESSAGING_BASE = ["messaging:read", "messaging:write"]
+_SETTINGS_READ = ["settings:read"]
+_BASE = [*_MESSAGING_BASE, *_SETTINGS_READ]
 
 ROLE_GRANTS = {
     "Admin": PERMISSIONS,
     "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write",
-               "pharmacy:read", "laboratory:read", "history:read", "history:manage"],
-    "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read"],
-    "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read"],
-    "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read"],
-    "Radiologist": ["radiology:manage", "clinical:read", "patients:read"],
-    "Receptionist": ["patients:read", "patients:write", "billing:read", "billing:manage"],
+               "pharmacy:read", "laboratory:read", "history:read", "history:manage",
+               "referrals:manage", "cheques:read", *_BASE],
+    "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read",
+              "cheques:read", *_BASE],
+    "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read", *_BASE],
+    "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read", *_BASE],
+    "Radiologist": ["radiology:manage", "clinical:read", "patients:read", *_BASE],
+    "Receptionist": ["patients:read", "patients:write", "billing:read", "billing:manage",
+                     "cheques:read", "cheques:manage", *_BASE],
 }
 
 
@@ -132,6 +208,36 @@ def _build_schema(db_name: str) -> None:
     Base.metadata.create_all(bind=engine)
 
 
+def _stamp_alembic_head(db_name: str) -> None:
+    """Mark the freshly-built tenant DB as fully migrated.
+
+    create_all builds the schema but doesn't populate alembic_version, which
+    leaves the tenant in the "legacy bootstrap" state — future migrations
+    would refuse to run because alembic thinks the DB is empty. Stamping at
+    head right after seed avoids the trap entirely: from this point on,
+    scripts/migrate_all_tenants.py just runs `alembic upgrade head` against
+    the tenant URL whenever a new revision is added.
+    """
+    import os
+    import subprocess
+    from pathlib import Path
+    backend_dir = Path(__file__).resolve().parent.parent.parent
+    alembic_bin = backend_dir / "venv" / "bin" / "alembic"
+    cmd = [str(alembic_bin) if alembic_bin.exists() else "alembic", "stamp", "head"]
+    base_url = DATABASE_URL.rsplit("/", 1)[0]
+    env = os.environ.copy()
+    env["DATABASE_URL"] = f"{base_url}/{db_name}"
+    result = subprocess.run(cmd, env=env, cwd=str(backend_dir), check=False)
+    if result.returncode != 0:
+        # Don't fail provisioning over a stamp failure — the migrate-all
+        # script will retry next deploy. Just log loudly so it's visible.
+        logger.warning(
+            "Could not stamp alembic_version for tenant '%s' (exit %d). "
+            "scripts/migrate_all_tenants.py will reconcile on next run.",
+            db_name, result.returncode,
+        )
+
+
 def _seed_baseline(db_name: str, admin_email: str, admin_full_name: str, temp_password: str) -> None:
     """Inserts roles, permissions, and the bootstrap Admin user with a temp password."""
     engine = get_tenant_engine(db_name)
@@ -163,6 +269,22 @@ def _seed_baseline(db_name: str, admin_email: str, admin_full_name: str, temp_pa
             must_change_password=True,
         )
         db.add(admin)
+
+        # Seed the default inventory locations. The Inventory page expects
+        # these to exist by name; without them, adding a stock batch fails
+        # with a FK violation against `locations`.
+        for name, description in DEFAULT_LOCATIONS:
+            db.add(Location(name=name, description=description))
+
+        # Seed default hospital settings so the Settings page is immediately
+        # usable.
+        for category, key, label, description, data_type, value, is_sensitive, sort_order in DEFAULT_SETTINGS:
+            db.add(HospitalSetting(
+                category=category, key=key, label=label, description=description,
+                data_type=data_type, value=value, is_sensitive=is_sensitive,
+                sort_order=sort_order,
+            ))
+
         db.commit()
     except Exception:
         db.rollback()
@@ -242,6 +364,7 @@ def provision_tenant(
             admin_full_name=admin_full_name,
             temp_password=temp_password,
         )
+        _stamp_alembic_head(db_name)
     except Exception as exc:
         master_db.rollback()
         _drop_database_silently(db_name)

@@ -70,10 +70,17 @@ def get_patient_by_id(patient_id: int, db: Session = Depends(get_db)):
 @router.post("/", dependencies=[Depends(RequirePermission("patients:write"))])
 def register_patient(patient_data: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     try:
+        # Collapse "" → None for fields that have unique indexes (or are
+        # indexed and compared by ==) so two blank submissions don't collide.
+        # Same defensive pattern as the users.license_number fix.
+        for k in ("id_number", "telephone_2", "email", "reference_number"):
+            if isinstance(patient_data.get(k), str) and not patient_data[k].strip():
+                patient_data[k] = None
+
         existing_patient = db.query(Patient).filter(
             or_(
                 Patient.telephone_1 == patient_data.get("telephone_1"),
-                (Patient.id_number == patient_data.get("id_number")) & (Patient.id_number != "")
+                (Patient.id_number == patient_data.get("id_number")) & (Patient.id_number.isnot(None))
             )
         ).first()
         

@@ -4,7 +4,30 @@ from sqlalchemy.orm import Session
 from app.config.database import get_db, get_master_db
 from app.config.settings import settings
 from app.models.master import SuperAdmin
-from app.models.user import User, Role
+from app.models.user import User, Role, Permission, UserPermissionOverride
+
+
+def resolve_effective_permissions(db: Session, user: User) -> list[str]:
+    """Compute the user's effective permission set.
+
+    Effective set = (role permissions ∪ explicit grants) − explicit revokes.
+    Returns sorted permission codenames so callers and the UI see a stable
+    order.
+    """
+    role_perms: set[str] = set()
+    if user.role and user.role.permissions:
+        role_perms = {p.codename for p in user.role.permissions}
+
+    overrides = (
+        db.query(UserPermissionOverride, Permission.codename)
+        .join(Permission, Permission.permission_id == UserPermissionOverride.permission_id)
+        .filter(UserPermissionOverride.user_id == user.user_id)
+        .all()
+    )
+    grants = {codename for ovr, codename in overrides if ovr.granted}
+    revokes = {codename for ovr, codename in overrides if not ovr.granted}
+
+    return sorted((role_perms | grants) - revokes)
 
 
 def require_superadmin(request: Request, db: Session = Depends(get_master_db)) -> dict:
@@ -89,8 +112,11 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User no longer active")
 
     role = db.query(Role).filter(Role.role_id == user.role_id).first()
-    permissions = [p.codename for p in role.permissions] if role else []
-        
+    # Effective permissions apply per-user overrides on top of the role's
+    # baseline grants, so admins can fine-tune a single user without minting
+    # a new role for the exception.
+    permissions = resolve_effective_permissions(db, user)
+
     return {
         "user_id": user.user_id,
         "email": user.email,

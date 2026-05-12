@@ -17,7 +17,7 @@ from app.config.database import Base
 
 # 3. 🚨 CRITICAL: You MUST import every single model file here!
 # If a model isn't imported, Alembic won't know it exists and won't create the table.
-from app.models.user import User, Role, Permission, role_permissions
+from app.models.user import User, Role, Permission, role_permissions, UserPermissionOverride
 from app.models.patient import Patient
 from app.models.clinical import Appointment, PatientQueue, MedicalRecord
 from app.models.laboratory import LabTestCatalog, LabTestRequiredItem, LabTest
@@ -32,6 +32,16 @@ from app.models.radiology import RadiologyRequest, RadiologyResult
 from app.models.auth_tokens import RefreshToken, PasswordResetToken
 from app.models.breach import BreachIncident
 from app.models.notification import Notification
+from app.models.messaging import (
+    Department, DepartmentMember,
+    Conversation, ConversationParticipant, Message,
+)
+from app.models.referral import Referral
+from app.models.settings import HospitalSetting
+from app.models.radiology import RadiologyExamCatalog
+from app.models.laboratory import LabCatalogParameter
+from app.models.cheque import Cheque
+from app.models.support import SupportTicket, SupportMessage  # noqa: F401 — master DB only
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

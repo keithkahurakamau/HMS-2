@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
     ShieldAlert, Activity, ShieldCheck, Eye, EyeOff,
     Stethoscope, HeartPulse, Lock, ArrowRight
@@ -16,10 +17,27 @@ export default function Login() {
     const { login, mustChangePassword, pendingUserId, clearMustChange } = useAuth();
     const navigate = useNavigate();
 
-    const tenantName = localStorage.getItem('hms_tenant_name') || 'HMS Enterprise';
+    const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
+    const tenantId = localStorage.getItem('hms_tenant_id');
+
+    // If the operator reached /login by typing the URL directly, we have no
+    // tenant context — the API client wouldn't attach X-Tenant-ID and the
+    // login backend would 400. Bounce them to the Portal so they pick a
+    // hospital first.
+    useEffect(() => {
+        if (!tenantId) {
+            toast('Pick your hospital first.', { icon: 'ℹ️' });
+            navigate('/', { replace: true });
+        }
+    }, [tenantId, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!tenantId) {
+            toast.error('No hospital selected. Choose one from the portal.');
+            navigate('/', { replace: true });
+            return;
+        }
         setIsSubmitting(true);
         const result = await login(email, password);
         if (result?.success) {

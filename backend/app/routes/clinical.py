@@ -200,3 +200,51 @@ def return_prescription(
     )
     db.commit()
     return {"message": "Prescription returned to doctor.", "record_id": record_id}
+
+
+# ==========================================
+# 6. VITALS TREND
+# ==========================================
+@router.get("/patients/{patient_id}/vitals-history", dependencies=[Depends(RequirePermission("clinical:read"))])
+def get_vitals_history(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    limit: int = 20,
+):
+    """Past vitals readings, oldest first, suitable for plotting a trend line.
+
+    Pulls from `medical_records` (every consultation captures vitals). Records
+    where every vitals field is null are skipped — they're typically early
+    drafts where the doctor hadn't filled them in yet.
+    """
+    records = (
+        db.query(MedicalRecord)
+        .filter(MedicalRecord.patient_id == patient_id)
+        .order_by(MedicalRecord.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    out = []
+    for r in records:
+        if all(v is None for v in (
+            r.blood_pressure, r.heart_rate, r.respiratory_rate,
+            r.temperature, r.spo2, r.weight_kg, r.height_cm,
+        )):
+            continue
+        out.append({
+            "record_id": r.record_id,
+            "recorded_at": r.created_at.isoformat() if r.created_at else None,
+            "blood_pressure": r.blood_pressure,
+            "heart_rate": r.heart_rate,
+            "respiratory_rate": r.respiratory_rate,
+            "temperature": r.temperature,
+            "spo2": r.spo2,
+            "weight_kg": r.weight_kg,
+            "height_cm": r.height_cm,
+            "bmi": r.calculated_bmi,
+        })
+
+    # Reverse to oldest-first so the UI can plot left-to-right naturally.
+    out.reverse()
+    return out

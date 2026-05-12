@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import { 
-    Search, User, Activity, FileText, Pill, CheckCircle2, AlertCircle, Clock, 
+import {
+    Search, User, Activity, FileText, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ClinicalDesk() {
+    const navigate = useNavigate();
     // --- DYNAMIC QUEUE STATE ---
     const [queue, setQueue] = useState([]);
     const [isLoadingQueue, setIsLoadingQueue] = useState(true);
@@ -197,16 +199,28 @@ export default function ClinicalDesk() {
                                 )}
                             </div>
 
-                            {/* History toolbar */}
+                            {/* History toolbar — each button deep-links to the
+                                Medical History page with the active patient
+                                pre-selected and the relevant section auto-expanded.
+                                The first item lands on the full chart (no entry_type
+                                filter) so the doctor sees everything at a glance. */}
                             <div className="bg-ink-50/40 border-b border-ink-100 p-2 flex gap-1.5 overflow-x-auto custom-scrollbar">
                                 {[
-                                    { icon: History, label: 'Medical Hx',    name: 'Medical History' },
-                                    { icon: Scissors, label: 'Surgical Hx',  name: 'Surgical History' },
-                                    { icon: Cigarette, label: 'Social Hx',   name: 'Social History' },
-                                    { icon: Dna, label: 'Family Hx',         name: 'Family History' },
-                                    { icon: Syringe, label: 'Immunizations', name: 'Immunizations' },
-                                ].map(({ icon: Icon, label, name }) => (
-                                    <button key={label} onClick={() => handleNotImplemented(name)} className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-white border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:border-brand-300 hover:text-brand-700 transition-colors">
+                                    { icon: History,   label: 'Medical Hx',    entry_type: null },
+                                    { icon: Scissors,  label: 'Surgical Hx',   entry_type: 'SURGICAL_HISTORY' },
+                                    { icon: Cigarette, label: 'Social Hx',     entry_type: 'SOCIAL_HISTORY' },
+                                    { icon: Dna,       label: 'Family Hx',     entry_type: 'FAMILY_HISTORY' },
+                                    { icon: Syringe,   label: 'Immunizations', entry_type: 'IMMUNIZATION' },
+                                ].map(({ icon: Icon, label, entry_type }) => (
+                                    <button
+                                        key={label}
+                                        onClick={() => {
+                                            const params = new URLSearchParams({ patient_id: String(activePatient.patient_id) });
+                                            if (entry_type) params.set('entry_type', entry_type);
+                                            navigate(`/app/medical-history?${params.toString()}`);
+                                        }}
+                                        className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-white border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:border-brand-300 hover:text-brand-700 transition-colors"
+                                    >
                                         <Icon size={13} /> {label}
                                     </button>
                                 ))}
@@ -295,7 +309,7 @@ export default function ClinicalDesk() {
                             </div>
 
                             <div className="flex gap-2">
-                                <button onClick={() => handleNotImplemented('Billing Integration')} className="btn-secondary text-brand-700 border-brand-200 hover:bg-brand-50">
+                                <button onClick={() => handleClinicalSubmit('Billed')} disabled={isSubmitting} className="btn-secondary text-brand-700 border-brand-200 hover:bg-brand-50">
                                     <Receipt size={15} /> Send to billing
                                 </button>
                                 <button onClick={() => handleClinicalSubmit('Pharmacy')} disabled={isSubmitting} className="btn-success">
