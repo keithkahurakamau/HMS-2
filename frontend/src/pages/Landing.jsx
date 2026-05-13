@@ -65,7 +65,7 @@ export default function Landing() {
                                 Open your hospital
                                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
                             </button>
-                            <button onClick={() => navigate('/patient')} className="btn-secondary text-base px-5 py-3 cursor-pointer">
+                            <button onClick={() => navigate('/portal?next=/patient')} className="btn-secondary text-base px-5 py-3 cursor-pointer">
                                 <HeartPulse size={16} /> Patient portal
                             </button>
                             <Link to="/superadmin/login" className="text-sm font-semibold text-ink-500 hover:text-brand-700 transition-colors px-3 py-3 cursor-pointer">
@@ -263,7 +263,7 @@ export default function Landing() {
                     </p>
                     <div className="flex items-center gap-4 text-xs text-ink-500">
                         <Link to="/portal" className="hover:text-brand-700 transition-colors">Sign in</Link>
-                        <Link to="/patient" className="hover:text-brand-700 transition-colors">Patient portal</Link>
+                        <Link to="/portal?next=/patient" className="hover:text-brand-700 transition-colors">Patient portal</Link>
                         <Link to="/superadmin/login" className="hover:text-brand-700 transition-colors">Platform</Link>
                     </div>
                 </div>
@@ -460,6 +460,4 @@ function ComplianceCard() {
                     <span className="text-2xs font-semibold uppercase tracking-wider text-accent-700">Verified</span>
                 </div>
             </div>
-        </div>
-    );
-}
+        </d

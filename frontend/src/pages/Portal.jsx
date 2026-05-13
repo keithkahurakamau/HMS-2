@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
     Building2, Search, ArrowRight, Activity, Sparkles, HeartPulse,
@@ -29,11 +29,21 @@ const TENANT_CHIP = {
     cyan:    { ring: 'bg-brand-50 text-brand-700 ring-brand-100' },
 };
 
+// Whitelisted post-pick destinations. We won't navigate the user to an
+// arbitrary `next` URL — only to surfaces the hospital picker is allowed to
+// hand off to.
+const ALLOWED_NEXT_PATHS = new Set(['/login', '/patient']);
+
 export default function Portal() {
     const [hospitals, setHospitals] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const nextPath = ALLOWED_NEXT_PATHS.has(searchParams.get('next'))
+        ? searchParams.get('next')
+        : '/login';
+    const isPatientFlow = nextPath === '/patient';
 
     useEffect(() => {
         const fetchHospitals = async () => {
@@ -61,7 +71,7 @@ export default function Portal() {
         localStorage.setItem('hms_tenant_id', tenant.db_name);
         localStorage.setItem('hms_tenant_name', tenant.name);
         toast.success(`Connected to ${tenant.name}`);
-        navigate('/login');
+        navigate(nextPath);
     };
 
     return (
@@ -74,7 +84,7 @@ export default function Portal() {
                     </Link>
                     <nav className="hidden md:flex items-center gap-1">
                         <Link to="/" className="px-3 py-2 text-sm font-medium text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">Home</Link>
-                        <Link to="/patient" className="px-3 py-2 text-sm font-medium text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">Patient portal</Link>
+                        <Link to="/portal?next=/patient" className="px-3 py-2 text-sm font-medium text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">Patient portal</Link>
                         <Link to="/superadmin/login" className="px-3 py-2 text-sm font-medium text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">Platform</Link>
                     </nav>
                     <button
@@ -98,17 +108,18 @@ export default function Portal() {
 
                 <div className="relative max-w-5xl mx-auto px-6 text-center animate-slide-up">
                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 ring-1 ring-brand-200 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">
-                        <Sparkles size={12} className="text-teal-500" />
-                        Hospital workspace selector
+                        {isPatientFlow ? <HeartPulse size={12} className="text-teal-500" /> : <Sparkles size={12} className="text-teal-500" />}
+                        {isPatientFlow ? 'Patient portal hospital picker' : 'Hospital workspace selector'}
                     </span>
                     <h1 className="mt-6 text-3xl sm:text-5xl font-semibold tracking-tightest leading-[1.05]">
-                        Pick your{' '}
-                        <span className="text-gradient-brand">hospital</span>{' '}
-                        to sign in.
+                        {isPatientFlow ? 'Find your ' : 'Pick your '}
+                        <span className="text-gradient-brand">hospital</span>
+                        {isPatientFlow ? ' to view your records.' : ' to sign in.'}
                     </h1>
                     <p className="mt-5 text-base sm:text-lg text-ink-600 leading-relaxed max-w-2xl mx-auto">
-                        Every hospital on MediFleet runs on its own dedicated database. Find your
-                        organization below — we'll connect you to its workspace.
+                        {isPatientFlow
+                            ? "Pick the hospital where you're registered. We'll take you to the patient portal next, where you can view appointments, lab results, and bills."
+                            : 'Every hospital on MediFleet runs on its own dedicated database. Find your organization below — we\'ll connect you to its workspace.'}
                     </p>
 
                     {/* Inline search */}
@@ -248,7 +259,7 @@ export default function Portal() {
                 <div className="max-w-5xl mx-auto px-6">
                     <div className="grid md:grid-cols-3 gap-4">
                         <PathCard
-                            to="/patient"
+                            to="/portal?next=/patient"
                             tone="teal"
                             icon={<HeartPulse size={18} />}
                             title="I'm a patient"
@@ -284,7 +295,7 @@ export default function Portal() {
                     </p>
                     <div className="flex items-center gap-4 text-xs text-ink-500">
                         <Link to="/" className="hover:text-brand-700 transition-colors cursor-pointer">Home</Link>
-                        <Link to="/patient" className="hover:text-brand-700 transition-colors cursor-pointer">Patient portal</Link>
+                        <Link to="/portal?next=/patient" className="hover:text-brand-700 transition-colors cursor-pointer">Patient portal</Link>
                         <Link to="/superadmin/login" className="hover:text-brand-700 transition-colors cursor-pointer">Platform</Link>
                     </div>
                 </div>
@@ -321,7 +332,4 @@ function PathCard({ to, icon, title, body, cta, tone }) {
             <p className="mt-1.5 text-sm text-ink-600 leading-relaxed">{body}</p>
             <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-700">
                 {cta} <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
-            </div>
-        </Link>
-    );
-}
+     
