@@ -460,4 +460,6 @@ function ComplianceCard() {
                     <span className="text-2xs font-semibold uppercase tracking-wider text-accent-700">Verified</span>
                 </div>
             </div>
-        </d
+        </div>
+    );
+}

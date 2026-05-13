@@ -332,4 +332,7 @@ function PathCard({ to, icon, title, body, cta, tone }) {
             <p className="mt-1.5 text-sm text-ink-600 leading-relaxed">{body}</p>
             <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-700">
                 {cta} <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
-     
+            </div>
+        </Link>
+    );
+}
