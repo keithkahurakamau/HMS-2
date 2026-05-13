@@ -1,0 +1,123 @@
+# Catches broken tenant migrations BEFORE Render attempts a deploy.
+#
+# Production deploys via Render run render-start.sh which calls
+# migrate_all_tenants.py and aborts the deploy on failure. That's the safety
+# net at runtime — but a failing migration there means the service stays up
+# on the previous image while the deploy is marked red, and operators have to
+# chase the regression in production logs.
+#
+# This workflow runs the same script against a fresh Postgres + a seeded test
+# tenant on every push/PR. If a migration breaks, the PR fails its checks and
+# Render never starts the deploy at all. Failing closed here is much cheaper
+# than failing closed at deploy time.
+
+name: Migration check (all tenants)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/alembic/**'
+      - 'backend/app/models/**'
+      - 'backend/scripts/migrate_all_tenants.py'
+      - 'backend/render-start.sh'
+      - '.github/workflows/migration-check.yml'
+
+jobs:
+  migrate-all-tenants:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medifleet
+          POSTGRES_PASSWORD: medifleet
+          POSTGRES_DB: hms_master
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medifleet -d hms_master"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://medifleet:medifleet@localhost:5432/hms_master
+      SECRET_KEY:  ci-secret-key-not-used-in-prod
+      ENCRYPTION_KEY: "00000000000000000000000000000000"
+      CORS_ORIGINS: http://localhost:5173
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Seed a test tenant DB so the migration script has work to do
+        working-directory: backend
+        env:
+          PGPASSWORD: medifleet
+        run: |
+          set -e
+          psql -h localhost -U medifleet -d hms_master \
+            -c "CREATE DATABASE tenant_ci_test;"
+          # Insert a row in the master registry so migrate_all_tenants.py
+          # discovers our test DB. The script tolerates a missing
+          # alembic_version (legacy tenant path).
+          python <<'PY'
+          from sqlalchemy import create_engine, text
+          eng = create_engine("postgresql://medifleet:medifleet@localhost:5432/hms_master")
+          with eng.begin() as conn:
+              conn.execute(text("""
+                  CREATE TABLE IF NOT EXISTS tenants (
+                      tenant_id SERIAL PRIMARY KEY,
+                      name TEXT NOT NULL,
+                      domain TEXT UNIQUE NOT NULL,
+                      db_name TEXT UNIQUE NOT NULL,
+                      theme_color TEXT DEFAULT 'blue',
+                      is_premium BOOLEAN DEFAULT FALSE,
+                      is_active BOOLEAN DEFAULT TRUE,
+                      feature_flags TEXT,
+                      plan_limits TEXT,
+                      notes TEXT,
+                      logo_data_url TEXT,
+                      background_data_url TEXT,
+                      brand_primary TEXT,
+                      brand_accent TEXT,
+                      print_templates TEXT,
+                      created_at TIMESTAMPTZ DEFAULT now()
+                  );
+              """))
+              conn.execute(text("""
+                  INSERT INTO tenants (name, domain, db_name)
+                  VALUES ('CI Test Hospital', 'ci.test', 'tenant_ci_test')
+                  ON CONFLICT (domain) DO NOTHING;
+              """))
+          PY
+
+      - name: Run migrate_all_tenants.py
+        working-directory: backend
+        run: python scripts/migrate_all_tenants.py
+
+      - name: Verify alembic_version is at head in the test tenant
+        working-directory: backend
+        env:
+          PGPASSWORD: medifleet
+        run: |
+          set -e
+          # Fail loudly if alembic didn't stamp the test tenant.
+          rows=$(psql -h localhost -U medifleet -d tenant_ci_test -tAc \
+            "SELECT count(*) FROM alembic_version;")
+          test "$rows" = "1" || { echo "alembic_version is empty — migration did not stamp tenant"; exit 1; }
+          echo "✓ tenant_ci_test is at alembic head"

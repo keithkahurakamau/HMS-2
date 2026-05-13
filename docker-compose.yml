@@ -1,0 +1,99 @@
+# MediFleet local stack.
+#
+# Brings up the full platform — postgres, redis, FastAPI backend, and the
+# nginx-served Vite frontend — on a single Docker network. Mirrors the
+# Render production topology closely enough that "works in compose" is a
+# strong signal it will work on Render too.
+#
+# Quick start:
+#   1. Copy .env.example to .env at the repo root and fill in any secrets.
+#   2. docker compose up --build
+#   3. Open http://localhost:5173 (frontend) — API is reachable through
+#      the nginx reverse proxy at /api.
+#
+# Notes:
+#   * If you already run the standalone `hms-redis` container on port 6379,
+#     stop it first (`docker stop hms-redis`) or change REDIS_HOST_PORT in
+#     .env so the two don't collide.
+#   * The backend container runs render-start.sh, which applies Alembic
+#     migrations to every tenant on boot — same as production.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: medifleet-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-medifleet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medifleet}
+      POSTGRES_DB:       ${POSTGRES_DB:-hms_master}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/postgres-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medifleet} -d ${POSTGRES_DB:-hms_master}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: medifleet-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: medifleet-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # DATABASE_URL points at the postgres service over the compose network.
+      # The app derives hms_master + per-tenant DB URLs from this base.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-medifleet}:${POSTGRES_PASSWORD:-medifleet}@postgres:5432/${POSTGRES_DB:-hms_master}
+      REDIS_URL:    redis://redis:6379/0
+      SECRET_KEY:        ${SECRET_KEY:?set SECRET_KEY in .env}
+      ENCRYPTION_KEY:    ${ENCRYPTION_KEY:-00000000000000000000000000000000}
+      CORS_ORIGINS:      ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
+      MPESA_ENV:         ${MPESA_ENV:-sandbox}
+      MPESA_CONSUMER_KEY:    ${MPESA_CONSUMER_KEY:-}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET:-}
+      MPESA_PASSKEY:         ${MPESA_PASSKEY:-}
+      MPESA_SHORTCODE:       ${MPESA_SHORTCODE:-}
+      SEED_SUPERADMIN_EMAIL:    ${SEED_SUPERADMIN_EMAIL:-superadmin@hms.co.ke}
+      SEED_SUPERADMIN_PASSWORD: ${SEED_SUPERADMIN_PASSWORD:-SuperAdmin@2026}
+      # Skip the tenant-migration step on first boot if you're seeding a
+      # fresh database — flip to 1 once tenants exist.
+      MIGRATE_ON_BOOT: ${MIGRATE_ON_BOOT:-1}
+    ports:
+      - "${BACKEND_HOST_PORT:-8000}:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: medifleet-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_HOST_PORT:-5173}:80"
+
+volumes:
+  postgres_data:
+  redis_data:

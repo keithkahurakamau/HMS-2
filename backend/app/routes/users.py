@@ -7,6 +7,11 @@ from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse
 from app.core.dependencies import get_current_user, RequirePermission, resolve_effective_permissions
 from app.core.security import get_password_hash
+from app.core.modules import (
+    get_tenant_flags_cached,
+    resolve_enabled_modules,
+    serialize_module_catalogue,
+)
 from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/users", tags=["User Management"])
@@ -40,6 +45,24 @@ def get_my_permissions(current_user: dict = Depends(get_current_user), db: Sessi
     if not user or not user.role:
         return []
     return resolve_effective_permissions(db, user)
+
+
+@router.get("/me/modules")
+def get_my_modules(request: Request, current_user: dict = Depends(get_current_user)):
+    """List of modules this tenant has purchased.
+
+    The frontend uses this to hide nav items the tenant cannot access and to
+    short-circuit the route guard before the user ever triggers a 402. The
+    server still gates on the middleware — this endpoint is a UX aid, not a
+    security boundary.
+    """
+    tenant_db = request.headers.get("X-Tenant-ID") or ""
+    flags_raw = get_tenant_flags_cached(tenant_db) if tenant_db else ""
+    enabled = resolve_enabled_modules(flags_raw)
+    return {
+        "enabled": enabled,
+        "catalogue": serialize_module_catalogue(enabled),
+    }
 
 # ==========================================
 # 2. USER MANAGEMENT (CRUD)

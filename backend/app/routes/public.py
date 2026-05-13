@@ -50,6 +50,133 @@ def _serialize_tenant(t: Tenant, *, include_flags: bool = True) -> Dict[str, Any
     return base
 
 
+@router.get("/superadmin/overview", dependencies=[Depends(require_superadmin)])
+def get_platform_overview(master_db: Session = Depends(get_master_db)):
+    """Aggregated platform telemetry for the superadmin Global Overview page.
+
+    Returns:
+      * tenant counts (total, active, suspended, premium, standard)
+      * platform MRR + ARR (computed off the same tier prices the billing UI
+        applies — see TIER_PRICING below)
+      * 30-day growth (tenants provisioned in the trailing window)
+      * total active users across every active tenant DB (best-effort —
+        failures per tenant are surfaced under ``user_count_errors`` so the
+        UI can warn instead of silently under-counting)
+      * the 5 most recently provisioned tenants
+      * open ticket count (so the overview can hint at queue pressure)
+
+    All work happens behind ``require_superadmin``. The cross-tenant user
+    count holds a session per tenant DB just long enough for a single
+    aggregate query and disposes it.
+    """
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text
+    from app.models.support import SupportTicket
+    from app.config.database import get_tenant_engine
+
+    # Tier pricing mirrors the frontend PlatformBilling client constants.
+    # When the canonical pricing moves into a config table this constant
+    # should be replaced with a DB lookup.
+    TIER_PRICING = {"premium": 49500, "standard": 18500}
+
+    tenants = master_db.query(Tenant).order_by(Tenant.created_at.desc()).all()
+    active = [t for t in tenants if t.is_active]
+    suspended = [t for t in tenants if not t.is_active]
+    premium_count = sum(1 for t in active if t.is_premium)
+    standard_count = len(active) - premium_count
+
+    mrr = premium_count * TIER_PRICING["premium"] + standard_count * TIER_PRICING["standard"]
+
+    # 30-day growth — tenants whose created_at falls inside the trailing window.
+    # We compare in UTC; the column has timezone=True so the math is honest.
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=30)
+    recent_window = [t for t in tenants if t.created_at and t.created_at >= cutoff]
+    prior_total = max(len(tenants) - len(recent_window), 1)
+    growth_pct = round((len(recent_window) / prior_total) * 100, 1)
+
+    # Aggregate users across every active tenant DB. Best-effort: one tenant
+    # failing must not nuke the whole dashboard. Errors are returned so the UI
+    # can render a "partial data" notice.
+    total_users = 0
+    user_count_errors: list[dict] = []
+    for t in active:
+        try:
+            engine = get_tenant_engine(t.db_name)
+            with engine.connect() as conn:
+                count = conn.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true")).scalar()
+                total_users += int(count or 0)
+        except Exception as exc:  # noqa: BLE001 — surface, don't crash
+            logger.warning("overview: user count failed for %s — %s", t.db_name, exc)
+            user_count_errors.append({"tenant": t.db_name, "error": str(exc)})
+
+    open_tickets = master_db.query(SupportTicket).filter(SupportTicket.status == "Open").count()
+    in_progress_tickets = master_db.query(SupportTicket).filter(SupportTicket.status == "In Progress").count()
+
+    recent_tenants = [
+        {
+            "tenant_id": t.tenant_id,
+            "name": t.name,
+            "domain": t.domain,
+            "is_premium": bool(t.is_premium),
+            "is_active": bool(t.is_active),
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        }
+        for t in tenants[:5]
+    ]
+
+    return {
+        "tenants": {
+            "total": len(tenants),
+            "active": len(active),
+            "suspended": len(suspended),
+            "premium": premium_count,
+            "standard": standard_count,
+        },
+        "users": {
+            "total_active": total_users,
+            "errors": user_count_errors,
+        },
+        "revenue": {
+            "mrr": mrr,
+            "arr": mrr * 12,
+            "currency": "KES",
+        },
+        "growth": {
+            "window_days": 30,
+            "new_tenants": len(recent_window),
+            "percent": growth_pct,
+        },
+        "tickets": {
+            "open": open_tickets,
+            "in_progress": in_progress_tickets,
+        },
+        "recent_tenants": recent_tenants,
+    }
+
+
+@router.get("/superadmin/module-catalogue", dependencies=[Depends(require_superadmin)])
+def get_module_catalogue():
+    """Returns the canonical list of gateable modules for the package editor.
+
+    The Tenants Manager uses this to render a curated checklist instead of
+    free-text flag keys (which were silently mis-spellable and never gated
+    anything). Always-on modules are marked so the UI can lock their
+    toggles.
+    """
+    from app.core.modules import MODULES
+    return [
+        {
+            "key": m.key,
+            "label": m.label,
+            "description": m.description,
+            "always_on": m.always_on,
+            "default_enabled": m.default_enabled,
+        }
+        for m in MODULES
+    ]
+
+
 @router.get("/hospitals")
 def get_available_hospitals(
     include_inactive: bool = False,
@@ -153,6 +280,7 @@ def update_tenant(tenant_id: int, payload: TenantUpdate, db: Session = Depends(g
         raise HTTPException(status_code=404, detail="Tenant not found.")
 
     update = payload.model_dump(exclude_unset=True)
+    flags_changed = "feature_flags" in update
     for field, value in update.items():
         if field in ("feature_flags", "plan_limits"):
             setattr(tenant, field, json.dumps(value) if value is not None else None)
@@ -160,6 +288,15 @@ def update_tenant(tenant_id: int, payload: TenantUpdate, db: Session = Depends(g
             setattr(tenant, field, value)
     db.commit()
     db.refresh(tenant)
+    # Tenant entitlements are cached in Redis (~60s) so the module gate doesn't
+    # query the master DB on every request. When a superadmin toggles a
+    # module, drop the cached entry so the next request reflects the change.
+    if flags_changed and tenant.db_name:
+        try:
+            from app.core.modules import invalidate_tenant_flags_cache
+            invalidate_tenant_flags_cache(tenant.db_name)
+        except Exception:  # noqa: BLE001 — never fail the write on a cache miss
+            pass
     return _serialize_tenant(tenant)
 
 

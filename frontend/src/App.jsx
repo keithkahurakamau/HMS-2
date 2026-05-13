@@ -4,6 +4,8 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { BrandingProvider } from './context/BrandingContext';
+import { ModuleProvider } from './context/ModuleContext';
+import ModuleGuard from './components/ModuleGuard';
 import { Activity } from 'lucide-react';
 
 // Page Imports
@@ -99,6 +101,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+        <ModuleProvider>
         <BrandingProvider>
         <BrowserRouter>
           <Toaster position="top-right" />
@@ -127,22 +130,23 @@ export default function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<RoleBasedRedirect />} /> 
             
-            <Route path="admin" element={<AdminDashboard />} /> 
+            <Route path="admin" element={<AdminDashboard />} />
             <Route path="patients" element={<Patients />} />
-            <Route path="clinical" element={<ClinicalDesk />} />
-            <Route path="laboratory" element={<Laboratory />} />
-            <Route path="radiology" element={<Radiology />} />
-            <Route path="pharmacy" element={<Pharmacy />} />
-            <Route path="wards" element={<Wards />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="medical-history" element={<MedicalHistory />} />
-            
+            <Route path="clinical" element={<ModuleGuard moduleKey="clinical"><ClinicalDesk /></ModuleGuard>} />
+            <Route path="laboratory" element={<ModuleGuard moduleKey="laboratory"><Laboratory /></ModuleGuard>} />
+            <Route path="radiology" element={<ModuleGuard moduleKey="radiology"><Radiology /></ModuleGuard>} />
+            <Route path="pharmacy" element={<ModuleGuard moduleKey="pharmacy"><Pharmacy /></ModuleGuard>} />
+            <Route path="wards" element={<ModuleGuard moduleKey="wards"><Wards /></ModuleGuard>} />
+            <Route path="inventory" element={<ModuleGuard moduleKey="inventory"><Inventory /></ModuleGuard>} />
+            <Route path="medical-history" element={<ModuleGuard moduleKey="medical_history"><MedicalHistory /></ModuleGuard>} />
+
             <Route path="appointments" element={<Appointments />} />
-            <Route path="billing" element={<Billing />} />
+            <Route path="billing" element={<ModuleGuard moduleKey="billing"><Billing /></ModuleGuard>} />
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="branding" element={<Branding />} />
-            <Route path="cheques" element={<Cheques />} />
+            <Route path="branding" element={<ModuleGuard moduleKey="branding"><Branding /></ModuleGuard>} />
+            <Route path="cheques" element={<ModuleGuard moduleKey="cheques"><Cheques /></ModuleGuard>} />
+            {/* Support is always-on — never wrap it; that's the escape hatch. */}
             <Route path="support" element={<Support />} />
           </Route>
 
@@ -153,6 +157,7 @@ export default function App() {
           </Routes>
         </BrowserRouter>
         </BrandingProvider>
+        </ModuleProvider>
       </AuthProvider>
     </ThemeProvider>
   );

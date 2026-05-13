@@ -11,8 +11,18 @@ from app.models.clinical import MedicalRecord, Appointment, PatientQueue
 from app.models.laboratory import LabTest
 from app.core.dependencies import get_current_user, RequirePermission
 from app.core.limiter import limiter
+from app.core import cache
 from app.utils.audit import log_audit
 from app.models.billing import Invoice, InvoiceItem
+
+# Cache prefixes for entries this router writes to. Mutations clear the
+# relevant tenant's dashboard rollups so the next read recomputes.
+_ANALYTICS_DASHBOARD = "analytics:dashboard"
+
+
+def _bust_dashboard(request: Request) -> None:
+    tenant = request.headers.get("X-Tenant-ID") if request else None
+    cache.invalidate_prefix(_ANALYTICS_DASHBOARD, tenant=tenant)
 
 router = APIRouter(prefix="/api/patients", tags=["Patient Registry"])
 
@@ -133,6 +143,7 @@ def register_patient(patient_data: dict, request: Request, db: Session = Depends
         
         db.commit()
         db.refresh(new_patient)
+        _bust_dashboard(request)
         return new_patient
 
     except Exception as e:
@@ -174,15 +185,16 @@ def delete_patient(patient_id: int, request: Request, db: Session = Depends(get_
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
         
-    patient.is_active = False 
-    
+    patient.is_active = False
+
     log_audit(
-        db=db, user_id=current_user["user_id"], action="DELETE", 
-        entity_type="Patient", entity_id=str(patient.patient_id), 
-        old_value={"is_active": True}, new_value={"is_active": False}, 
+        db=db, user_id=current_user["user_id"], action="DELETE",
+        entity_type="Patient", entity_id=str(patient.patient_id),
+        old_value={"is_active": True}, new_value={"is_active": False},
         ip_address=request.client.host
     )
     db.commit()
+    _bust_dashboard(request)
     return {"message": "Patient successfully deactivated."}
 
 # ==========================================
