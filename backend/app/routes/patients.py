@@ -226,31 +226,120 @@ def get_patient_history(patient_id: int, db: Session = Depends(get_db)):
 # ==========================================
 # 7. ROUTE PATIENT TO QUEUE
 # ==========================================
+# Canonical department names used by analytics rollups (analytics.py),
+# per-module queue endpoints (clinical/queue, laboratory/queue, etc.) and the
+# Command Center breakdown. Anything outside this set is silently ignored by
+# downstream consumers — a patient routed to "Clinical Desk" never shows up
+# on the Command Center because the analytics filter looks for
+# "Consultation". The map below normalises the friendly UI labels the front
+# desk picks from to the canonical names. Adding a new module? Extend this
+# map AND wire it through analytics.py + the per-module queue endpoint.
+_DEPARTMENT_ALIASES = {
+    # UI label → canonical name used everywhere else
+    "clinical desk":      "Consultation",
+    "clinical":           "Consultation",
+    "consultation":       "Consultation",
+    "triage":             "Triage",
+    "laboratory":         "Laboratory",
+    "lab":                "Laboratory",
+    "radiology":          "Radiology",
+    "imaging":            "Radiology",
+    "pharmacy":           "Pharmacy",
+    "billing":            "Billing",
+    "cashier":            "Billing",
+    "wards":              "Wards",
+    "ward":               "Wards",
+    "admissions":         "Wards",
+}
+CANONICAL_DEPARTMENTS = frozenset({
+    "Triage", "Consultation", "Laboratory", "Radiology",
+    "Pharmacy", "Billing", "Wards",
+})
+
+
+def _canonical_department(label: str) -> str:
+    """Resolve a UI department label to its canonical name. Raises 400 when
+    the caller picks something not in the catalogue."""
+    if not label:
+        raise HTTPException(status_code=400, detail="Department is required.")
+    key = label.strip().lower()
+    resolved = _DEPARTMENT_ALIASES.get(key)
+    if resolved is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unknown department '{label}'. Allowed: "
+                f"{', '.join(sorted(CANONICAL_DEPARTMENTS))}."
+            ),
+        )
+    return resolved
+
+
 class QueueRequest(BaseModel):
     department: str
     acuity_level: int = 3
 
+
 @router.post("/{patient_id}/route", dependencies=[Depends(RequirePermission("patients:write"))])
 def route_patient(patient_id: int, request: QueueRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """Route a registered patient onto a departmental queue.
+
+    The frontend exposes friendly labels (e.g. "Clinical Desk"); we resolve
+    them to the canonical name before persisting so analytics rollups and
+    per-module queue pages line up.
+    """
     patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
-        
+
+    department = _canonical_department(request.department)
+    acuity = max(1, min(5, int(request.acuity_level or 3)))
+
+    # Idempotency: don't let a double-click create two waiting rows in the
+    # same department. If one exists, return the existing queue_id so the
+    # caller can navigate to it instead of erroring.
     existing = db.query(PatientQueue).filter(
         PatientQueue.patient_id == patient_id,
-        PatientQueue.department == request.department,
-        PatientQueue.status.in_(["Waiting", "In Progress"])
+        PatientQueue.department == department,
+        PatientQueue.status.in_(["Waiting", "In Progress", "In Consultation"]),
     ).first()
-    
+
     if existing:
-        raise HTTPException(status_code=400, detail=f"Patient is already active in the {existing.department} queue.")
+        return {
+            "message": f"Patient is already active in the {existing.department} queue.",
+            "queue_id": existing.queue_id,
+            "department": existing.department,
+            "status": existing.status,
+            "already_queued": True,
+        }
 
     new_queue = PatientQueue(
         patient_id=patient_id,
-        department=request.department,
-        acuity_level=request.acuity_level,
-        status="Waiting"
+        department=department,
+        acuity_level=acuity,
+        status="Waiting",
     )
     db.add(new_queue)
     db.commit()
-    return {"message": f"Patient successfully routed to {request.department}."}
+    db.refresh(new_queue)
+
+    log_audit(
+        db=db, user_id=current_user["user_id"], action="ROUTE",
+        entity_type="PatientQueue", entity_id=str(new_queue.queue_id),
+        old_value=None,
+        new_value={"patient_id": patient_id, "department": department, "acuity_level": acuity},
+        ip_address=None,
+    )
+    db.commit()
+
+    # Cache invalidation — the dashboard waiting count changes when a new
+    # patient lands on a queue.
+    cache.invalidate_prefix(_ANALYTICS_DASHBOARD, tenant=None)
+
+    return {
+        "message": f"Patient successfully routed to {department}.",
+        "queue_id": new_queue.queue_id,
+        "department": department,
+        "status": new_queue.status,
+        "already_queued": False,
+    }
