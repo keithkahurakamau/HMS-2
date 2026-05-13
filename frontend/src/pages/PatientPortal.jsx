@@ -77,11 +77,12 @@ export default function PatientPortal() {
 
     useEffect(() => {
         // Without a hospital pick, the API client has no X-Tenant-ID and every
-        // portal call would 400. Bounce back to the public Portal so the
-        // patient picks their hospital first.
+        // portal call would 400. Bounce to the hospital picker with a `next`
+        // param so the Portal returns the patient straight back here after
+        // they choose their hospital — instead of dropping them on /login.
         if (!localStorage.getItem('hms_tenant_id')) {
             toast('Pick your hospital first.', { icon: 'ℹ️' });
-            navigate('/', { replace: true });
+            navigate('/portal?next=/patient', { replace: true });
             return;
         }
         (async () => {

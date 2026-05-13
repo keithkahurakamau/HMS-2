@@ -8,6 +8,7 @@ import {
     Syringe, Users, Heart, Brain, Baby, Cigarette,
     Trash2, Edit, Save, Lock, Printer
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import { printMedicalHistory } from '../utils/printTemplates';
 
 const ENTRY_TYPES = [
@@ -418,7 +419,7 @@ export default function MedicalHistory() {
                                 <h2 className="text-lg font-bold text-slate-900">{editEntry ? 'Edit History Entry' : 'Add History Entry'}</h2>
                                 <p className="text-xs text-slate-500 mt-0.5">All entries are audit-logged per KDPA 2019.</p>
                             </div>
-                            <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-700 p-1"><X size={20} /></button>
+                            <button onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
 
                         <form id="historyForm" onSubmit={handleAddEntry} className="p-5 space-y-4 overflow-y-auto">

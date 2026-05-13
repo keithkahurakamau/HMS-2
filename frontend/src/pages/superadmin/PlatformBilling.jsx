@@ -5,6 +5,7 @@ import {
     CreditCard, TrendingUp, Banknote, Users, Building2, Crown,
     ArrowUpRight, ArrowDownRight, Search, ShieldCheck, Activity,
 } from 'lucide-react';
+import PageHeader from '../../components/PageHeader';
 
 const TIER_PRICING = {
     Premium: 49500,
@@ -69,13 +70,14 @@ export default function PlatformBilling() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div>
-                <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-400">Console</span>
-                <h1 className="text-2xl font-semibold text-white tracking-tight mt-1 flex items-center gap-2">
-                    <CreditCard size={22} className="text-accent-400" /> Billing &amp; Subscriptions
-                </h1>
-                <p className="text-sm text-ink-400 mt-1">Track platform revenue, manage tenant subscription tiers, and project growth.</p>
-            </div>
+            <PageHeader
+                surface="dark"
+                tone="accent"
+                eyebrow="Console"
+                icon={CreditCard}
+                title="Billing & Subscriptions"
+                subtitle="Track platform revenue, manage tenant subscription tiers, and project growth."
+            />
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -101,11 +103,11 @@ export default function PlatformBilling() {
                     accent="amber"
                 />
                 <KpiCard
-                    icon={<Users size={18} className="text-indigo-400" />}
+                    icon={<Users size={18} className="text-brand-300" />}
                     label="Standard Subscribers"
                     value={stats.standard}
                     sub="Eligible for upgrade"
-                    accent="indigo"
+                    accent="brand"
                 />
             </div>
 

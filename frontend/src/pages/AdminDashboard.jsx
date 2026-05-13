@@ -243,7 +243,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="stat-tile">
                             <div className="flex justify-between items-start">
-                                <div className="stat-icon bg-purple-50 ring-purple-100 text-purple-600"><Activity size={20} /></div>
+                                <div className="stat-icon bg-teal-50 ring-teal-100 text-teal-700"><Activity size={20} /></div>
                             </div>
                             <div>
                                 <h3 className="stat-label">Active Inpatient Admissions</h3>
@@ -602,7 +602,7 @@ export default function AdminDashboard() {
                                 <h2 className="text-xl font-bold flex items-center gap-2"><UserPlus size={24} className="text-brand-400" /> Provision Account</h2>
                                 <p className="text-sm text-slate-400 mt-1">Create a new staff identity & assign RBAC roles.</p>
                             </div>
-                            <button onClick={() => setIsStaffModalOpen(false)} className="text-slate-400 hover:text-white"><X size={24}/></button>
+                            <button onClick={() => setIsStaffModalOpen(false)} aria-label="Close" className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
                             <form id="staffForm" onSubmit={handleRegisterStaff} className="space-y-4">
@@ -637,7 +637,7 @@ export default function AdminDashboard() {
                                 <h2 className="text-lg font-bold text-slate-900">{pricingForm.catalog_id ? "Edit Service Package" : "Create Service Package"}</h2>
                                 <p className="text-xs text-slate-500 mt-1">Configure pricing for Billing module.</p>
                             </div>
-                            <button onClick={() => setIsPricingModalOpen(false)} className="text-slate-400 hover:text-slate-700"><X size={20}/></button>
+                            <button onClick={() => setIsPricingModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
                         <div className="p-6">
                             <form id="pricingForm" onSubmit={handleSavePricing} className="space-y-4">
@@ -686,7 +686,7 @@ export default function AdminDashboard() {
                                 <h2 className="text-lg font-bold text-slate-900">Edit RBAC Access</h2>
                                 <p className="text-xs text-slate-500 mt-1">Modifying roles for {selectedUser.full_name}</p>
                             </div>
-                            <button onClick={() => setIsEditRoleModalOpen(false)} className="text-slate-400 hover:text-slate-700"><X size={20}/></button>
+                            <button onClick={() => setIsEditRoleModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
                         <div className="p-6">
                             <form id="editRoleForm" onSubmit={handleUpdateRole} className="space-y-4">

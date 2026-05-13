@@ -7,6 +7,7 @@ import {
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PageHeader from '../components/PageHeader';
 
 export default function ClinicalDesk() {
     const navigate = useNavigate();
@@ -128,7 +129,13 @@ export default function ClinicalDesk() {
 
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
-            
+            <PageHeader
+                eyebrow="Consultation"
+                icon={Stethoscope}
+                title="Clinical Desk"
+                subtitle="Run encounters end-to-end — vitals, diagnosis, prescriptions, and orders."
+            />
+
             {/* TOP PANEL: Collapsible Queue */}
             <div className="card shrink-0 flex flex-col z-20">
                 <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">

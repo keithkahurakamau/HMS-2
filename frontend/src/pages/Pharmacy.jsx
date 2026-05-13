@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
+import PageHeader from '../components/PageHeader';
 
 export default function Pharmacy() {
     // --- APP STATE ---
@@ -166,6 +167,12 @@ export default function Pharmacy() {
 
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
+            <PageHeader
+                eyebrow="Dispensary"
+                icon={Pill}
+                title="Pharmacy"
+                subtitle="Fulfil prescriptions, dispense over-the-counter sales, and track stock movements."
+            />
             {/* GLOBAL PHARMACY HEADER & TABS */}
             <div className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Pharmacy mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
