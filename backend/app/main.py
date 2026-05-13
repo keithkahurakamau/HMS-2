@@ -10,6 +10,7 @@ from slowapi.middleware import SlowAPIMiddleware
 import secrets
 from app.core.limiter import limiter
 from app.core.websocket import manager as ws_manager
+from app.core.module_gate import ModuleGateMiddleware
 
 from app.config.settings import settings
 
@@ -100,6 +101,12 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+# Module gating — short-circuits requests to modules the tenant hasn't
+# purchased with a structured HTTP 402. Added *before* CORS in the source so
+# the response still carries CORS headers (Starlette wraps middlewares in
+# reverse insertion order; CORS must wrap everything else).
+app.add_middleware(ModuleGateMiddleware)
 
 # 5. Configure CORS (Must be added BEFORE custom http middlewares)
 # Allowed origins are sourced from settings.CORS_ORIGINS so production deployments

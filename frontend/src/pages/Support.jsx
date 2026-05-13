@@ -1,11 +1,42 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import {
-    LifeBuoy, Plus, X, Send, Activity, RefreshCw, ChevronRight,
-    MessageSquare, Calendar, CheckCircle2, AlertCircle, Clock,
+    LifeBuoy, Plus, X, Send, Activity, RefreshCw,
+    MessageSquare, Calendar, CheckCircle2, AlertCircle, Clock, ShieldCheck,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+
+const STATUS_ICONS = {
+    'Open':                 AlertCircle,
+    'In Progress':          Activity,
+    'Waiting on Customer':  Clock,
+    'Resolved':             CheckCircle2,
+    'Closed':               CheckCircle2,
+};
+
+const STATUS_DOT_COLOR = {
+    'Open':                'bg-blue-500',
+    'In Progress':         'bg-amber-500',
+    'Waiting on Customer': 'bg-amber-500',
+    'Resolved':            'bg-accent-500',
+    'Closed':              'bg-ink-400',
+};
+
+const formatRelative = (iso) => {
+    if (!iso) return '—';
+    const then = new Date(iso).getTime();
+    const diff = Date.now() - then;
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    if (d < 7) return `${d}d ago`;
+    return new Date(iso).toLocaleDateString();
+};
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Tenant-side support inbox.                                                */
@@ -38,14 +69,35 @@ export default function Support() {
     const [reply, setReply] = useState('');
     const [sendingReply, setSendingReply] = useState(false);
 
-    useEffect(() => { fetchTickets(); }, [statusFilter]);  // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { fetchTickets(); }, []);  // initial load — filter is client-side now
+
+    // ModuleGuard hands us a prefill payload via router state when the user
+    // clicks "Contact MediFleet Support to upgrade". Open the new-ticket
+    // composer with the request already drafted so the operator only has to
+    // press Send.
+    const location = useLocation();
+    const navigate = useNavigate();
+    useEffect(() => {
+        const prefill = location.state?.prefill;
+        if (!prefill) return;
+        setDraft({
+            subject:  prefill.subject  || '',
+            body:     prefill.body     || '',
+            category: prefill.category || 'Account',
+            priority: prefill.priority || 'Normal',
+        });
+        setIsNewOpen(true);
+        // Strip the state so a back-forward navigation doesn't re-open the
+        // composer with stale prefill data.
+        navigate(location.pathname, { replace: true, state: null });
+    }, [location.state, location.pathname, navigate]);
 
     const fetchTickets = async () => {
         setIsLoading(true);
         try {
-            const params = new URLSearchParams();
-            if (statusFilter) params.set('status', statusFilter);
-            const res = await apiClient.get(`/support/?${params.toString()}`);
+            // Pull the full history once; client-side filter lets us show
+            // accurate counts per status across the whole inbox.
+            const res = await apiClient.get('/support/');
             setTickets(res.data || []);
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Failed to load tickets.');
@@ -109,7 +161,26 @@ export default function Support() {
         }
     };
 
-    const sortedTickets = useMemo(() => tickets, [tickets]);
+    // Per-status counts for the filter chips. Computed off the unfiltered
+    // history so the "All / Open / In Progress / …" totals stay accurate.
+    const statusCounts = useMemo(() => {
+        const counts = { Open: 0, 'In Progress': 0, 'Waiting on Customer': 0, Resolved: 0, Closed: 0 };
+        for (const t of tickets) {
+            if (counts[t.status] !== undefined) counts[t.status] += 1;
+        }
+        return counts;
+    }, [tickets]);
+
+    // History view — newest activity first. Apply the status filter here
+    // rather than on the server so the filter chips above can show counts.
+    const sortedTickets = useMemo(() => {
+        const filtered = statusFilter ? tickets.filter(t => t.status === statusFilter) : tickets;
+        return [...filtered].sort((a, b) => {
+            const at = new Date(a.updated_at || a.created_at || 0).getTime();
+            const bt = new Date(b.updated_at || b.created_at || 0).getTime();
+            return bt - at;
+        });
+    }, [tickets, statusFilter]);
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -126,18 +197,40 @@ export default function Support() {
                 }
             />
 
-            {/* Filter chips */}
-            <div className="card p-2 flex flex-wrap gap-1">
-                <button onClick={() => setStatusFilter('')}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${!statusFilter ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-50'}`}>
-                    All ({tickets.length})
+            {/* History filter chips — show count per status across the whole inbox */}
+            <div className="card p-2 flex flex-wrap gap-1" role="tablist" aria-label="Filter tickets by status">
+                <button
+                    type="button"
+                    onClick={() => setStatusFilter('')}
+                    role="tab"
+                    aria-selected={!statusFilter}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                        !statusFilter ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-ink-700 hover:bg-ink-50'
+                    }`}
+                >
+                    All
+                    <span className={`text-2xs font-semibold tabular-nums ${!statusFilter ? 'text-brand-700' : 'text-ink-500'}`}>{tickets.length}</span>
                 </button>
-                {Object.keys(STATUS_META).map(s => (
-                    <button key={s} onClick={() => setStatusFilter(s)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === s ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-50'}`}>
-                        {s}
-                    </button>
-                ))}
+                {Object.keys(STATUS_META).map(s => {
+                    const isActive = statusFilter === s;
+                    const count = statusCounts[s] || 0;
+                    return (
+                        <button
+                            key={s}
+                            type="button"
+                            onClick={() => setStatusFilter(s)}
+                            role="tab"
+                            aria-selected={isActive}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                                isActive ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-ink-700 hover:bg-ink-50'
+                            }`}
+                        >
+                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT_COLOR[s]}`} aria-hidden="true" />
+                            {s}
+                            <span className={`text-2xs font-semibold tabular-nums ${isActive ? 'text-brand-700' : 'text-ink-500'}`}>{count}</span>
+                        </button>
+                    );
+                })}
             </div>
 
             <div className="grid grid-cols-12 gap-4">
@@ -153,27 +246,44 @@ export default function Support() {
                             <p className="text-sm">No tickets yet. Click "New ticket" to raise one.</p>
                         </div>
                     ) : (
-                        <div className="overflow-y-auto custom-scrollbar divide-y divide-ink-100">
+                        <ul className="overflow-y-auto custom-scrollbar divide-y divide-ink-100">
                             {sortedTickets.map(t => {
                                 const meta = STATUS_META[t.status] || {};
                                 const active = activeTicket?.ticket_id === t.ticket_id;
+                                const lastUpdate = t.updated_at || t.created_at;
                                 return (
-                                    <button key={t.ticket_id} onClick={() => openTicket(t.ticket_id)}
-                                            className={`w-full p-4 text-left transition-colors ${active ? 'bg-brand-50/40' : 'hover:bg-ink-50/40'}`}>
-                                        <div className="flex justify-between items-start gap-2 mb-1">
-                                            <h3 className="font-semibold text-sm text-ink-900 line-clamp-1 flex-1">{t.subject}</h3>
-                                            <span className={meta.badge}>{t.status}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-xs text-ink-500 mt-1">
-                                            <span className="font-mono">#{t.ticket_id}</span>
-                                            <span>{t.category}</span>
-                                            <span>{t.priority}</span>
-                                            <span className="ml-auto flex items-center gap-1"><Calendar size={11} /> {new Date(t.created_at).toLocaleDateString()}</span>
-                                        </div>
-                                    </button>
+                                    <li key={t.ticket_id}>
+                                        <button
+                                            type="button"
+                                            onClick={() => openTicket(t.ticket_id)}
+                                            aria-current={active ? 'true' : undefined}
+                                            className={`w-full p-4 text-left transition-colors cursor-pointer flex gap-3 items-start ${
+                                                active ? 'bg-brand-50/60' : 'hover:bg-ink-50/60'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${STATUS_DOT_COLOR[t.status] || 'bg-ink-400'}`}
+                                                aria-hidden="true"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex justify-between items-start gap-2 mb-1">
+                                                    <h3 className="font-semibold text-sm text-ink-900 line-clamp-1 flex-1">{t.subject}</h3>
+                                                    <span className={`${meta.badge} shrink-0`}>{t.status}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 sm:gap-3 text-xs text-ink-500 mt-1 flex-wrap">
+                                                    <span className="font-mono">#{t.ticket_id}</span>
+                                                    <span>{t.category}</span>
+                                                    <span>{t.priority}</span>
+                                                    <span className="ml-auto flex items-center gap-1 shrink-0" title={new Date(lastUpdate).toLocaleString()}>
+                                                        <Calendar size={11} aria-hidden="true" /> {formatRelative(lastUpdate)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </li>
                                 );
                             })}
-                        </div>
+                        </ul>
                     )}
                 </div>
 
@@ -186,20 +296,37 @@ export default function Support() {
                         </div>
                     ) : (
                         <>
-                            <div className="p-4 border-b border-ink-100 bg-ink-50/40">
+                            <div className="p-4 border-b border-ink-100 bg-ink-50/60">
                                 <div className="flex justify-between items-start gap-3 mb-1">
                                     <div className="min-w-0">
                                         <h2 className="text-base font-semibold text-ink-900 truncate">{activeTicket.subject}</h2>
-                                        <div className="flex items-center gap-3 text-xs text-ink-500 mt-1">
+                                        <div className="flex items-center gap-2 sm:gap-3 text-xs text-ink-500 mt-1 flex-wrap">
                                             <span className="font-mono">#{activeTicket.ticket_id}</span>
                                             <span>{activeTicket.category}</span>
                                             <span>Priority: {activeTicket.priority}</span>
+                                            {activeTicket.created_at && (
+                                                <span title={new Date(activeTicket.created_at).toLocaleString()}>
+                                                    Opened {formatRelative(activeTicket.created_at)}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
-                                    <span className={STATUS_META[activeTicket.status]?.badge}>{activeTicket.status}</span>
+                                    <span className={`${STATUS_META[activeTicket.status]?.badge} shrink-0 inline-flex items-center gap-1`}>
+                                        {(() => {
+                                            const Ico = STATUS_ICONS[activeTicket.status] || AlertCircle;
+                                            return <Ico size={11} aria-hidden="true" />;
+                                        })()}
+                                        {activeTicket.status}
+                                    </span>
                                 </div>
                                 {activeTicket.status !== 'Closed' && (
-                                    <button onClick={closeTicket} className="text-xs text-rose-600 hover:underline mt-1">Mark as closed</button>
+                                    <button
+                                        type="button"
+                                        onClick={closeTicket}
+                                        className="text-xs text-rose-600 hover:text-rose-700 hover:underline mt-1 cursor-pointer"
+                                    >
+                                        Mark as closed
+                                    </button>
                                 )}
                             </div>
 
@@ -208,14 +335,19 @@ export default function Support() {
                                     const isPlatform = m.author_kind === 'platform';
                                     return (
                                         <div key={m.message_id} className={`flex ${isPlatform ? 'justify-start' : 'justify-end'}`}>
-                                            <div className={`max-w-[75%] rounded-2xl p-3 ${isPlatform ? 'bg-amber-50 ring-1 ring-amber-100' : 'bg-brand-50 ring-1 ring-brand-100'}`}>
+                                            <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-3 border ${
+                                                isPlatform ? 'bg-amber-50 border-amber-200' : 'bg-brand-50 border-brand-200'
+                                            }`}>
                                                 <div className="flex items-baseline justify-between gap-3 mb-1">
-                                                    <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
-                                                        {isPlatform ? '🟡 MediFleet Team' : m.author_name}
+                                                    <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 inline-flex items-center gap-1.5">
+                                                        {isPlatform && <ShieldCheck size={11} className="text-amber-700" aria-hidden="true" />}
+                                                        {isPlatform ? 'MediFleet Team' : m.author_name}
                                                     </span>
-                                                    <span className="text-2xs text-ink-400">{new Date(m.created_at).toLocaleString()}</span>
+                                                    <span className="text-2xs text-ink-500 shrink-0" title={new Date(m.created_at).toLocaleString()}>
+                                                        {formatRelative(m.created_at)}
+                                                    </span>
                                                 </div>
-                                                <p className="text-sm text-ink-800 whitespace-pre-wrap leading-relaxed">{m.body}</p>
+                                                <p className="text-sm text-ink-900 whitespace-pre-wrap leading-relaxed">{m.body}</p>
                                             </div>
                                         </div>
                                     );

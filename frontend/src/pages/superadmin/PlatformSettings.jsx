@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiClient } from '../../api/client';
 import {
     Settings, ShieldCheck, Database, Globe, Server, Activity,
-    Lock, Bell, KeyRound, Cpu, Wifi, AlertTriangle, CheckCircle2,
+    Lock, KeyRound, Cpu, Wifi, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 
@@ -111,40 +111,39 @@ export default function PlatformSettings() {
     return (
         <div className="space-y-6 animate-fade-in">
             <PageHeader
-                surface="dark"
-                tone="accent"
                 eyebrow="Console"
                 icon={Settings}
                 title="Platform Settings"
                 subtitle="Runtime configuration snapshot. Edit .env and rolling-restart workers to change values."
+                tone="accent"
                 meta={
                     isLoading ? (
-                        <span className="text-ink-500 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" /> Probing</span>
+                        <span className="text-ink-500 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" aria-hidden="true" /> Probing</span>
                     ) : (
-                        <span className="bg-accent-500/10 ring-1 ring-accent-500/30 text-accent-400 px-3 py-1.5 rounded-full text-2xs font-semibold uppercase tracking-wider flex items-center gap-2">
-                            <Server size={13} /> Operational
+                        <span className="badge-success inline-flex items-center gap-1.5">
+                            <Server size={11} aria-hidden="true" /> Operational
                         </span>
                     )
                 }
             />
 
             {sections.map(({ title, icon: Icon, rows }) => (
-                <section key={title} className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl overflow-hidden">
-                    <div className="px-5 py-3 border-b border-white/5 bg-white/[0.02] flex items-center gap-2">
-                        <Icon size={15} className="text-ink-400" />
-                        <h2 className="font-semibold text-white text-sm tracking-tight">{title}</h2>
+                <section key={title} className="card overflow-hidden" aria-labelledby={`section-${title}`}>
+                    <div className="px-5 py-3 border-b border-ink-200 bg-ink-50 flex items-center gap-2">
+                        <Icon size={15} className="text-brand-600" aria-hidden="true" />
+                        <h2 id={`section-${title}`} className="font-semibold text-ink-900 text-sm tracking-tight">{title}</h2>
                     </div>
-                    <ul className="divide-y divide-white/5">
+                    <ul className="divide-y divide-ink-100">
                         {rows.map(({ label, value, badge, mono, hint }) => (
-                            <li key={label} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                                <div>
-                                    <p className="text-sm text-ink-200 font-medium">{label}</p>
+                            <li key={label} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <div className="min-w-0">
+                                    <p className="text-sm text-ink-900 font-medium">{label}</p>
                                     {hint && <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">{hint}</p>}
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <span className={mono ? 'font-mono text-accent-400 text-xs' : 'text-white font-semibold text-sm'}>{value}</span>
-                                    {badge === 'success' && (<CheckCircle2 size={14} className="text-accent-400" aria-label="Active" />)}
-                                    {badge === 'warning' && (<AlertTriangle size={14} className="text-amber-400" aria-label="Attention" />)}
+                                <div className="flex items-center gap-2 shrink-0 sm:max-w-[55%] sm:justify-end">
+                                    <span className={mono ? 'font-mono text-accent-700 text-xs break-all' : 'text-ink-900 font-semibold text-sm text-right'}>{value}</span>
+                                    {badge === 'success' && (<CheckCircle2 size={14} className="text-accent-600 shrink-0" aria-label="Active" />)}
+                                    {badge === 'warning' && (<AlertTriangle size={14} className="text-amber-600 shrink-0" aria-label="Attention" />)}
                                 </div>
                             </li>
                         ))}
@@ -152,10 +151,10 @@ export default function PlatformSettings() {
                 </section>
             ))}
 
-            <div className="text-xs text-ink-500 px-2 leading-relaxed">
-                For a complete env reference see <code className="text-ink-200 bg-white/5 px-1 py-0.5 rounded">docs/DEPLOYMENT.md</code>.
-                Sensitive values (<code className="text-ink-300">SECRET_KEY</code>, <code className="text-ink-300">ENCRYPTION_KEY</code>, M-Pesa secrets) are deliberately not displayed.
-            </div>
+            <p className="text-xs text-ink-500 px-2 leading-relaxed">
+                For a complete env reference see <code className="text-ink-700 bg-ink-100 px-1 py-0.5 rounded font-mono">docs/DEPLOYMENT.md</code>.
+                Sensitive values (<code className="text-ink-700 font-mono">SECRET_KEY</code>, <code className="text-ink-700 font-mono">ENCRYPTION_KEY</code>, M-Pesa secrets) are deliberately not displayed.
+            </p>
         </div>
     );
 }

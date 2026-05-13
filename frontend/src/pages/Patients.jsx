@@ -43,10 +43,30 @@ export default function Patients() {
     const fetchPatients = async () => {
         setIsLoading(true);
         try {
-            const response = await apiClient.get(`/patients/?search=${searchQuery}`);
+            const response = await apiClient.get(`/patients/?search=${encodeURIComponent(searchQuery)}`);
             setPatients(response.data);
         } catch (error) {
-            toast.error("Failed to load patients. Are you authorized?");
+            // Surface the real reason so operators don't have to dig through
+            // network tabs to diagnose load failures. Distinguishes between
+            // the four common causes: no tenant selected, expired auth,
+            // missing permission, and everything else.
+            const status = error.response?.status;
+            const serverDetail = error.response?.data?.detail;
+            let msg;
+            if (!status) {
+                msg = 'Cannot reach the server. Check that the backend is running.';
+            } else if (status === 400 && /X-Tenant-ID/i.test(String(serverDetail))) {
+                msg = 'No hospital selected. Open the Portal and pick a hospital first.';
+            } else if (status === 401) {
+                msg = 'Your session has expired — sign in again.';
+            } else if (status === 403) {
+                msg = `Access denied: ${serverDetail || 'you do not have the patients:read permission.'}`;
+            } else if (status === 402) {
+                msg = serverDetail || 'Patient Registry is not in your package — contact MediFleet support.';
+            } else {
+                msg = serverDetail || `Failed to load patients (HTTP ${status}).`;
+            }
+            toast.error(msg);
         } finally {
             setIsLoading(false);
         }
