@@ -5,6 +5,7 @@ import {
     Users, Search, Building2, Phone, MapPin, Calendar, ShieldCheck,
     Activity, Eye, X, Filter, AlertTriangle, RefreshCw,
 } from 'lucide-react';
+import PageHeader from '../../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Superadmin patient browser — READ-ONLY, end-to-end.                       */
@@ -84,20 +85,24 @@ export default function SuperAdminPatients() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-400">Console</span>
-                    <h1 className="text-2xl font-semibold text-white tracking-tight mt-1 flex items-center gap-2">
-                        <Users size={22} className="text-amber-400" /> Patients — cross-tenant
-                    </h1>
-                    <p className="text-sm text-ink-400 mt-1 flex items-center gap-2">
-                        <ShieldCheck size={13} className="text-accent-400" /> Read-only. No write paths exposed.
-                    </p>
-                </div>
-                <button onClick={fetchPatients} className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-semibold ring-1 ring-white/10 flex items-center gap-2">
-                    <RefreshCw size={14} /> Refresh
-                </button>
-            </div>
+            <PageHeader
+                surface="dark"
+                tone="warning"
+                eyebrow="Console"
+                icon={Users}
+                title="Patients — cross-tenant"
+                subtitle="Read-only browser across every active tenant database."
+                meta={
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-500/10 ring-1 ring-accent-500/20 text-2xs font-semibold uppercase tracking-wider text-accent-300">
+                        <ShieldCheck size={11} /> Read-only
+                    </span>
+                }
+                actions={
+                    <button onClick={fetchPatients} className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-semibold ring-1 ring-white/10 flex items-center gap-2 cursor-pointer">
+                        <RefreshCw size={14} /> Refresh
+                    </button>
+                }
+            />
 
             {/* Filters */}
             <div className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl p-4 flex flex-wrap gap-3 items-center">

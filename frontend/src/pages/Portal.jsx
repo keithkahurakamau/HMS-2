@@ -1,16 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import { Building2, Search, ArrowRight, Activity, Sparkles, HeartPulse, Home } from 'lucide-react';
+import {
+    Building2, Search, ArrowRight, Activity, Sparkles, HeartPulse,
+    ShieldCheck, Globe2, Lock, CheckCircle2, X, ChevronRight,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import Logo from '../components/Logo';
 
-const THEME_RING = {
-    blue:    'bg-blue-500/15 ring-blue-400/30 text-blue-300',
-    emerald: 'bg-emerald-500/15 ring-emerald-400/30 text-emerald-300',
-    teal:    'bg-brand-500/15 ring-brand-400/30 text-brand-300',
-    amber:   'bg-amber-500/15 ring-amber-400/30 text-amber-300',
-    rose:    'bg-rose-500/15 ring-rose-400/30 text-rose-300',
+/**
+ * Portal — hospital workspace selector.
+ *
+ *  Acts as the front door once a visitor decides "I'm a member of a hospital
+ *  team." Lives in the same visual family as Landing (cyan/teal/emerald,
+ *  floating navbar, white-and-mesh body) so the trip from "I read about
+ *  MediFleet" → "I'm picking my hospital" feels like one product.
+ *
+ *  Premium and theme-color chips remain on each tenant card so a returning
+ *  user can spot their hospital at a glance.
+ */
+
+const TENANT_CHIP = {
+    blue:    { ring: 'bg-blue-50 text-blue-700 ring-blue-100' },
+    emerald: { ring: 'bg-accent-50 text-accent-700 ring-accent-100' },
+    teal:    { ring: 'bg-teal-50 text-teal-700 ring-teal-100' },
+    amber:   { ring: 'bg-amber-50 text-amber-700 ring-amber-100' },
+    rose:    { ring: 'bg-rose-50 text-rose-700 ring-rose-100' },
+    cyan:    { ring: 'bg-brand-50 text-brand-700 ring-brand-100' },
 };
 
 export default function Portal() {
@@ -49,123 +65,263 @@ export default function Portal() {
     };
 
     return (
-        <div className="min-h-screen bg-ink-950 text-white flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden">
-            {/* Ambient background */}
-            <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute -top-40 -left-32 w-[36rem] h-[36rem] bg-brand-500/15 rounded-full blur-[120px]" />
-                <div className="absolute -bottom-40 -right-32 w-[36rem] h-[36rem] bg-accent-500/15 rounded-full blur-[120px]" />
-                <div className="absolute inset-0 bg-grid opacity-[0.05]" />
-            </div>
-
-            <div className="relative z-10 w-full max-w-5xl flex flex-col items-center animate-slide-up">
-                {/* Brand header */}
-                <div className="mb-8">
-                    <Logo
-                        variant="full"
-                        size={48}
-                        label="MediFleet"
-                        sublabel="Multi-tenant clinical cloud"
-                        tone="mono-light"
-                    />
+        <div className="min-h-screen bg-ink-50 text-ink-900 font-sans">
+            {/* ============== Floating navbar ============== */}
+            <header className="fixed top-4 inset-x-4 z-50">
+                <div className="max-w-7xl mx-auto bg-white/85 backdrop-blur-xl border border-ink-200/70 rounded-2xl shadow-soft px-4 sm:px-6 py-3 flex items-center justify-between">
+                    <Link to="/" className="flex items-center cursor-pointer" aria-label="MediFleet home">
+                        <Logo variant="full" size={32} label="MediFleet" />
+                    </Link>
+                    <nav className="hidden md:flex items-center gap-1">
+                        <Link to="/" className="px-3 py-2 text-sm font-medium text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">Home</Link>
+                        <Link to="/patient" className="px-3 py-2 text-sm font-medium text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">Patient portal</Link>
+                        <Link to="/superadmin/login" className="px-3 py-2 text-sm font-medium text-ink-600 hover:text-ink-900 transition-colors cursor-pointer">Platform</Link>
+                    </nav>
+                    <button
+                        type="button"
+                        onClick={() => document.getElementById('directory')?.scrollIntoView({ behavior: 'smooth' })}
+                        className="btn-primary text-xs cursor-pointer"
+                    >
+                        Find my hospital <ArrowRight size={14} />
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => navigate('/')}
-                    className="absolute top-0 left-0 inline-flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.16em] text-ink-400 hover:text-brand-300 cursor-pointer transition-colors"
-                >
-                    <Home size={12} /> Back to landing
-                </button>
+            </header>
 
-                <div className="w-full bg-white/[0.04] backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-10 shadow-elevated">
-                    <div className="text-center mb-8 sm:mb-10">
-                        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 ring-1 ring-white/10 text-2xs font-semibold uppercase tracking-[0.14em] text-white/85">
-                            <Sparkles size={12} className="text-brand-300" />
-                            Hospital workspace
-                        </span>
-                        <h2 className="mt-4 text-2xl sm:text-3xl font-semibold tracking-tight">Select your organization</h2>
-                        <p className="mt-2 text-sm text-ink-400 max-w-xl mx-auto">
-                            Search for your hospital's workspace to connect to your dedicated cloud instance.
-                        </p>
+            {/* ============== Hero ============== */}
+            <section className="relative pt-32 pb-12 sm:pt-40 sm:pb-16 overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute inset-0 bg-aurora" />
+                    <div className="absolute inset-0 bg-grid-faint bg-grid-faint opacity-50" />
+                    <div className="absolute -top-24 -right-24 w-[36rem] h-[36rem] bg-brand-300/20 rounded-full blur-[120px]" />
+                    <div className="absolute -bottom-32 -left-24 w-[32rem] h-[32rem] bg-accent-300/20 rounded-full blur-[120px]" />
+                </div>
+
+                <div className="relative max-w-5xl mx-auto px-6 text-center animate-slide-up">
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 ring-1 ring-brand-200 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">
+                        <Sparkles size={12} className="text-teal-500" />
+                        Hospital workspace selector
+                    </span>
+                    <h1 className="mt-6 text-3xl sm:text-5xl font-semibold tracking-tightest leading-[1.05]">
+                        Pick your{' '}
+                        <span className="text-gradient-brand">hospital</span>{' '}
+                        to sign in.
+                    </h1>
+                    <p className="mt-5 text-base sm:text-lg text-ink-600 leading-relaxed max-w-2xl mx-auto">
+                        Every hospital on MediFleet runs on its own dedicated database. Find your
+                        organization below — we'll connect you to its workspace.
+                    </p>
+
+                    {/* Inline search */}
+                    <form
+                        onSubmit={(e) => e.preventDefault()}
+                        className="mt-8 max-w-xl mx-auto"
+                        role="search"
+                    >
+                        <label htmlFor="hospital-search" className="sr-only">
+                            Search for your hospital
+                        </label>
+                        <div className="relative">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" size={20} aria-hidden="true" />
+                            <input
+                                id="hospital-search"
+                                type="search"
+                                placeholder="Hospital name or domain (e.g. mayoclinic.hms.co.ke)"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-12 pr-12 py-3.5 bg-white border border-ink-200 rounded-2xl text-ink-900 placeholder-ink-400 shadow-soft focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 transition-all text-base"
+                                autoComplete="off"
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    aria-label="Clear search"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition-colors cursor-pointer"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+                    </form>
+
+                    {/* Trust strip */}
+                    <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-xs text-ink-500">
+                        <Trust icon={<Lock size={14} className="text-brand-600" />} label="HttpOnly JWT · CSRF" />
+                        <Trust icon={<ShieldCheck size={14} className="text-teal-600" />} label="KDPA aligned" />
+                        <Trust icon={<Globe2 size={14} className="text-accent-600" />} label="Database per tenant" />
+                    </div>
+                </div>
+            </section>
+
+            {/* ============== Hospital directory ============== */}
+            <section id="directory" className="relative pb-16 sm:pb-24 -mt-2">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="flex items-end justify-between flex-wrap gap-3 mb-6">
+                        <div>
+                            <span className="section-eyebrow">Directory</span>
+                            <h2 className="mt-1 text-2xl sm:text-3xl font-semibold tracking-tight text-ink-900">
+                                {isLoading
+                                    ? 'Scanning global registry…'
+                                    : `${filteredHospitals.length} ${filteredHospitals.length === 1 ? 'hospital' : 'hospitals'} available`}
+                            </h2>
+                            <p className="mt-1 text-sm text-ink-500">
+                                Click a card to connect to its instance, then sign in with your staff credentials.
+                            </p>
+                        </div>
+                        {!isLoading && (
+                            <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
+                                Showing {filteredHospitals.length} of {hospitals.length}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Search */}
-                    <div className="relative max-w-xl mx-auto mb-8 sm:mb-10">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-500" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Hospital name or domain (e.g. mayoclinic.hms.co.ke)"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-12 pr-4 py-3.5 bg-ink-950/60 border border-white/10 rounded-2xl text-white placeholder-ink-500 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/20 transition-all text-base"
-                        />
-                    </div>
-
-                    {/* Directory */}
                     {isLoading ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-brand-300">
-                            <Activity className="animate-spin mb-3" size={28} />
-                            <p className="text-sm text-ink-400 font-medium">Scanning global registry…</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <div key={i} className="bg-white border border-ink-200/70 rounded-2xl p-5 animate-pulse-soft">
+                                    <div className="w-10 h-10 rounded-xl bg-ink-100" />
+                                    <div className="mt-4 h-4 w-2/3 rounded bg-ink-100" />
+                                    <div className="mt-2 h-3 w-1/2 rounded bg-ink-100/70" />
+                                    <div className="mt-6 h-3 w-1/3 rounded bg-ink-100/60" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : filteredHospitals.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredHospitals.map((tenant) => {
+                                const chip = TENANT_CHIP[tenant.theme_color] || TENANT_CHIP.cyan;
+                                return (
+                                    <button
+                                        key={tenant.id}
+                                        onClick={() => handleSelectTenant(tenant)}
+                                        className="group text-left bg-white border border-ink-200/70 hover:border-brand-300 rounded-2xl p-5 shadow-soft hover:shadow-elevated transition-all duration-200 flex flex-col justify-between min-h-[12rem] cursor-pointer focus-visible:ring-4 focus-visible:ring-brand-500/20 focus-visible:border-brand-500"
+                                    >
+                                        <div>
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ring-inset ${chip.ring}`}>
+                                                    <Building2 size={18} />
+                                                </div>
+                                                {tenant.is_premium && (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-accent-50 ring-1 ring-inset ring-accent-100 text-accent-700 text-2xs font-semibold uppercase tracking-wider">
+                                                        <Sparkles size={10} /> Premium
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h3 className="text-base font-semibold text-ink-900 group-hover:text-brand-700 transition-colors tracking-tight">
+                                                {tenant.name}
+                                            </h3>
+                                            <p className="text-xs text-ink-500 mt-1 truncate font-mono">{tenant.domain}</p>
+                                        </div>
+                                        <div className="mt-5 flex items-center justify-between text-xs font-semibold text-ink-500 group-hover:text-brand-700 transition-colors">
+                                            <span className="inline-flex items-center gap-1.5">
+                                                <CheckCircle2 size={12} className="text-accent-500" /> Active instance
+                                            </span>
+                                            <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {filteredHospitals.length > 0 ? (
-                                filteredHospitals.map((tenant) => {
-                                    const ringStyle = THEME_RING[tenant.theme_color] || THEME_RING.teal;
-                                    return (
-                                        <button
-                                            key={tenant.id}
-                                            onClick={() => handleSelectTenant(tenant)}
-                                            className="group text-left bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 hover:border-brand-400/40 rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between"
-                                        >
-                                            <div>
-                                                <div className="flex justify-between items-start mb-4">
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ring-1 ring-inset ${ringStyle}`}>
-                                                        <Building2 size={18} />
-                                                    </div>
-                                                    {tenant.is_premium && (
-                                                        <span className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-2xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-soft">
-                                                            <Sparkles size={10} /> Premium
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <h3 className="text-base font-semibold text-white group-hover:text-brand-300 transition-colors tracking-tight">
-                                                    {tenant.name}
-                                                </h3>
-                                                <p className="text-xs text-ink-500 mt-1 truncate">{tenant.domain}</p>
-                                            </div>
-                                            <div className="mt-5 flex items-center justify-between text-xs font-semibold text-ink-400 group-hover:text-brand-300 transition-colors">
-                                                <span>Connect to instance</span>
-                                                <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
-                                            </div>
-                                        </button>
-                                    );
-                                })
-                            ) : (
-                                <div className="col-span-full text-center py-12 bg-white/[0.02] border border-white/5 rounded-2xl">
-                                    <Building2 size={40} className="mx-auto text-ink-700 mb-3" />
-                                    <h3 className="text-base font-semibold text-ink-300">No organizations found</h3>
-                                    <p className="text-sm text-ink-500 mt-1">Check your spelling or contact your system administrator.</p>
-                                </div>
-                            )}
+                        <div className="bg-white border border-dashed border-ink-300 rounded-2xl p-12 text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-brand-50 ring-1 ring-brand-100 text-brand-600 mx-auto flex items-center justify-center mb-4">
+                                <Building2 size={24} />
+                            </div>
+                            <h3 className="text-base font-semibold text-ink-900">No matches for &ldquo;{searchQuery}&rdquo;</h3>
+                            <p className="text-sm text-ink-500 mt-1 max-w-md mx-auto">
+                                Double-check the spelling, or contact your system administrator if your hospital isn't listed yet.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery('')}
+                                className="mt-5 btn-secondary cursor-pointer"
+                            >
+                                <X size={14} /> Clear search
+                            </button>
                         </div>
                     )}
                 </div>
+            </section>
 
-                <div className="mt-8 flex flex-col items-center gap-3">
-                    <button
-                        type="button"
-                        onClick={() => navigate('/patient')}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.04] hover:bg-white/[0.08] ring-1 ring-white/10 text-sm font-semibold text-brand-300 hover:text-brand-200 transition-colors"
-                    >
-                        <HeartPulse size={14} />
-                        Are you a patient? Open the Patient Portal
-                        <ArrowRight size={14} />
-                    </button>
-                    <p className="text-2xs text-ink-500 uppercase tracking-[0.18em]">
-                        Powered by Advanced Agentic Cloud Infrastructure
-                    </p>
+            {/* ============== Other paths card row ============== */}
+            <section className="pb-20 sm:pb-28">
+                <div className="max-w-5xl mx-auto px-6">
+                    <div className="grid md:grid-cols-3 gap-4">
+                        <PathCard
+                            to="/patient"
+                            tone="teal"
+                            icon={<HeartPulse size={18} />}
+                            title="I'm a patient"
+                            body="Look up appointments, lab results, prescriptions, and bills."
+                            cta="Open Patient Portal"
+                        />
+                        <PathCard
+                            to="/superadmin/login"
+                            tone="warning"
+                            icon={<ShieldCheck size={18} />}
+                            title="Platform team"
+                            body="Manage tenants, billing, and platform-wide settings."
+                            cta="Console sign-in"
+                        />
+                        <PathCard
+                            to="/"
+                            tone="brand"
+                            icon={<Sparkles size={18} />}
+                            title="New to MediFleet?"
+                            body="Read about the platform, modules, and security posture."
+                            cta="Visit landing page"
+                        />
+                    </div>
                 </div>
-            </div>
+            </section>
+
+            {/* ============== Footer ============== */}
+            <footer className="border-t border-ink-200/70 bg-white/60 backdrop-blur-md">
+                <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <Logo variant="full" size={28} />
+                    <p className="text-xs text-ink-500 uppercase tracking-[0.18em]">
+                        &copy; {new Date().getFullYear()} MediFleet &mdash; Multi-tenant clinical cloud
+                    </p>
+                    <div className="flex items-center gap-4 text-xs text-ink-500">
+                        <Link to="/" className="hover:text-brand-700 transition-colors cursor-pointer">Home</Link>
+                        <Link to="/patient" className="hover:text-brand-700 transition-colors cursor-pointer">Patient portal</Link>
+                        <Link to="/superadmin/login" className="hover:text-brand-700 transition-colors cursor-pointer">Platform</Link>
+                    </div>
+                </div>
+            </footer>
         </div>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function Trust({ icon, label }) {
+    return (
+        <span className="inline-flex items-center gap-2 font-medium text-ink-600">
+            {icon}{label}
+        </span>
+    );
+}
+
+function PathCard({ to, icon, title, body, cta, tone }) {
+    const ring =
+        tone === 'brand'   ? 'bg-brand-50 text-brand-700 ring-brand-100'
+      : tone === 'teal'    ? 'bg-teal-50 text-teal-700 ring-teal-100'
+      : tone === 'warning' ? 'bg-amber-50 text-amber-700 ring-amber-100'
+                           : 'bg-accent-50 text-accent-700 ring-accent-100';
+    return (
+        <Link
+            to={to}
+            className="group bg-white border border-ink-200/70 hover:border-brand-300 rounded-2xl p-5 shadow-soft hover:shadow-elevated transition-all cursor-pointer"
+        >
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ring-inset ${ring}`}>
+                {icon}
+            </div>
+            <h3 className="mt-4 text-base font-semibold tracking-tight text-ink-900">{title}</h3>
+            <p className="mt-1.5 text-sm text-ink-600 leading-relaxed">{body}</p>
+            <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-700">
+                {cta} <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+            </div>
+        </Link>
     );
 }

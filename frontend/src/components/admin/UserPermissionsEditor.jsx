@@ -138,8 +138,8 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                             Effective permissions are role defaults + grants − revokes.
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
-                        <X size={20} />
+                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer">
+                        <X size={20} aria-hidden="true" />
                     </button>
                 </div>
 

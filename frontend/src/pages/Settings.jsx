@@ -236,8 +236,8 @@ export default function Settings() {
                     <div className="relative w-full max-w-lg bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
                             <h2 className="text-lg font-semibold flex items-center gap-2"><Plus size={18} /> Add custom setting</h2>
-                            <button onClick={() => setShowCustomForm(false)} className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
-                                <X size={20} />
+                            <button onClick={() => setShowCustomForm(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full cursor-pointer">
+                                <X size={20} aria-hidden="true" />
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-ink-50/60">

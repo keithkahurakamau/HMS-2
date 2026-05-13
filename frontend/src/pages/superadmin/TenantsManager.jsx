@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import { Building2, Server, Database, Plus, Search, MoreVertical, Edit2, ShieldAlert, Power, CheckCircle2, X, ZapOff, Zap } from 'lucide-react';
+import PageHeader from '../../components/PageHeader';
 
 // Normalize whatever the backend (or network) returned into a single readable
 // string. FastAPI 422s come back as a list of {loc, msg, type}; HTTPException
@@ -151,18 +152,20 @@ export default function TenantsManager() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-400">Console</span>
-                    <h1 className="text-2xl font-semibold text-white tracking-tight mt-1">Tenant Fleet Manager</h1>
-                    <p className="text-sm text-ink-400 mt-1">Regulate hospital instances, database connections, and subscriptions.</p>
-                </div>
-                <button onClick={() => setIsAddModalOpen(true)}
-                    className="inline-flex items-center gap-2 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-glow transition-all">
-                    <Plus size={15} /> Provision new tenant
-                </button>
-            </div>
+            <PageHeader
+                surface="dark"
+                tone="warning"
+                eyebrow="Console"
+                icon={Building2}
+                title="Tenant Fleet Manager"
+                subtitle="Regulate hospital instances, database connections, and subscriptions."
+                actions={
+                    <button onClick={() => setIsAddModalOpen(true)}
+                        className="inline-flex items-center gap-2 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-glow transition-all cursor-pointer">
+                        <Plus size={15} /> Provision new tenant
+                    </button>
+                }
+            />
 
             {/* Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -183,7 +186,7 @@ export default function TenantsManager() {
                 ))}
                 <div className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl p-5">
                     <div className="flex justify-between items-start mb-4">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center ring-1 ring-inset bg-indigo-500/10 ring-indigo-500/20 text-indigo-400">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center ring-1 ring-inset bg-teal-500/10 ring-teal-500/20 text-teal-300">
                             <Server size={18} />
                         </div>
                     </div>

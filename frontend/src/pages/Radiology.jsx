@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printRadiologyReport } from '../utils/printTemplates';
+import PageHeader from '../components/PageHeader';
 
 const EMPTY_CATALOG = {
     exam_name: '', modality: 'X-Ray', body_part: '', description: '',
@@ -138,6 +139,12 @@ export default function Radiology() {
 
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
+            <PageHeader
+                eyebrow="Imaging"
+                icon={Radio}
+                title="Radiology"
+                subtitle="Acquire imaging requests, run studies, and publish reports."
+            />
             <div className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
                     <button role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}

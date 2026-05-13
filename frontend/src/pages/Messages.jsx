@@ -6,6 +6,7 @@ import {
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import PageHeader from '../components/PageHeader';
 
 // Build the WebSocket URL the same way the rest of the app talks to the API:
 // strip the /api suffix (apiClient uses baseURL '/api') and switch the scheme.
@@ -135,9 +136,16 @@ export default function Messages() {
     );
 
     return (
-        <div className="flex h-[calc(100vh-8rem)] gap-4">
-            {/* Sidebar */}
-            <aside className="w-80 shrink-0 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
+        <div className="flex flex-col gap-4 h-[calc(100vh-6rem)]">
+            <PageHeader
+                eyebrow="Inbox"
+                icon={MessageSquare}
+                title="Messages"
+                subtitle="Direct chats and group conversations across departments."
+            />
+            <div className="flex flex-1 min-h-0 gap-4 flex-col md:flex-row">
+            {/* Sidebar — full width on mobile (stacks above thread), fixed-width on tablet+. */}
+            <aside className={`md:w-80 shrink-0 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden ${activeId ? 'hidden md:flex' : 'flex'}`}>
                 <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                     <div>
                         <h2 className="text-sm font-semibold text-ink-900 dark:text-white tracking-tight">Conversations</h2>
@@ -217,19 +225,27 @@ export default function Messages() {
             </aside>
 
             {/* Main panel */}
-            <section className="flex-1 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
+            <section className={`flex-1 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden ${activeId ? 'flex' : 'hidden md:flex'}`}>
                 {!activeConv ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-ink-400 p-8">
-                        <MessageSquare size={40} className="mb-3 opacity-40" />
+                        <MessageSquare size={40} className="mb-3 opacity-40" aria-hidden="true" />
                         <p className="text-sm">Select a conversation, or start a new one.</p>
                     </div>
                 ) : (
                     <>
                         <header className="px-5 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setActiveId(null)}
+                                aria-label="Back to conversations"
+                                className="md:hidden p-1.5 -ml-1.5 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer"
+                            >
+                                <X size={18} aria-hidden="true" />
+                            </button>
                             {(() => {
                                 const Icon = KIND_ICON[activeConv.kind] || Hash;
                                 return (
-                                    <span className="shrink-0 w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-900/30 text-brand-600 flex items-center justify-center">
+                                    <span className="shrink-0 w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-900/30 text-brand-600 flex items-center justify-center" aria-hidden="true">
                                         <Icon size={18} />
                                     </span>
                                 );
@@ -305,6 +321,7 @@ export default function Messages() {
                     </>
                 )}
             </section>
+            </div>
 
             {picker && (
                 <NewConversationModal

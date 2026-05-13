@@ -4,6 +4,7 @@ import {
     Settings, ShieldCheck, Database, Globe, Server, Activity,
     Lock, Bell, KeyRound, Cpu, Wifi, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
+import PageHeader from '../../components/PageHeader';
 
 /**
  * Platform Settings is read-only by design — the canonical source of truth is
@@ -109,22 +110,23 @@ export default function PlatformSettings() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-400">Console</span>
-                    <h1 className="text-2xl font-semibold text-white tracking-tight mt-1 flex items-center gap-2">
-                        <Settings size={22} className="text-indigo-400" /> Platform Settings
-                    </h1>
-                    <p className="text-sm text-ink-400 mt-1">Runtime configuration snapshot. Edit your <code className="text-ink-200 bg-white/5 px-1 py-0.5 rounded text-xs">.env</code> and rolling-restart workers to change values.</p>
-                </div>
-                {isLoading ? (
-                    <span className="text-ink-500 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" /> Probing</span>
-                ) : (
-                    <span className="bg-accent-500/10 ring-1 ring-accent-500/30 text-accent-400 px-3 py-1.5 rounded-full text-2xs font-semibold uppercase tracking-wider flex items-center gap-2">
-                        <Server size={13} /> Operational
-                    </span>
-                )}
-            </div>
+            <PageHeader
+                surface="dark"
+                tone="accent"
+                eyebrow="Console"
+                icon={Settings}
+                title="Platform Settings"
+                subtitle="Runtime configuration snapshot. Edit .env and rolling-restart workers to change values."
+                meta={
+                    isLoading ? (
+                        <span className="text-ink-500 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" /> Probing</span>
+                    ) : (
+                        <span className="bg-accent-500/10 ring-1 ring-accent-500/30 text-accent-400 px-3 py-1.5 rounded-full text-2xs font-semibold uppercase tracking-wider flex items-center gap-2">
+                            <Server size={13} /> Operational
+                        </span>
+                    )
+                }
+            />
 
             {sections.map(({ title, icon: Icon, rows }) => (
                 <section key={title} className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl overflow-hidden">

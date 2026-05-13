@@ -5,6 +5,7 @@ import {
     LifeBuoy, Search, Filter, Send, RefreshCw, Activity, MessageSquare,
     Building2, Calendar, CheckCircle2, AlertCircle, Clock, X,
 } from 'lucide-react';
+import PageHeader from '../../components/PageHeader';
 
 const STATUS_META = {
     'Open':                 { color: 'bg-blue-500/20 text-blue-300 ring-blue-500/30',     icon: AlertCircle },
@@ -111,18 +112,19 @@ export default function SupportInbox() {
 
     return (
         <div className="space-y-5 animate-fade-in">
-            <div className="flex justify-between items-start flex-wrap gap-3">
-                <div>
-                    <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-400">Console</span>
-                    <h1 className="text-2xl font-semibold text-white tracking-tight mt-1 flex items-center gap-2">
-                        <LifeBuoy size={22} className="text-amber-400" /> Support Inbox
-                    </h1>
-                    <p className="text-sm text-ink-400 mt-1">Tickets raised by tenant admins across the fleet.</p>
-                </div>
-                <button onClick={fetchAll} className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-semibold ring-1 ring-white/10 flex items-center gap-2">
-                    <RefreshCw size={14} /> Refresh
-                </button>
-            </div>
+            <PageHeader
+                surface="dark"
+                tone="warning"
+                eyebrow="Console"
+                icon={LifeBuoy}
+                title="Support Inbox"
+                subtitle="Tickets raised by tenant admins across the fleet."
+                actions={
+                    <button onClick={fetchAll} className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-semibold ring-1 ring-white/10 flex items-center gap-2 cursor-pointer">
+                        <RefreshCw size={14} /> Refresh
+                    </button>
+                }
+            />
 
             {/* KPI row */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">

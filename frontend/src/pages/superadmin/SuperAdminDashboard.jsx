@@ -1,27 +1,31 @@
 import React from 'react';
-import { Activity, Building2, CreditCard, Users, TrendingUp } from 'lucide-react';
+import { Activity, Building2, CreditCard, Users, TrendingUp, LayoutDashboard } from 'lucide-react';
+import PageHeader from '../../components/PageHeader';
 
 export default function SuperAdminDashboard() {
     return (
         <div className="space-y-6 animate-fade-in">
-            <div>
-                <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-400">Console</span>
-                <h1 className="text-2xl font-semibold text-white tracking-tight mt-1">Global Overview</h1>
-                <p className="text-sm text-ink-400 mt-1">Real-time platform metrics and revenue telemetry across all tenants.</p>
-            </div>
+            <PageHeader
+                surface="dark"
+                tone="warning"
+                eyebrow="Console"
+                icon={LayoutDashboard}
+                title="Global Overview"
+                subtitle="Real-time platform metrics and revenue telemetry across all tenants."
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                     { icon: Building2,  label: 'Active tenants',  value: '—', accent: 'amber'   },
                     { icon: Users,      label: 'Total users',     value: '—', accent: 'brand'   },
                     { icon: CreditCard, label: 'MRR',             value: '—', accent: 'accent'  },
-                    { icon: TrendingUp, label: 'Growth (30d)',    value: '—', accent: 'blue'    },
+                    { icon: TrendingUp, label: 'Growth (30d)',    value: '—', accent: 'teal'    },
                 ].map(({ icon: Icon, label, value, accent }) => {
                     const ringMap = {
                         amber:  'bg-amber-500/10 ring-amber-500/20 text-amber-400',
                         brand:  'bg-brand-500/10 ring-brand-500/20 text-brand-300',
                         accent: 'bg-accent-500/10 ring-accent-500/20 text-accent-400',
-                        blue:   'bg-blue-500/10 ring-blue-500/20 text-blue-400',
+                        teal:   'bg-teal-500/10 ring-teal-500/20 text-teal-300',
                     };
                     return (
                         <div key={label} className="bg-white/[0.04] backdrop-blur-md ring-1 ring-white/10 rounded-2xl p-5 hover:bg-white/[0.06] transition-colors">

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printLabReport } from '../utils/printTemplates';
+import PageHeader from '../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Laboratory                                                                */
@@ -266,6 +267,12 @@ export default function Laboratory() {
 
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
+            <PageHeader
+                eyebrow="Diagnostics"
+                icon={TestTube}
+                title="Laboratory"
+                subtitle="Process orders, capture results, and publish reports — with full sample lifecycle tracking."
+            />
 
             {/* Tabs */}
             <div className="card p-2 flex items-center justify-between shrink-0">

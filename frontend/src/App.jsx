@@ -49,8 +49,8 @@ const ProtectedRoute = ({ children }) => {
   
   if (loading) {
       return (
-          <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
-              <Activity className="animate-spin text-brand-600" size={32} />
+          <div className="h-screen w-screen flex items-center justify-center bg-ink-50">
+              <Activity className="animate-spin text-brand-600" size={32} aria-label="Loading" />
           </div>
       );
   }
