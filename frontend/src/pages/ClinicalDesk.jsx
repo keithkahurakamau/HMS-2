@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
     Search, User, Activity, FileText, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
-    History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable
+    History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable,
+    X, Image as ImageIcon, Plus, Minus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
+import { useActivePatient } from '../context/PatientContext';
 
 export default function ClinicalDesk() {
     const navigate = useNavigate();
@@ -24,7 +26,16 @@ export default function ClinicalDesk() {
     const [icdSearch, setIcdSearch] = useState('');
     const [showIcdDropdown, setShowIcdDropdown] = useState(false);
     const [chargeConsultation, setChargeConsultation] = useState(false);
-    
+
+    // --- LAB / IMAGING ORDER MODAL STATE ---
+    const [isLabModalOpen, setIsLabModalOpen] = useState(false);
+    const [isImagingModalOpen, setIsImagingModalOpen] = useState(false);
+
+    // Cross-page active patient context (also drives the bar at the top of
+    // every workspace page). We mirror the local `activePatient` state into
+    // it so the rest of the system sees the doctor's current focus.
+    const { setActivePatient: setGlobalActivePatient } = useActivePatient();
+
     const mockIcdDatabase = ["A09 - Infectious gastroenteritis", "E11.9 - Type 2 diabetes mellitus", "I10 - Essential hypertension", "B50.9 - Severe Malaria", "J03.90 - Acute tonsillitis", "R50.9 - Fever, unspecified"];
     const filteredIcd = mockIcdDatabase.filter(code => code.toLowerCase().includes(icdSearch.toLowerCase()));
 
@@ -56,9 +67,13 @@ export default function ClinicalDesk() {
 
     const handlePatientSelect = (patientItem) => {
         setActivePatient(patientItem);
+        // Make this patient the system-wide active context so the persistent
+        // bar + cross-module navigation stays scoped to them, and the
+        // KDPA S.26 access log captures the doctor's movement.
+        setGlobalActivePatient(patientItem);
         setIsQueueOpen(false);
         // Reset all forms for the new patient
-        setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' }); 
+        setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
         setClinicalNotes({ cc: '', hpi: '', objective: '', diagnosis: '', plan: '', internal_notes: '' });
         setIcdSearch('');
         setChargeConsultation(false);
@@ -280,8 +295,20 @@ export default function ClinicalDesk() {
                                     <div className="rounded-xl border border-ink-200 p-4">
                                         <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 mb-3 flex items-center gap-2"><TestTube size={13} /> Investigations</h4>
                                         <div className="flex gap-2">
-                                            <button onClick={() => handleNotImplemented('Lab Ordering Modal')} className="btn-secondary flex-1 py-2 text-xs">+ Order Lab Tests</button>
-                                            <button onClick={() => handleNotImplemented('Radiology Ordering')} className="btn-secondary flex-1 py-2 text-xs">+ Order Imaging</button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsLabModalOpen(true)}
+                                                className="btn-secondary flex-1 py-2 text-xs cursor-pointer"
+                                            >
+                                                <TestTube size={13} aria-hidden="true" /> Order Lab Tests
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsImagingModalOpen(true)}
+                                                className="btn-secondary flex-1 py-2 text-xs cursor-pointer"
+                                            >
+                                                <ImageIcon size={13} aria-hidden="true" /> Order Imaging
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="rounded-xl border border-accent-200 bg-accent-50/40 p-4">
@@ -329,6 +356,445 @@ export default function ClinicalDesk() {
                         </div>
                     </>
                 )}
+            </div>
+
+            {/* Lab + imaging order modals — only rendered when a patient is
+                active so the modals always have a target to POST against. */}
+            {activePatient && isLabModalOpen && (
+                <LabOrderModal
+                    patient={activePatient}
+                    onClose={() => setIsLabModalOpen(false)}
+                />
+            )}
+            {activePatient && isImagingModalOpen && (
+                <ImagingOrderModal
+                    patient={activePatient}
+                    onClose={() => setIsImagingModalOpen(false)}
+                />
+            )}
+        </div>
+    );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Lab order modal.                                                          */
+/*                                                                            */
+/*  Fetches /laboratory/catalog (only active tests), lets the doctor pick     */
+/*  one or more, attach per-test clinical notes + priority, and submits in    */
+/*  a single transaction via /laboratory/orders.                              */
+/* ────────────────────────────────────────────────────────────────────────── */
+const PRIORITIES = ['Routine', 'Urgent', 'STAT'];
+
+function LabOrderModal({ patient, onClose }) {
+    const [catalog, setCatalog] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    // Map of catalog_id -> { selected, priority, clinical_notes }
+    const [selection, setSelection] = useState({});
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await apiClient.get('/laboratory/catalog?active_only=true');
+                setCatalog(res.data || []);
+            } catch (e) {
+                toast.error(e.response?.data?.detail || 'Failed to load lab catalog.');
+            } finally {
+                setIsLoading(false);
+            }
+        })();
+    }, []);
+
+    const filtered = useMemo(() => {
+        const needle = search.trim().toLowerCase();
+        if (!needle) return catalog;
+        return catalog.filter(c =>
+            c.test_name?.toLowerCase().includes(needle)
+            || c.specimen_type?.toLowerCase().includes(needle)
+        );
+    }, [catalog, search]);
+
+    const selectedItems = useMemo(() =>
+        Object.entries(selection).filter(([, v]) => v && v.selected)
+    , [selection]);
+
+    const toggle = (catalogId) => {
+        setSelection(prev => ({
+            ...prev,
+            [catalogId]: prev[catalogId]?.selected
+                ? { ...prev[catalogId], selected: false }
+                : { selected: true, priority: 'Routine', clinical_notes: '' },
+        }));
+    };
+
+    const updateField = (catalogId, field, value) => {
+        setSelection(prev => ({
+            ...prev,
+            [catalogId]: { ...prev[catalogId], [field]: value },
+        }));
+    };
+
+    const submit = async () => {
+        if (selectedItems.length === 0) {
+            toast.error('Pick at least one test.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const tests = selectedItems.map(([catalogId, v]) => ({
+                catalog_id: Number(catalogId),
+                clinical_notes: v.clinical_notes || null,
+                priority: v.priority || 'Routine',
+            }));
+            await apiClient.post('/laboratory/orders', {
+                patient_id: patient.patient_id,
+                record_id: null,
+                tests,
+            });
+            toast.success(`Ordered ${tests.length} lab test${tests.length === 1 ? '' : 's'}.`);
+            onClose();
+        } catch (e) {
+            toast.error(e.response?.data?.detail || 'Failed to create lab order.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-ink-950/60 backdrop-blur-sm animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lab-order-title"
+        >
+            <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-3xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-start gap-3 shrink-0">
+                    <div className="min-w-0">
+                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">New lab order</p>
+                        <h2 id="lab-order-title" className="text-base sm:text-lg font-semibold text-ink-900 tracking-tight truncate">
+                            {patient.patient_name}
+                        </h2>
+                        <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer shrink-0"
+                    >
+                        <X size={18} aria-hidden="true" />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    {/* Search */}
+                    <div className="px-4 sm:px-6 py-3 border-b border-ink-200 bg-white sticky top-0 z-10">
+                        <div className="relative">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
+                            <label htmlFor="lab-search" className="sr-only">Search tests</label>
+                            <input
+                                id="lab-search"
+                                type="search"
+                                placeholder="Search lab tests by name or specimen…"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="w-full bg-white border border-ink-200 rounded-lg pl-9 pr-3 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Catalog list */}
+                    <div className="p-4 sm:p-6 space-y-1.5">
+                        {isLoading ? (
+                            <div className="text-center py-8 text-ink-500">
+                                <Activity className="animate-spin inline mr-2 text-brand-600" size={18} aria-hidden="true" /> Loading catalog…
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <p className="text-center py-8 text-ink-500 text-sm">No tests match your search.</p>
+                        ) : filtered.map(item => {
+                            const state = selection[item.catalog_id];
+                            const isSelected = !!state?.selected;
+                            return (
+                                <div
+                                    key={item.catalog_id}
+                                    className={`rounded-lg border transition-colors ${
+                                        isSelected
+                                            ? 'bg-brand-50/60 border-brand-200'
+                                            : 'bg-white border-ink-200 hover:bg-ink-50'
+                                    }`}
+                                >
+                                    <label
+                                        htmlFor={`lab-${item.catalog_id}`}
+                                        className="flex items-start gap-3 px-3 py-2.5 cursor-pointer"
+                                    >
+                                        <input
+                                            id={`lab-${item.catalog_id}`}
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => toggle(item.catalog_id)}
+                                            aria-label={`Order ${item.test_name}`}
+                                            className="mt-0.5 w-4 h-4 accent-brand-600 cursor-pointer"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-ink-900 truncate">{item.test_name}</p>
+                                            <p className="text-xs text-ink-500 mt-0.5 truncate">
+                                                {item.specimen_type || 'Unknown specimen'}
+                                                {item.base_price !== undefined && item.base_price !== null
+                                                    ? ` · KES ${Number(item.base_price).toLocaleString('en-KE')}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                    </label>
+                                    {isSelected && (
+                                        <div className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <label className="sm:col-span-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
+                                                Priority
+                                                <select
+                                                    value={state.priority}
+                                                    onChange={e => updateField(item.catalog_id, 'priority', e.target.value)}
+                                                    className="mt-1 w-full bg-white border border-ink-200 rounded-md px-2 py-1.5 text-xs text-ink-900 normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                                >
+                                                    {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+                                                </select>
+                                            </label>
+                                            <label className="sm:col-span-2 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
+                                                Clinical notes (optional)
+                                                <input
+                                                    type="text"
+                                                    value={state.clinical_notes}
+                                                    onChange={e => updateField(item.catalog_id, 'clinical_notes', e.target.value)}
+                                                    placeholder="e.g. fasting since 8pm yesterday"
+                                                    className="mt-1 w-full bg-white border border-ink-200 rounded-md px-2 py-1.5 text-xs text-ink-900 normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                                />
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-2 shrink-0">
+                    <p className="text-xs text-ink-600">
+                        <span className="font-semibold text-ink-900">{selectedItems.length}</span> test{selectedItems.length === 1 ? '' : 's'} selected
+                    </p>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
+                        <button
+                            type="button"
+                            onClick={submit}
+                            disabled={submitting || selectedItems.length === 0}
+                            className="btn-primary disabled:opacity-50 cursor-pointer"
+                        >
+                            {submitting
+                                ? <><Activity size={15} className="animate-spin" aria-hidden="true" /> Submitting…</>
+                                : <><Send size={15} aria-hidden="true" /> Place order</>}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Imaging (radiology) order modal.                                          */
+/*                                                                            */
+/*  One exam per order. Doctor picks from the catalog (or types a free-text   */
+/*  exam name when the catalog doesn't have it), supplies clinical notes      */
+/*  and priority, then POST /radiology/.                                      */
+/* ────────────────────────────────────────────────────────────────────────── */
+function ImagingOrderModal({ patient, onClose }) {
+    const [catalog, setCatalog] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [pickedId, setPickedId] = useState(null);   // catalog_id of selected exam
+    const [customName, setCustomName] = useState(''); // free-text exam when no catalog
+    const [clinicalNotes, setClinicalNotes] = useState('');
+    const [priority, setPriority] = useState('Routine');
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await apiClient.get('/radiology/catalog?active_only=true');
+                setCatalog(res.data || []);
+            } catch (e) {
+                toast.error(e.response?.data?.detail || 'Failed to load imaging catalog.');
+            } finally {
+                setIsLoading(false);
+            }
+        })();
+    }, []);
+
+    const filtered = useMemo(() => {
+        const needle = search.trim().toLowerCase();
+        if (!needle) return catalog;
+        return catalog.filter(c =>
+            c.exam_name?.toLowerCase().includes(needle)
+            || c.modality?.toLowerCase().includes(needle)
+        );
+    }, [catalog, search]);
+
+    const submit = async () => {
+        if (!pickedId && !customName.trim()) {
+            toast.error('Pick an exam from the catalog or enter a custom exam name.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const body = {
+                patient_id: patient.patient_id,
+                catalog_id: pickedId,
+                exam_type: pickedId ? null : customName.trim(),
+                clinical_notes: clinicalNotes || null,
+                priority,
+            };
+            await apiClient.post('/radiology/', body);
+            toast.success('Imaging order placed.');
+            onClose();
+        } catch (e) {
+            toast.error(e.response?.data?.detail || 'Failed to create imaging order.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-ink-950/60 backdrop-blur-sm animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="imaging-order-title"
+        >
+            <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-2xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-start gap-3 shrink-0">
+                    <div className="min-w-0">
+                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">New imaging order</p>
+                        <h2 id="imaging-order-title" className="text-base sm:text-lg font-semibold text-ink-900 tracking-tight truncate">
+                            {patient.patient_name}
+                        </h2>
+                        <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer shrink-0"
+                    >
+                        <X size={18} aria-hidden="true" />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4">
+                    {/* Catalog picker */}
+                    <div>
+                        <label htmlFor="img-search" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Catalogue</label>
+                        <div className="relative mt-1.5">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
+                            <input
+                                id="img-search"
+                                type="search"
+                                placeholder="Search by exam name or modality…"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="w-full bg-white border border-ink-200 rounded-lg pl-9 pr-3 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                            />
+                        </div>
+                        <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-ink-200 custom-scrollbar">
+                            {isLoading ? (
+                                <div className="p-4 text-center text-ink-500 text-sm">
+                                    <Activity className="animate-spin inline mr-2 text-brand-600" size={16} aria-hidden="true" /> Loading…
+                                </div>
+                            ) : filtered.length === 0 ? (
+                                <p className="p-4 text-center text-ink-500 text-sm">No exams match.</p>
+                            ) : (
+                                <ul className="divide-y divide-ink-100">
+                                    {filtered.map(item => {
+                                        const isPicked = pickedId === item.catalog_id;
+                                        return (
+                                            <li key={item.catalog_id}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setPickedId(item.catalog_id); setCustomName(''); }}
+                                                    aria-pressed={isPicked}
+                                                    className={`w-full text-left px-3 py-2 transition-colors cursor-pointer ${
+                                                        isPicked ? 'bg-brand-50' : 'hover:bg-ink-50'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-sm font-medium text-ink-900 truncate">{item.exam_name}</span>
+                                                        {isPicked && <CheckCircle2 size={14} className="text-brand-700 shrink-0" aria-hidden="true" />}
+                                                    </div>
+                                                    <div className="text-xs text-ink-500 mt-0.5">
+                                                        {item.modality || 'Unknown modality'}
+                                                        {item.base_price !== undefined && item.base_price !== null
+                                                            ? ` · KES ${Number(item.base_price).toLocaleString('en-KE')}`
+                                                            : ''}
+                                                    </div>
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Custom exam fallback */}
+                    <div>
+                        <label htmlFor="img-custom" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+                            Or custom exam (when not in catalog)
+                        </label>
+                        <input
+                            id="img-custom"
+                            type="text"
+                            value={customName}
+                            onChange={e => { setCustomName(e.target.value); if (e.target.value) setPickedId(null); }}
+                            placeholder="e.g. X-Ray Right Wrist AP/Lat"
+                            className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <label className="sm:col-span-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+                            Priority
+                            <select
+                                value={priority}
+                                onChange={e => setPriority(e.target.value)}
+                                className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                            >
+                                {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+                            </select>
+                        </label>
+                        <label className="sm:col-span-2 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+                            Clinical notes
+                            <textarea
+                                value={clinicalNotes}
+                                onChange={e => setClinicalNotes(e.target.value)}
+                                rows="2"
+                                placeholder="Clinical question, indication, or area of interest"
+                                className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-none"
+                            />
+                        </label>
+                    </div>
+                </div>
+
+                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
+                    <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
+                    <button
+                        type="button"
+                        onClick={submit}
+                        disabled={submitting || (!pickedId && !customName.trim())}
+                        className="btn-primary disabled:opacity-50 cursor-pointer"
+                    >
+                        {submitting
+                            ? <><Activity size={15} className="animate-spin" aria-hidden="true" /> Submitting…</>
+                            : <><Send size={15} aria-hidden="true" /> Place imaging order</>}
+                    </button>
+                </div>
             </div>
         </div>
     );

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
+import ActivePatientBar from '../ActivePatientBar';
 import { TenantLogo } from '../Logo';
 import { useBranding } from '../../context/BrandingContext';
 
@@ -188,6 +189,10 @@ export default function MainLayout() {
                     tabIndex={-1}
                     className="flex-1 overflow-y-auto bg-ink-50 dark:bg-ink-950 p-4 sm:p-6 lg:p-8 custom-scrollbar"
                 >
+                    {/* Active-patient bar — pinned at the top of the main outlet so
+                        every workspace page renders the patient context above its
+                        own header. Bar self-hides when no patient is active. */}
+                    <ActivePatientBar />
                     <div className="animate-fade-in">
                         <Outlet />
                     </div>

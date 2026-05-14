@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { printPatientCard } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
+import { useActivePatient } from '../context/PatientContext';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Routing destinations.                                                     */
@@ -99,6 +100,7 @@ export default function Patients() {
     const [routingId, setRoutingId] = useState(null);        // queue-action in flight
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
+    const { setActivePatient } = useActivePatient();
 
     // Click-outside closes the row menu so it doesn't get stuck open on
     // mobile where a tap registers a touchend on body.
@@ -216,8 +218,13 @@ export default function Patients() {
     };
 
     // --- Action: View History ---
+    // Opening a chart promotes the patient into the cross-module active
+    // context so the bar persists as the user navigates around the system,
+    // and the KDPA S.26 access log captures every module visit.
     const viewHistory = (patientId) => {
         setActiveDropdown(null);
+        const patient = patients.find(p => p.patient_id === patientId);
+        if (patient) setActivePatient(patient);
         navigate(`/app/medical-history?patient_id=${patientId}`);
     };
 

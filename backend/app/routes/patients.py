@@ -223,6 +223,49 @@ def get_patient_history(patient_id: int, db: Session = Depends(get_db)):
         "appointments": appointments
     }
 
+
+# ==========================================
+# 6b. ACTIVE PATIENT NAVIGATION ACCESS LOG
+# ==========================================
+class AccessLogPayload(BaseModel):
+    """Lightweight body the frontend posts when the active patient bar
+    follows a user across modules. Both fields are optional — the endpoint
+    falls back to defaults if the UI doesn't supply them."""
+    module: str | None = None  # e.g. "Clinical Desk", "Pharmacy", "Laboratory"
+    reason: str | None = None  # operator-supplied free-text reason
+
+
+@router.post("/{patient_id}/access", dependencies=[Depends(RequirePermission("patients:read"))])
+def log_patient_access(
+    patient_id: int,
+    payload: AccessLogPayload,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Record that the current user navigated to a module while a patient
+    was the active context. Underpins the KDPA S.26 audit trail for who
+    looked at whose records and when — even when the navigation didn't
+    open the full chart.
+
+    This is a cheap, high-frequency endpoint. We do NOT validate the
+    patient exists with a SELECT here (one extra round-trip per nav is too
+    chatty); the FK constraint on data_access_logs.patient_id will reject
+    a bad id without spending application time.
+    """
+    from app.models.medical_history import DataAccessLog
+
+    reason = (payload.module or payload.reason or "Active patient navigation")[:255]
+    log = DataAccessLog(
+        accessed_by=current_user["user_id"],
+        patient_id=patient_id,
+        access_reason=reason,
+        ip_address=(request.client.host if request.client else None),
+    )
+    db.add(log)
+    db.commit()
+    return {"ok": True}
+
 # ==========================================
 # 7. ROUTE PATIENT TO QUEUE
 # ==========================================
