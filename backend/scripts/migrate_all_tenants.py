@@ -337,6 +337,25 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 — surface and continue
             LOG.exception("[%s] migration failed: %s", db_name, exc)
             failures.append((db_name, str(exc)))
+            continue
+
+        # After the schema is at head, backfill any new permissions onto
+        # the Admin role. This keeps existing tenants' admins in sync with
+        # the canonical PERMISSIONS catalogue without requiring a manual
+        # SQL nudge per release. The function is idempotent — when nothing
+        # is missing it's a no-op.
+        try:
+            from app.services.tenant_provisioning import backfill_admin_permissions
+            result = backfill_admin_permissions(db_name)
+            if result.get("created_permissions") or result.get("granted_to_admin"):
+                LOG.info(
+                    "[%s] admin backfill: +%d permission(s), +%d Admin grant(s)",
+                    db_name,
+                    result["created_permissions"],
+                    result["granted_to_admin"],
+                )
+        except Exception as exc:  # noqa: BLE001 — non-fatal
+            LOG.warning("[%s] admin permission backfill failed: %s", db_name, exc)
 
     if failures:
         LOG.error("Migration completed with %d failure(s):", len(failures))

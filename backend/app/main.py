@@ -135,13 +135,13 @@ async def csrf_middleware(request: Request, call_next):
     if request.method in ["GET", "HEAD", "OPTIONS"]:
         response = await call_next(request)
         if not request.cookies.get("csrf_token"):
-            is_production = settings.MPESA_ENV.lower() == "production"
+            is_production = settings.is_production
             response.set_cookie(
-                "csrf_token", 
-                secrets.token_hex(32), 
-                httponly=False, 
-                secure=is_production, 
-                samesite="none" if is_production else "lax"
+                "csrf_token",
+                secrets.token_hex(32),
+                httponly=False,
+                secure=is_production,
+                samesite="none" if is_production else "lax",
             )
         return response
     

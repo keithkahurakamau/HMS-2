@@ -238,6 +238,61 @@ def _stamp_alembic_head(db_name: str) -> None:
         )
 
 
+def backfill_admin_permissions(db_name: str) -> dict:
+    """Make sure the Admin role on *db_name* has every permission in PERMISSIONS.
+
+    Newly-added codenames (when we ship a new module or finer-grained gate)
+    are otherwise stuck on freshly-provisioned tenants only — existing
+    tenants would be missing them on their Admin role and the UI would
+    silently hide modules from an admin who should clearly see them. This
+    function:
+
+      1. Inserts any Permission rows that don't yet exist.
+      2. Attaches every PERMISSIONS row to the Admin role.
+
+    Idempotent. Safe to run on every boot — when there's nothing to do,
+    nothing changes. Returns a small dict of counts for logging.
+    """
+    engine = get_tenant_engine(db_name)
+    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    db = Session()
+    created_perms = 0
+    granted_to_admin = 0
+    try:
+        # 1. UPSERT permissions.
+        existing = {p.codename: p for p in db.query(Permission).all()}
+        for code in PERMISSIONS:
+            if code not in existing:
+                p = Permission(codename=code, description=f"Allows {code}")
+                db.add(p)
+                existing[code] = p
+                created_perms += 1
+        db.flush()
+
+        # 2. Attach every PERMISSIONS row to the Admin role.
+        admin = db.query(Role).filter(Role.name == "Admin").first()
+        if admin is None:
+            # Tenants that never had an Admin role can't be auto-healed
+            # safely — return early so the migration loop logs and moves on.
+            return {"db_name": db_name, "created_permissions": created_perms,
+                    "granted_to_admin": 0, "skipped": "no Admin role"}
+
+        attached = {p.codename for p in admin.permissions}
+        for code in PERMISSIONS:
+            if code not in attached:
+                admin.permissions.append(existing[code])
+                granted_to_admin += 1
+
+        db.commit()
+        return {"db_name": db_name, "created_permissions": created_perms,
+                "granted_to_admin": granted_to_admin}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def _seed_baseline(db_name: str, admin_email: str, admin_full_name: str, temp_password: str) -> None:
     """Inserts roles, permissions, and the bootstrap Admin user with a temp password."""
     engine = get_tenant_engine(db_name)

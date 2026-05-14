@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 # Cookie helpers
 # =====================================================================
 def _cookie_params():
-    is_production = settings.MPESA_ENV.lower() == "production"
+    is_production = settings.is_production
     return {
         "httponly": True,
         "secure": is_production,

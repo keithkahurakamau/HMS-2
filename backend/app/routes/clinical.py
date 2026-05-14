@@ -20,12 +20,23 @@ router = APIRouter(prefix="/api/clinical", tags=["Clinical Desk"])
 # ==========================================
 @router.get("/queue")
 def get_clinical_queue(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    """Fetches the active patient queue for the logged-in doctor."""
-    
+    """Fetches the active Consultation queue for the logged-in doctor.
+
+    Returns rows that are either:
+      * already assigned to this doctor (their personal worklist), or
+      * unassigned (claimable — any doctor can pick them up).
+
+    Filtering by ``department='Consultation'`` is intentional: patients
+    routed from the front desk land in this department by name, and we
+    don't want lab/pharmacy queue rows leaking into the clinical worklist.
+    """
+    from sqlalchemy import or_
+
     active_queue = db.query(
         PatientQueue.queue_id,
         PatientQueue.acuity_level,
         PatientQueue.status,
+        PatientQueue.assigned_to,
         func.to_char(PatientQueue.joined_at, 'HH12:MI AM').label('triage_time'),
         Patient.patient_id,
         Patient.surname,
@@ -38,7 +49,11 @@ def get_clinical_queue(db: Session = Depends(get_db), current_user: dict = Depen
         Patient, PatientQueue.patient_id == Patient.patient_id
     ).filter(
         PatientQueue.status.in_(["Waiting", "In Progress", "In Consultation"]),
-        PatientQueue.assigned_to == current_user["user_id"]
+        PatientQueue.department == "Consultation",
+        or_(
+            PatientQueue.assigned_to == current_user["user_id"],
+            PatientQueue.assigned_to.is_(None),
+        ),
     ).order_by(PatientQueue.acuity_level.asc(), PatientQueue.joined_at.asc()).all()
 
     formatted_queue = []
@@ -58,7 +73,9 @@ def get_clinical_queue(db: Session = Depends(get_db), current_user: dict = Depen
             "triage_time": q.triage_time,
             "status": q.status,
             "priority": priority,
-            "allergies": q.allergies or "None" 
+            "allergies": q.allergies or "None",
+            "assigned_to": q.assigned_to,
+            "unclaimed": q.assigned_to is None,
         })
 
     return formatted_queue
@@ -83,10 +100,16 @@ def submit_consultation(record_in: dict, request: Request, db: Session = Depends
         db.add(new_record)
         db.flush() 
 
-        # Handle Queue Status dynamically based on doctor's action
+        # Handle Queue Status dynamically based on doctor's action.
+        # An unclaimed row gets claimed here — by saving anything against
+        # this queue entry the doctor is implicitly taking ownership, so
+        # the row disappears from other doctors' queues and persists in
+        # theirs.
         if queue_id:
             queue_entry = db.query(PatientQueue).filter(PatientQueue.queue_id == queue_id).first()
             if queue_entry:
+                if queue_entry.assigned_to is None:
+                    queue_entry.assigned_to = current_user["user_id"]
                 if record_in.get("record_status") == "Draft":
                     queue_entry.status = "In Consultation"
                 else:

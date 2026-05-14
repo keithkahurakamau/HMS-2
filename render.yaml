@@ -37,10 +37,24 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
+      # Authoritative production flag. Drives cookie security flags
+      # (secure=true, samesite=none) so the Vercel-hosted frontend can
+      # round-trip the HttpOnly session cookie through the Render API
+      # over HTTPS. Without this set, cookies are issued with samesite=lax
+      # and the cross-domain login silently fails after a refresh.
+      - key: APP_ENV
+        value: production
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
         generateValue: true
+      # Lock CORS to the Vercel frontend domain(s). Override in the Render
+      # dashboard when promoting a preview deployment.
+      - key: CORS_ORIGINS
+        sync: false
+      # Optional: Redis URL for WebSocket pub/sub fan-out across workers.
+      - key: REDIS_URL
+        sync: false
       - key: SEED_SUPERADMIN_EMAIL
         sync: false
       - key: SEED_SUPERADMIN_PASSWORD
