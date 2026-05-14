@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, isTenantRedirect } from '../api/client';
 import toast from 'react-hot-toast';
@@ -95,29 +96,24 @@ export default function Patients() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Interactive States
-    const [activeDropdown, setActiveDropdown] = useState(null);
-    const [sexFilter, setSexFilter] = useState('');          // '', 'Male', 'Female'
-    const [routingId, setRoutingId] = useState(null);        // queue-action in flight
-    const dropdownRef = useRef(null);
+    // Active dropdown carries both the patient id (to drive which row's
+    // trigger highlights) AND the trigger DOM node, which the portal-based
+    // RowMenu uses to anchor itself in the viewport. Storing the DOM node
+    // in state is intentional: refs can't be enumerated across many rows,
+    // but capturing event.currentTarget on click works for every row with
+    // zero ref bookkeeping.
+    const [activeDropdown, setActiveDropdown] = useState(null);  // null | { patientId, anchorEl }
+    const [sexFilter, setSexFilter] = useState('');
+    const [routingId, setRoutingId] = useState(null);
     const navigate = useNavigate();
     const { setActivePatient } = useActivePatient();
 
-    // Click-outside closes the row menu so it doesn't get stuck open on
-    // mobile where a tap registers a touchend on body.
-    useEffect(() => {
-        if (activeDropdown === null) return;
-        const onDown = (e) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-                setActiveDropdown(null);
-            }
-        };
-        document.addEventListener('mousedown', onDown);
-        document.addEventListener('touchstart', onDown);
-        return () => {
-            document.removeEventListener('mousedown', onDown);
-            document.removeEventListener('touchstart', onDown);
-        };
-    }, [activeDropdown]);
+    const closeDropdown = () => setActiveDropdown(null);
+    const toggleDropdown = (patientId, e) => {
+        setActiveDropdown(prev =>
+            prev?.patientId === patientId ? null : { patientId, anchorEl: e.currentTarget }
+        );
+    };
 
     // Form State
     const defaultFormState = {
@@ -170,6 +166,54 @@ export default function Patients() {
 
     const handleInputChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    // ── Bidirectional age ↔ DOB sync ─────────────────────────────────────
+    // Doctors / receptionists often only know the approximate age (common
+    // when a Kenyan ID has been lost or the patient is a child). Typing an
+    // age sets DOB to "today minus N years" so the rest of the form can
+    // proceed; a tooltip on the field reminds the operator to confirm the
+    // exact date with the patient when known.
+    const computeDobFromAge = (age) => {
+        const n = parseInt(age, 10);
+        if (Number.isNaN(n) || n < 0 || n > 130) return '';
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - n);
+        const pad = (v) => String(v).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
+    const ageFromDobStr = (dob) => {
+        if (!dob) return '';
+        const birth = new Date(dob);
+        if (Number.isNaN(birth.getTime())) return '';
+        const now = new Date();
+        let age = now.getFullYear() - birth.getFullYear();
+        const m = now.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age -= 1;
+        return age >= 0 ? String(age) : '';
+    };
+
+    // The form holds DOB as the source of truth. `ageDisplay` is a derived
+    // string that lives next to it; editing either updates the other.
+    const [ageDisplay, setAgeDisplay] = useState('');
+
+    // Whenever DOB changes from outside the age field (e.g. opening for a
+    // new registration), re-derive the age so the two stay coherent.
+    useEffect(() => {
+        setAgeDisplay(ageFromDobStr(formData.date_of_birth));
+    }, [formData.date_of_birth]);
+
+    const handleAgeChange = (e) => {
+        const raw = e.target.value;
+        setAgeDisplay(raw);
+        const dob = computeDobFromAge(raw);
+        // Only push back into DOB if we got a sensible number; otherwise
+        // leave the existing DOB untouched so the operator doesn't lose
+        // a previously-picked date by accidentally typing a letter.
+        if (raw === '' || dob) {
+            setFormData(f => ({ ...f, date_of_birth: dob || f.date_of_birth }));
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -474,28 +518,16 @@ export default function Patients() {
 
                                             {/* Manage dropdown */}
                                             <td className="px-5 py-3 text-right align-top">
-                                                <div className="relative inline-block" ref={activeDropdown === patient.patient_id ? dropdownRef : null}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setActiveDropdown(activeDropdown === patient.patient_id ? null : patient.patient_id)}
-                                                        aria-label={`More actions for ${patient.surname}, ${patient.other_names}`}
-                                                        aria-haspopup="menu"
-                                                        aria-expanded={activeDropdown === patient.patient_id}
-                                                        className="p-2 text-ink-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors cursor-pointer"
-                                                    >
-                                                        <MoreVertical size={16} aria-hidden="true" />
-                                                    </button>
-                                                    {activeDropdown === patient.patient_id && (
-                                                        <RowMenu
-                                                            patient={patient}
-                                                            onView={viewHistory}
-                                                            onPrint={(p) => { printPatientCard(p); setActiveDropdown(null); }}
-                                                            onExport={exportPatientData}
-                                                            onDeactivate={deactivatePatient}
-                                                            onErase={erasePatient}
-                                                        />
-                                                    )}
-                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => toggleDropdown(patient.patient_id, e)}
+                                                    aria-label={`More actions for ${patient.surname}, ${patient.other_names}`}
+                                                    aria-haspopup="menu"
+                                                    aria-expanded={activeDropdown?.patientId === patient.patient_id}
+                                                    className="p-2 text-ink-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors cursor-pointer"
+                                                >
+                                                    <MoreVertical size={16} aria-hidden="true" />
+                                                </button>
                                             </td>
                                         </tr>
                                     );
@@ -539,26 +571,16 @@ export default function Patients() {
                                             )}
                                         </div>
                                     </div>
-                                    <div className="relative shrink-0" ref={activeDropdown === patient.patient_id ? dropdownRef : null}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setActiveDropdown(activeDropdown === patient.patient_id ? null : patient.patient_id)}
-                                            aria-label={`More actions for ${patient.surname}`}
-                                            className="w-11 h-11 inline-flex items-center justify-center text-ink-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg cursor-pointer"
-                                        >
-                                            <MoreVertical size={18} aria-hidden="true" />
-                                        </button>
-                                        {activeDropdown === patient.patient_id && (
-                                            <RowMenu
-                                                patient={patient}
-                                                onView={viewHistory}
-                                                onPrint={(p) => { printPatientCard(p); setActiveDropdown(null); }}
-                                                onExport={exportPatientData}
-                                                onDeactivate={deactivatePatient}
-                                                onErase={erasePatient}
-                                            />
-                                        )}
-                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => toggleDropdown(patient.patient_id, e)}
+                                        aria-label={`More actions for ${patient.surname}`}
+                                        aria-haspopup="menu"
+                                        aria-expanded={activeDropdown?.patientId === patient.patient_id}
+                                        className="shrink-0 w-11 h-11 inline-flex items-center justify-center text-ink-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg cursor-pointer"
+                                    >
+                                        <MoreVertical size={18} aria-hidden="true" />
+                                    </button>
                                 </header>
 
                                 <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -668,8 +690,39 @@ export default function Patients() {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="label">Date of Birth <span className="text-red-500">*</span></label>
-                                            <input required type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleInputChange} className="input" />
+                                            <label className="label" htmlFor="reg-dob">Date of Birth <span className="text-red-500">*</span></label>
+                                            <input
+                                                id="reg-dob"
+                                                required
+                                                type="date"
+                                                name="date_of_birth"
+                                                value={formData.date_of_birth}
+                                                onChange={handleInputChange}
+                                                max={new Date().toISOString().slice(0, 10)}
+                                                className="input"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label flex items-center gap-1" htmlFor="reg-age">
+                                                Age
+                                                <span className="text-2xs font-normal text-ink-400 normal-case tracking-normal">(years)</span>
+                                            </label>
+                                            <input
+                                                id="reg-age"
+                                                type="number"
+                                                min="0"
+                                                max="130"
+                                                step="1"
+                                                inputMode="numeric"
+                                                value={ageDisplay}
+                                                onChange={handleAgeChange}
+                                                placeholder="e.g. 34"
+                                                className="input"
+                                                title="Type the age if exact DOB is unknown — DOB auto-fills to today minus N years. Confirm with patient."
+                                            />
+                                            {ageDisplay && !formData.date_of_birth && (
+                                                <p className="helper text-amber-700">Approximated DOB — confirm with patient when possible.</p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="label">ID Type</label>
@@ -830,6 +883,26 @@ export default function Patients() {
                     </div>
                 </div>
             )}
+
+            {/* Singleton portal-anchored row menu — exactly one instance
+                rendered when *some* row's More button is active. Portaled
+                to <body> so no ancestor's overflow can clip it. */}
+            {activeDropdown && (() => {
+                const open = patients.find(p => p.patient_id === activeDropdown.patientId);
+                if (!open) return null;
+                return (
+                    <RowMenu
+                        patient={open}
+                        anchorEl={activeDropdown.anchorEl}
+                        onClose={closeDropdown}
+                        onView={viewHistory}
+                        onPrint={(p) => { printPatientCard(p); closeDropdown(); }}
+                        onExport={exportPatientData}
+                        onDeactivate={deactivatePatient}
+                        onErase={erasePatient}
+                    />
+                );
+            })()}
         </div>
     );
 }
@@ -856,11 +929,92 @@ function DirectoryStat({ label, value, icon: Icon, accent = 'brand' }) {
     );
 }
 
-function RowMenu({ patient, onView, onPrint, onExport, onDeactivate, onErase }) {
-    return (
+/**
+ * RowMenu — portal-rendered "Manage" dropdown.
+ *
+ * Why a portal: the desktop table sits inside `<div className="overflow-x-auto">`
+ * because the columns can overflow on smaller windows. CSS resolves `overflow-y`
+ * to `auto` whenever `overflow-x` isn't `visible`, so an absolute child gets
+ * clipped vertically — that's why the old menu hid its last items. Rendering
+ * into <body> with `position: fixed` sidesteps every ancestor's overflow.
+ *
+ * Positioning: anchor to the trigger button's bounding rect. Right-align with
+ * the trigger, drop below by 6px, clamp inside the viewport, and flip above
+ * the trigger if the bottom of the menu would otherwise spill off-screen.
+ */
+const MENU_WIDTH = 232;
+const MENU_MARGIN = 8;
+
+function RowMenu({ patient, anchorEl, onClose, onView, onPrint, onExport, onDeactivate, onErase }) {
+    const menuRef = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0, ready: false });
+
+    const recompute = () => {
+        if (!anchorEl) return;
+        const r = anchorEl.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const menuH = menuRef.current?.offsetHeight || 280;
+
+        // Right-align with the trigger, then clamp to viewport.
+        let left = r.right - MENU_WIDTH;
+        if (left < MENU_MARGIN) left = MENU_MARGIN;
+        if (left + MENU_WIDTH + MENU_MARGIN > vw) left = vw - MENU_WIDTH - MENU_MARGIN;
+
+        // Prefer below; flip above when the menu would spill off the bottom.
+        let top = r.bottom + 6;
+        if (top + menuH + MENU_MARGIN > vh) {
+            const flipped = r.top - menuH - 6;
+            top = flipped >= MENU_MARGIN ? flipped : Math.max(MENU_MARGIN, vh - menuH - MENU_MARGIN);
+        }
+
+        setPos({ top, left, ready: true });
+    };
+
+    useLayoutEffect(() => { recompute(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [anchorEl]);
+
+    useEffect(() => {
+        // Recompute on scroll (capture so we catch scrolling ancestors too)
+        // and on resize so the menu doesn't drift when the user rotates a
+        // tablet or resizes the window.
+        const onScroll = () => recompute();
+        const onResize = () => recompute();
+        const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+        const onDocClick = (e) => {
+            if (menuRef.current?.contains(e.target)) return;
+            if (anchorEl?.contains?.(e.target)) return;
+            onClose();
+        };
+        window.addEventListener('scroll', onScroll, true);
+        window.addEventListener('resize', onResize);
+        document.addEventListener('keydown', onKey);
+        document.addEventListener('mousedown', onDocClick);
+        document.addEventListener('touchstart', onDocClick);
+        return () => {
+            window.removeEventListener('scroll', onScroll, true);
+            window.removeEventListener('resize', onResize);
+            document.removeEventListener('keydown', onKey);
+            document.removeEventListener('mousedown', onDocClick);
+            document.removeEventListener('touchstart', onDocClick);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [anchorEl, onClose]);
+
+    if (typeof document === 'undefined') return null;
+
+    return createPortal(
         <div
+            ref={menuRef}
             role="menu"
-            className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-elevated border border-ink-200 py-2 z-30 text-left animate-fade-in"
+            aria-label="Patient actions"
+            style={{
+                position: 'fixed',
+                top: pos.top,
+                left: pos.left,
+                width: MENU_WIDTH,
+                opacity: pos.ready ? 1 : 0,
+            }}
+            className="bg-white rounded-xl shadow-elevated border border-ink-200 py-2 z-[60] text-left animate-fade-in"
         >
             <div className="px-3 pt-1 pb-1.5 text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em]">Manage</div>
             <button type="button" role="menuitem" onClick={() => onView(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
@@ -879,6 +1033,7 @@ function RowMenu({ patient, onView, onPrint, onExport, onDeactivate, onErase }) 
             <button type="button" role="menuitem" onClick={() => onErase(patient)} className="w-full px-3.5 py-2 text-sm text-rose-700 hover:bg-rose-50 flex items-center gap-2.5 font-semibold cursor-pointer">
                 <Trash size={15} aria-hidden="true" /> Erase (KDPA S.40)
             </button>
-        </div>
+        </div>,
+        document.body
     );
 }
