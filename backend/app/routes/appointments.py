@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -10,7 +10,7 @@ from app.config.database import get_db
 from app.core.dependencies import get_current_user, RequirePermission
 from app.models.clinical import Appointment
 from app.models.patient import Patient
-from app.models.user import User
+from app.models.user import User, Role
 from app.schemas.appointment import AppointmentCreate, AppointmentResponse
 from app.utils.audit import log_audit
 
@@ -19,6 +19,85 @@ router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
 
 
 VALID_STATUSES = {"Scheduled", "Confirmed", "Completed", "Cancelled", "No-Show"}
+
+# How long a default appointment is treated as occupying for the collision
+# check. Until the model carries a duration column, we treat every slot as
+# this many minutes for the purposes of availability queries.
+DEFAULT_SLOT_MINUTES = 30
+
+
+@router.get("/doctors", dependencies=[Depends(RequirePermission("patients:write"))])
+def list_doctors(db: Session = Depends(get_db)):
+    """Active doctors available for booking.
+
+    Pulled from the tenant ``users`` table by role name = 'Doctor'.
+    Exposed under the appointments router so any user with patients:write
+    (front desk + clinicians) can populate the booking form — without
+    needing users:manage, which is gate-kept for admin features.
+    """
+    doctors = (
+        db.query(User)
+          .join(Role, User.role_id == Role.role_id)
+          .filter(Role.name == "Doctor", User.is_active == True)
+          .order_by(User.full_name.asc())
+          .all()
+    )
+    return [
+        {
+            "user_id":         d.user_id,
+            "full_name":       d.full_name,
+            "specialization":  d.specialization,
+        }
+        for d in doctors
+    ]
+
+
+@router.get("/availability", dependencies=[Depends(RequirePermission("patients:write"))])
+def get_doctor_availability(
+    doctor_id: int = Query(..., description="Doctor whose calendar we're inspecting"),
+    date: str = Query(..., description="ISO date (YYYY-MM-DD) to inspect"),
+    db: Session = Depends(get_db),
+):
+    """Existing bookings for *doctor_id* on *date*.
+
+    Returns just the time slots that are taken — the frontend computes the
+    free slots locally from the clinic's working hours so different tenants
+    can apply their own working-hour configuration without a round-trip.
+    """
+    try:
+        day = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD.")
+
+    start_of_day = datetime.combine(day, datetime.min.time())
+    end_of_day   = start_of_day + timedelta(days=1)
+
+    booked = (
+        db.query(Appointment)
+          .filter(
+              Appointment.doctor_id == doctor_id,
+              Appointment.appointment_date >= start_of_day,
+              Appointment.appointment_date <  end_of_day,
+              Appointment.status.in_(["Scheduled", "Confirmed"]),
+          )
+          .order_by(Appointment.appointment_date.asc())
+          .all()
+    )
+
+    return {
+        "doctor_id": doctor_id,
+        "date": date,
+        "slot_minutes": DEFAULT_SLOT_MINUTES,
+        "bookings": [
+            {
+                "appointment_id": a.appointment_id,
+                "appointment_date": a.appointment_date.isoformat() if a.appointment_date else None,
+                "patient_id": a.patient_id,
+                "status": a.status,
+            }
+            for a in booked
+        ],
+    }
 
 
 def _enrich(db: Session, appt: Appointment) -> dict:

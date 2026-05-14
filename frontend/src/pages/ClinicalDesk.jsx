@@ -27,9 +27,14 @@ export default function ClinicalDesk() {
     const [showIcdDropdown, setShowIcdDropdown] = useState(false);
     const [chargeConsultation, setChargeConsultation] = useState(false);
 
-    // --- LAB / IMAGING ORDER MODAL STATE ---
+    // --- LAB / IMAGING / FOLLOW-UP MODAL STATE ---
     const [isLabModalOpen, setIsLabModalOpen] = useState(false);
     const [isImagingModalOpen, setIsImagingModalOpen] = useState(false);
+    const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
+    // Holds the most recent appointment we booked from this consultation so
+    // the doctor sees confirmation in-line and the button updates from
+    // "Select date…" to the scheduled date/time.
+    const [pendingFollowUp, setPendingFollowUp] = useState(null);
 
     // Cross-page active patient context (also drives the bar at the top of
     // every workspace page). We mirror the local `activePatient` state into
@@ -319,7 +324,39 @@ export default function ClinicalDesk() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div><label className="label">Internal notes (nursing / ward)</label><input type="text" value={clinicalNotes.internal_notes} onChange={(e) => setClinicalNotes({...clinicalNotes, internal_notes: e.target.value})} className="input" placeholder="e.g. Please administer stat dose before discharge" /></div>
-                                    <div><label className="label flex items-center gap-1"><CalendarPlus size={13} /> Next follow-up</label><button onClick={() => handleNotImplemented('Scheduling')} className="input text-left text-ink-400">Select date…</button></div>
+                                    <div>
+                                        <label className="label flex items-center gap-1">
+                                            <CalendarPlus size={13} aria-hidden="true" /> Next follow-up
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsFollowUpOpen(true)}
+                                            className={`input text-left flex items-center justify-between gap-2 cursor-pointer ${
+                                                pendingFollowUp ? 'text-ink-900 border-brand-300 bg-brand-50/40' : 'text-ink-400'
+                                            }`}
+                                        >
+                                            <span className="truncate">
+                                                {pendingFollowUp
+                                                    ? new Date(pendingFollowUp.appointment_date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+                                                    : 'Select date…'}
+                                            </span>
+                                            {pendingFollowUp
+                                                ? <CheckCircle2 size={13} className="text-accent-600 shrink-0" aria-hidden="true" />
+                                                : <CalendarPlus size={13} className="text-ink-400 shrink-0" aria-hidden="true" />}
+                                        </button>
+                                        {pendingFollowUp && (
+                                            <p className="text-2xs text-ink-500 mt-1">
+                                                With <span className="font-medium text-ink-700">{pendingFollowUp.doctor_name}</span>.{' '}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsFollowUpOpen(true)}
+                                                    className="text-brand-700 hover:text-brand-800 cursor-pointer underline"
+                                                >
+                                                    Change
+                                                </button>
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <label htmlFor="chargeFee" className="border border-brand-200 bg-brand-50/50 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-brand-50/80 transition-colors">
@@ -370,6 +407,14 @@ export default function ClinicalDesk() {
                 <ImagingOrderModal
                     patient={activePatient}
                     onClose={() => setIsImagingModalOpen(false)}
+                />
+            )}
+            {activePatient && isFollowUpOpen && (
+                <FollowUpModal
+                    patient={activePatient}
+                    existing={pendingFollowUp}
+                    onClose={() => setIsFollowUpOpen(false)}
+                    onBooked={(appt) => { setPendingFollowUp(appt); setIsFollowUpOpen(false); }}
                 />
             )}
         </div>
@@ -793,6 +838,269 @@ function ImagingOrderModal({ patient, onClose }) {
                         {submitting
                             ? <><Activity size={15} className="animate-spin" aria-hidden="true" /> Submitting…</>
                             : <><Send size={15} aria-hidden="true" /> Place imaging order</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Follow-up booking modal.                                                  */
+/*                                                                            */
+/*  POSTs to /appointments/. Pre-fills the doctor from /appointments/doctors. */
+/*  Quick-pick chips for +1 week, +2 weeks, +1 month so the most common       */
+/*  follow-up cadences are one click. Surfaces existing bookings for that     */
+/*  doctor on the picked date so the user can avoid double-booking.           */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+const QUICK_PICKS = [
+    { label: '+1 week',   add: { weeks: 1 } },
+    { label: '+2 weeks',  add: { weeks: 2 } },
+    { label: '+1 month',  add: { months: 1 } },
+    { label: '+3 months', add: { months: 3 } },
+];
+
+const addToDate = (base, { weeks = 0, months = 0 }) => {
+    const d = new Date(base);
+    if (weeks)  d.setDate(d.getDate() + weeks * 7);
+    if (months) d.setMonth(d.getMonth() + months);
+    return d;
+};
+
+const toDateInput = (d) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+function FollowUpModal({ patient, existing, onClose, onBooked }) {
+    const [doctors, setDoctors] = useState([]);
+    const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
+    const [doctorId, setDoctorId] = useState(existing?.doctor_id ? String(existing.doctor_id) : '');
+    const initial = existing?.appointment_date
+        ? new Date(existing.appointment_date)
+        : addToDate(new Date(), { weeks: 1 });
+    const [date, setDate] = useState(toDateInput(initial));
+    const [time, setTime] = useState(() => {
+        const pad = (n) => String(n).padStart(2, '0');
+        const hours = initial.getHours() || 9;
+        const minutes = Math.floor((initial.getMinutes() || 0) / 30) * 30;
+        return `${pad(hours)}:${pad(minutes)}`;
+    });
+    const [notes, setNotes] = useState(existing?.notes || 'Follow-up consultation');
+    const [bookings, setBookings] = useState([]);
+    const [busy, setBusy] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await apiClient.get('/appointments/doctors');
+                setDoctors(res.data || []);
+                if (!doctorId && res.data?.length) {
+                    setDoctorId(String(res.data[0].user_id));
+                }
+            } catch (e) {
+                toast.error(e.response?.data?.detail || 'Failed to load doctors.');
+            } finally {
+                setIsLoadingDoctors(false);
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (!doctorId || !date) return;
+        let cancelled = false;
+        setBusy(true);
+        apiClient.get('/appointments/availability', { params: { doctor_id: doctorId, date } })
+            .then(res => { if (!cancelled) setBookings(res.data?.bookings || []); })
+            .catch(() => { if (!cancelled) setBookings([]); })
+            .finally(() => { if (!cancelled) setBusy(false); });
+        return () => { cancelled = true; };
+    }, [doctorId, date]);
+
+    const bookingTimes = useMemo(() => new Set(
+        bookings.map(b => {
+            if (!b.appointment_date) return null;
+            const d = new Date(b.appointment_date);
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }).filter(Boolean)
+    ), [bookings]);
+
+    const applyQuickPick = (offset) => {
+        const next = addToDate(new Date(), offset);
+        setDate(toDateInput(next));
+    };
+
+    const submit = async () => {
+        if (!doctorId) { toast.error('Pick a doctor.'); return; }
+        if (!date || !time) { toast.error('Pick a date and time.'); return; }
+        if (bookingTimes.has(time)) {
+            toast.error('That slot is already booked for the selected doctor.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const iso = new Date(`${date}T${time}:00`).toISOString();
+            const res = await apiClient.post('/appointments/', {
+                patient_id: patient.patient_id,
+                doctor_id:  parseInt(doctorId, 10),
+                appointment_date: iso,
+                notes: notes || null,
+            });
+            toast.success(`Follow-up booked for ${new Date(res.data.appointment_date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.`);
+            onBooked(res.data);
+        } catch (e) {
+            toast.error(e.response?.data?.detail || 'Failed to book follow-up.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-ink-950/60 backdrop-blur-sm animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="followup-title"
+        >
+            <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-start gap-3 shrink-0">
+                    <div className="min-w-0">
+                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">Schedule follow-up</p>
+                        <h2 id="followup-title" className="text-base sm:text-lg font-semibold text-ink-900 tracking-tight truncate">
+                            {patient.patient_name}
+                        </h2>
+                        <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer shrink-0"
+                    >
+                        <X size={18} aria-hidden="true" />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4">
+                    <div>
+                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 mb-1.5">Common cadences</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {QUICK_PICKS.map(q => (
+                                <button
+                                    key={q.label}
+                                    type="button"
+                                    onClick={() => applyQuickPick(q.add)}
+                                    className="inline-flex items-center px-2.5 py-1.5 rounded-md text-2xs font-semibold bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 cursor-pointer"
+                                >
+                                    {q.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label htmlFor="fu-doctor" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Doctor</label>
+                        <select
+                            id="fu-doctor"
+                            value={doctorId}
+                            onChange={e => setDoctorId(e.target.value)}
+                            disabled={isLoadingDoctors}
+                            className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                        >
+                            {isLoadingDoctors ? (
+                                <option>Loading doctors…</option>
+                            ) : doctors.length === 0 ? (
+                                <option value="">No doctors available</option>
+                            ) : (
+                                doctors.map(d => (
+                                    <option key={d.user_id} value={d.user_id}>
+                                        {d.full_name}{d.specialization ? ` — ${d.specialization}` : ''}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label htmlFor="fu-date" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Date</label>
+                            <input
+                                id="fu-date"
+                                type="date"
+                                value={date}
+                                onChange={e => setDate(e.target.value)}
+                                min={toDateInput(new Date())}
+                                className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="fu-time" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Time</label>
+                            <input
+                                id="fu-time"
+                                type="time"
+                                value={time}
+                                onChange={e => setTime(e.target.value)}
+                                step={60 * 30}
+                                className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border border-ink-200 bg-ink-50/40">
+                        <div className="px-3 py-2 border-b border-ink-200 flex items-center justify-between text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
+                            <span>Doctor's bookings on {date || '—'}</span>
+                            {busy && <Activity size={12} className="animate-spin text-brand-600" aria-hidden="true" />}
+                        </div>
+                        {bookings.length === 0 ? (
+                            <p className="px-3 py-3 text-xs text-ink-500">No appointments yet for this day.</p>
+                        ) : (
+                            <ul className="divide-y divide-ink-100 max-h-32 overflow-y-auto">
+                                {bookings.map(b => {
+                                    const d = b.appointment_date ? new Date(b.appointment_date) : null;
+                                    const pad = (n) => String(n).padStart(2, '0');
+                                    const slot = d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '—';
+                                    const isYou = b.patient_id === patient.patient_id;
+                                    return (
+                                        <li key={b.appointment_id} className="px-3 py-1.5 flex items-center justify-between gap-2 text-xs">
+                                            <span className={`font-mono ${time === slot ? 'text-rose-700 font-semibold' : 'text-ink-700'}`}>{slot}</span>
+                                            <span className={isYou ? 'text-brand-700 italic' : 'text-ink-500'}>
+                                                {isYou ? 'this patient' : `patient #${b.patient_id}`} · {b.status}
+                                            </span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div>
+                        <label htmlFor="fu-notes" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Notes</label>
+                        <textarea
+                            id="fu-notes"
+                            value={notes}
+                            onChange={e => setNotes(e.target.value)}
+                            rows="2"
+                            placeholder="What should this follow-up review?"
+                            className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
+                    <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
+                    <button
+                        type="button"
+                        onClick={submit}
+                        disabled={submitting}
+                        className="btn-primary disabled:opacity-50 cursor-pointer"
+                    >
+                        {submitting
+                            ? <><Activity size={15} className="animate-spin" aria-hidden="true" /> Booking…</>
+                            : <><CalendarPlus size={15} aria-hidden="true" /> Book follow-up</>}
                     </button>
                 </div>
             </div>
