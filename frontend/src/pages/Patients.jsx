@@ -21,13 +21,18 @@ import { useActivePatient } from '../context/PatientContext';
 /*  department). The friendly `label` is what the user sees; `department` is  */
 /*  what we POST. Order drives the inline chip row on each patient.           */
 /* ────────────────────────────────────────────────────────────────────────── */
+// Each routing target carries the canonical department name, the role
+// whose members should appear in the "Who?" picker, and a flag telling the
+// modal whether picking a specific staff member is required, optional, or
+// not applicable. Billing → cashier role; Wards/Pharmacy/Lab/Radiology
+// → their respective clinical role; Clinical → Doctor.
 const ROUTE_TARGETS = [
-    { department: 'Consultation', label: 'Clinical',  icon: Stethoscope, accent: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200' },
-    { department: 'Laboratory',   label: 'Lab',       icon: TestTube,    accent: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' },
-    { department: 'Radiology',    label: 'Radiology', icon: Image,       accent: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200' },
-    { department: 'Pharmacy',     label: 'Pharmacy',  icon: Pill,        accent: 'bg-accent-50 text-accent-700 hover:bg-accent-100 border-accent-200' },
-    { department: 'Billing',      label: 'Billing',   icon: CreditCard,  accent: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },
-    { department: 'Wards',        label: 'Wards',     icon: Bed,         accent: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200' },
+    { department: 'Consultation', label: 'Clinical',  icon: Stethoscope, role: 'Doctor',          assignment: 'optional', accent: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200' },
+    { department: 'Laboratory',   label: 'Lab',       icon: TestTube,    role: 'Lab Technician',  assignment: 'optional', accent: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' },
+    { department: 'Radiology',    label: 'Radiology', icon: Image,       role: 'Radiologist',     assignment: 'optional', accent: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200' },
+    { department: 'Pharmacy',     label: 'Pharmacy',  icon: Pill,        role: 'Pharmacist',      assignment: 'optional', accent: 'bg-accent-50 text-accent-700 hover:bg-accent-100 border-accent-200' },
+    { department: 'Billing',      label: 'Billing',   icon: CreditCard,  role: 'Receptionist',    assignment: 'optional', accent: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },
+    { department: 'Wards',        label: 'Wards',     icon: Bed,         role: 'Nurse',           assignment: 'optional', accent: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200' },
 ];
 
 const initialsOf = (patient) => {
@@ -110,8 +115,19 @@ export default function Patients() {
 
     const closeDropdown = () => setActiveDropdown(null);
     const toggleDropdown = (patientId, e) => {
+        // Capture the DOM node NOW. React 18 zeroes out `e.currentTarget`
+        // after the handler returns, and our updater fn runs during the
+        // next render — by then `e.currentTarget` would be null, the menu
+        // would anchor at viewport (0,0), and the doc-level click-outside
+        // listener would see the trigger as "not inside the anchor" and
+        // close the menu the moment it opened.
+        const anchorEl = e.currentTarget;
+        // Stop the synthetic click from bubbling to the doc-level
+        // mousedown/click listener the menu installs — the same physical
+        // click would otherwise be treated as "outside" the menu.
+        e.stopPropagation();
         setActiveDropdown(prev =>
-            prev?.patientId === patientId ? null : { patientId, anchorEl: e.currentTarget }
+            prev?.patientId === patientId ? null : { patientId, anchorEl }
         );
     };
 
@@ -233,27 +249,34 @@ export default function Patients() {
     };
 
     // --- Action: Route Patient ---
-    // Sends the canonical department name (resolved server-side; the backend
-    // also accepts UI synonyms but we send the canonical here so analytics +
-    // queue lookups match without a round trip). On success the response
-    // includes the queue_id so we could deep-link to it later — for now we
-    // just surface a toast and close the menu.
-    const routePatient = async (patient, target) => {
+    // Two-step flow: click a route chip → open the picker modal so the
+    // receptionist can pick *which* staff member to assign the patient to.
+    // The actual POST happens from inside the modal once the picker
+    // confirms (or skips, in which case the row lands in the unassigned
+    // pool so any qualified clinician can claim it).
+    const [routeRequest, setRouteRequest] = useState(null); // { patient, target } | null
+
+    const openRoutePicker = (patient, target) => {
+        setRouteRequest({ patient, target });
+    };
+
+    const submitRoute = async ({ patient, target, assigned_to, acuity = 3 }) => {
         const { department, label } = target;
         setRoutingId(`${patient.patient_id}:${department}`);
         try {
             const res = await apiClient.post(`/patients/${patient.patient_id}/route`, {
                 department,
-                acuity_level: 3,
+                acuity_level: acuity,
+                assigned_to: assigned_to ?? null,
             });
             const alreadyQueued = res.data?.already_queued;
             const name = `${patient.surname}, ${patient.other_names}`;
-            toast[alreadyQueued ? 'success' : 'success'](
+            toast.success(
                 alreadyQueued
                     ? `${name} is already in the ${label} queue.`
-                    : `${name} sent to ${label}.`,
+                    : `${name} sent to ${label}${assigned_to ? '' : ' (unassigned)'}.`,
             );
-            setActiveDropdown(null);
+            setRouteRequest(null);
         } catch (error) {
             toast.error(error.response?.data?.detail || `Failed to route to ${label}.`);
         } finally {
@@ -500,7 +523,7 @@ export default function Patients() {
                                                             <button
                                                                 key={t.department}
                                                                 type="button"
-                                                                onClick={() => routePatient(patient, t)}
+                                                                onClick={() => openRoutePicker(patient, t)}
                                                                 disabled={busy}
                                                                 aria-label={`Send ${patient.surname} to ${t.label}`}
                                                                 title={`Send to ${t.label}`}
@@ -623,7 +646,7 @@ export default function Patients() {
                                                 <button
                                                     key={t.department}
                                                     type="button"
-                                                    onClick={() => routePatient(patient, t)}
+                                                    onClick={() => openRoutePicker(patient, t)}
                                                     disabled={busy}
                                                     aria-label={`Send ${patient.surname} to ${t.label}`}
                                                     className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-2xs font-semibold border transition-colors cursor-pointer disabled:opacity-50 ${t.accent}`}
@@ -884,6 +907,23 @@ export default function Patients() {
                 </div>
             )}
 
+            {/* Route-to picker modal — opens when the front desk clicks
+                any route chip. Lets them pick a specific staff member to
+                assign the patient to within that module. */}
+            {routeRequest && (
+                <RouteToModal
+                    patient={routeRequest.patient}
+                    target={routeRequest.target}
+                    busy={routingId === `${routeRequest.patient.patient_id}:${routeRequest.target.department}`}
+                    onSubmit={(payload) => submitRoute({
+                        patient: routeRequest.patient,
+                        target: routeRequest.target,
+                        ...payload,
+                    })}
+                    onClose={() => setRouteRequest(null)}
+                />
+            )}
+
             {/* Singleton portal-anchored row menu — exactly one instance
                 rendered when *some* row's More button is active. Portaled
                 to <body> so no ancestor's overflow can clip it. */}
@@ -924,6 +964,235 @@ function DirectoryStat({ label, value, icon: Icon, accent = 'brand' }) {
             <div className="min-w-0">
                 <p className="stat-label truncate">{label}</p>
                 <p className="stat-value tabular-nums">{value}</p>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * RouteToModal — "Who should this patient see?" picker.
+ *
+ * Fetches active staff for the destination's role via /api/patients/staff,
+ * lets the receptionist either pick a specific person or send unassigned
+ * (any qualified clinician can claim the row). Triage acuity is exposed so
+ * the front desk can mark genuine emergencies — the clinical queue is
+ * ordered by acuity ascending before joined_at, so a "Critical" patient
+ * jumps the queue.
+ */
+const ACUITY_PRESETS = [
+    { value: 1, label: 'Critical',  hint: 'Resuscitate now',     className: 'bg-rose-50 text-rose-800 border-rose-200' },
+    { value: 2, label: 'High',      hint: 'See within 10 min',   className: 'bg-amber-50 text-amber-800 border-amber-200' },
+    { value: 3, label: 'Normal',    hint: 'Routine triage',      className: 'bg-brand-50 text-brand-800 border-brand-200' },
+    { value: 4, label: 'Low',       hint: 'Can wait',            className: 'bg-ink-50 text-ink-700 border-ink-200' },
+    { value: 5, label: 'Non-urgent', hint: 'Walk-in',            className: 'bg-ink-50 text-ink-700 border-ink-200' },
+];
+
+function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
+    const [staff, setStaff] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedId, setSelectedId] = useState('');
+    const [acuity, setAcuity] = useState(3);
+    const [search, setSearch] = useState('');
+
+    useEffect(() => {
+        let cancelled = false;
+        setIsLoading(true);
+        apiClient.get('/patients/staff', { params: target.role ? { role: target.role } : {} })
+            .then(res => { if (!cancelled) setStaff(res.data || []); })
+            .catch(() => { if (!cancelled) setStaff([]); })
+            .finally(() => { if (!cancelled) setIsLoading(false); });
+        return () => { cancelled = true; };
+    }, [target.role]);
+
+    const filtered = useMemo(() => {
+        const needle = search.trim().toLowerCase();
+        if (!needle) return staff;
+        return staff.filter(s =>
+            s.full_name?.toLowerCase().includes(needle)
+            || (s.specialization || '').toLowerCase().includes(needle)
+        );
+    }, [staff, search]);
+
+    const Icon = target.icon;
+
+    const send = () => {
+        onSubmit({
+            assigned_to: selectedId ? parseInt(selectedId, 10) : null,
+            acuity,
+        });
+    };
+
+    const fullName = `${patient.surname}, ${patient.other_names}`;
+    const noRoleMatch = !isLoading && staff.length === 0;
+
+    return (
+        <div
+            className="fixed inset-0 z-[55] flex items-center justify-center p-3 sm:p-4 bg-ink-950/60 backdrop-blur-sm animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="route-modal-title"
+        >
+            <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-lg max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                {/* Header */}
+                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-start gap-3 shrink-0">
+                    <div className="min-w-0 flex items-start gap-3">
+                        <div className={`shrink-0 w-10 h-10 rounded-xl border flex items-center justify-center ${target.accent}`} aria-hidden="true">
+                            <Icon size={18} />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">Route to {target.label}</p>
+                            <h2 id="route-modal-title" className="text-base font-semibold text-ink-900 tracking-tight truncate">{fullName}</h2>
+                            <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer shrink-0"
+                    >
+                        <X size={18} aria-hidden="true" />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4">
+                    {/* Acuity */}
+                    <div>
+                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 mb-1.5">Triage acuity</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5" role="radiogroup" aria-label="Triage acuity">
+                            {ACUITY_PRESETS.map(p => {
+                                const active = acuity === p.value;
+                                return (
+                                    <button
+                                        key={p.value}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={active}
+                                        onClick={() => setAcuity(p.value)}
+                                        title={p.hint}
+                                        className={`rounded-md border px-2 py-1.5 text-left transition-colors cursor-pointer ${
+                                            active ? `${p.className} ring-2 ring-offset-1 ring-brand-500/20 font-semibold` : 'bg-white border-ink-200 hover:bg-ink-50 text-ink-700'
+                                        }`}
+                                    >
+                                        <p className="text-2xs font-semibold uppercase tracking-wider">{p.label}</p>
+                                        <p className="text-[10px] text-ink-500 truncate">{p.hint}</p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Staff picker */}
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+                                Assign to {target.role ? <span className="text-ink-500 normal-case tracking-normal">({target.role})</span> : ''}
+                            </p>
+                            <span className="text-2xs text-ink-500">{isLoading ? 'Loading…' : `${filtered.length} available`}</span>
+                        </div>
+
+                        {/* Search — only show when more than a handful of staff */}
+                        {staff.length > 5 && (
+                            <div className="relative mb-2">
+                                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
+                                <label htmlFor="route-staff-search" className="sr-only">Search staff</label>
+                                <input
+                                    id="route-staff-search"
+                                    type="search"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search by name or specialization…"
+                                    className="w-full bg-white border border-ink-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                />
+                            </div>
+                        )}
+
+                        {/* Unassigned option — first row, always visible */}
+                        <label
+                            htmlFor="staff-none"
+                            className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                selectedId === ''
+                                    ? 'bg-brand-50/60 border-brand-200'
+                                    : 'bg-white border-ink-200 hover:bg-ink-50'
+                            }`}
+                        >
+                            <span className="flex items-center gap-2 min-w-0">
+                                <input
+                                    id="staff-none"
+                                    type="radio"
+                                    name="route-staff"
+                                    value=""
+                                    checked={selectedId === ''}
+                                    onChange={() => setSelectedId('')}
+                                    className="accent-brand-600"
+                                />
+                                <span className="text-sm font-medium text-ink-900">Send unassigned</span>
+                            </span>
+                            <span className="text-2xs text-ink-500">Anyone on the {target.label} queue can claim</span>
+                        </label>
+
+                        {/* Staff list */}
+                        <div className="mt-1.5 max-h-64 overflow-y-auto custom-scrollbar rounded-lg border border-ink-200 divide-y divide-ink-100">
+                            {isLoading ? (
+                                <div className="p-6 text-center text-ink-500 text-sm">
+                                    <Activity className="animate-spin inline mr-2 text-brand-600" size={16} aria-hidden="true" /> Loading staff…
+                                </div>
+                            ) : noRoleMatch ? (
+                                <p className="p-4 text-center text-xs text-ink-500">
+                                    No active {target.role}s configured. The patient will land unassigned —
+                                    any qualified clinician can pick them up from the {target.label} queue.
+                                </p>
+                            ) : filtered.length === 0 ? (
+                                <p className="p-4 text-center text-xs text-ink-500">No staff match "{search}".</p>
+                            ) : filtered.map(s => {
+                                const isPicked = selectedId === String(s.user_id);
+                                return (
+                                    <label
+                                        key={s.user_id}
+                                        htmlFor={`staff-${s.user_id}`}
+                                        className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer transition-colors ${
+                                            isPicked ? 'bg-brand-50/60' : 'hover:bg-ink-50'
+                                        }`}
+                                    >
+                                        <span className="flex items-center gap-2 min-w-0">
+                                            <input
+                                                id={`staff-${s.user_id}`}
+                                                type="radio"
+                                                name="route-staff"
+                                                value={String(s.user_id)}
+                                                checked={isPicked}
+                                                onChange={() => setSelectedId(String(s.user_id))}
+                                                className="accent-brand-600"
+                                            />
+                                            <span className="min-w-0">
+                                                <span className="block text-sm font-medium text-ink-900 truncate">{s.full_name}</span>
+                                                {s.specialization && (
+                                                    <span className="block text-2xs text-ink-500 truncate">{s.specialization}</span>
+                                                )}
+                                            </span>
+                                        </span>
+                                        {s.role && <span className="text-2xs text-ink-500 shrink-0">{s.role}</span>}
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
+                    <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
+                    <button
+                        type="button"
+                        onClick={send}
+                        disabled={busy}
+                        className="btn-primary disabled:opacity-50 cursor-pointer"
+                    >
+                        {busy
+                            ? <><Activity size={15} className="animate-spin" aria-hidden="true" /> Routing…</>
+                            : <><Send size={15} aria-hidden="true" /> Send to {target.label}</>}
+                    </button>
+                </div>
             </div>
         </div>
     );

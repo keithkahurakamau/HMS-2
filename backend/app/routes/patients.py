@@ -321,6 +321,41 @@ def _canonical_department(label: str) -> str:
 class QueueRequest(BaseModel):
     department: str
     acuity_level: int = 3
+    # When set, the patient is assigned directly to this specific staff
+    # member. Otherwise the row lands in the unclaimed pool and the first
+    # available clinician picks it up. The latter is the legacy behaviour.
+    assigned_to: int | None = None
+
+
+@router.get("/staff", dependencies=[Depends(RequirePermission("patients:write"))])
+def list_staff_by_role(role: str = "", db: Session = Depends(get_db)):
+    """Active staff members filtered by role name.
+
+    Used by the front-desk routing picker so the receptionist can pick
+    *which* doctor / lab tech / radiologist the patient should land with.
+    Empty role returns every active user.
+
+    Available with patients:write so receptionists and clinical staff can
+    populate the picker without needing users:manage.
+    """
+    from app.models.user import User, Role
+    q = (
+        db.query(User)
+          .join(Role, User.role_id == Role.role_id)
+          .filter(User.is_active == True)
+    )
+    if role:
+        q = q.filter(Role.name == role)
+    rows = q.order_by(User.full_name.asc()).all()
+    return [
+        {
+            "user_id":        u.user_id,
+            "full_name":      u.full_name,
+            "role":           u.role.name if u.role else None,
+            "specialization": getattr(u, "specialization", None),
+        }
+        for u in rows
+    ]
 
 
 @router.post("/{patient_id}/route", dependencies=[Depends(RequirePermission("patients:write"))])
@@ -356,11 +391,26 @@ def route_patient(patient_id: int, request: QueueRequest, db: Session = Depends(
             "already_queued": True,
         }
 
+    # Validate the picked staff member exists + is active. We only check
+    # presence (not role-vs-department fit) so the receptionist can route
+    # to an unusual specialist when clinically appropriate.
+    assigned_to = None
+    if request.assigned_to is not None:
+        from app.models.user import User
+        candidate = db.query(User).filter(
+            User.user_id == request.assigned_to,
+            User.is_active == True,
+        ).first()
+        if not candidate:
+            raise HTTPException(status_code=400, detail="Selected staff member not found or inactive.")
+        assigned_to = candidate.user_id
+
     new_queue = PatientQueue(
         patient_id=patient_id,
         department=department,
         acuity_level=acuity,
         status="Waiting",
+        assigned_to=assigned_to,
     )
     db.add(new_queue)
     db.commit()
@@ -370,7 +420,12 @@ def route_patient(patient_id: int, request: QueueRequest, db: Session = Depends(
         db=db, user_id=current_user["user_id"], action="ROUTE",
         entity_type="PatientQueue", entity_id=str(new_queue.queue_id),
         old_value=None,
-        new_value={"patient_id": patient_id, "department": department, "acuity_level": acuity},
+        new_value={
+            "patient_id": patient_id,
+            "department": department,
+            "acuity_level": acuity,
+            "assigned_to": assigned_to,
+        },
         ip_address=None,
     )
     db.commit()
