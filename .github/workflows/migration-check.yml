@@ -64,47 +64,44 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt
 
-      - name: Seed a test tenant DB so the migration script has work to do
-        working-directory: backend
+      - name: Create the test tenant database
         env:
           PGPASSWORD: medifleet
         run: |
-          set -e
+          # Migrate_all_tenants will create the master `tenants` +
+          # `superadmins` tables via MASTER_DB_PATCHES, but it can't
+          # create a fresh tenant *database* (that's an out-of-band
+          # CREATE DATABASE). Create the empty container here; the
+          # script handles every schema patch.
           psql -h localhost -U medifleet -d hms_master \
             -c "CREATE DATABASE tenant_ci_test;"
-          # Insert a row in the master registry so migrate_all_tenants.py
-          # discovers our test DB. The script tolerates a missing
-          # alembic_version (legacy tenant path).
+
+      - name: Apply master DB patches on a fresh hms_master
+        working-directory: backend
+        run: |
+          # Run only the master-patch helper. This must succeed on a
+          # brand-new master DB — the bug we just fixed (support_tickets
+          # FK'ing to a non-existent superadmins table) lived exactly
+          # here. If this step turns red, the patch list is broken.
           python <<'PY'
-          from sqlalchemy import create_engine, text
-          eng = create_engine("postgresql://medifleet:medifleet@localhost:5432/hms_master")
-          with eng.begin() as conn:
-              conn.execute(text("""
-                  CREATE TABLE IF NOT EXISTS tenants (
-                      tenant_id SERIAL PRIMARY KEY,
-                      name TEXT NOT NULL,
-                      domain TEXT UNIQUE NOT NULL,
-                      db_name TEXT UNIQUE NOT NULL,
-                      theme_color TEXT DEFAULT 'blue',
-                      is_premium BOOLEAN DEFAULT FALSE,
-                      is_active BOOLEAN DEFAULT TRUE,
-                      feature_flags TEXT,
-                      plan_limits TEXT,
-                      notes TEXT,
-                      logo_data_url TEXT,
-                      background_data_url TEXT,
-                      brand_primary TEXT,
-                      brand_accent TEXT,
-                      print_templates TEXT,
-                      created_at TIMESTAMPTZ DEFAULT now()
-                  );
-              """))
-              conn.execute(text("""
-                  INSERT INTO tenants (name, domain, db_name)
-                  VALUES ('CI Test Hospital', 'ci.test', 'tenant_ci_test')
-                  ON CONFLICT (domain) DO NOTHING;
-              """))
+          import os
+          os.environ.setdefault("DATABASE_URL", "postgresql://medifleet:medifleet@localhost:5432/hms_master")
+          from scripts.migrate_all_tenants import _apply_master_patches, _master_db_url
+          _apply_master_patches(_master_db_url(os.environ["DATABASE_URL"]))
+          print("master patches OK")
           PY
+
+      - name: Register the test tenant in the master registry
+        env:
+          PGPASSWORD: medifleet
+        run: |
+          # tenants table now exists thanks to the previous step; safe
+          # to INSERT the discovery row migrate_all_tenants will find.
+          psql -h localhost -U medifleet -d hms_master <<SQL
+          INSERT INTO tenants (name, domain, db_name)
+          VALUES ('CI Test Hospital', 'ci.test', 'tenant_ci_test')
+          ON CONFLICT (domain) DO NOTHING;
+          SQL
 
       - name: Run migrate_all_tenants.py
         working-directory: backend

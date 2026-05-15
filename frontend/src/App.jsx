@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { BrandingProvider } from './context/BrandingContext';
 import { ModuleProvider } from './context/ModuleContext';
+import { PatientProvider } from './context/PatientContext';
 import ModuleGuard from './components/ModuleGuard';
 import { Activity } from 'lucide-react';
 
@@ -104,6 +105,7 @@ export default function App() {
         <ModuleProvider>
         <BrandingProvider>
         <BrowserRouter>
+        <PatientProvider>
           <Toaster position="top-right" />
           <a href="#main-content" className="skip-link">Skip to main content</a>
           <Routes>
@@ -155,6 +157,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
           </Routes>
+        </PatientProvider>
         </BrowserRouter>
         </BrandingProvider>
         </ModuleProvider>

@@ -54,22 +54,61 @@ apiClient.interceptors.request.use((config) => {
 });
 
 // =====================================================================
-// Silent token refresh.
+// Silent token refresh + global tenant guard.
 //
 // When a request fails with 401 because the access token expired, we attempt
 // /auth/refresh exactly once. If the refresh succeeds, the original request is
 // replayed transparently. We coalesce concurrent refresh attempts via a shared
 // promise so a burst of 401s only triggers a single /auth/refresh round-trip.
+//
+// Global tenant guard: when the backend reports the X-Tenant-ID header is
+// missing (HTTP 400 from get_db), redirect to /portal so the user can pick a
+// hospital instead of every page firing its own "Failed to load …" toast. The
+// guard fires at most once per page load to avoid a navigation storm when
+// several requests race in.
 // =====================================================================
 let refreshInFlight = null;
+let tenantRedirectFired = false;
 
 const SKIP_REFRESH_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout', '/auth/forgot-password', '/auth/reset-password'];
+
+// Pages that should be allowed to render even without a tenant selected.
+// Anything else gets redirected to /portal when the X-Tenant-ID guard trips.
+const TENANT_OPTIONAL_PATHS = ['/portal', '/login', '/superadmin', '/patient', '/forgot-password', '/reset-password'];
+
+const isTenantOptionalPath = (pathname) =>
+    TENANT_OPTIONAL_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`));
+
+const isTenantMissingError = (status, detail) =>
+    status === 400 && typeof detail === 'string' && /X-Tenant-ID/i.test(detail);
 
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
         const original = error.config;
         const status = error.response?.status;
+        const detail = error.response?.data?.detail;
+
+        // ── Tenant guard: redirect to /portal on missing X-Tenant-ID ─────────
+        // This is the source of most "Failed to load …" toasts on production
+        // deployments where a fresh tab opens before the user picks a hospital.
+        // Redirecting once is much cleaner than every page firing its own
+        // error UI.
+        if (isTenantMissingError(status, detail)
+            && !tenantRedirectFired
+            && typeof window !== 'undefined'
+            && !isTenantOptionalPath(window.location.pathname)
+            && !isSuperAdminPath(original?.url)
+        ) {
+            tenantRedirectFired = true;
+            // Soft redirect — preserve where we wanted to go so portal can
+            // bounce back. URL-encode so query strings survive the round trip.
+            const back = encodeURIComponent(window.location.pathname + window.location.search);
+            window.location.assign(`/portal?next=${back}`);
+            // Don't reject — we're navigating away. Resolve with an empty
+            // shape so any pending UI code can finish without throwing.
+            return Promise.reject(new axios.Cancel('Redirecting to portal — no tenant selected'));
+        }
 
         if (!original || status !== 401) {
             return Promise.reject(error);
@@ -106,3 +145,7 @@ apiClient.interceptors.response.use(
         }
     }
 );
+
+// Cleanly swallow the cancellation we issue from the tenant guard so it
+// doesn't surface to per-page error handlers as a generic network error.
+export const isTenantRedirect = (err) => axios.isCancel(err);

@@ -1,15 +1,97 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../api/client';
+import { apiClient, isTenantRedirect } from '../api/client';
 import toast from 'react-hot-toast';
 import {
     Search, UserPlus, X, Activity, Clock, ShieldCheck, Users,
-    MapPin, Phone, Briefcase, HeartPulse, FileText,
-    MoreVertical, Stethoscope, TestTube, AlertCircle, UserMinus,
-    Pill, Bed, CreditCard, Printer, Download, Trash
+    MapPin, Phone, Briefcase, HeartPulse,
+    MoreVertical, Stethoscope, TestTube, UserMinus,
+    Pill, Bed, CreditCard, Printer, Download, Trash, Eye,
+    AlertTriangle, Droplet, Send, Image, ChevronDown,
 } from 'lucide-react';
 import { printPatientCard } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
+import { useActivePatient } from '../context/PatientContext';
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Routing destinations.                                                     */
+/*                                                                            */
+/*  Backend canonical names (mirror app/routes/patients.py _canonical_        */
+/*  department). The friendly `label` is what the user sees; `department` is  */
+/*  what we POST. Order drives the inline chip row on each patient.           */
+/* ────────────────────────────────────────────────────────────────────────── */
+// Each routing target carries the canonical department name, the role
+// whose members should appear in the "Who?" picker, and a flag telling the
+// modal whether picking a specific staff member is required, optional, or
+// not applicable. Billing → cashier role; Wards/Pharmacy/Lab/Radiology
+// → their respective clinical role; Clinical → Doctor.
+const ROUTE_TARGETS = [
+    { department: 'Consultation', label: 'Clinical',  icon: Stethoscope, role: 'Doctor',          assignment: 'optional', accent: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200' },
+    { department: 'Laboratory',   label: 'Lab',       icon: TestTube,    role: 'Lab Technician',  assignment: 'optional', accent: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' },
+    { department: 'Radiology',    label: 'Radiology', icon: Image,       role: 'Radiologist',     assignment: 'optional', accent: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200' },
+    { department: 'Pharmacy',     label: 'Pharmacy',  icon: Pill,        role: 'Pharmacist',      assignment: 'optional', accent: 'bg-accent-50 text-accent-700 hover:bg-accent-100 border-accent-200' },
+    { department: 'Billing',      label: 'Billing',   icon: CreditCard,  role: 'Receptionist',    assignment: 'optional', accent: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },
+    { department: 'Wards',        label: 'Wards',     icon: Bed,         role: 'Nurse',           assignment: 'optional', accent: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200' },
+];
+
+const initialsOf = (patient) => {
+    const s = (patient?.surname || '?').trim()[0] || '?';
+    const o = (patient?.other_names || '').trim()[0] || '';
+    return (s + o).toUpperCase();
+};
+
+const ageFrom = (dob) => {
+    if (!dob) return null;
+    const birth = new Date(dob);
+    if (isNaN(birth)) return null;
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age -= 1;
+    return age;
+};
+
+const isToday = (iso) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear()
+        && d.getMonth() === now.getMonth()
+        && d.getDate() === now.getDate();
+};
+
+const formatRelative = (iso) => {
+    if (!iso) return '—';
+    const then = new Date(iso).getTime();
+    const diff = Date.now() - then;
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    if (d < 7) return `${d}d ago`;
+    return new Date(iso).toLocaleDateString();
+};
+
+// Deterministic colour from the patient's name so the avatar stays stable
+// across renders and pages. Cyan/teal/emerald palette feels clinical.
+const AVATAR_PALETTE = [
+    'bg-brand-100 text-brand-700',
+    'bg-teal-100  text-teal-700',
+    'bg-accent-100 text-accent-700',
+    'bg-amber-100 text-amber-700',
+    'bg-rose-100  text-rose-700',
+    'bg-indigo-100 text-indigo-700',
+    'bg-purple-100 text-purple-700',
+];
+const avatarColor = (key) => {
+    if (!key) return AVATAR_PALETTE[0];
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+    return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
+};
 
 export default function Patients() {
     const [patients, setPatients] = useState([]);
@@ -19,8 +101,35 @@ export default function Patients() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Interactive States
-    const [activeDropdown, setActiveDropdown] = useState(null);
+    // Active dropdown carries both the patient id (to drive which row's
+    // trigger highlights) AND the trigger DOM node, which the portal-based
+    // RowMenu uses to anchor itself in the viewport. Storing the DOM node
+    // in state is intentional: refs can't be enumerated across many rows,
+    // but capturing event.currentTarget on click works for every row with
+    // zero ref bookkeeping.
+    const [activeDropdown, setActiveDropdown] = useState(null);  // null | { patientId, anchorEl }
+    const [sexFilter, setSexFilter] = useState('');
+    const [routingId, setRoutingId] = useState(null);
     const navigate = useNavigate();
+    const { setActivePatient } = useActivePatient();
+
+    const closeDropdown = () => setActiveDropdown(null);
+    const toggleDropdown = (patientId, e) => {
+        // Capture the DOM node NOW. React 18 zeroes out `e.currentTarget`
+        // after the handler returns, and our updater fn runs during the
+        // next render — by then `e.currentTarget` would be null, the menu
+        // would anchor at viewport (0,0), and the doc-level click-outside
+        // listener would see the trigger as "not inside the anchor" and
+        // close the menu the moment it opened.
+        const anchorEl = e.currentTarget;
+        // Stop the synthetic click from bubbling to the doc-level
+        // mousedown/click listener the menu installs — the same physical
+        // click would otherwise be treated as "outside" the menu.
+        e.stopPropagation();
+        setActiveDropdown(prev =>
+            prev?.patientId === patientId ? null : { patientId, anchorEl }
+        );
+    };
 
     // Form State
     const defaultFormState = {
@@ -46,17 +155,16 @@ export default function Patients() {
             const response = await apiClient.get(`/patients/?search=${encodeURIComponent(searchQuery)}`);
             setPatients(response.data);
         } catch (error) {
-            // Surface the real reason so operators don't have to dig through
-            // network tabs to diagnose load failures. Distinguishes between
-            // the four common causes: no tenant selected, expired auth,
-            // missing permission, and everything else.
+            // Suppress the toast when the client is in the middle of
+            // redirecting to /portal (tenant guard) — the page is about
+            // to unmount anyway and a flashing toast looks like a bug.
+            if (isTenantRedirect(error)) return;
+
             const status = error.response?.status;
             const serverDetail = error.response?.data?.detail;
             let msg;
             if (!status) {
-                msg = 'Cannot reach the server. Check that the backend is running.';
-            } else if (status === 400 && /X-Tenant-ID/i.test(String(serverDetail))) {
-                msg = 'No hospital selected. Open the Portal and pick a hospital first.';
+                msg = 'Cannot reach the server. Retrying shortly…';
             } else if (status === 401) {
                 msg = 'Your session has expired — sign in again.';
             } else if (status === 403) {
@@ -76,6 +184,54 @@ export default function Patients() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    // ── Bidirectional age ↔ DOB sync ─────────────────────────────────────
+    // Doctors / receptionists often only know the approximate age (common
+    // when a Kenyan ID has been lost or the patient is a child). Typing an
+    // age sets DOB to "today minus N years" so the rest of the form can
+    // proceed; a tooltip on the field reminds the operator to confirm the
+    // exact date with the patient when known.
+    const computeDobFromAge = (age) => {
+        const n = parseInt(age, 10);
+        if (Number.isNaN(n) || n < 0 || n > 130) return '';
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - n);
+        const pad = (v) => String(v).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
+    const ageFromDobStr = (dob) => {
+        if (!dob) return '';
+        const birth = new Date(dob);
+        if (Number.isNaN(birth.getTime())) return '';
+        const now = new Date();
+        let age = now.getFullYear() - birth.getFullYear();
+        const m = now.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age -= 1;
+        return age >= 0 ? String(age) : '';
+    };
+
+    // The form holds DOB as the source of truth. `ageDisplay` is a derived
+    // string that lives next to it; editing either updates the other.
+    const [ageDisplay, setAgeDisplay] = useState('');
+
+    // Whenever DOB changes from outside the age field (e.g. opening for a
+    // new registration), re-derive the age so the two stay coherent.
+    useEffect(() => {
+        setAgeDisplay(ageFromDobStr(formData.date_of_birth));
+    }, [formData.date_of_birth]);
+
+    const handleAgeChange = (e) => {
+        const raw = e.target.value;
+        setAgeDisplay(raw);
+        const dob = computeDobFromAge(raw);
+        // Only push back into DOB if we got a sensible number; otherwise
+        // leave the existing DOB untouched so the operator doesn't lose
+        // a previously-picked date by accidentally typing a letter.
+        if (raw === '' || dob) {
+            setFormData(f => ({ ...f, date_of_birth: dob || f.date_of_birth }));
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -93,19 +249,49 @@ export default function Patients() {
     };
 
     // --- Action: Route Patient ---
-    const routePatient = async (patientId, department) => {
+    // Two-step flow: click a route chip → open the picker modal so the
+    // receptionist can pick *which* staff member to assign the patient to.
+    // The actual POST happens from inside the modal once the picker
+    // confirms (or skips, in which case the row lands in the unassigned
+    // pool so any qualified clinician can claim it).
+    const [routeRequest, setRouteRequest] = useState(null); // { patient, target } | null
+
+    const openRoutePicker = (patient, target) => {
+        setRouteRequest({ patient, target });
+    };
+
+    const submitRoute = async ({ patient, target, assigned_to, acuity = 3 }) => {
+        const { department, label } = target;
+        setRoutingId(`${patient.patient_id}:${department}`);
         try {
-            await apiClient.post(`/patients/${patientId}/route`, { department, acuity_level: 3 });
-            toast.success(`Successfully sent to ${department} queue.`);
-            setActiveDropdown(null);
+            const res = await apiClient.post(`/patients/${patient.patient_id}/route`, {
+                department,
+                acuity_level: acuity,
+                assigned_to: assigned_to ?? null,
+            });
+            const alreadyQueued = res.data?.already_queued;
+            const name = `${patient.surname}, ${patient.other_names}`;
+            toast.success(
+                alreadyQueued
+                    ? `${name} is already in the ${label} queue.`
+                    : `${name} sent to ${label}${assigned_to ? '' : ' (unassigned)'}.`,
+            );
+            setRouteRequest(null);
         } catch (error) {
-            toast.error(error.response?.data?.detail || `Failed to route to ${department}`);
+            toast.error(error.response?.data?.detail || `Failed to route to ${label}.`);
+        } finally {
+            setRoutingId(null);
         }
     };
 
     // --- Action: View History ---
+    // Opening a chart promotes the patient into the cross-module active
+    // context so the bar persists as the user navigates around the system,
+    // and the KDPA S.26 access log captures every module visit.
     const viewHistory = (patientId) => {
         setActiveDropdown(null);
+        const patient = patients.find(p => p.patient_id === patientId);
+        if (patient) setActivePatient(patient);
         navigate(`/app/medical-history?patient_id=${patientId}`);
     };
 
@@ -164,120 +350,320 @@ export default function Patients() {
         }
     };
 
+    // Client-side filter applied on top of the server's search results.
+    const visiblePatients = useMemo(() => (
+        sexFilter ? patients.filter(p => p.sex === sexFilter) : patients
+    ), [patients, sexFilter]);
+
+    // Aggregate stats for the strip at the top of the directory.
+    const stats = useMemo(() => {
+        const today = patients.filter(p => isToday(p.registered_on)).length;
+        const female = patients.filter(p => p.sex === 'Female').length;
+        const male = patients.filter(p => p.sex === 'Male').length;
+        const withAllergies = patients.filter(p => p.allergies && p.allergies.trim()).length;
+        return { total: patients.length, today, female, male, withAllergies };
+    }, [patients]);
+
     return (
-        <div className="space-y-6 relative h-full">
+        <div className="space-y-6">
             <PageHeader
                 eyebrow="Front desk"
                 icon={Users}
                 title="Patient Directory"
-                subtitle="Manage comprehensive registrations, medical records, and departmental queues."
+                subtitle="Register, search, and route patients across departmental queues."
+                tone="brand"
                 actions={
-                    <button onClick={() => setIsModalOpen(true)} className="btn-primary cursor-pointer">
-                        <UserPlus size={16} /> Register patient
+                    <button
+                        type="button"
+                        onClick={() => setIsModalOpen(true)}
+                        className="btn-primary cursor-pointer"
+                    >
+                        <UserPlus size={16} aria-hidden="true" /> Register patient
                     </button>
                 }
             />
 
-            {/* Toolbar */}
-            <div className="card p-3 sm:p-4 flex items-center justify-between">
-                <div className="relative w-full max-w-md">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+            {/* ── Stat strip ──────────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <DirectoryStat label="Active patients"      value={stats.total}          icon={Users}        accent="brand" />
+                <DirectoryStat label="Registered today"     value={stats.today}          icon={UserPlus}     accent="accent" />
+                <DirectoryStat label="Female"               value={stats.female}         icon={Users}        accent="rose" />
+                <DirectoryStat label="Male"                 value={stats.male}           icon={Users}        accent="teal" />
+                <DirectoryStat label="Allergy flagged"      value={stats.withAllergies}  icon={AlertTriangle} accent="amber" />
+            </div>
+
+            {/* ── Toolbar: search + filter ───────────────────────────────── */}
+            <div className="card p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="relative flex-1 min-w-0">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
+                    <label htmlFor="patient-search" className="sr-only">Search patients</label>
                     <input
-                        type="text"
+                        id="patient-search"
+                        type="search"
                         placeholder="Search by OP Number, name, ID, or phone…"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="input pl-10"
                     />
                 </div>
+                <div className="flex items-center gap-2" role="tablist" aria-label="Filter by sex">
+                    {['', 'Male', 'Female'].map(s => (
+                        <button
+                            key={s || 'all'}
+                            type="button"
+                            onClick={() => setSexFilter(s)}
+                            role="tab"
+                            aria-selected={sexFilter === s}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                                sexFilter === s
+                                    ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200'
+                                    : 'text-ink-700 hover:bg-ink-50'
+                            }`}
+                        >
+                            {s || 'All'}
+                        </button>
+                    ))}
+                </div>
+                <div className="text-xs text-ink-500 sm:ml-2 shrink-0">
+                    {visiblePatients.length} of {patients.length} record{patients.length === 1 ? '' : 's'}
+                </div>
             </div>
 
-            {/* Data Table */}
-            <div className="card overflow-visible">
-                <div className="overflow-x-auto overflow-y-visible pb-24">
-                    <table className="table-clean">
-                        <thead>
+            {/* ── Desktop table (md+) ─────────────────────────────────────── */}
+            <div className="hidden md:block card overflow-visible">
+                <div className="overflow-x-auto overflow-y-visible">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-ink-50 text-ink-600 text-2xs uppercase font-semibold tracking-[0.14em]">
                             <tr>
-                                <th>OP Number</th>
-                                <th>Patient Profile</th>
-                                <th>Contact Info</th>
-                                <th>Registered Date</th>
-                                <th className="text-center">Actions</th>
+                                <th className="px-5 py-3">Patient</th>
+                                <th className="px-5 py-3">Contact</th>
+                                <th className="px-5 py-3">Vitals</th>
+                                <th className="px-5 py-3">Route to queue</th>
+                                <th className="px-5 py-3 text-right">Manage</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-ink-100 text-ink-700">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan="5" className="px-6 py-12 text-center text-ink-400">
-                                        <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={22} />
+                                    <td colSpan="5" className="px-6 py-12 text-center text-ink-500">
+                                        <Activity className="animate-spin inline mr-2 text-brand-600" size={20} aria-hidden="true" />
                                         Loading patient records…
                                     </td>
                                 </tr>
-                            ) : patients.length === 0 ? (
+                            ) : visiblePatients.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="px-6 py-12 text-center text-ink-400">
-                                        No active patients found matching your search.
+                                    <td colSpan="5" className="px-6 py-16 text-center text-ink-500">
+                                        <Users size={36} className="mx-auto mb-2 text-ink-300" aria-hidden="true" />
+                                        <p className="text-sm font-medium text-ink-700">No patients match the current filters.</p>
+                                        <p className="text-xs mt-1">Try clearing the search or registering a new patient.</p>
                                     </td>
                                 </tr>
                             ) : (
-                                patients.map((patient) => (
-                                    <tr key={patient.patient_id}>
-                                        <td className="font-mono text-xs font-semibold text-brand-700">
-                                            {patient.outpatient_no}
-                                        </td>
-                                        <td>
-                                            <div className="font-semibold text-ink-900">
-                                                {patient.surname}, {patient.other_names}
-                                            </div>
-                                            <div className="text-xs text-ink-500 mt-0.5">
-                                                {patient.sex} &middot; {patient.date_of_birth}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div className="flex items-center gap-1.5 text-ink-700"><Phone size={12} className="text-ink-400" /> {patient.telephone_1}</div>
-                                            <div className="text-xs text-ink-500 mt-0.5 flex items-center gap-1.5">
-                                                <MapPin size={12} className="text-ink-400" /> {patient.residence || patient.town || 'Unspecified'}
-                                            </div>
-                                        </td>
-                                        <td className="text-ink-500 text-xs">
-                                            {new Date(patient.registered_on).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-center relative">
-                                            <button
-                                                onClick={() => setActiveDropdown(activeDropdown === patient.patient_id ? null : patient.patient_id)}
-                                                aria-label="Patient actions"
-                                                className="p-2 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                                            >
-                                                <MoreVertical size={16} />
-                                            </button>
-
-                                            {activeDropdown === patient.patient_id && (
-                                                <div className="absolute right-10 top-10 w-52 bg-white rounded-xl shadow-elevated border border-ink-200/70 py-2 z-30 text-left animate-fade-in">
-                                                    <div className="px-3 pt-1 pb-1.5 text-2xs font-semibold text-ink-400 uppercase tracking-[0.14em]">Route to</div>
-                                                    <button onClick={() => routePatient(patient.patient_id, 'Clinical Desk')} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5"><Stethoscope size={15} className="text-blue-500" /> Clinical Desk</button>
-                                                    <button onClick={() => routePatient(patient.patient_id, 'Laboratory')} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5"><TestTube size={15} className="text-purple-500" /> Laboratory</button>
-                                                    <button onClick={() => routePatient(patient.patient_id, 'Radiology')} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5"><Activity size={15} className="text-indigo-500" /> Radiology</button>
-                                                    <button onClick={() => routePatient(patient.patient_id, 'Pharmacy')} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5"><Pill size={15} className="text-accent-600" /> Pharmacy</button>
-                                                    <button onClick={() => routePatient(patient.patient_id, 'Billing')} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5"><CreditCard size={15} className="text-amber-500" /> Billing</button>
-                                                    <button onClick={() => routePatient(patient.patient_id, 'Wards')} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5"><Bed size={15} className="text-rose-500" /> Wards</button>
-
-                                                    <div className="border-t border-ink-100 my-1.5"></div>
-                                                    <div className="px-3 pt-1 pb-1.5 text-2xs font-semibold text-ink-400 uppercase tracking-[0.14em]">Manage</div>
-
-                                                    <button onClick={() => viewHistory(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5"><Clock size={15} className="text-ink-500" /> View History</button>
-                                                    <button onClick={() => { printPatientCard(patient); setActiveDropdown(null); }} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5"><Printer size={15} className="text-ink-500" /> Print Card</button>
-                                                    <button onClick={() => exportPatientData(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5"><Download size={15} className="text-ink-500" /> Export Data (KDPA)</button>
-                                                    <button onClick={() => deactivatePatient(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2.5"><UserMinus size={15} /> Deactivate</button>
-                                                    <button onClick={() => erasePatient(patient)} className="w-full px-3.5 py-2 text-sm text-rose-700 hover:bg-rose-50 flex items-center gap-2.5 font-semibold"><Trash size={15} /> Erase (KDPA S.40)</button>
+                                visiblePatients.map(patient => {
+                                    const age = ageFrom(patient.date_of_birth);
+                                    const hasAllergies = patient.allergies && patient.allergies.trim();
+                                    return (
+                                        <tr key={patient.patient_id} className="hover:bg-ink-50/60 transition-colors">
+                                            {/* Patient */}
+                                            <td className="px-5 py-3 align-top">
+                                                <div className="flex items-start gap-3">
+                                                    <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${avatarColor(patient.outpatient_no)}`} aria-hidden="true">
+                                                        {initialsOf(patient)}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="font-semibold text-ink-900 truncate">{patient.surname}, {patient.other_names}</div>
+                                                        <div className="flex items-center gap-2 text-xs text-ink-500 mt-0.5">
+                                                            <span className="font-mono text-brand-700">{patient.outpatient_no}</span>
+                                                            <span aria-hidden="true">·</span>
+                                                            <span>{patient.sex}{age !== null ? `, ${age}y` : ''}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))
+                                            </td>
+
+                                            {/* Contact */}
+                                            <td className="px-5 py-3 align-top text-xs">
+                                                <div className="flex items-center gap-1.5 text-ink-700">
+                                                    <Phone size={12} className="text-ink-400 shrink-0" aria-hidden="true" />
+                                                    <span className="truncate">{patient.telephone_1 || '—'}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-ink-500 mt-1">
+                                                    <MapPin size={12} className="text-ink-400 shrink-0" aria-hidden="true" />
+                                                    <span className="truncate">{patient.residence || patient.town || 'Unspecified'}</span>
+                                                </div>
+                                                <div className="text-2xs text-ink-400 mt-1" title={patient.registered_on ? new Date(patient.registered_on).toLocaleString() : ''}>
+                                                    Registered {formatRelative(patient.registered_on)}
+                                                </div>
+                                            </td>
+
+                                            {/* Vitals */}
+                                            <td className="px-5 py-3 align-top text-xs">
+                                                <div className="flex items-center gap-1.5 text-ink-700">
+                                                    <Droplet size={12} className="text-rose-500 shrink-0" aria-hidden="true" />
+                                                    <span>{patient.blood_group && patient.blood_group !== 'Unknown' ? patient.blood_group : 'Unknown'}</span>
+                                                </div>
+                                                <div className="mt-1 min-h-[1rem]">
+                                                    {hasAllergies ? (
+                                                        <span className="badge-warn inline-flex items-center gap-1" title={patient.allergies}>
+                                                            <AlertTriangle size={10} aria-hidden="true" /> Allergies
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-ink-400 text-2xs">No allergies</span>
+                                                    )}
+                                                </div>
+                                            </td>
+
+                                            {/* Route to queue */}
+                                            <td className="px-5 py-3 align-top">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {ROUTE_TARGETS.map(t => {
+                                                        const Icon = t.icon;
+                                                        const busy = routingId === `${patient.patient_id}:${t.department}`;
+                                                        return (
+                                                            <button
+                                                                key={t.department}
+                                                                type="button"
+                                                                onClick={() => openRoutePicker(patient, t)}
+                                                                disabled={busy}
+                                                                aria-label={`Send ${patient.surname} to ${t.label}`}
+                                                                title={`Send to ${t.label}`}
+                                                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-semibold border transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${t.accent}`}
+                                                            >
+                                                                {busy
+                                                                    ? <Activity size={11} className="animate-spin" aria-hidden="true" />
+                                                                    : <Icon size={11} aria-hidden="true" />}
+                                                                <span>{t.label}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </td>
+
+                                            {/* Manage dropdown */}
+                                            <td className="px-5 py-3 text-right align-top">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => toggleDropdown(patient.patient_id, e)}
+                                                    aria-label={`More actions for ${patient.surname}, ${patient.other_names}`}
+                                                    aria-haspopup="menu"
+                                                    aria-expanded={activeDropdown?.patientId === patient.patient_id}
+                                                    className="p-2 text-ink-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors cursor-pointer"
+                                                >
+                                                    <MoreVertical size={16} aria-hidden="true" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            {/* ── Mobile cards ─────────────────────────────────────────────── */}
+            <div className="md:hidden space-y-3">
+                {isLoading ? (
+                    <div className="card p-8 text-center text-ink-500">
+                        <Activity className="animate-spin inline mr-2 text-brand-600" size={20} aria-hidden="true" /> Loading…
+                    </div>
+                ) : visiblePatients.length === 0 ? (
+                    <div className="card p-8 text-center text-ink-500">
+                        <Users size={32} className="mx-auto mb-2 text-ink-300" aria-hidden="true" />
+                        <p className="text-sm font-medium text-ink-700">No patients match the current filters.</p>
+                    </div>
+                ) : (
+                    visiblePatients.map(patient => {
+                        const age = ageFrom(patient.date_of_birth);
+                        const hasAllergies = patient.allergies && patient.allergies.trim();
+                        return (
+                            <article key={patient.patient_id} className="card p-4">
+                                <header className="flex items-start gap-3">
+                                    <div className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold ${avatarColor(patient.outpatient_no)}`} aria-hidden="true">
+                                        {initialsOf(patient)}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="font-semibold text-ink-900 truncate">{patient.surname}, {patient.other_names}</h3>
+                                        <div className="text-xs text-ink-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                            <span className="font-mono text-brand-700">{patient.outpatient_no}</span>
+                                            <span>{patient.sex}{age !== null ? ` · ${age}y` : ''}</span>
+                                            {hasAllergies && (
+                                                <span className="badge-warn inline-flex items-center gap-1">
+                                                    <AlertTriangle size={10} aria-hidden="true" /> Allergies
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => toggleDropdown(patient.patient_id, e)}
+                                        aria-label={`More actions for ${patient.surname}`}
+                                        aria-haspopup="menu"
+                                        aria-expanded={activeDropdown?.patientId === patient.patient_id}
+                                        className="shrink-0 w-11 h-11 inline-flex items-center justify-center text-ink-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg cursor-pointer"
+                                    >
+                                        <MoreVertical size={18} aria-hidden="true" />
+                                    </button>
+                                </header>
+
+                                <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                        <dt className="text-ink-500">Phone</dt>
+                                        <dd className="text-ink-900 flex items-center gap-1 mt-0.5">
+                                            <Phone size={11} className="text-ink-400" aria-hidden="true" />
+                                            <span className="truncate">{patient.telephone_1 || '—'}</span>
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-ink-500">Residence</dt>
+                                        <dd className="text-ink-900 flex items-center gap-1 mt-0.5">
+                                            <MapPin size={11} className="text-ink-400" aria-hidden="true" />
+                                            <span className="truncate">{patient.residence || patient.town || '—'}</span>
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-ink-500">Blood</dt>
+                                        <dd className="text-ink-900 flex items-center gap-1 mt-0.5">
+                                            <Droplet size={11} className="text-rose-500" aria-hidden="true" />
+                                            {patient.blood_group && patient.blood_group !== 'Unknown' ? patient.blood_group : 'Unknown'}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-ink-500">Registered</dt>
+                                        <dd className="text-ink-900 mt-0.5" title={patient.registered_on ? new Date(patient.registered_on).toLocaleString() : ''}>
+                                            {formatRelative(patient.registered_on)}
+                                        </dd>
+                                    </div>
+                                </dl>
+
+                                <div className="mt-3">
+                                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 mb-1.5">Route to queue</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {ROUTE_TARGETS.map(t => {
+                                            const Icon = t.icon;
+                                            const busy = routingId === `${patient.patient_id}:${t.department}`;
+                                            return (
+                                                <button
+                                                    key={t.department}
+                                                    type="button"
+                                                    onClick={() => openRoutePicker(patient, t)}
+                                                    disabled={busy}
+                                                    aria-label={`Send ${patient.surname} to ${t.label}`}
+                                                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-2xs font-semibold border transition-colors cursor-pointer disabled:opacity-50 ${t.accent}`}
+                                                >
+                                                    {busy
+                                                        ? <Activity size={11} className="animate-spin" aria-hidden="true" />
+                                                        : <Icon size={11} aria-hidden="true" />}
+                                                    <span>{t.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </article>
+                        );
+                    })
+                )}
             </div>
 
             {/* --- History Drawer removed in favor of full Medical History module --- */}
@@ -327,8 +713,39 @@ export default function Patients() {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="label">Date of Birth <span className="text-red-500">*</span></label>
-                                            <input required type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleInputChange} className="input" />
+                                            <label className="label" htmlFor="reg-dob">Date of Birth <span className="text-red-500">*</span></label>
+                                            <input
+                                                id="reg-dob"
+                                                required
+                                                type="date"
+                                                name="date_of_birth"
+                                                value={formData.date_of_birth}
+                                                onChange={handleInputChange}
+                                                max={new Date().toISOString().slice(0, 10)}
+                                                className="input"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label flex items-center gap-1" htmlFor="reg-age">
+                                                Age
+                                                <span className="text-2xs font-normal text-ink-400 normal-case tracking-normal">(years)</span>
+                                            </label>
+                                            <input
+                                                id="reg-age"
+                                                type="number"
+                                                min="0"
+                                                max="130"
+                                                step="1"
+                                                inputMode="numeric"
+                                                value={ageDisplay}
+                                                onChange={handleAgeChange}
+                                                placeholder="e.g. 34"
+                                                className="input"
+                                                title="Type the age if exact DOB is unknown — DOB auto-fills to today minus N years. Confirm with patient."
+                                            />
+                                            {ageDisplay && !formData.date_of_birth && (
+                                                <p className="helper text-amber-700">Approximated DOB — confirm with patient when possible.</p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="label">ID Type</label>
@@ -489,6 +906,403 @@ export default function Patients() {
                     </div>
                 </div>
             )}
+
+            {/* Route-to picker modal — opens when the front desk clicks
+                any route chip. Lets them pick a specific staff member to
+                assign the patient to within that module. */}
+            {routeRequest && (
+                <RouteToModal
+                    patient={routeRequest.patient}
+                    target={routeRequest.target}
+                    busy={routingId === `${routeRequest.patient.patient_id}:${routeRequest.target.department}`}
+                    onSubmit={(payload) => submitRoute({
+                        patient: routeRequest.patient,
+                        target: routeRequest.target,
+                        ...payload,
+                    })}
+                    onClose={() => setRouteRequest(null)}
+                />
+            )}
+
+            {/* Singleton portal-anchored row menu — exactly one instance
+                rendered when *some* row's More button is active. Portaled
+                to <body> so no ancestor's overflow can clip it. */}
+            {activeDropdown && (() => {
+                const open = patients.find(p => p.patient_id === activeDropdown.patientId);
+                if (!open) return null;
+                return (
+                    <RowMenu
+                        patient={open}
+                        anchorEl={activeDropdown.anchorEl}
+                        onClose={closeDropdown}
+                        onView={viewHistory}
+                        onPrint={(p) => { printPatientCard(p); closeDropdown(); }}
+                        onExport={exportPatientData}
+                        onDeactivate={deactivatePatient}
+                        onErase={erasePatient}
+                    />
+                );
+            })()}
         </div>
+    );
+}
+
+const STAT_ACCENTS = {
+    brand:  'bg-brand-50  text-brand-700  ring-brand-100',
+    teal:   'bg-teal-50   text-teal-700   ring-teal-100',
+    accent: 'bg-accent-50 text-accent-700 ring-accent-100',
+    amber:  'bg-amber-50  text-amber-700  ring-amber-100',
+    rose:   'bg-rose-50   text-rose-700   ring-rose-100',
+};
+
+function DirectoryStat({ label, value, icon: Icon, accent = 'brand' }) {
+    return (
+        <div className="stat-tile">
+            <div className={`stat-icon ${STAT_ACCENTS[accent] || STAT_ACCENTS.brand}`} aria-hidden="true">
+                <Icon size={18} />
+            </div>
+            <div className="min-w-0">
+                <p className="stat-label truncate">{label}</p>
+                <p className="stat-value tabular-nums">{value}</p>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * RouteToModal — "Who should this patient see?" picker.
+ *
+ * Fetches active staff for the destination's role via /api/patients/staff,
+ * lets the receptionist either pick a specific person or send unassigned
+ * (any qualified clinician can claim the row). Triage acuity is exposed so
+ * the front desk can mark genuine emergencies — the clinical queue is
+ * ordered by acuity ascending before joined_at, so a "Critical" patient
+ * jumps the queue.
+ */
+const ACUITY_PRESETS = [
+    { value: 1, label: 'Critical',  hint: 'Resuscitate now',     className: 'bg-rose-50 text-rose-800 border-rose-200' },
+    { value: 2, label: 'High',      hint: 'See within 10 min',   className: 'bg-amber-50 text-amber-800 border-amber-200' },
+    { value: 3, label: 'Normal',    hint: 'Routine triage',      className: 'bg-brand-50 text-brand-800 border-brand-200' },
+    { value: 4, label: 'Low',       hint: 'Can wait',            className: 'bg-ink-50 text-ink-700 border-ink-200' },
+    { value: 5, label: 'Non-urgent', hint: 'Walk-in',            className: 'bg-ink-50 text-ink-700 border-ink-200' },
+];
+
+function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
+    const [staff, setStaff] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedId, setSelectedId] = useState('');
+    const [acuity, setAcuity] = useState(3);
+    const [search, setSearch] = useState('');
+
+    useEffect(() => {
+        let cancelled = false;
+        setIsLoading(true);
+        apiClient.get('/patients/staff', { params: target.role ? { role: target.role } : {} })
+            .then(res => { if (!cancelled) setStaff(res.data || []); })
+            .catch(() => { if (!cancelled) setStaff([]); })
+            .finally(() => { if (!cancelled) setIsLoading(false); });
+        return () => { cancelled = true; };
+    }, [target.role]);
+
+    const filtered = useMemo(() => {
+        const needle = search.trim().toLowerCase();
+        if (!needle) return staff;
+        return staff.filter(s =>
+            s.full_name?.toLowerCase().includes(needle)
+            || (s.specialization || '').toLowerCase().includes(needle)
+        );
+    }, [staff, search]);
+
+    const Icon = target.icon;
+
+    const send = () => {
+        onSubmit({
+            assigned_to: selectedId ? parseInt(selectedId, 10) : null,
+            acuity,
+        });
+    };
+
+    const fullName = `${patient.surname}, ${patient.other_names}`;
+    const noRoleMatch = !isLoading && staff.length === 0;
+
+    return (
+        <div
+            className="fixed inset-0 z-[55] flex items-center justify-center p-3 sm:p-4 bg-ink-950/60 backdrop-blur-sm animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="route-modal-title"
+        >
+            <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-lg max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                {/* Header */}
+                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-start gap-3 shrink-0">
+                    <div className="min-w-0 flex items-start gap-3">
+                        <div className={`shrink-0 w-10 h-10 rounded-xl border flex items-center justify-center ${target.accent}`} aria-hidden="true">
+                            <Icon size={18} />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">Route to {target.label}</p>
+                            <h2 id="route-modal-title" className="text-base font-semibold text-ink-900 tracking-tight truncate">{fullName}</h2>
+                            <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer shrink-0"
+                    >
+                        <X size={18} aria-hidden="true" />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4">
+                    {/* Acuity */}
+                    <div>
+                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 mb-1.5">Triage acuity</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5" role="radiogroup" aria-label="Triage acuity">
+                            {ACUITY_PRESETS.map(p => {
+                                const active = acuity === p.value;
+                                return (
+                                    <button
+                                        key={p.value}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={active}
+                                        onClick={() => setAcuity(p.value)}
+                                        title={p.hint}
+                                        className={`rounded-md border px-2 py-1.5 text-left transition-colors cursor-pointer ${
+                                            active ? `${p.className} ring-2 ring-offset-1 ring-brand-500/20 font-semibold` : 'bg-white border-ink-200 hover:bg-ink-50 text-ink-700'
+                                        }`}
+                                    >
+                                        <p className="text-2xs font-semibold uppercase tracking-wider">{p.label}</p>
+                                        <p className="text-[10px] text-ink-500 truncate">{p.hint}</p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Staff picker */}
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+                                Assign to {target.role ? <span className="text-ink-500 normal-case tracking-normal">({target.role})</span> : ''}
+                            </p>
+                            <span className="text-2xs text-ink-500">{isLoading ? 'Loading…' : `${filtered.length} available`}</span>
+                        </div>
+
+                        {/* Search — only show when more than a handful of staff */}
+                        {staff.length > 5 && (
+                            <div className="relative mb-2">
+                                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
+                                <label htmlFor="route-staff-search" className="sr-only">Search staff</label>
+                                <input
+                                    id="route-staff-search"
+                                    type="search"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search by name or specialization…"
+                                    className="w-full bg-white border border-ink-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                />
+                            </div>
+                        )}
+
+                        {/* Unassigned option — first row, always visible */}
+                        <label
+                            htmlFor="staff-none"
+                            className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                selectedId === ''
+                                    ? 'bg-brand-50/60 border-brand-200'
+                                    : 'bg-white border-ink-200 hover:bg-ink-50'
+                            }`}
+                        >
+                            <span className="flex items-center gap-2 min-w-0">
+                                <input
+                                    id="staff-none"
+                                    type="radio"
+                                    name="route-staff"
+                                    value=""
+                                    checked={selectedId === ''}
+                                    onChange={() => setSelectedId('')}
+                                    className="accent-brand-600"
+                                />
+                                <span className="text-sm font-medium text-ink-900">Send unassigned</span>
+                            </span>
+                            <span className="text-2xs text-ink-500">Anyone on the {target.label} queue can claim</span>
+                        </label>
+
+                        {/* Staff list */}
+                        <div className="mt-1.5 max-h-64 overflow-y-auto custom-scrollbar rounded-lg border border-ink-200 divide-y divide-ink-100">
+                            {isLoading ? (
+                                <div className="p-6 text-center text-ink-500 text-sm">
+                                    <Activity className="animate-spin inline mr-2 text-brand-600" size={16} aria-hidden="true" /> Loading staff…
+                                </div>
+                            ) : noRoleMatch ? (
+                                <p className="p-4 text-center text-xs text-ink-500">
+                                    No active {target.role}s configured. The patient will land unassigned —
+                                    any qualified clinician can pick them up from the {target.label} queue.
+                                </p>
+                            ) : filtered.length === 0 ? (
+                                <p className="p-4 text-center text-xs text-ink-500">No staff match "{search}".</p>
+                            ) : filtered.map(s => {
+                                const isPicked = selectedId === String(s.user_id);
+                                return (
+                                    <label
+                                        key={s.user_id}
+                                        htmlFor={`staff-${s.user_id}`}
+                                        className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer transition-colors ${
+                                            isPicked ? 'bg-brand-50/60' : 'hover:bg-ink-50'
+                                        }`}
+                                    >
+                                        <span className="flex items-center gap-2 min-w-0">
+                                            <input
+                                                id={`staff-${s.user_id}`}
+                                                type="radio"
+                                                name="route-staff"
+                                                value={String(s.user_id)}
+                                                checked={isPicked}
+                                                onChange={() => setSelectedId(String(s.user_id))}
+                                                className="accent-brand-600"
+                                            />
+                                            <span className="min-w-0">
+                                                <span className="block text-sm font-medium text-ink-900 truncate">{s.full_name}</span>
+                                                {s.specialization && (
+                                                    <span className="block text-2xs text-ink-500 truncate">{s.specialization}</span>
+                                                )}
+                                            </span>
+                                        </span>
+                                        {s.role && <span className="text-2xs text-ink-500 shrink-0">{s.role}</span>}
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
+                    <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
+                    <button
+                        type="button"
+                        onClick={send}
+                        disabled={busy}
+                        className="btn-primary disabled:opacity-50 cursor-pointer"
+                    >
+                        {busy
+                            ? <><Activity size={15} className="animate-spin" aria-hidden="true" /> Routing…</>
+                            : <><Send size={15} aria-hidden="true" /> Send to {target.label}</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * RowMenu — portal-rendered "Manage" dropdown.
+ *
+ * Why a portal: the desktop table sits inside `<div className="overflow-x-auto">`
+ * because the columns can overflow on smaller windows. CSS resolves `overflow-y`
+ * to `auto` whenever `overflow-x` isn't `visible`, so an absolute child gets
+ * clipped vertically — that's why the old menu hid its last items. Rendering
+ * into <body> with `position: fixed` sidesteps every ancestor's overflow.
+ *
+ * Positioning: anchor to the trigger button's bounding rect. Right-align with
+ * the trigger, drop below by 6px, clamp inside the viewport, and flip above
+ * the trigger if the bottom of the menu would otherwise spill off-screen.
+ */
+const MENU_WIDTH = 232;
+const MENU_MARGIN = 8;
+
+function RowMenu({ patient, anchorEl, onClose, onView, onPrint, onExport, onDeactivate, onErase }) {
+    const menuRef = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0, ready: false });
+
+    const recompute = () => {
+        if (!anchorEl) return;
+        const r = anchorEl.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const menuH = menuRef.current?.offsetHeight || 280;
+
+        // Right-align with the trigger, then clamp to viewport.
+        let left = r.right - MENU_WIDTH;
+        if (left < MENU_MARGIN) left = MENU_MARGIN;
+        if (left + MENU_WIDTH + MENU_MARGIN > vw) left = vw - MENU_WIDTH - MENU_MARGIN;
+
+        // Prefer below; flip above when the menu would spill off the bottom.
+        let top = r.bottom + 6;
+        if (top + menuH + MENU_MARGIN > vh) {
+            const flipped = r.top - menuH - 6;
+            top = flipped >= MENU_MARGIN ? flipped : Math.max(MENU_MARGIN, vh - menuH - MENU_MARGIN);
+        }
+
+        setPos({ top, left, ready: true });
+    };
+
+    useLayoutEffect(() => { recompute(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [anchorEl]);
+
+    useEffect(() => {
+        // Recompute on scroll (capture so we catch scrolling ancestors too)
+        // and on resize so the menu doesn't drift when the user rotates a
+        // tablet or resizes the window.
+        const onScroll = () => recompute();
+        const onResize = () => recompute();
+        const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+        const onDocClick = (e) => {
+            if (menuRef.current?.contains(e.target)) return;
+            if (anchorEl?.contains?.(e.target)) return;
+            onClose();
+        };
+        window.addEventListener('scroll', onScroll, true);
+        window.addEventListener('resize', onResize);
+        document.addEventListener('keydown', onKey);
+        document.addEventListener('mousedown', onDocClick);
+        document.addEventListener('touchstart', onDocClick);
+        return () => {
+            window.removeEventListener('scroll', onScroll, true);
+            window.removeEventListener('resize', onResize);
+            document.removeEventListener('keydown', onKey);
+            document.removeEventListener('mousedown', onDocClick);
+            document.removeEventListener('touchstart', onDocClick);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [anchorEl, onClose]);
+
+    if (typeof document === 'undefined') return null;
+
+    return createPortal(
+        <div
+            ref={menuRef}
+            role="menu"
+            aria-label="Patient actions"
+            style={{
+                position: 'fixed',
+                top: pos.top,
+                left: pos.left,
+                width: MENU_WIDTH,
+                opacity: pos.ready ? 1 : 0,
+            }}
+            className="bg-white rounded-xl shadow-elevated border border-ink-200 py-2 z-[60] text-left animate-fade-in"
+        >
+            <div className="px-3 pt-1 pb-1.5 text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em]">Manage</div>
+            <button type="button" role="menuitem" onClick={() => onView(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
+                <Eye size={15} className="text-ink-500" aria-hidden="true" /> View history
+            </button>
+            <button type="button" role="menuitem" onClick={() => onPrint(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
+                <Printer size={15} className="text-ink-500" aria-hidden="true" /> Print card
+            </button>
+            <button type="button" role="menuitem" onClick={() => onExport(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
+                <Download size={15} className="text-ink-500" aria-hidden="true" /> Export (KDPA S.26)
+            </button>
+            <div className="border-t border-ink-100 my-1.5" role="separator" />
+            <button type="button" role="menuitem" onClick={() => onDeactivate(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer">
+                <UserMinus size={15} aria-hidden="true" /> Deactivate
+            </button>
+            <button type="button" role="menuitem" onClick={() => onErase(patient)} className="w-full px-3.5 py-2 text-sm text-rose-700 hover:bg-rose-50 flex items-center gap-2.5 font-semibold cursor-pointer">
+                <Trash size={15} aria-hidden="true" /> Erase (KDPA S.40)
+            </button>
+        </div>,
+        document.body
     );
 }

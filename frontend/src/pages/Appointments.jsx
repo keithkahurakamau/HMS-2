@@ -6,6 +6,7 @@ import {
     UserRound, Stethoscope, Activity, RefreshCw,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import { useActivePatient } from '../context/PatientContext';
 
 const STATUS_BADGES = {
     Scheduled:  'badge-info',
@@ -28,6 +29,8 @@ export default function Appointments() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [form, setForm] = useState({ patient_id: '', doctor_id: '', appointment_date: '', notes: '' });
     const [submitting, setSubmitting] = useState(false);
+    // Cross-page active patient — when present, "New appointment" pre-fills.
+    const { activePatient } = useActivePatient();
 
     const fetchAppointments = async () => {
         setIsLoading(true);
@@ -47,16 +50,28 @@ export default function Appointments() {
 
     const fetchDirectory = async () => {
         try {
+            // /appointments/doctors is gated only by patients:write so receptionists
+            // can populate the form. /admin/users would 403 for non-admins.
             const [doctorsRes, patientsRes] = await Promise.all([
-                apiClient.get('/admin/users').catch(() => ({ data: [] })),
+                apiClient.get('/appointments/doctors').catch(() => ({ data: [] })),
                 apiClient.get('/patients/').catch(() => ({ data: [] })),
             ]);
-            setDoctors((doctorsRes.data || []).filter(u => u.role === 'Doctor' && u.is_active));
+            setDoctors(doctorsRes.data || []);
             setPatients(patientsRes.data || []);
         } catch (error) { /* non-fatal */ }
     };
 
     useEffect(() => { fetchDirectory(); }, []);
+
+    // When an active patient is open and the user clicks "New appointment",
+    // pre-select them. This is what makes the Calendar feel connected to
+    // the rest of the system — open patient → book → done.
+    useEffect(() => {
+        if (isFormOpen && activePatient?.patient_id && !form.patient_id) {
+            setForm(f => ({ ...f, patient_id: String(activePatient.patient_id) }));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isFormOpen, activePatient]);
 
     useEffect(() => {
         fetchAppointments();
