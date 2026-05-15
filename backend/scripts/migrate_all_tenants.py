@@ -76,6 +76,35 @@ logging.basicConfig(
 # model. Every statement is idempotent (IF NOT EXISTS / WHERE NOT EXISTS),
 # so re-running on every deploy is a no-op once converged.
 MASTER_DB_PATCHES: list[str] = [
+    # Master-DB tables that the seed normally creates via SQLAlchemy
+    # create_all on first boot. Migrations run BEFORE the seed in
+    # render-start.sh (and in CI we don't run the seed at all), so on a
+    # fresh master DB we have to bootstrap these ourselves or downstream
+    # patches that FK into them will fail with `relation … does not
+    # exist`. Every CREATE here is IF NOT EXISTS so re-running on an
+    # already-seeded DB is a no-op.
+    """
+    CREATE TABLE IF NOT EXISTS superadmins (
+        admin_id        SERIAL PRIMARY KEY,
+        email           VARCHAR(255) UNIQUE NOT NULL,
+        full_name       VARCHAR(255) NOT NULL,
+        hashed_password VARCHAR(255) NOT NULL,
+        is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS tenants (
+        tenant_id        SERIAL PRIMARY KEY,
+        name             VARCHAR(255) NOT NULL,
+        domain           VARCHAR(255) UNIQUE NOT NULL,
+        db_name          VARCHAR(100) UNIQUE NOT NULL,
+        theme_color      VARCHAR(50) DEFAULT 'blue',
+        is_premium       BOOLEAN DEFAULT FALSE,
+        is_active        BOOLEAN DEFAULT TRUE,
+        created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    """,
     # c7a2e94d318f — tenant flexibility fields
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS feature_flags TEXT;",
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS plan_limits TEXT;",
