@@ -44,7 +44,6 @@ const defaultForm = {
 
 export default function MedicalHistory() {
     const [searchParams] = useSearchParams();
-    const [searchQuery, setSearchQuery] = useState('');
     const [chart, setChart] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [searchInput, setSearchInput] = useState(searchParams.get('patient_id') || '');

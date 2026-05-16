@@ -1240,7 +1240,7 @@ function RowMenu({ patient, anchorEl, onClose, onView, onPrint, onExport, onDeac
         setPos({ top, left, ready: true });
     };
 
-    useLayoutEffect(() => { recompute(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [anchorEl]);
+    useLayoutEffect(() => { recompute();   }, [anchorEl]);
 
     useEffect(() => {
         // Recompute on scroll (capture so we catch scrolling ancestors too)

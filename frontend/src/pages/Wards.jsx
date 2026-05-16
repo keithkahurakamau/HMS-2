@@ -12,7 +12,6 @@ export default function Wards() {
     const [wards, setWards] = useState([]);
     const [wardInventory, setWardInventory] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
     const [patients, setPatients] = useState([]);
     
     // UI Modals & Target Entities
