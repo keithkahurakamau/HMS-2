@@ -1,0 +1,52 @@
+# Backend tests + frontend lint/build for every branch in the
+# development -> beta -> main promotion path. Status checks are
+# wired into branch protection in the repo settings; if a job here
+# turns red the merge button stays disabled.
+
+name: CI
+
+on:
+  push:
+    branches: [development, beta, main]
+  pull_request:
+    branches: [development, beta, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # NOTE: backend pytest job is intentionally not here yet. The
+  # current tests in backend/tests/* are integration tests that
+  # require a seeded tenant DB and a running uvicorn server — not
+  # something we want to spin up on every PR until the test setup
+  # is split into unit vs integration tiers. Migration-check.yml
+  # exercises the boot path; that's our backend signal for now.
+  # TODO: add a `backend-unit` job once pure unit tests exist.
+
+  frontend:
+    name: frontend (lint + build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
