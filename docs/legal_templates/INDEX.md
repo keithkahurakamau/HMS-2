@@ -32,6 +32,7 @@ This index catalogues all legal and compliance template documents maintained by 
 6. **Scan and upload** the completed document to the patient's record in MediFleet immediately after signing.
 7. **Retain the original paper copy** in the patient's physical file.
 8. **Observe retention periods** strictly. Documents must not be destroyed before the minimum retention period has elapsed.
+9. **Assign a unique Reference Number** in the format `[REF-XXXX-YYYY]` where `XXXX` is a sequential document number and `YYYY` is the calendar year (e.g., `REF-0042-2025`). Record this number in MediFleet.
 
 ---
 
@@ -80,7 +81,7 @@ This index catalogues all legal and compliance template documents maintained by 
 |---|---|
 | Data Protection Officer | [FILL IN — Name, Email, Phone] |
 | Legal Department | [FILL IN — Name, Email, Phone] |
-| ODPC (Breach Reporting) | Office of the Data Protection Commissioner, Nairobi | www.odpc.go.ke |
+| ODPC (Breach Reporting) | Office of the Data Protection Commissioner, Nairobi \| www.odpc.go.ke |
 | Hospital Director | [FILL IN — Name] |
 
 ---
