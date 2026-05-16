@@ -5,12 +5,14 @@ import {
     BookOpen, Coins, CalendarRange, Settings as SettingsIcon,
     Plus, X, ChevronRight, ChevronDown, CheckCircle2, RotateCcw, AlertCircle,
     Sliders, Truck, ShieldCheck, Tag, Link2,
+    Users as UsersIcon, Send, FileText, Wallet,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 
 const TABS = [
     { key: 'coa',        label: 'Chart of Accounts', icon: BookOpen },
     { key: 'journal',    label: 'Journal Entries',   icon: CalendarRange },
+    { key: 'debtors',    label: 'Debtors',           icon: UsersIcon },
     { key: 'config',     label: 'Configuration',     icon: Sliders },
     { key: 'currencies', label: 'Currencies & FX',   icon: Coins },
     { key: 'settings',   label: 'Settings',          icon: SettingsIcon },
@@ -33,6 +35,12 @@ const TYPE_TONE = {
 const formatAmount = (v) => {
     const n = Number(v ?? 0);
     return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const firstOfMonthISO = () => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 };
 
 export default function Accounting() {
@@ -67,6 +75,7 @@ export default function Accounting() {
 
             {tab === 'coa'        && <ChartOfAccountsTab />}
             {tab === 'journal'    && <JournalEntriesTab />}
+            {tab === 'debtors'    && <DebtorsTab />}
             {tab === 'config'     && <ConfigurationTab />}
             {tab === 'currencies' && <CurrenciesTab />}
             {tab === 'settings'   && <SettingsTab />}
@@ -1520,6 +1529,538 @@ function DataCard({ loading, empty, emptyMsg, children }) {
                 <div className="p-6 text-sm text-ink-500">{emptyMsg}</div>
             ) : children}
         </div>
+    );
+}
+
+
+/* ─── Debtors (claim schedules + client deposits) ────────────────────────── */
+
+const DEBTORS_SECTIONS = [
+    { key: 'claims',   label: 'Insurance Claims', icon: FileText },
+    { key: 'deposits', label: 'Client Deposits',  icon: Wallet },
+];
+
+const CLAIM_STATUS_BADGE = {
+    draft:     'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+    submitted: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200',
+    settled:   'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+    rejected:  'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+};
+
+const DEPOSIT_STATUS_BADGE = {
+    available:         'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+    partially_applied: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+    fully_applied:     'bg-ink-50 text-ink-600 ring-1 ring-ink-200',
+    refunded:          'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+};
+
+function DebtorsTab() {
+    const [section, setSection] = useState('claims');
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
+            <aside className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-2 h-fit">
+                <nav className="space-y-1">
+                    {DEBTORS_SECTIONS.map(({ key, label, icon: Icon }) => (
+                        <button key={key}
+                                onClick={() => setSection(key)}
+                                className={
+                                    'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ' +
+                                    (section === key
+                                        ? 'bg-brand-50 text-brand-700 font-medium'
+                                        : 'text-ink-600 hover:bg-ink-50')
+                                }>
+                            <Icon size={16} /> {label}
+                        </button>
+                    ))}
+                </nav>
+            </aside>
+            <div>
+                {section === 'claims'   && <ClaimsSection />}
+                {section === 'deposits' && <DepositsSection />}
+            </div>
+        </div>
+    );
+}
+
+function ClaimsSection() {
+    const [items, setItems] = useState([]);
+    const [providers, setProviders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [open, setOpen] = useState(false);
+    const [selected, setSelected] = useState(null);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const [c, p] = await Promise.all([
+                apiClient.get('/accounting/debtors/claims'),
+                apiClient.get('/accounting/config/insurance-providers'),
+            ]);
+            setItems(c.data || []);
+            setProviders(p.data || []);
+        } catch { toast.error('Could not load claims.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); }, []);
+
+    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '—';
+
+    const submit = async (id) => {
+        try {
+            await apiClient.post(`/accounting/debtors/claims/${id}/submit`);
+            toast.success('Claim submitted.');
+            load();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not submit.'); }
+    };
+
+    const settle = async (id) => {
+        const amount = window.prompt('Settled amount:');
+        if (!amount) return;
+        const ref = window.prompt('Settlement reference (optional):') || '';
+        try {
+            await apiClient.post(`/accounting/debtors/claims/${id}/settle`, {
+                settled_amount: Number(amount),
+                settlement_reference: ref || null,
+            });
+            toast.success('Claim settled.');
+            load();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not settle.'); }
+    };
+
+    const reject = async (id) => {
+        const reason = window.prompt('Rejection reason:');
+        if (!reason) return;
+        try {
+            await apiClient.post(`/accounting/debtors/claims/${id}/reject`, { reason });
+            toast.success('Claim rejected.');
+            load();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not reject.'); }
+    };
+
+    return (
+        <div className="space-y-4">
+            <SectionHeader title="Insurance Claims" subtitle="Batch invoices into claim schedules; submit to insurers; settle on payment."
+                           onNew={() => setOpen(true)}
+                           disabled={providers.length === 0}
+                           disabledMsg="Add an insurance provider first (Configuration tab)." />
+
+            <DataCard loading={loading} empty={items.length === 0} emptyMsg="No claim schedules yet.">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Number</th>
+                            <th className="text-left px-4 py-2 font-medium">Provider</th>
+                            <th className="text-left px-4 py-2 font-medium">Period</th>
+                            <th className="text-right px-4 py-2 font-medium">Items</th>
+                            <th className="text-right px-4 py-2 font-medium">Claimed</th>
+                            <th className="text-right px-4 py-2 font-medium">Settled</th>
+                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map(c => (
+                            <tr key={c.schedule_id} className="hover:bg-ink-50/40">
+                                <td className="px-4 py-2 font-mono text-xs">
+                                    <button onClick={() => setSelected(c)} className="hover:underline">
+                                        {c.schedule_number}
+                                    </button>
+                                </td>
+                                <td className="px-4 py-2">{providerName(c.provider_id)}</td>
+                                <td className="px-4 py-2 text-ink-600">{c.period_from} → {c.period_to}</td>
+                                <td className="px-4 py-2 text-right">{c.items?.length || 0}</td>
+                                <td className="px-4 py-2 text-right font-mono">{formatAmount(c.total_amount)}</td>
+                                <td className="px-4 py-2 text-right font-mono">{c.settled_amount ? formatAmount(c.settled_amount) : '—'}</td>
+                                <td className="px-4 py-2">
+                                    <span className={`text-xs px-2 py-0.5 rounded-md ${CLAIM_STATUS_BADGE[c.status]}`}>
+                                        {c.status}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-2 text-right space-x-2">
+                                    {c.status === 'draft' && (
+                                        <button onClick={() => submit(c.schedule_id)}
+                                                className="inline-flex items-center gap-1 text-xs text-sky-700 hover:underline">
+                                            <Send size={12} /> Submit
+                                        </button>
+                                    )}
+                                    {c.status === 'submitted' && (
+                                        <>
+                                            <button onClick={() => settle(c.schedule_id)}
+                                                    className="text-xs text-emerald-700 hover:underline">Settle</button>
+                                            <button onClick={() => reject(c.schedule_id)}
+                                                    className="text-xs text-rose-700 hover:underline">Reject</button>
+                                        </>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DataCard>
+
+            {open && <ClaimModal providers={providers}
+                                 onClose={() => setOpen(false)}
+                                 onSaved={() => { setOpen(false); load(); }} />}
+            {selected && <ClaimDetailsModal claim={selected} providerName={providerName(selected.provider_id)}
+                                            onClose={() => setSelected(null)} />}
+        </div>
+    );
+}
+
+function ClaimModal({ providers, onClose, onSaved }) {
+    const [schemes, setSchemes] = useState([]);
+    const [form, setForm] = useState({
+        provider_id: providers[0]?.provider_id || '',
+        scheme_id: '',
+        period_from: firstOfMonthISO(),
+        period_to: todayISO(),
+        notes: '',
+    });
+    const [items, setItems] = useState([{
+        invoice_reference: '', patient_name: '', member_number: '', amount_claimed: '',
+    }]);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (!form.provider_id) { setSchemes([]); return; }
+        apiClient.get(`/accounting/config/medical-schemes?provider_id=${form.provider_id}`)
+            .then(r => setSchemes(r.data || []))
+            .catch(() => setSchemes([]));
+    }, [form.provider_id]);
+
+    const setItem = (idx, patch) =>
+        setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
+    const addItem = () => setItems([...items, { invoice_reference: '', patient_name: '', member_number: '', amount_claimed: '' }]);
+    const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
+
+    const total = useMemo(() =>
+        items.reduce((s, it) => s + Number(it.amount_claimed || 0), 0), [items]);
+
+    const submit = async () => {
+        const cleaned = items.filter(i => Number(i.amount_claimed) > 0).map(i => ({
+            invoice_reference: i.invoice_reference || null,
+            patient_name: i.patient_name || null,
+            member_number: i.member_number || null,
+            amount_claimed: Number(i.amount_claimed),
+        }));
+        if (cleaned.length === 0) { toast.error('Add at least one item.'); return; }
+        setSaving(true);
+        try {
+            await apiClient.post('/accounting/debtors/claims', {
+                provider_id: Number(form.provider_id),
+                scheme_id: form.scheme_id ? Number(form.scheme_id) : null,
+                period_from: form.period_from,
+                period_to: form.period_to,
+                notes: form.notes || null,
+                items: cleaned,
+            });
+            toast.success('Claim created (draft).');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title="New claim schedule" onClose={onClose} wide>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="Provider *">
+                    <select className="input" value={form.provider_id}
+                            onChange={(e) => setForm({ ...form, provider_id: e.target.value, scheme_id: '' })}>
+                        {providers.map(p => <option key={p.provider_id} value={p.provider_id}>{p.name}</option>)}
+                    </select>
+                </Field>
+                <Field label="Scheme">
+                    <select className="input" value={form.scheme_id}
+                            onChange={(e) => setForm({ ...form, scheme_id: e.target.value })}>
+                        <option value="">— any/none —</option>
+                        {schemes.map(s => <option key={s.scheme_id} value={s.scheme_id}>{s.name}</option>)}
+                    </select>
+                </Field>
+                <Field label="Period from *">
+                    <input type="date" className="input" value={form.period_from}
+                           onChange={(e) => setForm({ ...form, period_from: e.target.value })} />
+                </Field>
+                <Field label="Period to *">
+                    <input type="date" className="input" value={form.period_to}
+                           onChange={(e) => setForm({ ...form, period_to: e.target.value })} />
+                </Field>
+            </div>
+
+            <div className="mt-4 border border-ink-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50 text-ink-600">
+                        <tr>
+                            <th className="text-left px-3 py-2 font-medium">Invoice ref</th>
+                            <th className="text-left px-3 py-2 font-medium">Patient</th>
+                            <th className="text-left px-3 py-2 font-medium">Member #</th>
+                            <th className="text-right px-3 py-2 font-medium w-32">Amount</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map((it, idx) => (
+                            <tr key={idx}>
+                                <td className="px-3 py-1.5"><input className="input" value={it.invoice_reference}
+                                    onChange={e => setItem(idx, { invoice_reference: e.target.value })} /></td>
+                                <td className="px-3 py-1.5"><input className="input" value={it.patient_name}
+                                    onChange={e => setItem(idx, { patient_name: e.target.value })} /></td>
+                                <td className="px-3 py-1.5"><input className="input" value={it.member_number}
+                                    onChange={e => setItem(idx, { member_number: e.target.value })} /></td>
+                                <td className="px-3 py-1.5"><input type="number" step="0.01" className="input text-right"
+                                    value={it.amount_claimed}
+                                    onChange={e => setItem(idx, { amount_claimed: e.target.value })} /></td>
+                                <td className="px-2">
+                                    {items.length > 1 && (
+                                        <button onClick={() => removeItem(idx)} className="text-ink-400 hover:text-rose-600">
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot className="bg-ink-50">
+                        <tr>
+                            <td colSpan={3} className="px-3 py-2">
+                                <button onClick={addItem}
+                                        className="text-xs text-brand-700 hover:underline inline-flex items-center gap-1">
+                                    <Plus size={12} /> Add item
+                                </button>
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-semibold">{formatAmount(total)}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <Field label="Notes">
+                <textarea className="input min-h-[60px]" value={form.notes}
+                          onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </Field>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Create draft" />
+        </ModalShell>
+    );
+}
+
+function ClaimDetailsModal({ claim, providerName, onClose }) {
+    return (
+        <ModalShell title={`Claim ${claim.schedule_number}`} onClose={onClose} wide>
+            <div className="grid grid-cols-3 gap-3 text-sm mb-4">
+                <div><div className="text-xs text-ink-500">Provider</div>{providerName}</div>
+                <div><div className="text-xs text-ink-500">Period</div>{claim.period_from} → {claim.period_to}</div>
+                <div><div className="text-xs text-ink-500">Status</div>
+                    <span className={`text-xs px-2 py-0.5 rounded-md ${CLAIM_STATUS_BADGE[claim.status]}`}>
+                        {claim.status}
+                    </span>
+                </div>
+                <div><div className="text-xs text-ink-500">Total claimed</div><span className="font-mono">{formatAmount(claim.total_amount)}</span></div>
+                {claim.settled_amount && <div><div className="text-xs text-ink-500">Settled</div><span className="font-mono">{formatAmount(claim.settled_amount)}</span></div>}
+                {claim.settlement_reference && <div><div className="text-xs text-ink-500">Settlement ref</div>{claim.settlement_reference}</div>}
+            </div>
+            {claim.rejection_reason && (
+                <div className="mb-4 p-3 bg-rose-50 text-rose-700 text-sm rounded-lg">
+                    Rejected: {claim.rejection_reason}
+                </div>
+            )}
+            <div className="border border-ink-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50 text-ink-600">
+                        <tr>
+                            <th className="text-left px-3 py-2 font-medium">Invoice ref</th>
+                            <th className="text-left px-3 py-2 font-medium">Patient</th>
+                            <th className="text-left px-3 py-2 font-medium">Member #</th>
+                            <th className="text-right px-3 py-2 font-medium">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {claim.items.map(it => (
+                            <tr key={it.item_id}>
+                                <td className="px-3 py-1.5">{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '—')}</td>
+                                <td className="px-3 py-1.5">{it.patient_name || '—'}</td>
+                                <td className="px-3 py-1.5 font-mono text-xs">{it.member_number || '—'}</td>
+                                <td className="px-3 py-1.5 text-right font-mono">{formatAmount(it.amount_claimed)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </ModalShell>
+    );
+}
+
+function DepositsSection() {
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [open, setOpen] = useState(false);
+    const [applying, setApplying] = useState(null);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const r = await apiClient.get('/accounting/debtors/deposits');
+            setItems(r.data || []);
+        } catch { toast.error('Could not load deposits.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); }, []);
+
+    return (
+        <div className="space-y-4">
+            <SectionHeader title="Client Deposits" subtitle="Patient pre-payments held as a liability until applied to invoices."
+                           onNew={() => setOpen(true)} />
+
+            <DataCard loading={loading} empty={items.length === 0} emptyMsg="No deposits yet.">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Number</th>
+                            <th className="text-left px-4 py-2 font-medium">Patient #</th>
+                            <th className="text-left px-4 py-2 font-medium">Date</th>
+                            <th className="text-left px-4 py-2 font-medium">Method</th>
+                            <th className="text-right px-4 py-2 font-medium">Amount</th>
+                            <th className="text-right px-4 py-2 font-medium">Applied</th>
+                            <th className="text-right px-4 py-2 font-medium">Available</th>
+                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map(d => {
+                            const avail = Number(d.amount) - Number(d.amount_applied || 0);
+                            return (
+                                <tr key={d.deposit_id}>
+                                    <td className="px-4 py-1.5 font-mono text-xs">{d.deposit_number}</td>
+                                    <td className="px-4 py-1.5">{d.patient_id}</td>
+                                    <td className="px-4 py-1.5">{d.deposit_date}</td>
+                                    <td className="px-4 py-1.5">{d.method}</td>
+                                    <td className="px-4 py-1.5 text-right font-mono">{formatAmount(d.amount)}</td>
+                                    <td className="px-4 py-1.5 text-right font-mono">{formatAmount(d.amount_applied || 0)}</td>
+                                    <td className="px-4 py-1.5 text-right font-mono font-semibold">{formatAmount(avail)}</td>
+                                    <td className="px-4 py-1.5">
+                                        <span className={`text-xs px-2 py-0.5 rounded-md ${DEPOSIT_STATUS_BADGE[d.status]}`}>
+                                            {d.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-1.5 text-right">
+                                        {avail > 0 && (
+                                            <button onClick={() => setApplying(d)}
+                                                    className="text-xs text-brand-700 hover:underline">
+                                                Apply
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </DataCard>
+
+            {open && <DepositModal onClose={() => setOpen(false)} onSaved={() => { setOpen(false); load(); }} />}
+            {applying && <DepositApplyModal deposit={applying}
+                                            onClose={() => setApplying(null)}
+                                            onSaved={() => { setApplying(null); load(); }} />}
+        </div>
+    );
+}
+
+function DepositModal({ onClose, onSaved }) {
+    const [form, setForm] = useState({
+        patient_id: '', deposit_date: todayISO(), amount: '',
+        method: 'Cash', reference: '', notes: '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    const submit = async () => {
+        if (!form.patient_id || !form.amount) {
+            toast.error('Patient and amount required.'); return;
+        }
+        setSaving(true);
+        try {
+            await apiClient.post('/accounting/debtors/deposits', {
+                patient_id: Number(form.patient_id),
+                deposit_date: form.deposit_date,
+                amount: Number(form.amount),
+                method: form.method,
+                reference: form.reference || null,
+                notes: form.notes || null,
+            });
+            toast.success('Deposit recorded.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title="New deposit" onClose={onClose}>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="Patient ID *"><input type="number" className="input" value={form.patient_id}
+                    onChange={(e) => setForm({ ...form, patient_id: e.target.value })} /></Field>
+                <Field label="Date"><input type="date" className="input" value={form.deposit_date}
+                    onChange={(e) => setForm({ ...form, deposit_date: e.target.value })} /></Field>
+                <Field label="Amount *"><input type="number" step="0.01" className="input" value={form.amount}
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field>
+                <Field label="Method">
+                    <select className="input" value={form.method}
+                            onChange={(e) => setForm({ ...form, method: e.target.value })}>
+                        {['Cash', 'Bank', 'M-Pesa', 'Cheque', 'Card'].map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                </Field>
+                <Field label="Reference"><input className="input" value={form.reference}
+                    onChange={(e) => setForm({ ...form, reference: e.target.value })} placeholder="Receipt no., M-Pesa code, etc." /></Field>
+            </div>
+            <Field label="Notes">
+                <textarea className="input min-h-[60px]" value={form.notes}
+                          onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </Field>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
+        </ModalShell>
+    );
+}
+
+function DepositApplyModal({ deposit, onClose, onSaved }) {
+    const available = Number(deposit.amount) - Number(deposit.amount_applied || 0);
+    const [form, setForm] = useState({ invoice_id: '', amount: available.toFixed(2), notes: '' });
+    const [saving, setSaving] = useState(false);
+
+    const submit = async () => {
+        if (!form.invoice_id || !form.amount) { toast.error('Invoice and amount required.'); return; }
+        if (Number(form.amount) > available) {
+            toast.error(`Max available: ${formatAmount(available)}`); return;
+        }
+        setSaving(true);
+        try {
+            await apiClient.post(`/accounting/debtors/deposits/${deposit.deposit_id}/apply`, {
+                invoice_id: Number(form.invoice_id),
+                amount: Number(form.amount),
+                notes: form.notes || null,
+            });
+            toast.success('Deposit applied.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not apply.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title={`Apply deposit ${deposit.deposit_number}`} onClose={onClose}>
+            <p className="text-sm text-ink-600 mb-3">
+                Patient #{deposit.patient_id} · Available: <span className="font-mono font-semibold">{formatAmount(available)}</span>
+            </p>
+            <div className="space-y-3">
+                <Field label="Invoice ID *"><input type="number" className="input" value={form.invoice_id}
+                    onChange={(e) => setForm({ ...form, invoice_id: e.target.value })} /></Field>
+                <Field label="Amount to apply *">
+                    <input type="number" step="0.01" max={available} className="input" value={form.amount}
+                           onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                </Field>
+                <Field label="Notes">
+                    <textarea className="input min-h-[50px]" value={form.notes}
+                              onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                </Field>
+            </div>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Apply" />
+        </ModalShell>
     );
 }
 

@@ -157,6 +157,7 @@ SOURCE_KEY_CATALOGUE = [
     ("mpesa.receipt.direct",         "Direct M-Pesa receipt with no prior invoice"),
     ("insurance.claim.submitted",    "Claim moved from patient to insurance receivable"),
     ("insurance.claim.settled",      "Insurer paid; clear insurance receivable"),
+    ("billing.deposit.applied",      "Patient deposit applied to an invoice"),
 ]
 
 
