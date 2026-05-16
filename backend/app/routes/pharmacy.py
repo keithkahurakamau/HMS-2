@@ -10,6 +10,7 @@ from app.models.billing import Invoice, InvoiceItem
 from app.models.idempotency import IdempotencyKey
 from app.schemas.pharmacy import DispenseRequest, DispenseResponse
 from app.core.dependencies import get_current_user, RequirePermission
+from app.services.accounting_posting import post_dispense_pair
 from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/pharmacy", tags=["Pharmacy"])
@@ -90,6 +91,19 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
                 amount=total_cost, item_type="Pharmacy", reference_id=log_entry.dispense_id
             )
             db.add(line_item)
+
+        # 4b. Auto-post the dispensation to the ledger.
+        # Revenue side uses unit_price (what we charged), COGS side uses
+        # unit_cost (what we paid). Both post in the same transaction.
+        cogs_amount = float(item.unit_cost or 0) * req.quantity
+        post_dispense_pair(
+            db,
+            dispense_id=log_entry.dispense_id,
+            revenue_amount=total_cost,
+            cogs_amount=cogs_amount,
+            memo=f"Pharmacy: {item.name} x{req.quantity}",
+            user_id=current_user["user_id"],
+        )
 
         # 5. Audit & Idempotency Save
         resp_data = {"dispense_id": log_entry.dispense_id, "item_id": item.item_id, "quantity_dispensed": req.quantity, "total_cost": total_cost, "dispensed_at": str(log_entry.dispensed_at)}

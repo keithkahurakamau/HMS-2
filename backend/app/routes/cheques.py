@@ -27,6 +27,7 @@ from app.models.billing import Invoice, Payment
 from app.models.cheque import Cheque
 from app.models.patient import Patient
 from app.models.user import User
+from app.services.accounting_posting import post_from_event
 
 logger = logging.getLogger(__name__)
 
@@ -344,6 +345,19 @@ def clear_cheque(
                     invoice.status = "Paid"
                 elif invoice.amount_paid > 0:
                     invoice.status = "Partially Paid"
+
+    # Auto-post the cleared cheque to the ledger regardless of invoice link.
+    # Mapping default: Dr Bank Accounts / Cr Accounts Receivable.
+    post_from_event(
+        db,
+        source_key="cheques.deposit.cleared",
+        source_id=c.cheque_id,
+        amount=c.amount,
+        on_date=c.clearance_date.date() if hasattr(c.clearance_date, "date") else c.clearance_date,
+        memo=f"Cheque cleared #{c.cheque_id}" + (f" against Invoice #{c.invoice_id}" if c.invoice_id else ""),
+        reference=f"CHQ-{c.cheque_id}",
+        user_id=current_user["user_id"],
+    )
 
     db.commit()
     db.refresh(c)
