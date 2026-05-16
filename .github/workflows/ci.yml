@@ -1,0 +1,89 @@
+# Backend tests + frontend lint/build for every branch in the
+# development -> beta -> main promotion path. Status checks are
+# wired into branch protection in the repo settings; if a job here
+# turns red the merge button stays disabled.
+
+name: CI
+
+on:
+  push:
+    branches: [development, beta, main]
+  pull_request:
+    branches: [development, beta, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (pytest)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medifleet
+          POSTGRES_PASSWORD: medifleet
+          POSTGRES_DB: hms_master
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medifleet -d hms_master"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://medifleet:medifleet@localhost:5432/hms_master
+      SECRET_KEY: ci-secret-key-not-used-in-prod
+      ENCRYPTION_KEY: "00000000000000000000000000000000"
+      CORS_ORIGINS: http://localhost:5173
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run pytest
+        working-directory: backend
+        run: pytest -q --maxfail=3 --disable-warnings
+
+  frontend:
+    name: frontend (lint + build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

@@ -15,9 +15,9 @@ name: Migration check (all tenants)
 
 on:
   push:
-    branches: [main]
+    branches: [development, beta, main]
   pull_request:
-    branches: [main]
+    branches: [development, beta, main]
     paths:
       - 'backend/alembic/**'
       - 'backend/app/models/**'
