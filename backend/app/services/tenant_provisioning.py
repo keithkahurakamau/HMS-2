@@ -54,6 +54,8 @@ from app.models import messaging as _messaging  # noqa: F401
 from app.models import settings as _settings  # noqa: F401
 from app.models import referral as _referral  # noqa: F401
 from app.models import cheque as _cheque  # noqa: F401
+from app.models import support as _support  # noqa: F401
+from app.models import accounting as _accounting  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +127,10 @@ PERMISSIONS = [
     "cheques:read", "cheques:manage",
     # Support tickets to the MediFleet platform team. Admin-only.
     "support:manage",
+    # Managerial Accounting — split create/post for separation-of-duties.
+    "accounting:view", "accounting:coa.manage",
+    "accounting:journal.create", "accounting:journal.post",
+    "accounting:settings.manage",
 ]
 
 # Baseline grants applied to every staff role so messaging works out of the box.
@@ -144,6 +150,15 @@ ROLE_GRANTS = {
     "Radiologist": ["radiology:manage", "clinical:read", "patients:read", *_BASE],
     "Receptionist": ["patients:read", "patients:write", "billing:read", "billing:manage",
                      "cheques:read", "cheques:manage", *_BASE],
+    # Accountant role — has full view + journal lifecycle but cannot
+    # edit the chart of accounts (that's Admin) and gets read-only
+    # access to billing for cross-checking.
+    "Accountant": [
+        "accounting:view", "accounting:journal.create", "accounting:journal.post",
+        "accounting:settings.manage",
+        "billing:read", "cheques:read",
+        *_BASE,
+    ],
 }
 
 
