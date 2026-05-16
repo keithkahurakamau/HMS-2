@@ -202,3 +202,94 @@ class AccountingSettingsUpdate(BaseModel):
     base_currency_code: Optional[str] = Field(default=None, min_length=3, max_length=3)
     go_live_date: Optional[date] = None
     fiscal_year_start_month: Optional[int] = Field(default=None, ge=1, le=12)
+
+
+# ─── Reports ─────────────────────────────────────────────────────────────────
+
+class TrialBalanceRow(BaseModel):
+    account_id: int
+    code: str
+    name: str
+    account_type: AccountType
+    debit: Decimal
+    credit: Decimal
+    balance: Decimal
+
+
+class TrialBalanceTotals(BaseModel):
+    debit: Decimal
+    credit: Decimal
+    difference: Decimal
+
+
+class TrialBalanceResponse(BaseModel):
+    as_of: date
+    rows: List[TrialBalanceRow]
+    totals: TrialBalanceTotals
+
+
+class PlAccountLine(BaseModel):
+    account_id: int
+    code: str
+    name: str
+    account_type: AccountType
+    amount: Decimal
+
+
+class IncomeStatementResponse(BaseModel):
+    from_date: date
+    to_date: date
+    revenue: List[PlAccountLine]
+    total_revenue: Decimal
+    cogs: List[PlAccountLine]
+    total_cogs: Decimal
+    gross_profit: Decimal
+    operating_expenses: List[PlAccountLine]
+    total_operating_expenses: Decimal
+    net_income: Decimal
+
+
+class BalanceSheetLine(BaseModel):
+    account_id: int
+    code: str
+    name: str
+    account_type: AccountType
+    amount: Decimal
+
+
+class BalanceSheetResponse(BaseModel):
+    as_of: date
+    assets: List[BalanceSheetLine]
+    total_assets: Decimal
+    liabilities: List[BalanceSheetLine]
+    total_liabilities: Decimal
+    equity: List[BalanceSheetLine]
+    current_year_earnings: Decimal
+    total_equity: Decimal
+    total_liabilities_and_equity: Decimal
+    balanced: bool
+
+
+class CashFlowResponse(BaseModel):
+    from_date: date
+    to_date: date
+    operating: Decimal
+    investing: Decimal
+    financing: Decimal
+    net_change: Decimal
+    cash_in: Decimal
+    cash_out: Decimal
+
+
+class DailyCollectionRow(BaseModel):
+    date: date
+    account_code: str
+    account_name: str
+    amount: Decimal
+
+
+class DailyCollectionsResponse(BaseModel):
+    from_date: date
+    to_date: date
+    rows: List[DailyCollectionRow]
+    total: Decimal
