@@ -70,6 +70,7 @@ MODULES: Tuple[ModuleDef, ...] = (
     ModuleDef("branding",     "Branding",           "Logos, colours, document templates.",      False),
     ModuleDef("referrals",    "Referrals",          "Out-bound and in-bound referrals.",        False),
     ModuleDef("privacy",      "Privacy",            "Consent, DSAR, audit logs.",               False),
+    ModuleDef("accounting",   "Managerial Accounting","Chart of accounts, journals, financial statements.", False),
 )
 
 # Convenience lookups.
@@ -110,6 +111,7 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/branding/",                    "branding"),
     ("/api/referrals/",                   "referrals"),
     ("/api/privacy/",                     "privacy"),
+    ("/api/accounting/",                  "accounting"),
 )
 
 

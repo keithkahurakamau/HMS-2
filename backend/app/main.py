@@ -44,6 +44,7 @@ import app.routes.settings as settings_module
 import app.routes.cheques as cheques_module
 import app.routes.support as support_module
 import app.routes.branding as branding_module
+import app.routes.accounting as accounting_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -205,6 +206,7 @@ app.include_router(settings_module.router)
 app.include_router(cheques_module.router)
 app.include_router(support_module.tenant_router)
 app.include_router(support_module.admin_router)
+app.include_router(accounting_module.router)
 app.include_router(branding_module.router)
 app.include_router(branding_module.public_router)
 
