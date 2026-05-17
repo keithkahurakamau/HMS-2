@@ -82,11 +82,39 @@ const isTenantOptionalPath = (pathname) =>
 const isTenantMissingError = (status, detail) =>
     status === 400 && typeof detail === 'string' && /X-Tenant-ID/i.test(detail);
 
+// FastAPI 422s carry `detail` as an array of validation error objects:
+//   [{ type, loc, msg, input }, ...]
+// React components blow up when those land in JSX (e.g. `toast.error(detail)`).
+// Flatten to a readable string here so the 75-odd `err.response.data.detail`
+// callsites all behave the same way.
+const normalizeFastApiDetail = (data) => {
+    const detail = data?.detail;
+    if (Array.isArray(detail)) {
+        const summary = detail
+            .map((d) => {
+                if (typeof d === 'string') return d;
+                if (d && typeof d === 'object') {
+                    const field = Array.isArray(d.loc) ? d.loc.filter(p => p !== 'body').join('.') : '';
+                    const msg = d.msg || d.message || JSON.stringify(d);
+                    return field ? `${field}: ${msg}` : msg;
+                }
+                return String(d);
+            })
+            .join('; ');
+        // Mutate in place — interceptor downstream + callers read the same object.
+        data.detail = summary || 'Validation error';
+    } else if (detail && typeof detail === 'object') {
+        data.detail = detail.msg || detail.message || JSON.stringify(detail);
+    }
+};
+
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
         const original = error.config;
         const status = error.response?.status;
+        // Reshape FastAPI validation errors BEFORE anything downstream reads them.
+        if (error.response?.data) normalizeFastApiDetail(error.response.data);
         const detail = error.response?.data?.detail;
 
         // ── Tenant guard: redirect to /portal on missing X-Tenant-ID ─────────
