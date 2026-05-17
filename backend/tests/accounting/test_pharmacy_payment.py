@@ -194,8 +194,11 @@ def test_cannot_pay_already_paid_invoice(db):
     assert "already" in exc.value.detail.lower()
 
 
-def test_walk_in_dispense_cannot_be_paid_via_endpoint(db):
-    """Walk-ins (no patient_id, no invoice) are handled at the cashier."""
+def test_walk_in_dispense_without_invoice_returns_404(db):
+    """A dispense with no linked Invoice (legacy data, or test scaffolding
+    that skipped creating one) returns 404 on /pay — the caller needs
+    the invoice context. Walk-ins WITH an invoice work fine, see
+    test_pharmacy_otc_receipt_ledger."""
     item, _ = _seed_pharmacy_inventory(db)
     dispense = DispenseLog(
         item_id=item.item_id, batch_id=1, patient_id=None,
@@ -211,7 +214,7 @@ def test_walk_in_dispense_cannot_be_paid_via_endpoint(db):
             DispensePaymentRequest(method="cash", amount=50.0),
             _FakeRequest(), db, CURRENT_USER,
         )
-    assert exc.value.status_code == 400
+    assert exc.value.status_code == 404
 
 
 # ─── Card stub ─────────────────────────────────────────────────────────────

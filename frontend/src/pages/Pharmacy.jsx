@@ -4,7 +4,7 @@ import {
     Search, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Package, Printer, XCircle,
     FileWarning, ShoppingCart, Plus, Minus, Trash2, CreditCard, Store, Activity,
-    Banknote, Smartphone, X as XIcon,
+    Banknote, Smartphone, X as XIcon, ReceiptText, History,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
@@ -12,7 +12,7 @@ import PageHeader from '../components/PageHeader';
 
 export default function Pharmacy() {
     // --- APP STATE ---
-    const [activeTab, setActiveTab] = useState('rx'); // 'rx' or 'otc'
+    const [activeTab, setActiveTab] = useState('rx'); // 'rx' | 'otc' | 'transactions'
     const [isLoading, setIsLoading] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -121,10 +121,21 @@ export default function Pharmacy() {
         if (cart.length === 0) return;
         setIsProcessing(true);
         try {
-            await dispenseItems(cart);  // walk-in: no patient, no invoice
-            toast.success(`KES ${cartTotal.toLocaleString()} collected (cash at counter).`);
-            setCart([]);
+            const responses = await dispenseItems(cart);  // walk-in
+            toast.success("Items dispensed. Collect payment.");
             fetchPharmacyInventory();
+
+            const last = responses[responses.length - 1];
+            if (last?.invoice_id) {
+                setPayment({
+                    invoiceId: last.invoice_id,
+                    dispenseId: last.dispense_id,
+                    amount: last.invoice_balance ?? cartTotal,
+                    patientName: "Walk-in",
+                });
+            } else {
+                setCart([]);
+            }
         } catch (error) {
             toast.error(error?.response?.data?.detail || "Checkout failed");
         } finally {
@@ -186,8 +197,19 @@ export default function Pharmacy() {
         }
     };
 
-    const handlePaymentSettled = () => {
+    const handlePaymentSettled = async (settledPayment) => {
         // Called by the modal when payment completes successfully.
+        // Fire the receipt print before we tear down state — the modal's
+        // already closed by the time this resolves.
+        const dispenseId = settledPayment?.dispenseId ?? payment?.dispenseId;
+        if (dispenseId) {
+            try {
+                const r = await apiClient.get(`/pharmacy/dispense/${dispenseId}/receipt`);
+                printPharmacyReceipt(r.data);
+            } catch {
+                toast.error("Could not load receipt for printing.");
+            }
+        }
         setPayment(null);
         setCart([]);
         if (activeOrder) {
@@ -213,6 +235,9 @@ export default function Pharmacy() {
                     </button>
                     <button role="tab" aria-selected={activeTab === 'otc'} onClick={() => setActiveTab('otc')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'otc' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
                         <Store size={16} className={activeTab === 'otc' ? 'text-accent-600' : 'text-ink-400'} /> OTC Point of Sale
+                    </button>
+                    <button role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'transactions' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                        <History size={16} className={activeTab === 'transactions' ? 'text-brand-600' : 'text-ink-400'} /> Transactions
                     </button>
                 </div>
                 <div className="text-right px-3 text-xs font-semibold text-ink-500">
@@ -443,6 +468,10 @@ export default function Pharmacy() {
                 </div>
             )}
 
+            {activeTab === 'transactions' && (
+                <TransactionsTab />
+            )}
+
             {payment && (
                 <PaymentModal
                     invoiceId={payment.invoiceId}
@@ -454,6 +483,223 @@ export default function Pharmacy() {
                 />
             )}
         </div>
+    );
+}
+
+
+/* ─── Receipt printer ─────────────────────────────────────────────────────── */
+
+function printPharmacyReceipt(receipt) {
+    const win = window.open('', '_blank', 'width=420,height=720');
+    if (!win) {
+        toast.error('Pop-up blocked — allow pop-ups to print the receipt.');
+        return;
+    }
+    const money = (v) => Number(v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const itemsHtml = (receipt.items || []).map(
+        (it) => `<tr><td>${escapeHtml(it.description)}</td><td class="r">${money(it.amount)}</td></tr>`
+    ).join('');
+    const paymentsHtml = (receipt.payments || []).map(
+        (p) => `<tr><td>${escapeHtml(p.method)}${p.reference ? ` <span class="muted">${escapeHtml(p.reference)}</span>` : ''}</td><td class="r">${money(p.amount)}</td></tr>`
+    ).join('');
+    const issued = receipt.issued_at ? new Date(receipt.issued_at).toLocaleString() : '';
+    const html = `<!doctype html><html><head><meta charset="utf-8"/>
+<title>${escapeHtml(receipt.receipt_no)}</title>
+<style>
+  body { font-family: ui-sans-serif, system-ui, sans-serif; padding: 16px; color: #1f2937; }
+  .hd { text-align: center; margin-bottom: 12px; }
+  .hd h1 { margin: 0; font-size: 18px; }
+  .hd p { margin: 2px 0; font-size: 11px; color: #6b7280; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 4px 0; }
+  th { text-align: left; border-bottom: 1px dashed #9ca3af; }
+  .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: #6b7280; font-size: 10px; }
+  .total { border-top: 1px solid #111; font-weight: 600; }
+  .meta { font-size: 11px; color: #6b7280; margin: 8px 0; }
+  .foot { text-align: center; margin-top: 16px; font-size: 11px; color: #6b7280; }
+  @media print { @page { margin: 4mm; } }
+</style></head><body>
+  <div class="hd">
+    <h1>${escapeHtml(receipt.hospital?.name || 'MediFleet')}</h1>
+    ${receipt.hospital?.tagline ? `<p>${escapeHtml(receipt.hospital.tagline)}</p>` : ''}
+    <p>Receipt: <strong>${escapeHtml(receipt.receipt_no)}</strong></p>
+    <p>${escapeHtml(issued)}</p>
+  </div>
+  <div class="meta">
+    Customer: ${escapeHtml(receipt.patient || 'Walk-in')}<br/>
+    ${receipt.cashier ? `Cashier: ${escapeHtml(receipt.cashier)}<br/>` : ''}
+    Dispense #: ${receipt.dispense_id}
+  </div>
+  <table>
+    <thead><tr><th>Item</th><th class="r">Amount</th></tr></thead>
+    <tbody>${itemsHtml}</tbody>
+    <tfoot>
+      <tr class="total"><td>Total</td><td class="r">KES ${money(receipt.totals?.total)}</td></tr>
+    </tfoot>
+  </table>
+  ${paymentsHtml ? `
+    <table style="margin-top:10px">
+      <thead><tr><th>Paid via</th><th class="r">Amount</th></tr></thead>
+      <tbody>${paymentsHtml}</tbody>
+      <tfoot>
+        <tr class="total"><td>Total paid</td><td class="r">KES ${money(receipt.totals?.paid)}</td></tr>
+        <tr><td>Balance</td><td class="r">KES ${money(receipt.totals?.balance)}</td></tr>
+      </tfoot>
+    </table>
+  ` : ''}
+  <div class="foot">Thank you. ${receipt.totals?.status === 'Paid' ? 'Settled in full.' : `Status: ${escapeHtml(receipt.totals?.status || '')}`}</div>
+  <script>window.onload = function(){ window.print(); }</script>
+</body></html>`;
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+}
+
+function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+
+/* ─── Transactions tab ────────────────────────────────────────────────────── */
+
+function TransactionsTab() {
+    const today = new Date().toISOString().slice(0, 10);
+    const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        .toISOString().slice(0, 10);
+    const [from, setFrom] = useState(firstOfMonth);
+    const [to, setTo] = useState(today);
+    const [method, setMethod] = useState('');
+    const [status, setStatus] = useState('');
+    const [rows, setRows] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const params = { from_date: from, to_date: to, limit: 200 };
+            if (method) params.method = method;
+            if (status) params.status = status;
+            const r = await apiClient.get('/pharmacy/transactions', { params });
+            setRows(r.data?.items || []);
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not load transactions.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+    const printReceipt = async (dispenseId) => {
+        try {
+            const r = await apiClient.get(`/pharmacy/dispense/${dispenseId}/receipt`);
+            printPharmacyReceipt(r.data);
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not load receipt.');
+        }
+    };
+
+    const total = rows.reduce((s, r) => s + Number(r.total_cost || 0), 0);
+    const paid  = rows.reduce((s, r) => s + Number(r.amount_paid || 0), 0);
+
+    return (
+        <div className="card p-4 flex-1 overflow-auto">
+            <div className="flex flex-wrap items-end gap-3 mb-4">
+                <Field label="From"><input type="date" className="input" value={from} onChange={e => setFrom(e.target.value)} /></Field>
+                <Field label="To"><input type="date" className="input" value={to} onChange={e => setTo(e.target.value)} /></Field>
+                <Field label="Method">
+                    <select className="input" value={method} onChange={e => setMethod(e.target.value)}>
+                        <option value="">All</option>
+                        <option>Cash</option>
+                        <option>M-Pesa</option>
+                        <option>Card</option>
+                        <option value="Unpaid">Unpaid</option>
+                    </select>
+                </Field>
+                <Field label="Status">
+                    <select className="input" value={status} onChange={e => setStatus(e.target.value)}>
+                        <option value="">All</option>
+                        <option>Paid</option>
+                        <option>Partially Paid</option>
+                        <option>Pending</option>
+                        <option>Pending M-Pesa</option>
+                    </select>
+                </Field>
+                <button onClick={load}
+                        className="btn-primary text-sm"
+                        disabled={loading}>
+                    {loading ? 'Loading...' : 'Apply'}
+                </button>
+                <div className="ml-auto text-xs text-ink-600">
+                    <span className="mr-3">Charged: <strong>KES {total.toLocaleString()}</strong></span>
+                    <span>Collected: <strong>KES {paid.toLocaleString()}</strong></span>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto border border-ink-200/70 rounded-lg">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-3 py-2 font-medium">Date</th>
+                            <th className="text-left px-3 py-2 font-medium">Item</th>
+                            <th className="text-right px-3 py-2 font-medium">Qty</th>
+                            <th className="text-right px-3 py-2 font-medium">Total</th>
+                            <th className="text-left px-3 py-2 font-medium">Customer</th>
+                            <th className="text-left px-3 py-2 font-medium">Method</th>
+                            <th className="text-left px-3 py-2 font-medium">Status</th>
+                            <th className="text-left px-3 py-2 font-medium">Cashier</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {loading ? (
+                            <tr><td colSpan={9} className="px-3 py-6 text-ink-500">Loading...</td></tr>
+                        ) : rows.length === 0 ? (
+                            <tr><td colSpan={9} className="px-3 py-6 text-ink-500">No transactions in this window.</td></tr>
+                        ) : rows.map((r) => (
+                            <tr key={r.dispense_id}>
+                                <td className="px-3 py-1.5 whitespace-nowrap">
+                                    {r.dispensed_at ? new Date(r.dispensed_at).toLocaleString() : '—'}
+                                </td>
+                                <td className="px-3 py-1.5">{r.item_name}</td>
+                                <td className="px-3 py-1.5 text-right">{r.quantity}</td>
+                                <td className="px-3 py-1.5 text-right font-mono">{Number(r.total_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                <td className="px-3 py-1.5">{r.patient_id ? `#${r.patient_id}` : 'Walk-in'}</td>
+                                <td className="px-3 py-1.5">{r.payment_method || '—'}</td>
+                                <td className="px-3 py-1.5">
+                                    <span className={'text-xs px-2 py-0.5 rounded-md ' + (
+                                        r.invoice_status === 'Paid' ? 'bg-emerald-50 text-emerald-700' :
+                                        r.invoice_status === 'Partially Paid' ? 'bg-amber-50 text-amber-700' :
+                                        r.invoice_status?.includes('Pending') ? 'bg-sky-50 text-sky-700' :
+                                        'bg-ink-50 text-ink-600'
+                                    )}>{r.invoice_status}</span>
+                                </td>
+                                <td className="px-3 py-1.5 text-ink-600">{r.cashier || '—'}</td>
+                                <td className="px-3 py-1.5 text-right">
+                                    <button onClick={() => printReceipt(r.dispense_id)}
+                                            className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
+                                        <ReceiptText size={12} /> Receipt
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+function Field({ label, children }) {
+    return (
+        <label className="block">
+            <span className="block text-xs font-medium text-ink-600 mb-1">{label}</span>
+            {children}
+        </label>
     );
 }
 

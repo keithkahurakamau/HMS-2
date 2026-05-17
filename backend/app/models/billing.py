@@ -6,7 +6,9 @@ from app.config.database import Base
 class Invoice(Base):
     __tablename__ = "invoices"
     invoice_id = Column(Integer, primary_key=True)
-    patient_id = Column(Integer, ForeignKey("patients.patient_id"), index=True, nullable=False)
+    # Nullable so walk-in pharmacy sales (no patient record) can still
+    # have an Invoice — needed for the unified payment + receipt flow.
+    patient_id = Column(Integer, ForeignKey("patients.patient_id"), index=True, nullable=True)
     appointment_id = Column(Integer, ForeignKey("appointments.appointment_id"), index=True, nullable=True)
     
     total_amount = Column(Numeric(10, 2), nullable=False)

@@ -90,24 +90,33 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
         db.add(log_entry)
         db.flush()
 
-        # 4. Billing Integration (If patient is known, route to their bill)
+        # 4. Billing Integration — always create an invoice so the same
+        # payment + receipt pipeline works for walk-in OTC and patient Rx
+        # alike. For known patients we roll into their open Pending
+        # invoice; for walk-ins we mint a fresh single-dispense invoice
+        # with patient_id NULL.
         if req.patient_id:
-            # Find an active pending invoice or create one
-            invoice = db.query(Invoice).filter(Invoice.patient_id == req.patient_id, Invoice.status == "Pending").first()
+            invoice = db.query(Invoice).filter(
+                Invoice.patient_id == req.patient_id, Invoice.status == "Pending"
+            ).first()
             if not invoice:
-                invoice = Invoice(patient_id=req.patient_id, total_amount=0, created_by=current_user["user_id"])
+                invoice = Invoice(patient_id=req.patient_id, total_amount=0,
+                                  created_by=current_user["user_id"])
                 db.add(invoice)
                 db.flush()
-            
-            invoice.total_amount += total_cost
-            
-            # Add line item detailing the exact drug dispensed
-            line_item = InvoiceItem(
-                invoice_id=invoice.invoice_id,
-                description=f"Pharmacy: {item.name} x{req.quantity}",
-                amount=total_cost, item_type="Pharmacy", reference_id=log_entry.dispense_id
-            )
-            db.add(line_item)
+        else:
+            invoice = Invoice(patient_id=None, total_amount=0,
+                              created_by=current_user["user_id"])
+            db.add(invoice)
+            db.flush()
+
+        invoice.total_amount += total_cost
+        db.add(InvoiceItem(
+            invoice_id=invoice.invoice_id,
+            description=f"Pharmacy: {item.name} x{req.quantity}",
+            amount=total_cost, item_type="Pharmacy",
+            reference_id=log_entry.dispense_id,
+        ))
 
         # 4b. Auto-post the dispensation to the ledger.
         # Revenue side uses unit_price (what we charged), COGS side uses
@@ -123,12 +132,8 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
         )
 
         # 5. Audit & Idempotency Save.
-        # Always include the invoice context in the response so the frontend
-        # can immediately prompt for payment collection — None for walk-ins.
-        invoice_id = invoice.invoice_id if req.patient_id and invoice else None
-        invoice_balance = None
-        if invoice_id is not None:
-            invoice_balance = float((invoice.total_amount or Decimal(0)) - (invoice.amount_paid or Decimal(0)))
+        invoice_id = invoice.invoice_id
+        invoice_balance = float((invoice.total_amount or Decimal(0)) - (invoice.amount_paid or Decimal(0)))
 
         resp_data = {
             "dispense_id": log_entry.dispense_id,
@@ -157,17 +162,12 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
 # ─── Payment collection (post-dispense) ─────────────────────────────────────
 
 def _resolve_dispense_invoice(db: Session, dispense_id: int) -> tuple[DispenseLog, Invoice]:
-    """Common lookup: dispense + its linked invoice. Walk-in dispenses (no
-    invoice) cannot be paid via this flow — they're cash-on-counter and
-    can be recorded via the cashier module."""
+    """Find a dispense and the invoice that holds its line item.
+    Works for both known-patient and walk-in dispenses — both now have
+    an Invoice row (walk-ins have patient_id NULL)."""
     dispense = db.query(DispenseLog).filter(DispenseLog.dispense_id == dispense_id).first()
     if not dispense:
         raise HTTPException(404, detail="Dispense record not found.")
-    if not dispense.patient_id:
-        raise HTTPException(
-            400,
-            detail="This dispense has no linked patient/invoice — collect payment manually via the cashier.",
-        )
     invoice = (
         db.query(Invoice)
         .join(InvoiceItem, InvoiceItem.invoice_id == Invoice.invoice_id)
@@ -346,3 +346,180 @@ def dispense_payment_status(dispense_id: int, db: Session = Depends(get_db)):
         "mpesa_receipt_number": pending_mpesa.receipt_number if pending_mpesa else None,
         "mpesa_result_desc": pending_mpesa.result_desc if pending_mpesa else None,
     }
+
+
+# ─── Receipt ────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/dispense/{dispense_id}/receipt",
+    dependencies=[Depends(RequirePermission("pharmacy:read"))],
+)
+def dispense_receipt(dispense_id: int, db: Session = Depends(get_db)):
+    """Receipt payload for printing. Includes hospital branding settings,
+    all line items on the invoice, all payments collected, and totals.
+
+    The frontend renders this through utils/printTemplates so the look
+    stays consistent with prescriptions / cheques / etc."""
+    dispense, invoice = _resolve_dispense_invoice(db, dispense_id)
+
+    items = (
+        db.query(InvoiceItem)
+        .filter(InvoiceItem.invoice_id == invoice.invoice_id)
+        .order_by(InvoiceItem.id)
+        .all()
+    )
+    payments = (
+        db.query(Payment)
+        .filter(Payment.invoice_id == invoice.invoice_id)
+        .order_by(Payment.payment_id)
+        .all()
+    )
+
+    # Hospital branding from settings — fall back gracefully if not set.
+    from app.models.settings import HospitalSetting
+    branding = {
+        row.key: row.value
+        for row in db.query(HospitalSetting)
+        .filter(HospitalSetting.category == "branding").all()
+    }
+    receipt_no = f"RCP-{invoice.invoice_id:08d}"
+
+    cashier = None
+    if invoice.created_by:
+        from app.models.user import User
+        u = db.query(User).filter(User.user_id == invoice.created_by).first()
+        cashier = u.full_name if u else None
+
+    patient_label = "Walk-in"
+    if dispense.patient_id:
+        from app.models.patient import Patient
+        p = db.query(Patient).filter(Patient.patient_id == dispense.patient_id).first()
+        if p:
+            patient_label = f"{p.surname}, {p.other_names}".strip(", ")
+
+    return {
+        "receipt_no": receipt_no,
+        "invoice_id": invoice.invoice_id,
+        "issued_at": invoice.billing_date.isoformat() if invoice.billing_date else None,
+        "dispense_id": dispense.dispense_id,
+        "patient": patient_label,
+        "cashier": cashier,
+        "hospital": {
+            "name": branding.get("hospital_name") or "MediFleet",
+            "tagline": branding.get("tagline") or "",
+            "logo_url": branding.get("logo_url") or "",
+        },
+        "items": [
+            {
+                "description": it.description,
+                "amount": float(it.amount),
+                "item_type": it.item_type,
+            } for it in items
+        ],
+        "payments": [
+            {
+                "method": p.payment_method,
+                "amount": float(p.amount),
+                "reference": p.transaction_reference,
+                "paid_at": p.payment_date.isoformat() if p.payment_date else None,
+            } for p in payments
+        ],
+        "totals": {
+            "total": float(invoice.total_amount or 0),
+            "paid": float(invoice.amount_paid or 0),
+            "balance": float((invoice.total_amount or Decimal(0))
+                             - (invoice.amount_paid or Decimal(0))),
+            "status": invoice.status,
+        },
+    }
+
+
+# ─── Transaction ledger ────────────────────────────────────────────────────
+
+@router.get(
+    "/transactions",
+    dependencies=[Depends(RequirePermission("pharmacy:read"))],
+)
+def pharmacy_transactions(
+    db: Session = Depends(get_db),
+    from_date: str | None = None,
+    to_date: str | None = None,
+    method: str | None = None,
+    status: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """Paginated ledger of pharmacy transactions.
+
+    One row per dispense: rolls up its invoice + payments. Filters:
+    - from_date / to_date (YYYY-MM-DD) match against dispensed_at
+    - method matches the dominant payment method on the invoice
+      ('Cash', 'M-Pesa', 'Card', or unpaid)
+    - status: 'Paid' | 'Partially Paid' | 'Pending' | 'Pending M-Pesa'
+    """
+    from datetime import date as _date
+    from app.models.user import User
+
+    limit = max(1, min(limit, 500))
+
+    q = (
+        db.query(DispenseLog)
+        .order_by(DispenseLog.dispensed_at.desc())
+    )
+    if from_date:
+        try:
+            q = q.filter(DispenseLog.dispensed_at >= _date.fromisoformat(from_date))
+        except ValueError:
+            raise HTTPException(400, detail=f"Bad from_date: {from_date}")
+    if to_date:
+        try:
+            # End-of-day cutoff: <= to_date + 1 day strictly less
+            from datetime import timedelta, datetime
+            cutoff = datetime.fromisoformat(to_date) + timedelta(days=1)
+            q = q.filter(DispenseLog.dispensed_at < cutoff)
+        except ValueError:
+            raise HTTPException(400, detail=f"Bad to_date: {to_date}")
+
+    rows = q.offset(offset).limit(limit).all()
+    total = q.count() if offset == 0 else None  # cheap: skip on pagination
+
+    out = []
+    for d in rows:
+        invoice = (
+            db.query(Invoice)
+            .join(InvoiceItem, InvoiceItem.invoice_id == Invoice.invoice_id)
+            .filter(InvoiceItem.reference_id == d.dispense_id,
+                    InvoiceItem.item_type == "Pharmacy")
+            .order_by(Invoice.invoice_id.desc())
+            .first()
+        )
+        item = db.query(InventoryItem).filter(InventoryItem.item_id == d.item_id).first()
+        cashier = db.query(User).filter(User.user_id == d.dispensed_by).first()
+        payments = (
+            db.query(Payment).filter(Payment.invoice_id == invoice.invoice_id).all()
+            if invoice else []
+        )
+        primary_method = next((p.payment_method for p in payments), None)
+
+        # Apply post-query filters (cheaper than complex SQL).
+        if status and (invoice.status if invoice else "Pending") != status:
+            continue
+        if method and (primary_method or "Unpaid") != method:
+            continue
+
+        out.append({
+            "dispense_id": d.dispense_id,
+            "dispensed_at": d.dispensed_at.isoformat() if d.dispensed_at else None,
+            "item_name": item.name if item else "—",
+            "quantity": d.quantity_dispensed,
+            "total_cost": float(d.total_cost),
+            "patient_id": d.patient_id,
+            "cashier": cashier.full_name if cashier else None,
+            "invoice_id": invoice.invoice_id if invoice else None,
+            "invoice_status": invoice.status if invoice else "Pending",
+            "amount_paid": float(invoice.amount_paid or 0) if invoice else 0,
+            "payment_method": primary_method,
+            "payment_count": len(payments),
+        })
+
+    return {"items": out, "total": total, "limit": limit, "offset": offset}
