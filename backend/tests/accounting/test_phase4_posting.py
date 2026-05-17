@@ -149,6 +149,51 @@ def test_payment_method_to_key_recognises_variants():
 
 # ─── Dispense pair ─────────────────────────────────────────────────────────
 
+def test_posting_error_doesnt_poison_outer_transaction(db):
+    """Regression: when post_from_event hits an error mid-flush, the
+    SAVEPOINT must roll back ONLY the posting attempt. The outer
+    transaction (the caller's session) must remain usable so its own
+    INSERTs (audit logs, idempotency keys) still succeed.
+
+    Reproduces the InFailedSqlTransaction we hit on pharmacy dispense
+    when post_from_event blew up and the audit_log INSERT that ran
+    immediately afterwards was rejected by Postgres.
+    """
+    from unittest.mock import patch as mock_patch
+    from app.models.patient import Patient
+
+    # Force the inner posting flow to blow up at flush time by making
+    # _next_entry_number raise. This simulates a unique-constraint hit
+    # or any other SQL failure mid-post.
+    with mock_patch(
+        "app.services.accounting_posting._next_entry_number",
+        side_effect=RuntimeError("simulated SQL failure"),
+    ):
+        result = post_from_event(
+            db,
+            user_id=1,
+            source_key="billing.payment.cash",
+            source_id=42,
+            amount=Decimal("100"),
+        )
+
+    assert result is None, "swallowed error should return None, not raise"
+
+    # The outer transaction must still be usable. Without the savepoint,
+    # this next INSERT would die with InFailedSqlTransaction.
+    p = Patient(
+        outpatient_no="OP-SAVEPOINT-001",
+        surname="After",
+        other_names="Failure",
+        sex="Female",
+        date_of_birth=date(1990, 1, 1),
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    assert p.patient_id is not None
+
+
 def test_post_dispense_pair_creates_two_entries(db):
     rev, cogs = post_dispense_pair(
         db,
