@@ -199,7 +199,7 @@ def db(_engine) -> Iterator[Session]:
     SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
     session = SessionLocal()
 
-    # Clean accounting + billing tables between tests.
+    # Clean accounting + billing + pharmacy/inventory tables between tests.
     for tbl in [
         "acc_bank_transactions", "acc_bank_accounts",
         "acc_deposit_applications", "acc_client_deposits",
@@ -208,7 +208,10 @@ def db(_engine) -> Iterator[Session]:
         "acc_insurance_providers", "acc_suppliers",
         "acc_journal_lines", "acc_journal_entries", "acc_fiscal_periods",
         "acc_fx_rates", "acc_accounts", "acc_settings", "acc_currencies",
+        "mpesa_transactions",
         "payments", "invoice_items", "invoices",
+        "dispense_logs", "stock_batches", "inventory_items", "locations",
+        "patients",
     ]:
         try:
             session.execute(text(f"TRUNCATE TABLE {tbl} RESTART IDENTITY CASCADE"))

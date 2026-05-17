@@ -122,13 +122,32 @@ async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
                 if item.get("Name") == "Amount":
                     txn.amount = item.get("Value")
                     
-            # Update the associated Invoice
+            # Update the associated Invoice + record a Payment row so the
+            # cashier / billing module sees the receipt where expected.
+            # Idempotent on transaction_reference (the M-Pesa receipt) —
+            # a duplicate callback won't double-record the payment.
             if txn.invoice_id:
+                from app.models.billing import Payment
+                from decimal import Decimal
                 invoice = db.query(Invoice).filter(Invoice.invoice_id == txn.invoice_id).first()
-                if invoice:
-                    invoice.status = "Paid"
-                    invoice.amount_paid = txn.amount
-                    invoice.payment_method = "M-Pesa"
+                if invoice and txn.amount:
+                    existing_payment = None
+                    if txn.receipt_number:
+                        existing_payment = (
+                            db.query(Payment)
+                            .filter(Payment.transaction_reference == txn.receipt_number)
+                            .first()
+                        )
+                    if not existing_payment:
+                        db.add(Payment(
+                            invoice_id=invoice.invoice_id,
+                            amount=Decimal(str(txn.amount)),
+                            payment_method="M-Pesa",
+                            transaction_reference=txn.receipt_number,
+                        ))
+                        invoice.amount_paid = (invoice.amount_paid or Decimal(0)) + Decimal(str(txn.amount))
+                        invoice.status = "Paid" if invoice.amount_paid >= invoice.total_amount else "Partially Paid"
+                        invoice.payment_method = "M-Pesa"
 
             # Auto-post the receipt to the ledger. Use the invoice-linked key
             # when an invoice exists (Dr M-Pesa / Cr AR), otherwise the direct
@@ -139,7 +158,8 @@ async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
                 source_key=source_key,
                 source_id=txn.id,
                 amount=txn.amount or 0,
-                memo=f"M-Pesa receipt {txn.receipt_number or checkout_request_id}",
+                memo=(f"M-Pesa receipt {txn.receipt_number or checkout_request_id}"
+                      + (f" (pharmacy dispense #{txn.dispense_id})" if txn.dispense_id else "")),
                 reference=f"INV-{txn.invoice_id}" if txn.invoice_id else (txn.receipt_number or checkout_request_id),
             )
         else:

@@ -28,19 +28,23 @@ class MpesaTransaction(Base):
     __tablename__ = "mpesa_transactions"
     id = Column(Integer, primary_key=True)
     invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), index=True, nullable=True)
-    
+    # Optional link back to the pharmacy dispense that initiated the STK push.
+    # Lets the callback close out the dispense + ledger entry without
+    # having to query the invoice graph for context.
+    dispense_id = Column(Integer, ForeignKey("dispense_logs.dispense_id"), index=True, nullable=True)
+
     phone_number = Column(String(20), index=True, nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
-    
+
     # STK Push Identifiers (returned by Safaricom instantly)
     merchant_request_id = Column(String(100), index=True, nullable=True)
     checkout_request_id = Column(String(100), index=True, nullable=True)
-    
+
     # Safaricom Callback Data (populated via Webhook)
     receipt_number = Column(String(50), unique=True, index=True, nullable=True) # e.g. QKT123456
     status = Column(String(50), default="Pending", index=True) # Pending, Success, Failed, Timeout
     result_desc = Column(String(255), nullable=True) # Safaricom's explanation (e.g., "The balance is insufficient")
-    
+
     transaction_date = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    
+
     invoice = relationship("Invoice", backref="mpesa_transactions")
