@@ -29,17 +29,23 @@ from app.schemas.accounting import (
     AccountResponse,
     AccountTreeNode,
     AccountUpdate,
+    BalanceSheetResponse,
+    CashFlowResponse,
     CurrencyCreate,
     CurrencyResponse,
     CurrencyUpdate,
+    DailyCollectionsResponse,
     FiscalPeriodResponse,
     FiscalPeriodSeedRequest,
     FxRateCreate,
     FxRateResponse,
+    IncomeStatementResponse,
     JournalEntryCreate,
     JournalEntryResponse,
+    TrialBalanceResponse,
 )
 from app.services import accounting as svc
+from app.services import accounting_reports as reports
 
 router = APIRouter(prefix="/api/accounting", tags=["Accounting"])
 
@@ -411,3 +417,62 @@ def reverse_entry(
     db.commit()
     db.refresh(mirror)
     return mirror
+
+
+# ─── Reports ─────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/reports/trial-balance",
+    response_model=TrialBalanceResponse,
+    dependencies=[Depends(RequirePermission("accounting:view"))],
+)
+def report_trial_balance(as_of: date, db: Session = Depends(get_db)):
+    return reports.trial_balance(db, as_of)
+
+
+@router.get(
+    "/reports/income-statement",
+    response_model=IncomeStatementResponse,
+    dependencies=[Depends(RequirePermission("accounting:view"))],
+)
+def report_income_statement(from_date: date = Query(..., alias="from"),
+                            to_date: date = Query(..., alias="to"),
+                            db: Session = Depends(get_db)):
+    if from_date > to_date:
+        raise HTTPException(400, detail="from must be <= to.")
+    return reports.income_statement(db, from_date, to_date)
+
+
+@router.get(
+    "/reports/balance-sheet",
+    response_model=BalanceSheetResponse,
+    dependencies=[Depends(RequirePermission("accounting:view"))],
+)
+def report_balance_sheet(as_of: date, db: Session = Depends(get_db)):
+    return reports.balance_sheet(db, as_of)
+
+
+@router.get(
+    "/reports/cash-flow",
+    response_model=CashFlowResponse,
+    dependencies=[Depends(RequirePermission("accounting:view"))],
+)
+def report_cash_flow(from_date: date = Query(..., alias="from"),
+                     to_date: date = Query(..., alias="to"),
+                     db: Session = Depends(get_db)):
+    if from_date > to_date:
+        raise HTTPException(400, detail="from must be <= to.")
+    return reports.cash_flow(db, from_date, to_date)
+
+
+@router.get(
+    "/reports/daily-collections",
+    response_model=DailyCollectionsResponse,
+    dependencies=[Depends(RequirePermission("accounting:view"))],
+)
+def report_daily_collections(from_date: date = Query(..., alias="from"),
+                             to_date: date = Query(..., alias="to"),
+                             db: Session = Depends(get_db)):
+    if from_date > to_date:
+        raise HTTPException(400, detail="from must be <= to.")
+    return reports.daily_collections(db, from_date, to_date)
