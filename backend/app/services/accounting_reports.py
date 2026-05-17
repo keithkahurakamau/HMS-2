@@ -61,6 +61,9 @@ def _posted_lines_query(db: Session, on_or_before: Optional[date] = None,
         .join(JournalEntry, JournalLine.entry_id == JournalEntry.entry_id)
         .join(Account, JournalLine.account_id == Account.account_id)
         .filter(JournalEntry.status == "posted")
+        # Exclude reversal mirrors so a reversed entry pair nets to zero
+        # in the report (the original is already excluded via status='reversed').
+        .filter(JournalEntry.reverses_entry_id.is_(None))
     )
     if on_or_before is not None:
         q = q.filter(JournalEntry.entry_date <= on_or_before)
