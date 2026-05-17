@@ -28,6 +28,7 @@ import Appointments from './pages/Appointments';
 import PatientPortal from './pages/PatientPortal';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
+import MpesaSettings from './pages/MpesaSettings';
 import Cheques from './pages/Cheques';
 import Support from './pages/Support';
 import Landing from './pages/Landing';
@@ -147,6 +148,7 @@ export default function App() {
             <Route path="billing" element={<ModuleGuard moduleKey="billing"><Billing /></ModuleGuard>} />
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="mpesa-settings" element={<ModuleGuard moduleKey="mpesa"><MpesaSettings /></ModuleGuard>} />
             <Route path="branding" element={<ModuleGuard moduleKey="branding"><Branding /></ModuleGuard>} />
             <Route path="cheques" element={<ModuleGuard moduleKey="cheques"><Cheques /></ModuleGuard>} />
             <Route path="accounting" element={<ModuleGuard moduleKey="accounting"><Accounting /></ModuleGuard>} />
