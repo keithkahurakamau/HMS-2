@@ -490,3 +490,71 @@ class DepositApplication(Base):
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_acc_deposit_applications_positive"),
     )
+
+
+# ─── Bank module: accounts + statement transactions + reconciliation ─────────
+
+class BankAccount(Base):
+    """Bank account master. Linked to a GL asset account so reconciliation
+    can compare 'what the bank says' vs 'what the ledger says'."""
+    __tablename__ = "acc_bank_accounts"
+
+    bank_account_id = Column(Integer, primary_key=True)
+    name = Column(String(120), nullable=False, index=True)
+    bank_name = Column(String(120), nullable=False)
+    branch = Column(String(120), nullable=True)
+    account_number = Column(String(60), nullable=False)
+    swift_code = Column(String(20), nullable=True)
+    currency_code = Column(String(3), nullable=False, default="KES")
+    gl_account_id = Column(Integer, ForeignKey("acc_accounts.account_id"), nullable=True)
+    opening_balance = Column(Numeric(14, 2), nullable=False, default=0)
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("bank_name", "account_number", name="uq_acc_bank_accounts_bank_number"),
+    )
+
+
+RECON_STATUSES = ("unreconciled", "matched", "ignored")
+
+
+class BankTransaction(Base):
+    """A line from a bank statement.
+
+    Reconciliation flow: operator imports/enters lines, then for each one:
+      * marks `matched` + links to a `journal_line_id` (the ledger move that
+        corresponds), OR
+      * marks `ignored` with a reason (duplicate, already-handled, etc.).
+    Open items (`unreconciled`) appear in the 'needs attention' view.
+    """
+    __tablename__ = "acc_bank_transactions"
+
+    bank_transaction_id = Column(Integer, primary_key=True)
+    bank_account_id = Column(Integer, ForeignKey("acc_bank_accounts.bank_account_id", ondelete="CASCADE"),
+                              nullable=False, index=True)
+    transaction_date = Column(Date, nullable=False, index=True)
+    description = Column(String(255), nullable=False)
+    # Positive = money in (credit on bank statement),
+    # negative = money out (debit on bank statement).
+    amount = Column(Numeric(14, 2), nullable=False)
+    running_balance = Column(Numeric(14, 2), nullable=True)
+    reference = Column(String(120), nullable=True, index=True)
+
+    reconciliation_status = Column(String(15), nullable=False, default="unreconciled", index=True)
+    journal_line_id = Column(Integer, ForeignKey("acc_journal_lines.line_id"), nullable=True)
+    reconciled_at = Column(DateTime(timezone=True), nullable=True)
+    reconciled_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    ignore_reason = Column(Text, nullable=True)
+
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "reconciliation_status IN ('unreconciled','matched','ignored')",
+            name="ck_acc_bank_transactions_recon",
+        ),
+    )

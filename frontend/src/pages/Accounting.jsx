@@ -6,6 +6,7 @@ import {
     Plus, X, ChevronRight, ChevronDown, CheckCircle2, RotateCcw, AlertCircle,
     Sliders, Truck, ShieldCheck, Tag, Link2,
     Users as UsersIcon, Send, FileText, Wallet,
+    Landmark, ArrowDownToLine, Check, Slash,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 
@@ -13,6 +14,7 @@ const TABS = [
     { key: 'coa',        label: 'Chart of Accounts', icon: BookOpen },
     { key: 'journal',    label: 'Journal Entries',   icon: CalendarRange },
     { key: 'debtors',    label: 'Debtors',           icon: UsersIcon },
+    { key: 'bank',       label: 'Bank',              icon: Landmark },
     { key: 'config',     label: 'Configuration',     icon: Sliders },
     { key: 'currencies', label: 'Currencies & FX',   icon: Coins },
     { key: 'settings',   label: 'Settings',          icon: SettingsIcon },
@@ -76,6 +78,7 @@ export default function Accounting() {
             {tab === 'coa'        && <ChartOfAccountsTab />}
             {tab === 'journal'    && <JournalEntriesTab />}
             {tab === 'debtors'    && <DebtorsTab />}
+            {tab === 'bank'       && <BankTab />}
             {tab === 'config'     && <ConfigurationTab />}
             {tab === 'currencies' && <CurrenciesTab />}
             {tab === 'settings'   && <SettingsTab />}
@@ -2060,6 +2063,511 @@ function DepositApplyModal({ deposit, onClose, onSaved }) {
                 </Field>
             </div>
             <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Apply" />
+        </ModalShell>
+    );
+}
+
+
+/* ─── Bank ───────────────────────────────────────────────────────────────── */
+
+const BANK_SECTIONS = [
+    { key: 'accounts',     label: 'Bank Accounts',  icon: Landmark },
+    { key: 'transactions', label: 'Transactions',   icon: ArrowDownToLine },
+    { key: 'reconcile',    label: 'Reconciliation', icon: Check },
+];
+
+const RECON_BADGE = {
+    unreconciled: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+    matched:      'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+    ignored:      'bg-ink-50 text-ink-500 ring-1 ring-ink-200',
+};
+
+function BankTab() {
+    const [section, setSection] = useState('accounts');
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
+            <aside className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-2 h-fit">
+                <nav className="space-y-1">
+                    {BANK_SECTIONS.map(({ key, label, icon: Icon }) => (
+                        <button key={key}
+                                onClick={() => setSection(key)}
+                                className={
+                                    'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ' +
+                                    (section === key
+                                        ? 'bg-brand-50 text-brand-700 font-medium'
+                                        : 'text-ink-600 hover:bg-ink-50')
+                                }>
+                            <Icon size={16} /> {label}
+                        </button>
+                    ))}
+                </nav>
+            </aside>
+            <div>
+                {section === 'accounts'     && <BankAccountsSection />}
+                {section === 'transactions' && <BankTransactionsSection />}
+                {section === 'reconcile'    && <ReconciliationSection />}
+            </div>
+        </div>
+    );
+}
+
+function BankAccountsSection() {
+    const [items, setItems] = useState([]);
+    const [accounts, setAccounts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [open, setOpen] = useState(false);
+    const [editing, setEditing] = useState(null);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const [b, a] = await Promise.all([
+                apiClient.get('/accounting/bank/accounts?include_inactive=true'),
+                apiClient.get('/accounting/accounts?account_type=Asset&include_inactive=false'),
+            ]);
+            setItems(b.data || []);
+            setAccounts((a.data || []).filter(x => x.is_postable));
+        } catch { toast.error('Could not load bank accounts.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); }, []);
+
+    const accountName = (id) => {
+        const a = accounts.find(x => x.account_id === id);
+        return a ? `${a.code} ${a.name}` : '—';
+    };
+
+    return (
+        <div className="space-y-4">
+            <SectionHeader title="Bank Accounts" subtitle="Bank accounts linked to GL asset accounts for reconciliation."
+                           onNew={() => { setEditing(null); setOpen(true); }} />
+            <DataCard loading={loading} empty={items.length === 0} emptyMsg="No bank accounts yet.">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Name</th>
+                            <th className="text-left px-4 py-2 font-medium">Bank</th>
+                            <th className="text-left px-4 py-2 font-medium">Account #</th>
+                            <th className="text-left px-4 py-2 font-medium">Currency</th>
+                            <th className="text-left px-4 py-2 font-medium">GL link</th>
+                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map(b => (
+                            <tr key={b.bank_account_id}>
+                                <td className="px-4 py-1.5 font-medium">{b.name}</td>
+                                <td className="px-4 py-1.5">{b.bank_name}{b.branch ? ` · ${b.branch}` : ''}</td>
+                                <td className="px-4 py-1.5 font-mono text-xs">{b.account_number}</td>
+                                <td className="px-4 py-1.5">{b.currency_code}</td>
+                                <td className="px-4 py-1.5 text-ink-600">{accountName(b.gl_account_id)}</td>
+                                <td className="px-4 py-1.5">
+                                    <span className={'text-xs ' + (b.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                        {b.is_active ? 'active' : 'inactive'}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-1.5 text-right">
+                                    <button onClick={() => { setEditing(b); setOpen(true); }}
+                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DataCard>
+            {open && <BankAccountModal initial={editing} accounts={accounts}
+                                       onClose={() => setOpen(false)}
+                                       onSaved={() => { setOpen(false); load(); }} />}
+        </div>
+    );
+}
+
+function BankAccountModal({ initial, accounts, onClose, onSaved }) {
+    const isEdit = !!initial;
+    const [form, setForm] = useState(initial || {
+        name: '', bank_name: '', branch: '', account_number: '', swift_code: '',
+        currency_code: 'KES', gl_account_id: '', opening_balance: 0, notes: '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    const submit = async () => {
+        if (!form.name || !form.bank_name || !form.account_number) {
+            toast.error('Name, bank, and account number are required.'); return;
+        }
+        setSaving(true);
+        try {
+            const payload = { ...form,
+                gl_account_id: form.gl_account_id || null,
+                opening_balance: Number(form.opening_balance || 0),
+            };
+            if (isEdit) await apiClient.patch(`/accounting/bank/accounts/${initial.bank_account_id}`, payload);
+            else await apiClient.post('/accounting/bank/accounts', payload);
+            toast.success(isEdit ? 'Account updated.' : 'Account created.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title={isEdit ? 'Edit bank account' : 'New bank account'} onClose={onClose} wide>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="Name *"><input className="input" value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Main Operations" /></Field>
+                <Field label="Bank *"><input className="input" value={form.bank_name}
+                    onChange={(e) => setForm({ ...form, bank_name: e.target.value })} placeholder="e.g. Equity Bank" /></Field>
+                <Field label="Branch"><input className="input" value={form.branch || ''}
+                    onChange={(e) => setForm({ ...form, branch: e.target.value })} /></Field>
+                <Field label="Account number *"><input className="input" value={form.account_number}
+                    onChange={(e) => setForm({ ...form, account_number: e.target.value })} /></Field>
+                <Field label="SWIFT"><input className="input" value={form.swift_code || ''}
+                    onChange={(e) => setForm({ ...form, swift_code: e.target.value })} /></Field>
+                <Field label="Currency"><input className="input" maxLength={3} value={form.currency_code}
+                    onChange={(e) => setForm({ ...form, currency_code: e.target.value.toUpperCase() })} /></Field>
+                <Field label="GL account">
+                    <select className="input" value={form.gl_account_id || ''}
+                            onChange={(e) => setForm({ ...form, gl_account_id: e.target.value })}>
+                        <option value="">— pick an Asset account —</option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                    </select>
+                </Field>
+                <Field label="Opening balance"><input type="number" step="0.01" className="input"
+                    value={form.opening_balance}
+                    onChange={(e) => setForm({ ...form, opening_balance: e.target.value })} /></Field>
+            </div>
+            <Field label="Notes">
+                <textarea className="input min-h-[50px]" value={form.notes || ''}
+                          onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </Field>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
+        </ModalShell>
+    );
+}
+
+function BankTransactionsSection() {
+    const [items, setItems] = useState([]);
+    const [accounts, setAccounts] = useState([]);
+    const [filter, setFilter] = useState({ account_id: '', status: '' });
+    const [loading, setLoading] = useState(true);
+    const [open, setOpen] = useState(false);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const [a] = await Promise.all([
+                apiClient.get('/accounting/bank/accounts'),
+            ]);
+            setAccounts(a.data || []);
+            const params = {};
+            if (filter.account_id) params.bank_account_id = filter.account_id;
+            if (filter.status) params.status = filter.status;
+            const t = await apiClient.get('/accounting/bank/transactions', { params });
+            setItems(t.data || []);
+        } catch { toast.error('Could not load transactions.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter]);
+
+    const accountName = (id) => accounts.find(a => a.bank_account_id === id)?.name || '—';
+
+    return (
+        <div className="space-y-4">
+            <SectionHeader title="Bank Transactions" subtitle="Statement lines imported or keyed in manually."
+                           onNew={() => setOpen(true)}
+                           disabled={accounts.length === 0}
+                           disabledMsg="Add a bank account first." />
+
+            <div className="flex flex-wrap items-center gap-3">
+                <select className="input max-w-xs" value={filter.account_id}
+                        onChange={(e) => setFilter({ ...filter, account_id: e.target.value })}>
+                    <option value="">All accounts</option>
+                    {accounts.map(a => <option key={a.bank_account_id} value={a.bank_account_id}>{a.name}</option>)}
+                </select>
+                <select className="input max-w-xs" value={filter.status}
+                        onChange={(e) => setFilter({ ...filter, status: e.target.value })}>
+                    <option value="">All statuses</option>
+                    <option value="unreconciled">Unreconciled</option>
+                    <option value="matched">Matched</option>
+                    <option value="ignored">Ignored</option>
+                </select>
+            </div>
+
+            <DataCard loading={loading} empty={items.length === 0} emptyMsg="No transactions.">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Date</th>
+                            <th className="text-left px-4 py-2 font-medium">Account</th>
+                            <th className="text-left px-4 py-2 font-medium">Description</th>
+                            <th className="text-left px-4 py-2 font-medium">Reference</th>
+                            <th className="text-right px-4 py-2 font-medium">Amount</th>
+                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map(t => (
+                            <tr key={t.bank_transaction_id}>
+                                <td className="px-4 py-1.5">{t.transaction_date}</td>
+                                <td className="px-4 py-1.5">{accountName(t.bank_account_id)}</td>
+                                <td className="px-4 py-1.5 text-ink-700">{t.description}</td>
+                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '—'}</td>
+                                <td className={'px-4 py-1.5 text-right font-mono ' +
+                                    (Number(t.amount) >= 0 ? 'text-emerald-700' : 'text-rose-700')}>
+                                    {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
+                                </td>
+                                <td className="px-4 py-1.5">
+                                    <span className={`text-xs px-2 py-0.5 rounded-md ${RECON_BADGE[t.reconciliation_status]}`}>
+                                        {t.reconciliation_status}
+                                    </span>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DataCard>
+
+            {open && <BankTxModal accounts={accounts} onClose={() => setOpen(false)}
+                                  onSaved={() => { setOpen(false); load(); }} />}
+        </div>
+    );
+}
+
+function BankTxModal({ accounts, onClose, onSaved }) {
+    const [form, setForm] = useState({
+        bank_account_id: accounts[0]?.bank_account_id || '',
+        transaction_date: todayISO(),
+        description: '',
+        amount: '',
+        running_balance: '',
+        reference: '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    const submit = async () => {
+        if (!form.bank_account_id || !form.description || !form.amount) {
+            toast.error('Account, description, and amount are required.'); return;
+        }
+        setSaving(true);
+        try {
+            await apiClient.post('/accounting/bank/transactions', {
+                bank_account_id: Number(form.bank_account_id),
+                transaction_date: form.transaction_date,
+                description: form.description,
+                amount: Number(form.amount),
+                running_balance: form.running_balance ? Number(form.running_balance) : null,
+                reference: form.reference || null,
+            });
+            toast.success('Transaction added.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title="New bank transaction" onClose={onClose}>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="Bank account *">
+                    <select className="input" value={form.bank_account_id}
+                            onChange={(e) => setForm({ ...form, bank_account_id: e.target.value })}>
+                        {accounts.map(a => <option key={a.bank_account_id} value={a.bank_account_id}>{a.name}</option>)}
+                    </select>
+                </Field>
+                <Field label="Date *"><input type="date" className="input" value={form.transaction_date}
+                    onChange={(e) => setForm({ ...form, transaction_date: e.target.value })} /></Field>
+                <Field label="Description *">
+                    <input className="input" value={form.description}
+                           onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                </Field>
+                <Field label="Reference">
+                    <input className="input" value={form.reference}
+                           onChange={(e) => setForm({ ...form, reference: e.target.value })} />
+                </Field>
+                <Field label="Amount * (signed: + in / − out)"><input type="number" step="0.01" className="input"
+                    value={form.amount}
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field>
+                <Field label="Running balance"><input type="number" step="0.01" className="input"
+                    value={form.running_balance}
+                    onChange={(e) => setForm({ ...form, running_balance: e.target.value })} /></Field>
+            </div>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
+        </ModalShell>
+    );
+}
+
+function ReconciliationSection() {
+    const [accounts, setAccounts] = useState([]);
+    const [selected, setSelected] = useState('');
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [matching, setMatching] = useState(null);
+
+    const loadAccounts = async () => {
+        try {
+            const r = await apiClient.get('/accounting/bank/accounts');
+            setAccounts(r.data || []);
+            if ((r.data || []).length > 0 && !selected) setSelected(r.data[0].bank_account_id);
+        } catch { toast.error('Could not load accounts.'); }
+    };
+    useEffect(() => { loadAccounts(); }, []);
+
+    const loadItems = async () => {
+        if (!selected) return;
+        setLoading(true);
+        try {
+            const r = await apiClient.get('/accounting/bank/transactions', {
+                params: { bank_account_id: selected, status: 'unreconciled' },
+            });
+            setItems(r.data || []);
+        } catch { toast.error('Could not load transactions.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { loadItems(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [selected]);
+
+    const ignore = async (id) => {
+        const reason = window.prompt('Ignore reason:');
+        if (!reason) return;
+        try {
+            await apiClient.post(`/accounting/bank/transactions/${id}/ignore`, { reason });
+            toast.success('Marked ignored.');
+            loadItems();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not ignore.'); }
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-end justify-between">
+                <div>
+                    <h3 className="text-lg font-semibold text-ink-900">Reconciliation</h3>
+                    <p className="text-sm text-ink-600 mt-1">Match unreconciled bank lines to journal entries.</p>
+                </div>
+                <Field label="Account">
+                    <select className="input min-w-[200px]" value={selected}
+                            onChange={(e) => setSelected(e.target.value)}>
+                        <option value="">—</option>
+                        {accounts.map(a => <option key={a.bank_account_id} value={a.bank_account_id}>{a.name}</option>)}
+                    </select>
+                </Field>
+            </div>
+
+            <DataCard loading={loading} empty={items.length === 0}
+                      emptyMsg={selected ? 'Nothing left to reconcile here.' : 'Pick an account above.'}>
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Date</th>
+                            <th className="text-left px-4 py-2 font-medium">Description</th>
+                            <th className="text-left px-4 py-2 font-medium">Reference</th>
+                            <th className="text-right px-4 py-2 font-medium">Amount</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map(t => (
+                            <tr key={t.bank_transaction_id}>
+                                <td className="px-4 py-1.5">{t.transaction_date}</td>
+                                <td className="px-4 py-1.5">{t.description}</td>
+                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '—'}</td>
+                                <td className={'px-4 py-1.5 text-right font-mono ' +
+                                    (Number(t.amount) >= 0 ? 'text-emerald-700' : 'text-rose-700')}>
+                                    {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
+                                </td>
+                                <td className="px-4 py-1.5 text-right space-x-2">
+                                    <button onClick={() => setMatching(t)}
+                                            className="text-xs text-emerald-700 hover:underline inline-flex items-center gap-1">
+                                        <Check size={12} /> Match
+                                    </button>
+                                    <button onClick={() => ignore(t.bank_transaction_id)}
+                                            className="text-xs text-ink-500 hover:underline inline-flex items-center gap-1">
+                                        <Slash size={12} /> Ignore
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DataCard>
+
+            {matching && <MatchModal tx={matching}
+                                     onClose={() => setMatching(null)}
+                                     onSaved={() => { setMatching(null); loadItems(); }} />}
+        </div>
+    );
+}
+
+function MatchModal({ tx, onClose, onSaved }) {
+    const [candidates, setCandidates] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const r = await apiClient.get(`/accounting/bank/transactions/${tx.bank_transaction_id}/candidates`);
+            setCandidates(r.data || []);
+        } catch { toast.error('Could not load candidates.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+    const match = async (line_id) => {
+        setSaving(true);
+        try {
+            await apiClient.post(`/accounting/bank/transactions/${tx.bank_transaction_id}/match`, {
+                journal_line_id: line_id,
+            });
+            toast.success('Matched.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not match.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title="Match bank transaction" onClose={onClose} wide>
+            <div className="text-sm text-ink-600 mb-3">
+                {tx.transaction_date} · {tx.description} · <span className="font-mono">{formatAmount(tx.amount)}</span>
+            </div>
+            {loading ? (
+                <div className="p-6 text-sm text-ink-500">Searching for candidates...</div>
+            ) : candidates.length === 0 ? (
+                <div className="p-6 text-sm text-ink-500">
+                    No matching journal lines found within ±7 days at the same amount.
+                </div>
+            ) : (
+                <div className="border border-ink-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead className="bg-ink-50 text-ink-600">
+                            <tr>
+                                <th className="text-left px-3 py-2 font-medium">Entry</th>
+                                <th className="text-left px-3 py-2 font-medium">Date</th>
+                                <th className="text-right px-3 py-2 font-medium">Debit</th>
+                                <th className="text-right px-3 py-2 font-medium">Credit</th>
+                                <th className="text-left px-3 py-2 font-medium">Memo</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-ink-100">
+                            {candidates.map(c => (
+                                <tr key={c.line_id}>
+                                    <td className="px-3 py-1.5 font-mono text-xs">{c.entry_number}</td>
+                                    <td className="px-3 py-1.5">{c.entry_date}</td>
+                                    <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.debit)}</td>
+                                    <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.credit)}</td>
+                                    <td className="px-3 py-1.5 text-ink-600">{c.memo || c.description || '—'}</td>
+                                    <td className="px-3 py-1.5 text-right">
+                                        <button onClick={() => match(c.line_id)} disabled={saving}
+                                                className="text-xs text-emerald-700 hover:underline">
+                                            Match
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+            <div className="flex justify-end pt-4">
+                <button onClick={onClose} className="px-3 py-2 rounded-lg border border-ink-200 text-sm hover:bg-ink-50">Close</button>
+            </div>
         </ModalShell>
     );
 }
