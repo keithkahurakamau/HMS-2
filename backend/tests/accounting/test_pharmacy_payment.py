@@ -217,17 +217,38 @@ def test_walk_in_dispense_without_invoice_returns_404(db):
     assert exc.value.status_code == 404
 
 
-# ─── Card stub ─────────────────────────────────────────────────────────────
+# ─── Card payment (no terminal integration — manual recording) ─────────────
 
-def test_card_payment_returns_501(db):
-    dispense, _ = _seed_dispense_with_invoice(db, total=Decimal("100"))
-    with pytest.raises(HTTPException) as exc:
-        collect_dispense_payment(
-            dispense.dispense_id,
-            DispensePaymentRequest(method="card", amount=100.0),
-            _FakeRequest(), db, CURRENT_USER,
-        )
-    assert exc.value.status_code == 501
+def test_card_payment_settles_invoice_and_posts_bank_ledger(db):
+    """Card is treated identically to a bank transfer at the ledger level:
+    Dr 1120 Bank / Cr 1140 AR via the billing.payment.bank source key."""
+    dispense, invoice = _seed_dispense_with_invoice(db, total=Decimal("250"))
+
+    resp = collect_dispense_payment(
+        dispense.dispense_id,
+        DispensePaymentRequest(method="card", amount=250.0,
+                                transaction_reference="AUTH-77"),
+        _FakeRequest(), db, CURRENT_USER,
+    )
+    db.refresh(invoice)
+    assert resp.status == "paid"
+    assert invoice.status == "Paid"
+
+    payments = db.query(Payment).filter(Payment.invoice_id == invoice.invoice_id).all()
+    assert len(payments) == 1
+    assert payments[0].payment_method == "Card"
+    assert payments[0].transaction_reference == "AUTH-77"
+
+    # Ledger entry uses billing.payment.bank (card settles into bank).
+    from app.models.accounting import JournalEntry
+    entry = (
+        db.query(JournalEntry)
+        .filter(JournalEntry.source_type == "billing.payment.bank",
+                JournalEntry.source_id == payments[0].payment_id)
+        .first()
+    )
+    assert entry is not None
+    assert entry.status == "posted"
 
 
 # ─── M-Pesa flow ───────────────────────────────────────────────────────────

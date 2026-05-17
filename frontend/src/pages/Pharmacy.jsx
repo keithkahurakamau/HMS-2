@@ -117,27 +117,56 @@ export default function Pharmacy() {
         return responses;
     };
 
-    const handleOTCCheckout = async () => {
+    // Pay-straight-away OTC checkout: dispense the cart, then immediately
+    // process the chosen method against the rolled-up invoice. No "choose
+    // method" modal — the cashier already picked Cash/Card/M-Pesa.
+    const handleOTCPay = async (method, { phoneNumber = null, reference = null } = {}) => {
         if (cart.length === 0) return;
+        if (method === 'mpesa' && !phoneNumber) {
+            return toast.error('M-Pesa needs a phone number.');
+        }
         setIsProcessing(true);
         try {
             const responses = await dispenseItems(cart);  // walk-in
-            toast.success("Items dispensed. Collect payment.");
             fetchPharmacyInventory();
 
             const last = responses[responses.length - 1];
-            if (last?.invoice_id) {
+            if (!last?.invoice_id) {
+                setCart([]);
+                toast.success('Items dispensed (no invoice).');
+                return;
+            }
+
+            const amount = Number(last.invoice_balance ?? cartTotal);
+            const res = await apiClient.post(`/pharmacy/dispense/${last.dispense_id}/pay`, {
+                method,
+                amount,
+                phone_number: method === 'mpesa' ? phoneNumber : null,
+                transaction_reference: reference || null,
+            });
+
+            if (method === 'mpesa') {
+                toast.success('STK push sent. Customer to confirm on their phone.');
+                // Open the modal in polling mode so the cashier can watch.
                 setPayment({
                     invoiceId: last.invoice_id,
                     dispenseId: last.dispense_id,
-                    amount: last.invoice_balance ?? cartTotal,
-                    patientName: "Walk-in",
+                    amount,
+                    patientName: 'Walk-in',
+                    pendingMpesa: { checkout_request_id: res.data?.checkout_request_id,
+                                    mpesa_transaction_id: res.data?.mpesa_transaction_id },
                 });
             } else {
+                toast.success(`${method === 'card' ? 'Card' : 'Cash'} payment recorded.`);
+                // Receipt prints directly without the modal round-trip.
+                try {
+                    const r = await apiClient.get(`/pharmacy/dispense/${last.dispense_id}/receipt`);
+                    printPharmacyReceipt(r.data);
+                } catch { /* silently skip — payment still landed */ }
                 setCart([]);
             }
         } catch (error) {
-            toast.error(error?.response?.data?.detail || "Checkout failed");
+            toast.error(error?.response?.data?.detail || `${method} payment failed.`);
         } finally {
             setIsProcessing(false);
         }
@@ -456,13 +485,19 @@ export default function Pharmacy() {
                         </div>
 
                         <div className="p-4 border-t border-ink-100 bg-white">
-                            <div className="flex justify-between items-center mb-4">
+                            <div className="flex justify-between items-center mb-3">
                                 <span className="section-eyebrow">Subtotal</span>
                                 <span className="text-xl font-semibold text-ink-900 tracking-tight">KES {cartTotal.toLocaleString()}</span>
                             </div>
-                            <button onClick={handleOTCCheckout} disabled={cart.length === 0 || isProcessing} className="btn-success w-full py-3">
-                                <CreditCard size={16} /> {isProcessing ? 'Processing…' : 'Checkout & dispense'}
-                            </button>
+                            <OtcPayBar
+                                disabled={cart.length === 0 || isProcessing}
+                                onCash={() => handleOTCPay('cash')}
+                                onCard={() => {
+                                    const ref = window.prompt('Card auth code / reference (optional):') || null;
+                                    handleOTCPay('card', { reference: ref });
+                                }}
+                                onMpesa={(phone) => handleOTCPay('mpesa', { phoneNumber: phone })}
+                            />
                         </div>
                     </div>
                 </div>
@@ -478,9 +513,46 @@ export default function Pharmacy() {
                     dispenseId={payment.dispenseId}
                     amountDue={payment.amount}
                     patientName={payment.patientName}
+                    pendingMpesa={payment.pendingMpesa}
                     onClose={() => setPayment(null)}
                     onSettled={handlePaymentSettled}
                 />
+            )}
+        </div>
+    );
+}
+
+
+/* ─── OTC pay-straight-away bar ──────────────────────────────────────────── */
+
+function OtcPayBar({ disabled, onCash, onCard, onMpesa }) {
+    const [showMpesa, setShowMpesa] = useState(false);
+    const [phone, setPhone] = useState('');
+    return (
+        <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+                <button onClick={onCash} disabled={disabled}
+                        className="btn-success py-3 flex flex-col items-center gap-1 text-xs">
+                    <Banknote size={18} /><span>Cash</span>
+                </button>
+                <button onClick={onCard} disabled={disabled}
+                        className="btn-primary py-3 flex flex-col items-center gap-1 text-xs">
+                    <CreditCard size={18} /><span>Card</span>
+                </button>
+                <button onClick={() => setShowMpesa((s) => !s)} disabled={disabled}
+                        className="py-3 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-60 flex flex-col items-center gap-1">
+                    <Smartphone size={18} /><span>M-Pesa</span>
+                </button>
+            </div>
+            {showMpesa && (
+                <div className="flex gap-2 pt-1">
+                    <input className="input flex-1" placeholder="07XXXXXXXX or 2547XXXXXXXX"
+                           value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    <button onClick={() => onMpesa(phone)} disabled={disabled || !phone}
+                            className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-60">
+                        Send STK
+                    </button>
+                </div>
             )}
         </div>
     );
@@ -709,13 +781,13 @@ function Field({ label, children }) {
 const POLL_MS = 3000;
 const POLL_TIMEOUT_MS = 90_000;
 
-function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, onClose, onSettled }) {
+function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMpesa, onClose, onSettled }) {
     const [method, setMethod] = useState('cash');     // 'cash' | 'mpesa'
     const [amount, setAmount] = useState(amountDue ? Number(amountDue).toFixed(2) : '');
     const [phone, setPhone] = useState('');
     const [reference, setReference] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [pollingTxnId, setPollingTxnId] = useState(null);
+    const [pollingTxnId, setPollingTxnId] = useState(pendingMpesa?.mpesa_transaction_id ?? null);
     const [pollStatus, setPollStatus] = useState(null);
 
     // Poll the dispense's payment status while M-Pesa is pending.
