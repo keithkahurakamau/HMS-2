@@ -4,12 +4,14 @@ import toast from 'react-hot-toast';
 import {
     BookOpen, Coins, CalendarRange, Settings as SettingsIcon,
     Plus, X, ChevronRight, ChevronDown, CheckCircle2, RotateCcw, AlertCircle,
+    BarChart3, Download,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 
 const TABS = [
     { key: 'coa',        label: 'Chart of Accounts', icon: BookOpen },
     { key: 'journal',    label: 'Journal Entries',   icon: CalendarRange },
+    { key: 'reports',    label: 'Reports',           icon: BarChart3 },
     { key: 'currencies', label: 'Currencies & FX',   icon: Coins },
     { key: 'settings',   label: 'Settings',          icon: SettingsIcon },
 ];
@@ -65,6 +67,7 @@ export default function Accounting() {
 
             {tab === 'coa'        && <ChartOfAccountsTab />}
             {tab === 'journal'    && <JournalEntriesTab />}
+            {tab === 'reports'    && <ReportsTab />}
             {tab === 'currencies' && <CurrenciesTab />}
             {tab === 'settings'   && <SettingsTab />}
         </div>
@@ -791,6 +794,346 @@ function SettingsTab() {
                     Seed fiscal periods for a year
                 </button>
             </div>
+        </div>
+    );
+}
+
+
+/* ─── Reports ────────────────────────────────────────────────────────────── */
+
+const REPORT_TYPES = [
+    { key: 'trial-balance',     label: 'Trial Balance',     range: 'as_of' },
+    { key: 'income-statement',  label: 'Income Statement',  range: 'period' },
+    { key: 'balance-sheet',     label: 'Balance Sheet',     range: 'as_of' },
+    { key: 'cash-flow',         label: 'Cash Flow',         range: 'period' },
+    { key: 'daily-collections', label: 'Daily Collections', range: 'period' },
+];
+
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+
+function firstOfMonthISO() {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+function csvDownload(filename, rows, headers) {
+    const escape = (v) => {
+        if (v == null) return '';
+        const s = String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [headers.map(h => escape(h.label)).join(',')];
+    rows.forEach(r => lines.push(headers.map(h => escape(typeof h.get === 'function' ? h.get(r) : r[h.key])).join(',')));
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+}
+
+function ReportsTab() {
+    const [report, setReport] = useState('trial-balance');
+    const [asOf, setAsOf] = useState(todayISO());
+    const [from, setFrom] = useState(firstOfMonthISO());
+    const [to, setTo] = useState(todayISO());
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(false);
+
+    const meta = REPORT_TYPES.find(r => r.key === report);
+
+    const load = async () => {
+        setLoading(true);
+        setData(null);
+        try {
+            const params = meta.range === 'as_of' ? { as_of: asOf } : { from, to };
+            const res = await apiClient.get(`/accounting/reports/${report}`, { params });
+            setData(res.data);
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not load report.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Auto-load when switching reports.
+    useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [report]);
+
+    return (
+        <div className="space-y-4">
+            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-4 flex flex-wrap items-end gap-3">
+                <Field label="Report">
+                    <select className="input" value={report} onChange={(e) => setReport(e.target.value)}>
+                        {REPORT_TYPES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                    </select>
+                </Field>
+                {meta.range === 'as_of' ? (
+                    <Field label="As of">
+                        <input type="date" className="input" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+                    </Field>
+                ) : (
+                    <>
+                        <Field label="From">
+                            <input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
+                        </Field>
+                        <Field label="To">
+                            <input type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
+                        </Field>
+                    </>
+                )}
+                <button onClick={load} disabled={loading}
+                        className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
+                    {loading ? 'Loading...' : 'Run'}
+                </button>
+                {data && (
+                    <button onClick={() => exportReport(report, data)}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 text-sm font-medium hover:bg-ink-50">
+                        <Download size={14} /> Export CSV
+                    </button>
+                )}
+            </div>
+
+            {loading && <div className="p-6 text-sm text-ink-500">Loading...</div>}
+            {!loading && data && report === 'trial-balance'     && <TrialBalanceView data={data} />}
+            {!loading && data && report === 'income-statement'  && <IncomeStatementView data={data} />}
+            {!loading && data && report === 'balance-sheet'     && <BalanceSheetView data={data} />}
+            {!loading && data && report === 'cash-flow'         && <CashFlowView data={data} />}
+            {!loading && data && report === 'daily-collections' && <DailyCollectionsView data={data} />}
+        </div>
+    );
+}
+
+function exportReport(report, data) {
+    if (report === 'trial-balance') {
+        csvDownload(`trial-balance-${data.as_of}.csv`, data.rows, [
+            { key: 'code', label: 'Code' }, { key: 'name', label: 'Account' },
+            { key: 'account_type', label: 'Type' }, { key: 'debit', label: 'Debit' },
+            { key: 'credit', label: 'Credit' }, { key: 'balance', label: 'Balance' },
+        ]);
+    } else if (report === 'income-statement') {
+        const rows = [
+            ...data.revenue.map(r => ({ section: 'Revenue', ...r })),
+            ...data.cogs.map(r => ({ section: 'COGS', ...r })),
+            ...data.operating_expenses.map(r => ({ section: 'Operating Expense', ...r })),
+        ];
+        csvDownload(`income-statement-${data.from_date}-to-${data.to_date}.csv`, rows, [
+            { key: 'section', label: 'Section' }, { key: 'code', label: 'Code' },
+            { key: 'name', label: 'Account' }, { key: 'amount', label: 'Amount' },
+        ]);
+    } else if (report === 'balance-sheet') {
+        const rows = [
+            ...data.assets.map(r => ({ section: 'Asset', ...r })),
+            ...data.liabilities.map(r => ({ section: 'Liability', ...r })),
+            ...data.equity.map(r => ({ section: 'Equity', ...r })),
+            { section: 'Equity', code: '—', name: 'Current Year Earnings', amount: data.current_year_earnings },
+        ];
+        csvDownload(`balance-sheet-${data.as_of}.csv`, rows, [
+            { key: 'section', label: 'Section' }, { key: 'code', label: 'Code' },
+            { key: 'name', label: 'Account' }, { key: 'amount', label: 'Amount' },
+        ]);
+    } else if (report === 'cash-flow') {
+        csvDownload(`cash-flow-${data.from_date}-to-${data.to_date}.csv`, [
+            { label: 'Operating activities', amount: data.operating },
+            { label: 'Investing activities', amount: data.investing },
+            { label: 'Financing activities', amount: data.financing },
+            { label: 'Net change in cash', amount: data.net_change },
+        ], [{ key: 'label', label: 'Section' }, { key: 'amount', label: 'Amount' }]);
+    } else if (report === 'daily-collections') {
+        csvDownload(`daily-collections-${data.from_date}-to-${data.to_date}.csv`, data.rows, [
+            { key: 'date', label: 'Date' }, { key: 'account_code', label: 'Code' },
+            { key: 'account_name', label: 'Account' }, { key: 'amount', label: 'Amount' },
+        ]);
+    }
+}
+
+function TrialBalanceView({ data }) {
+    return (
+        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
+            <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Trial Balance — as of {data.as_of}</h3>
+                <span className={'text-xs ' + (Number(data.totals.difference) === 0 ? 'text-emerald-700' : 'text-rose-700')}>
+                    Difference: {formatAmount(data.totals.difference)}
+                </span>
+            </div>
+            <table className="w-full text-sm">
+                <thead className="bg-ink-50/60 text-ink-600">
+                    <tr>
+                        <th className="text-left px-4 py-2 font-medium">Code</th>
+                        <th className="text-left px-4 py-2 font-medium">Account</th>
+                        <th className="text-left px-4 py-2 font-medium">Type</th>
+                        <th className="text-right px-4 py-2 font-medium">Debit</th>
+                        <th className="text-right px-4 py-2 font-medium">Credit</th>
+                        <th className="text-right px-4 py-2 font-medium">Balance</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-ink-100">
+                    {data.rows.length === 0 ? (
+                        <tr><td colSpan={6} className="px-4 py-6 text-ink-500">No posted entries up to this date.</td></tr>
+                    ) : data.rows.map(r => (
+                        <tr key={r.account_id}>
+                            <td className="px-4 py-1.5 font-mono text-xs">{r.code}</td>
+                            <td className="px-4 py-1.5">{r.name}</td>
+                            <td className="px-4 py-1.5">
+                                <span className={`text-xs px-2 py-0.5 rounded-md ${TYPE_TONE[r.account_type] || ''}`}>{r.account_type}</span>
+                            </td>
+                            <td className="px-4 py-1.5 text-right font-mono">{formatAmount(r.debit)}</td>
+                            <td className="px-4 py-1.5 text-right font-mono">{formatAmount(r.credit)}</td>
+                            <td className="px-4 py-1.5 text-right font-mono font-semibold">{formatAmount(r.balance)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+                <tfoot className="bg-ink-50">
+                    <tr>
+                        <td colSpan={3} className="px-4 py-2 font-semibold">Totals</td>
+                        <td className="px-4 py-2 text-right font-mono font-semibold">{formatAmount(data.totals.debit)}</td>
+                        <td className="px-4 py-2 text-right font-mono font-semibold">{formatAmount(data.totals.credit)}</td>
+                        <td className="px-4 py-2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    );
+}
+
+function IncomeStatementView({ data }) {
+    return (
+        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5">
+            <h3 className="text-sm font-semibold text-ink-900">
+                Income Statement — {data.from_date} to {data.to_date}
+            </h3>
+
+            <Section label="Revenue" rows={data.revenue} total={data.total_revenue} totalTone="text-emerald-700" />
+            <Section label="Cost of Services" rows={data.cogs} total={data.total_cogs} totalTone="text-amber-700" />
+            <Row label="Gross Profit" value={data.gross_profit} bold />
+            <Section label="Operating Expenses" rows={data.operating_expenses} total={data.total_operating_expenses} totalTone="text-amber-700" />
+            <div className="pt-3 border-t-2 border-ink-200">
+                <Row
+                    label="Net Income"
+                    value={data.net_income}
+                    bold
+                    tone={Number(data.net_income) >= 0 ? 'text-emerald-700' : 'text-rose-700'}
+                />
+            </div>
+        </div>
+    );
+}
+
+function BalanceSheetView({ data }) {
+    return (
+        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5">
+            <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-ink-900">Balance Sheet — as of {data.as_of}</h3>
+                <span className={'text-xs ' + (data.balanced ? 'text-emerald-700' : 'text-rose-700')}>
+                    {data.balanced ? 'Balanced' : 'Out of balance'}
+                </span>
+            </div>
+
+            <Section label="Assets" rows={data.assets} total={data.total_assets} totalTone="text-sky-700" />
+
+            <div className="pt-3 border-t border-ink-200">
+                <Section label="Liabilities" rows={data.liabilities} total={data.total_liabilities} totalTone="text-rose-700" />
+            </div>
+
+            <div className="pt-3 border-t border-ink-200">
+                <h4 className="text-xs font-semibold text-ink-600 uppercase mb-2">Equity</h4>
+                {data.equity.map(e => (
+                    <Row key={e.account_id} label={`${e.code} — ${e.name}`} value={e.amount} />
+                ))}
+                <Row label="Current Year Earnings" value={data.current_year_earnings} />
+                <Row label="Total Equity" value={data.total_equity} bold tone="text-violet-700" />
+            </div>
+
+            <div className="pt-3 border-t-2 border-ink-200">
+                <Row label="Total Liabilities + Equity" value={data.total_liabilities_and_equity} bold />
+            </div>
+        </div>
+    );
+}
+
+function CashFlowView({ data }) {
+    return (
+        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-ink-900">
+                Cash Flow — {data.from_date} to {data.to_date}
+            </h3>
+            <Row label="Operating activities" value={data.operating} />
+            <Row label="Investing activities" value={data.investing} />
+            <Row label="Financing activities" value={data.financing} />
+            <div className="pt-3 border-t border-ink-200">
+                <Row
+                    label="Net change in cash"
+                    value={data.net_change}
+                    bold
+                    tone={Number(data.net_change) >= 0 ? 'text-emerald-700' : 'text-rose-700'}
+                />
+            </div>
+            <div className="text-xs text-ink-500 grid grid-cols-2 gap-2 pt-3 border-t border-ink-100">
+                <div>Cash in: <span className="font-mono">{formatAmount(data.cash_in)}</span></div>
+                <div>Cash out: <span className="font-mono">{formatAmount(data.cash_out)}</span></div>
+            </div>
+        </div>
+    );
+}
+
+function DailyCollectionsView({ data }) {
+    return (
+        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
+            <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
+                <h3 className="text-sm font-semibold">
+                    Daily Collections — {data.from_date} to {data.to_date}
+                </h3>
+                <span className="text-xs text-ink-700">Total: <span className="font-mono font-semibold">{formatAmount(data.total)}</span></span>
+            </div>
+            <table className="w-full text-sm">
+                <thead className="bg-ink-50/60 text-ink-600">
+                    <tr>
+                        <th className="text-left px-4 py-2 font-medium">Date</th>
+                        <th className="text-left px-4 py-2 font-medium">Code</th>
+                        <th className="text-left px-4 py-2 font-medium">Account</th>
+                        <th className="text-right px-4 py-2 font-medium">Amount</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-ink-100">
+                    {data.rows.length === 0 ? (
+                        <tr><td colSpan={4} className="px-4 py-6 text-ink-500">No cash collections in this window.</td></tr>
+                    ) : data.rows.map((r, idx) => (
+                        <tr key={idx}>
+                            <td className="px-4 py-1.5">{r.date}</td>
+                            <td className="px-4 py-1.5 font-mono text-xs">{r.account_code}</td>
+                            <td className="px-4 py-1.5">{r.account_name}</td>
+                            <td className="px-4 py-1.5 text-right font-mono">{formatAmount(r.amount)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function Section({ label, rows, total, totalTone }) {
+    if (!rows || rows.length === 0) {
+        return (
+            <div>
+                <h4 className="text-xs font-semibold text-ink-600 uppercase mb-2">{label}</h4>
+                <Row label={`Total ${label}`} value={total} bold tone={totalTone} />
+            </div>
+        );
+    }
+    return (
+        <div>
+            <h4 className="text-xs font-semibold text-ink-600 uppercase mb-2">{label}</h4>
+            {rows.map(r => <Row key={r.account_id} label={`${r.code} — ${r.name}`} value={r.amount} />)}
+            <Row label={`Total ${label}`} value={total} bold tone={totalTone} />
+        </div>
+    );
+}
+
+function Row({ label, value, bold, tone }) {
+    return (
+        <div className={'flex items-baseline justify-between py-1 ' + (bold ? 'border-t border-ink-100 mt-1 pt-2' : '')}>
+            <span className={'text-sm ' + (bold ? 'font-semibold text-ink-900' : 'text-ink-700')}>{label}</span>
+            <span className={'font-mono text-sm ' + (bold ? 'font-semibold ' : '') + (tone || 'text-ink-900')}>
+                {formatAmount(value)}
+            </span>
         </div>
     );
 }
