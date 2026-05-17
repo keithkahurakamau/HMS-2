@@ -181,9 +181,105 @@ def check_transaction_status(checkout_request_id: str, db: Session = Depends(get
     txn = db.query(MpesaTransaction).filter(MpesaTransaction.checkout_request_id == checkout_request_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
-        
+
     return {
         "status": txn.status,
         "receipt_number": txn.receipt_number,
-        "result_desc": txn.result_desc
+        "result_desc": txn.result_desc,
     }
+
+
+# ─── C2B (direct-to-till) webhooks ─────────────────────────────────────────
+
+@router.post("/c2b/validation")
+async def c2b_validation(request: Request, db: Session = Depends(get_db)):
+    """Daraja's pre-payment validation hook. We accept every payment by
+    default — config.c2b_response_type drives the higher-level decision
+    (Completed = accept all). Return ResultCode 0 to allow Safaricom to
+    proceed with charging the customer.
+
+    Note: validation calls only fire if the C2B URL was registered with
+    ResponseType='Cancelled'. Default 'Completed' skips this hook
+    entirely. We expose it anyway for tenants who want stricter control."""
+    try:
+        await request.json()  # consume body; nothing to do beyond ack
+    except Exception:
+        pass
+    return {"ResultCode": 0, "ResultDesc": "Accepted"}
+
+
+@router.post("/c2b/confirmation")
+async def c2b_confirmation(request: Request, db: Session = Depends(get_db)):
+    """Daraja's post-payment confirmation. By the time we receive this,
+    Safaricom has already debited the customer — we MUST return success
+    or they'll retry indefinitely.
+
+    Strategy:
+      1. Idempotently record the M-Pesa transaction (key on TransID).
+      2. Run the matching cascade (invoice_id → opd_number → phone).
+      3. If matched: create Payment + flip invoice + post ledger.
+         If unmatched: leave the row with match_basis='unmatched' for
+         cashier review via /api/admin/mpesa/unmatched.
+      4. Always return ResultCode 0.
+    """
+    from decimal import Decimal as _D
+    from app.services.mpesa_matcher import find_invoice_for_c2b, settle_invoice_from_c2b
+    from app.services.accounting_posting import post_from_event
+
+    try:
+        payload = await request.json()
+        logger.info(f"M-Pesa C2B confirmation: {payload}")
+
+        receipt_no = payload.get("TransID") or payload.get("MpesaReceiptNumber")
+        msisdn = str(payload.get("MSISDN") or "")
+        amount = _D(str(payload.get("TransAmount") or 0))
+        bill_ref = (payload.get("BillRefNumber") or "").strip()
+
+        if not receipt_no or amount <= 0:
+            return {"ResultCode": 0, "ResultDesc": "Accepted (ignored: missing fields)"}
+
+        # Idempotency: don't double-record the same receipt.
+        existing = db.query(MpesaTransaction).filter(
+            MpesaTransaction.receipt_number == receipt_no
+        ).first()
+        if existing:
+            return {"ResultCode": 0, "ResultDesc": "Accepted (already recorded)"}
+
+        # Match cascade.
+        invoice, basis = find_invoice_for_c2b(db, bill_ref=bill_ref, msisdn=msisdn)
+
+        txn = MpesaTransaction(
+            invoice_id=invoice.invoice_id if invoice else None,
+            phone_number=msisdn,
+            amount=amount,
+            receipt_number=receipt_no,
+            status="Success",
+            transaction_type="C2B",
+            bill_ref_number=bill_ref or None,
+            match_basis=basis or "unmatched",
+        )
+        db.add(txn)
+        db.flush()
+
+        if invoice:
+            settle_invoice_from_c2b(
+                db, invoice=invoice, amount=amount, mpesa_receipt=receipt_no,
+            )
+            post_from_event(
+                db,
+                source_key="billing.payment.mpesa",
+                source_id=txn.id,
+                amount=amount,
+                memo=f"M-Pesa direct-to-till receipt {receipt_no} (matched by {basis})",
+                reference=f"INV-{invoice.invoice_id}",
+            )
+
+        db.commit()
+        return {"ResultCode": 0, "ResultDesc": "Accepted"}
+
+    except Exception as exc:
+        logger.exception("C2B confirmation failed")
+        # Still return success — Safaricom won't retry on 200, and the
+        # customer's been debited regardless. Operator reviews the
+        # transactions table.
+        return {"ResultCode": 0, "ResultDesc": f"Accepted (handler error: {exc})"}
