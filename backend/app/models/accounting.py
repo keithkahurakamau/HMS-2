@@ -374,3 +374,119 @@ class LedgerMapping(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+# ─── Debtor lifecycle: claim schedules + client deposits ─────────────────────
+
+CLAIM_STATUSES = ("draft", "submitted", "settled", "rejected")
+
+
+class ClaimSchedule(Base):
+    """An insurance claim batch — multiple invoices submitted together."""
+    __tablename__ = "acc_claim_schedules"
+
+    schedule_id = Column(Integer, primary_key=True)
+    schedule_number = Column(String(40), unique=True, nullable=False, index=True)
+    provider_id = Column(Integer, ForeignKey("acc_insurance_providers.provider_id"),
+                         nullable=False, index=True)
+    scheme_id = Column(Integer, ForeignKey("acc_medical_schemes.scheme_id"), nullable=True)
+    period_from = Column(Date, nullable=False)
+    period_to = Column(Date, nullable=False)
+    total_amount = Column(Numeric(14, 2), nullable=False, default=0)
+    status = Column(String(12), nullable=False, default="draft", index=True)
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
+    submitted_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    settled_at = Column(DateTime(timezone=True), nullable=True)
+    settled_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    settled_amount = Column(Numeric(14, 2), nullable=True)
+    settlement_reference = Column(String(120), nullable=True)
+    rejection_reason = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    items = relationship("ClaimScheduleItem", back_populates="schedule",
+                         cascade="all, delete-orphan",
+                         order_by="ClaimScheduleItem.item_id")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft','submitted','settled','rejected')",
+            name="ck_acc_claim_schedules_status",
+        ),
+    )
+
+
+class ClaimScheduleItem(Base):
+    """One invoice (or portion thereof) inside a claim schedule."""
+    __tablename__ = "acc_claim_schedule_items"
+
+    item_id = Column(Integer, primary_key=True)
+    schedule_id = Column(Integer, ForeignKey("acc_claim_schedules.schedule_id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=True, index=True)
+    invoice_reference = Column(String(80), nullable=True)
+    patient_name = Column(String(200), nullable=True)
+    member_number = Column(String(80), nullable=True)
+    amount_claimed = Column(Numeric(14, 2), nullable=False, default=0)
+    amount_approved = Column(Numeric(14, 2), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    schedule = relationship("ClaimSchedule", back_populates="items")
+
+
+DEPOSIT_STATUSES = ("available", "partially_applied", "fully_applied", "refunded")
+
+
+class ClientDeposit(Base):
+    """Patient pre-payment held as a liability until applied to invoices."""
+    __tablename__ = "acc_client_deposits"
+
+    deposit_id = Column(Integer, primary_key=True)
+    deposit_number = Column(String(40), unique=True, nullable=False, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.patient_id"), nullable=False, index=True)
+    deposit_date = Column(Date, nullable=False, default=func.current_date())
+    amount = Column(Numeric(14, 2), nullable=False)
+    amount_applied = Column(Numeric(14, 2), nullable=False, default=0)
+    method = Column(String(40), nullable=False)  # Cash/Bank/M-Pesa/Cheque
+    reference = Column(String(120), nullable=True)
+    status = Column(String(20), nullable=False, default="available", index=True)
+    notes = Column(Text, nullable=True)
+    received_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    applications = relationship("DepositApplication", back_populates="deposit",
+                                cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('available','partially_applied','fully_applied','refunded')",
+            name="ck_acc_client_deposits_status",
+        ),
+        CheckConstraint("amount > 0", name="ck_acc_client_deposits_positive"),
+        CheckConstraint("amount_applied >= 0 AND amount_applied <= amount",
+                        name="ck_acc_client_deposits_applied_bounds"),
+    )
+
+
+class DepositApplication(Base):
+    """Trail of which invoice a deposit was applied against."""
+    __tablename__ = "acc_deposit_applications"
+
+    application_id = Column(Integer, primary_key=True)
+    deposit_id = Column(Integer, ForeignKey("acc_client_deposits.deposit_id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=False, index=True)
+    amount = Column(Numeric(14, 2), nullable=False)
+    applied_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    applied_at = Column(DateTime(timezone=True), server_default=func.now())
+    notes = Column(Text, nullable=True)
+
+    deposit = relationship("ClientDeposit", back_populates="applications")
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_acc_deposit_applications_positive"),
+    )
