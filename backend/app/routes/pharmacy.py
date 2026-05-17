@@ -195,20 +195,18 @@ def collect_dispense_payment(
 ):
     """Collect payment for a pharmacy dispensation.
 
-    cash    — record a Payment row, mark invoice (partially) paid,
-              post billing.payment.cash to the ledger. Idempotent on the
-              Payment.transaction_reference if supplied.
-    mpesa   — initiate an STK push tied to (dispense_id, invoice_id).
-              Returns checkout_request_id; the actual ledger posting
-              happens in the M-Pesa callback when the customer confirms.
-    card    — returns 501 for now; integration in a future PR.
+    cash  — record a Payment row, mark invoice (partially) paid, post
+            billing.payment.cash to the ledger.
+    card  — same shape as cash, but payment_method='Card' and posts
+            billing.payment.bank (cards settle into the bank account
+            same as bank transfers). transaction_reference holds the
+            card terminal auth code if supplied. Card-terminal API
+            integration (Pesapal / Stripe Terminal / etc.) can be wired
+            later — for now this records the receipt manually.
+    mpesa — initiate an STK push tied to (dispense_id, invoice_id).
+            Returns checkout_request_id; the actual ledger posting
+            happens in the M-Pesa callback when the customer confirms.
     """
-    if req.method == "card":
-        raise HTTPException(
-            status_code=501,
-            detail="Card payments are not yet integrated. Use Cash or M-Pesa.",
-        )
-
     dispense, invoice = _resolve_dispense_invoice(db, dispense_id)
 
     if invoice.status == "Paid":
@@ -222,12 +220,13 @@ def collect_dispense_payment(
             detail=f"Amount {amt} exceeds outstanding balance {outstanding}.",
         )
 
-    # ── Cash ────────────────────────────────────────────────────────────────
-    if req.method == "cash":
+    # ── Cash + Card (immediate settlement) ──────────────────────────────────
+    if req.method in ("cash", "card"):
+        method_label = "Cash" if req.method == "cash" else "Card"
         payment = Payment(
             invoice_id=invoice.invoice_id,
             amount=amt,
-            payment_method="Cash",
+            payment_method=method_label,
             transaction_reference=req.transaction_reference,
         )
         db.add(payment)
@@ -236,21 +235,23 @@ def collect_dispense_payment(
         invoice.amount_paid = (invoice.amount_paid or Decimal(0)) + amt
         invoice.status = "Paid" if invoice.amount_paid >= invoice.total_amount else "Partially Paid"
         if invoice.status == "Paid":
-            invoice.payment_method = "Cash"
+            invoice.payment_method = method_label
 
-        # Ledger: Dr Cash / Cr AR via the auto-posting bridge.
+        # Ledger: cash → 1110 Cash; card → 1120 Bank (settles into bank
+        # account same as a transfer). payment_method_to_key picks the
+        # right source_key for each.
         post_from_event(
             db,
-            source_key=payment_method_to_key("Cash"),
+            source_key=payment_method_to_key(method_label),
             source_id=payment.payment_id,
             amount=amt,
-            memo=f"Pharmacy dispense #{dispense_id} — cash payment",
+            memo=f"Pharmacy dispense #{dispense_id} — {method_label.lower()} payment",
             reference=f"INV-{invoice.invoice_id}",
             user_id=current_user["user_id"],
         )
 
         log_audit(db, current_user["user_id"], "CREATE", "Payment", payment.payment_id, None,
-                  {"dispense_id": dispense_id, "amount": float(amt), "method": "Cash"},
+                  {"dispense_id": dispense_id, "amount": float(amt), "method": method_label},
                   request.client.host)
         db.commit()
         return CashPaymentResponse(
