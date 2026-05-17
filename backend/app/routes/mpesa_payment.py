@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.config.database import get_db
 from app.services.mpesa_service import initiate_stk_push
+from app.services.accounting_posting import post_from_event
 from app.models.mpesa import MpesaTransaction
 from app.models.billing import Invoice
 from pydantic import BaseModel
@@ -128,6 +129,19 @@ async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
                     invoice.status = "Paid"
                     invoice.amount_paid = txn.amount
                     invoice.payment_method = "M-Pesa"
+
+            # Auto-post the receipt to the ledger. Use the invoice-linked key
+            # when an invoice exists (Dr M-Pesa / Cr AR), otherwise the direct
+            # receipt key (Dr M-Pesa / Cr Other Revenue).
+            source_key = "billing.payment.mpesa" if txn.invoice_id else "mpesa.receipt.direct"
+            post_from_event(
+                db,
+                source_key=source_key,
+                source_id=txn.id,
+                amount=txn.amount or 0,
+                memo=f"M-Pesa receipt {txn.receipt_number or checkout_request_id}",
+                reference=f"INV-{txn.invoice_id}" if txn.invoice_id else (txn.receipt_number or checkout_request_id),
+            )
         else:
             # Transaction Failed (e.g., cancelled by user, insufficient funds)
             txn.status = "Failed"

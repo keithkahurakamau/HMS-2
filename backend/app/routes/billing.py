@@ -9,6 +9,7 @@ from app.models.idempotency import IdempotencyKey
 from app.schemas.billing import PaymentRequest, MPesaRequest, InvoiceResponse
 from app.core.dependencies import get_current_user, RequirePermission
 from app.services.payment_service import mpesa_service
+from app.services.accounting_posting import post_from_event, payment_method_to_key
 from app.utils.audit import log_audit
 from pydantic import BaseModel
 
@@ -60,10 +61,22 @@ def process_cash_card_payment(req: PaymentRequest, request: Request, db: Session
         db.add(payment)
         db.flush()
 
+        # Auto-post to the ledger. Wrapped in the same transaction so
+        # the entry rolls back with the payment if the commit fails.
+        post_from_event(
+            db,
+            source_key=payment_method_to_key(req.payment_method),
+            source_id=payment.payment_id,
+            amount=req.amount,
+            memo=f"Payment against Invoice #{invoice.invoice_id}",
+            reference=f"INV-{invoice.invoice_id}",
+            user_id=current_user.get("user_id"),
+        )
+
         resp_data = {"status": "Success", "invoice_status": invoice.status, "payment_id": payment.payment_id}
         db.add(IdempotencyKey(key=req.idempotency_key, response_body=json.dumps(resp_data)))
         log_audit(db, current_user["user_id"], "CREATE", "Payment", payment.payment_id, None, {"amount": req.amount, "method": req.payment_method}, request.client.host)
-        
+
         db.commit()
         return resp_data
 
@@ -117,9 +130,21 @@ def charge_consultation_fee(req: ConsultationFeeRequest, request: Request, db: S
         item_type="Consultation"
     )
     db.add(item)
-    
+    db.flush()  # ensure item.id is available for the posting source_id
+
+    # Auto-post invoice charge to the ledger (Dr AR / Cr revenue per mapping).
+    post_from_event(
+        db,
+        source_key="billing.invoice.created",
+        source_id=item.id,
+        amount=req.amount,
+        memo=f"Consultation fee · Invoice #{invoice.invoice_id}",
+        reference=f"INV-{invoice.invoice_id}",
+        user_id=current_user["user_id"],
+    )
+
     log_audit(db, current_user["user_id"], "CREATE", "InvoiceItem", item.id, None, {"amount": req.amount, "type": "Consultation"}, request.client.host)
-    
+
     db.commit()
     return {"message": "Consultation fee successfully charged."}
 
