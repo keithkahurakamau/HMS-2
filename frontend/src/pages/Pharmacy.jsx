@@ -3,7 +3,8 @@ import { apiClient } from '../api/client';
 import {
     Search, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Package, Printer, XCircle,
-    FileWarning, ShoppingCart, Plus, Minus, Trash2, CreditCard, Store, Activity
+    FileWarning, ShoppingCart, Plus, Minus, Trash2, CreditCard, Store, Activity,
+    Banknote, Smartphone, X as XIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
@@ -25,6 +26,12 @@ export default function Pharmacy() {
     const [otcSearch, setOtcSearch] = useState('');
     const [inventory, setInventory] = useState([]);
     const [cart, setCart] = useState([]);
+
+    // --- PAYMENT MODAL STATE (post-dispense) ---
+    // payment.invoice_id is the rolled-up invoice for the dispense run;
+    // payment.lastDispenseId is the dispense whose /pay endpoint we'll hit
+    // (any of the items work — they share the invoice).
+    const [payment, setPayment] = useState(null);
 
     // --- DATA FETCHING ---
     useEffect(() => {
@@ -89,28 +96,37 @@ export default function Pharmacy() {
     const cartTotal = cart.reduce((sum, item) => sum + (item.unit_price * item.qty), 0);
 
     // --- API SUBMISSION HANDLERS ---
-    const generateIdempotencyKey = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const genKey = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Loops the cart and posts one /pharmacy/dispense call per line.
+    // Returns the array of API responses (each carries invoice_id +
+    // invoice_balance when the patient is known).
+    const dispenseItems = async (items, { patient_id = null, record_id = null } = {}) => {
+        const responses = [];
+        for (const it of items) {
+            const res = await apiClient.post('/pharmacy/dispense', {
+                idempotency_key: genKey(),
+                batch_id: it.batch_id,
+                quantity: it.qty,
+                patient_id,
+                record_id,
+                notes: it.notes || null,
+            });
+            responses.push(res.data);
+        }
+        return responses;
+    };
 
     const handleOTCCheckout = async () => {
         if (cart.length === 0) return;
         setIsProcessing(true);
         try {
-            const payload = {
-                items: cart.map(c => ({
-                    batch_id: c.batch_id,
-                    item_id: c.item_id,
-                    quantity: c.qty,
-                    price: c.unit_price
-                })),
-                idempotency_key: generateIdempotencyKey()
-            };
-
-            await apiClient.post('/pharmacy/dispense', payload);
-            toast.success(`Payment of KES ${cartTotal.toLocaleString()} received. Stock deducted.`);
+            await dispenseItems(cart);  // walk-in: no patient, no invoice
+            toast.success(`KES ${cartTotal.toLocaleString()} collected (cash at counter).`);
             setCart([]);
-            fetchPharmacyInventory(); 
+            fetchPharmacyInventory();
         } catch (error) {
-            toast.error(error.response?.data?.detail || "Checkout failed");
+            toast.error(error?.response?.data?.detail || "Checkout failed");
         } finally {
             setIsProcessing(false);
         }
@@ -135,33 +151,49 @@ export default function Pharmacy() {
 
     const handleRxDispense = async () => {
         if (!activeOrder) return;
+        if (cart.length === 0) {
+            return toast.error("Add the prescribed items to the cart first.");
+        }
         setIsProcessing(true);
         try {
-            const payload = {
-                items: [
-                    {
-                        batch_id: inventory[0]?.batch_id || 1, 
-                        item_id: inventory[0]?.item_id || 1,
-                        quantity: 1, 
-                        price: inventory[0]?.unit_price || 0
-                    }
-                ],
+            const responses = await dispenseItems(cart, {
                 patient_id: activeOrder.patient_id,
                 record_id: activeOrder.record_id,
-                idempotency_key: generateIdempotencyKey()
-            };
+            });
+            toast.success(`Prescription ${activeOrder.id} dispensed.`);
+            fetchPharmacyInventory();
 
-            await apiClient.post('/pharmacy/dispense', payload);
-            toast.success(`Prescription ${activeOrder.id} dispensed & closed!`);
-            
+            // Open payment modal seeded from the rolled-up invoice.
+            const last = responses[responses.length - 1];
+            if (last?.invoice_id) {
+                setPayment({
+                    invoiceId: last.invoice_id,
+                    dispenseId: last.dispense_id,
+                    amount: last.invoice_balance ?? cartTotal,
+                    patientName: activeOrder.patient_name,
+                });
+            } else {
+                // No invoice (walk-in) — just clear and exit.
+                setCart([]);
+                setQueue(queue.filter(q => q.id !== activeOrder.id));
+                setActiveOrder(null);
+                setIsQueueOpen(true);
+            }
+        } catch (error) {
+            toast.error(error?.response?.data?.detail || "Failed to dispense prescription.");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handlePaymentSettled = () => {
+        // Called by the modal when payment completes successfully.
+        setPayment(null);
+        setCart([]);
+        if (activeOrder) {
             setQueue(queue.filter(q => q.id !== activeOrder.id));
             setActiveOrder(null);
             setIsQueueOpen(true);
-            fetchPharmacyInventory(); 
-        } catch (error) {
-            toast.error(error.response?.data?.detail || "Failed to dispense prescription.");
-        } finally {
-            setIsProcessing(false);
         }
     };
 
@@ -410,6 +442,176 @@ export default function Pharmacy() {
                     </div>
                 </div>
             )}
+
+            {payment && (
+                <PaymentModal
+                    invoiceId={payment.invoiceId}
+                    dispenseId={payment.dispenseId}
+                    amountDue={payment.amount}
+                    patientName={payment.patientName}
+                    onClose={() => setPayment(null)}
+                    onSettled={handlePaymentSettled}
+                />
+            )}
+        </div>
+    );
+}
+
+
+/* ─── Payment modal ───────────────────────────────────────────────────────── */
+
+const POLL_MS = 3000;
+const POLL_TIMEOUT_MS = 90_000;
+
+function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, onClose, onSettled }) {
+    const [method, setMethod] = useState('cash');     // 'cash' | 'mpesa'
+    const [amount, setAmount] = useState(amountDue ? Number(amountDue).toFixed(2) : '');
+    const [phone, setPhone] = useState('');
+    const [reference, setReference] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const [pollingTxnId, setPollingTxnId] = useState(null);
+    const [pollStatus, setPollStatus] = useState(null);
+
+    // Poll the dispense's payment status while M-Pesa is pending.
+    useEffect(() => {
+        if (!pollingTxnId) return undefined;
+        const startedAt = Date.now();
+        const interval = setInterval(async () => {
+            try {
+                const r = await apiClient.get(`/pharmacy/dispense/${dispenseId}/payment-status`);
+                setPollStatus(r.data);
+                if (r.data?.invoice_status === 'Paid' || r.data?.mpesa_status === 'Success') {
+                    clearInterval(interval);
+                    toast.success(`M-Pesa receipt ${r.data?.mpesa_receipt_number || ''} confirmed.`);
+                    onSettled();
+                } else if (r.data?.mpesa_status === 'Failed') {
+                    clearInterval(interval);
+                    toast.error(r.data?.mpesa_result_desc || 'M-Pesa payment failed.');
+                    setPollingTxnId(null);
+                } else if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+                    clearInterval(interval);
+                    toast.error('M-Pesa did not confirm in time. Check Cashier > M-Pesa transactions.');
+                    setPollingTxnId(null);
+                }
+            } catch {
+                // Transient — keep polling until timeout.
+            }
+        }, POLL_MS);
+        return () => clearInterval(interval);
+    }, [pollingTxnId, dispenseId, onSettled]);
+
+    const submit = async () => {
+        const amt = Number(amount);
+        if (!amt || amt <= 0) return toast.error('Enter a valid amount.');
+        if (method === 'mpesa' && !phone) return toast.error('M-Pesa needs a phone number.');
+
+        setSubmitting(true);
+        try {
+            const payload = {
+                method,
+                amount: amt,
+                phone_number: method === 'mpesa' ? phone : null,
+                transaction_reference: reference || null,
+            };
+            const res = await apiClient.post(`/pharmacy/dispense/${dispenseId}/pay`, payload);
+
+            if (method === 'cash') {
+                toast.success(`Cash payment recorded. Invoice ${res.data?.invoice_status}.`);
+                onSettled();
+            } else if (method === 'mpesa') {
+                toast.success('STK push sent. Customer to confirm on their phone.');
+                setPollingTxnId(res.data?.mpesa_transaction_id);
+            }
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Payment failed.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-elevated w-full max-w-md">
+                <div className="flex items-center justify-between p-4 border-b border-ink-100">
+                    <div>
+                        <h3 className="text-sm font-semibold text-ink-900">Collect payment</h3>
+                        <p className="text-xs text-ink-500">
+                            {patientName ? `${patientName} · ` : ''}Invoice #{invoiceId} · KES {Number(amountDue || 0).toLocaleString()}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-ink-400 hover:text-ink-700" aria-label="Close">
+                        <XIcon size={18} />
+                    </button>
+                </div>
+
+                <div className="p-5 space-y-4">
+                    {pollingTxnId ? (
+                        <div className="text-center py-6">
+                            <Smartphone size={32} className="mx-auto text-brand-700 mb-2" />
+                            <p className="text-sm text-ink-700 font-medium">Waiting for M-Pesa confirmation…</p>
+                            <p className="text-xs text-ink-500 mt-1">Customer should accept the STK push on their phone.</p>
+                            {pollStatus?.mpesa_status && (
+                                <p className="text-xs mt-3 font-mono">status: {pollStatus.mpesa_status}</p>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex gap-2 border-b border-ink-100">
+                                <button onClick={() => setMethod('cash')}
+                                        className={'flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
+                                            (method === 'cash' ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-500')}>
+                                    <Banknote size={14} /> Cash
+                                </button>
+                                <button onClick={() => setMethod('mpesa')}
+                                        className={'flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
+                                            (method === 'mpesa' ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-500')}>
+                                    <Smartphone size={14} /> M-Pesa
+                                </button>
+                                <button disabled
+                                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px border-transparent text-ink-300 cursor-not-allowed"
+                                        title="Card integration coming soon">
+                                    <CreditCard size={14} /> Card
+                                </button>
+                            </div>
+
+                            <label className="block">
+                                <span className="block text-xs font-medium text-ink-600 mb-1">Amount</span>
+                                <input type="number" step="0.01" className="input" value={amount}
+                                       onChange={(e) => setAmount(e.target.value)} />
+                            </label>
+
+                            {method === 'mpesa' && (
+                                <label className="block">
+                                    <span className="block text-xs font-medium text-ink-600 mb-1">Phone number</span>
+                                    <input className="input" value={phone}
+                                           onChange={(e) => setPhone(e.target.value)}
+                                           placeholder="07XXXXXXXX or 2547XXXXXXXX" />
+                                </label>
+                            )}
+
+                            <label className="block">
+                                <span className="block text-xs font-medium text-ink-600 mb-1">
+                                    Reference (optional)
+                                </span>
+                                <input className="input" value={reference}
+                                       onChange={(e) => setReference(e.target.value)}
+                                       placeholder="Receipt no., notes, etc." />
+                            </label>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button onClick={onClose}
+                                        className="px-3 py-2 rounded-lg border border-ink-200 text-sm font-medium hover:bg-ink-50">
+                                    Cancel
+                                </button>
+                                <button onClick={submit} disabled={submitting}
+                                        className="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
+                                    {submitting ? 'Sending…' : (method === 'mpesa' ? 'Send STK push' : 'Record cash')}
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
