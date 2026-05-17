@@ -68,11 +68,28 @@ def post_from_event(
     transaction owns the commit so the entry lives or dies with the
     source row.
     """
+    # Wrap the entire body in a SAVEPOINT. Without it, if any SQL inside
+    # (the entry/lines INSERT, the FX rate lookup, anything) raises and we
+    # silently swallow the exception, the caller's transaction is left in
+    # `InFailedSqlTransaction` state — every subsequent statement (the
+    # audit_log INSERT in the source route, for instance) then gets
+    # rejected by Postgres. The savepoint lets us roll back ONLY this
+    # posting attempt while leaving the outer transaction usable.
+    try:
+        sp = db.begin_nested()
+    except Exception:
+        # Caller never opened a transaction; fall back to no-savepoint mode.
+        # The outer-transaction cascade is still possible here, but that's
+        # the caller's problem to fix.
+        sp = None
+
     try:
         amt = Decimal(str(amount)).quantize(ROUND_QUANT)
         if amt <= ZERO:
             LOG.debug("accounting: skip zero/negative amount source_key=%s source_id=%s amount=%s",
                       source_key, source_id, amount)
+            if sp is not None and sp.is_active:
+                sp.rollback()
             return None
 
         on = on_date or _date.today()
@@ -82,6 +99,8 @@ def post_from_event(
         if settings.go_live_date and on < settings.go_live_date:
             LOG.info("accounting: skip pre-go-live event source_key=%s source_id=%s on=%s go_live=%s",
                      source_key, source_id, on, settings.go_live_date)
+            if sp is not None and sp.is_active:
+                sp.rollback()
             return None
 
         # Idempotency: did we already post this exact event?
@@ -97,6 +116,8 @@ def post_from_event(
         if existing is not None:
             LOG.debug("accounting: idempotent hit source_key=%s source_id=%s entry=%s",
                       source_key, source_id, existing.entry_id)
+            if sp is not None and sp.is_active:
+                sp.rollback()
             return existing
 
         # Look up mapping.
@@ -109,10 +130,14 @@ def post_from_event(
         if mapping is None:
             LOG.warning("accounting: no mapping configured for source_key=%s — skipping post",
                         source_key)
+            if sp is not None and sp.is_active:
+                sp.rollback()
             return None
         if not mapping.debit_account_id or not mapping.credit_account_id:
             LOG.warning("accounting: mapping for %s has unset Dr/Cr accounts — skipping post",
                         source_key)
+            if sp is not None and sp.is_active:
+                sp.rollback()
             return None
 
         cur = currency_code or settings.base_currency_code or "KES"
@@ -157,11 +182,21 @@ def post_from_event(
         ))
         db.flush()
 
+        if sp is not None:
+            sp.commit()
         LOG.info("accounting: posted %s source_id=%s amount=%s entry=%s",
                  source_key, source_id, amt, entry.entry_number)
         return entry
 
     except Exception:  # noqa: BLE001 — auto-post must never break the source op
+        # Roll back to the savepoint so the outer transaction is still
+        # usable (audit log inserts, idempotency-key inserts, etc.).
+        if sp is not None and sp.is_active:
+            try:
+                sp.rollback()
+            except Exception:
+                LOG.exception("accounting: savepoint rollback failed after posting error "
+                              "source_key=%s source_id=%s", source_key, source_id)
         LOG.exception("accounting: failed to post source_key=%s source_id=%s amount=%s",
                       source_key, source_id, amount)
         return None
