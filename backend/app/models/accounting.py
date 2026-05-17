@@ -267,3 +267,110 @@ class AccountingSettings(Base):
             name="ck_acc_settings_fy_month",
         ),
     )
+
+
+# ─── Configuration: suppliers, insurance, schemes, price list, mappings ──────
+
+class Supplier(Base):
+    """Vendor master — companies the hospital buys goods/services from."""
+    __tablename__ = "acc_suppliers"
+
+    supplier_id = Column(Integer, primary_key=True)
+    name = Column(String(160), nullable=False, index=True)
+    contact_person = Column(String(120), nullable=True)
+    email = Column(String(160), nullable=True)
+    phone = Column(String(40), nullable=True)
+    address = Column(Text, nullable=True)
+    tax_pin = Column(String(40), nullable=True, index=True)  # KRA PIN
+    payment_terms_days = Column(Integer, nullable=False, default=30)
+    # When AP entries are auto-created, this account is the credit side.
+    default_payable_account_id = Column(
+        Integer, ForeignKey("acc_accounts.account_id"), nullable=True,
+    )
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class InsuranceProvider(Base):
+    """Insurance company master. Schemes (acc_medical_schemes) belong to one."""
+    __tablename__ = "acc_insurance_providers"
+
+    provider_id = Column(Integer, primary_key=True)
+    name = Column(String(160), nullable=False, unique=True, index=True)
+    contact_person = Column(String(120), nullable=True)
+    email = Column(String(160), nullable=True)
+    phone = Column(String(40), nullable=True)
+    address = Column(Text, nullable=True)
+    # AR entries from insurance claims credit this account.
+    default_receivable_account_id = Column(
+        Integer, ForeignKey("acc_accounts.account_id"), nullable=True,
+    )
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    schemes = relationship("MedicalScheme", back_populates="provider", cascade="all, delete-orphan")
+
+
+class MedicalScheme(Base):
+    """Insurance scheme — e.g. 'AAR Standard', 'AAR Gold'."""
+    __tablename__ = "acc_medical_schemes"
+
+    scheme_id = Column(Integer, primary_key=True)
+    provider_id = Column(Integer, ForeignKey("acc_insurance_providers.provider_id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    name = Column(String(160), nullable=False)
+    scheme_code = Column(String(60), nullable=True, index=True)
+    coverage_limit = Column(Numeric(14, 2), nullable=True)
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    provider = relationship("InsuranceProvider", back_populates="schemes")
+
+    __table_args__ = (
+        UniqueConstraint("provider_id", "name", name="uq_acc_medical_schemes_provider_name"),
+    )
+
+
+class PriceListItem(Base):
+    """Master list of billable services. Phase 4 will read unit_price + the
+    `revenue_account_id` to know what to credit when an invoice is auto-posted."""
+    __tablename__ = "acc_price_list"
+
+    price_id = Column(Integer, primary_key=True)
+    service_code = Column(String(60), nullable=False, unique=True, index=True)
+    name = Column(String(200), nullable=False, index=True)
+    category = Column(String(60), nullable=False, index=True)  # 'Consultation','Lab','Radiology','Pharmacy','Ward','Other'
+    unit_price = Column(Numeric(14, 2), nullable=False, default=0)
+    revenue_account_id = Column(Integer, ForeignKey("acc_accounts.account_id"), nullable=True)
+    tax_rate_pct = Column(Numeric(5, 2), nullable=False, default=0)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class LedgerMapping(Base):
+    """Maps a source-event key (e.g. 'billing.invoice.created') to default
+    debit/credit accounts used by the Phase 4 auto-posting service.
+
+    Why this exists: hard-coding account ids in code would mean every tenant
+    is stuck with the default CoA layout forever. With a mapping table,
+    tenants can rename / restructure their CoA and just point the keys at
+    the new account ids.
+    """
+    __tablename__ = "acc_ledger_mappings"
+
+    mapping_id = Column(Integer, primary_key=True)
+    source_key = Column(String(80), nullable=False, unique=True, index=True)
+    debit_account_id = Column(Integer, ForeignKey("acc_accounts.account_id"), nullable=True)
+    credit_account_id = Column(Integer, ForeignKey("acc_accounts.account_id"), nullable=True)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

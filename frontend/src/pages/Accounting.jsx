@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
     BookOpen, Coins, CalendarRange, Settings as SettingsIcon,
     Plus, X, ChevronRight, ChevronDown, CheckCircle2, RotateCcw, AlertCircle,
+    Sliders, Truck, ShieldCheck, Tag, Link2,
     BarChart3, Download,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
@@ -12,6 +13,7 @@ const TABS = [
     { key: 'coa',        label: 'Chart of Accounts', icon: BookOpen },
     { key: 'journal',    label: 'Journal Entries',   icon: CalendarRange },
     { key: 'reports',    label: 'Reports',           icon: BarChart3 },
+    { key: 'config',     label: 'Configuration',     icon: Sliders },
     { key: 'currencies', label: 'Currencies & FX',   icon: Coins },
     { key: 'settings',   label: 'Settings',          icon: SettingsIcon },
 ];
@@ -68,6 +70,7 @@ export default function Accounting() {
             {tab === 'coa'        && <ChartOfAccountsTab />}
             {tab === 'journal'    && <JournalEntriesTab />}
             {tab === 'reports'    && <ReportsTab />}
+            {tab === 'config'     && <ConfigurationTab />}
             {tab === 'currencies' && <CurrenciesTab />}
             {tab === 'settings'   && <SettingsTab />}
         </div>
@@ -799,6 +802,731 @@ function SettingsTab() {
 }
 
 
+/* ─── Configuration ──────────────────────────────────────────────────────── */
+
+const CONFIG_SECTIONS = [
+    { key: 'suppliers',  label: 'Suppliers',           icon: Truck },
+    { key: 'insurance',  label: 'Insurance Providers', icon: ShieldCheck },
+    { key: 'schemes',    label: 'Medical Schemes',     icon: ShieldCheck },
+    { key: 'pricelist',  label: 'Price List',          icon: Tag },
+    { key: 'mappings',   label: 'Ledger Mappings',     icon: Link2 },
+];
+
+function ConfigurationTab() {
+    const [section, setSection] = useState('suppliers');
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
+            <aside className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-2 h-fit">
+                <nav className="space-y-1">
+                    {CONFIG_SECTIONS.map(({ key, label, icon: Icon }) => (
+                        <button key={key}
+                                onClick={() => setSection(key)}
+                                className={
+                                    'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ' +
+                                    (section === key
+                                        ? 'bg-brand-50 text-brand-700 font-medium'
+                                        : 'text-ink-600 hover:bg-ink-50')
+                                }>
+                            <Icon size={16} /> {label}
+                        </button>
+                    ))}
+                </nav>
+            </aside>
+            <div>
+                {section === 'suppliers'  && <SuppliersSection />}
+                {section === 'insurance'  && <InsuranceSection />}
+                {section === 'schemes'    && <SchemesSection />}
+                {section === 'pricelist'  && <PriceListSection />}
+                {section === 'mappings'   && <MappingsSection />}
+            </div>
+        </div>
+    );
+}
+
+/* Suppliers */
+function SuppliersSection() {
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [open, setOpen] = useState(false);
+    const [editing, setEditing] = useState(null);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const r = await apiClient.get('/accounting/config/suppliers?include_inactive=true');
+            setItems(r.data || []);
+        } catch { toast.error('Could not load suppliers.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); }, []);
+
+    return (
+        <div className="space-y-4">
+            <SectionHeader title="Suppliers" subtitle="Vendors you buy goods and services from."
+                           onNew={() => { setEditing(null); setOpen(true); }} />
+            <DataCard loading={loading} empty={items.length === 0} emptyMsg="No suppliers yet.">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Name</th>
+                            <th className="text-left px-4 py-2 font-medium">Contact</th>
+                            <th className="text-left px-4 py-2 font-medium">KRA PIN</th>
+                            <th className="text-right px-4 py-2 font-medium">Terms (days)</th>
+                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map((s) => (
+                            <tr key={s.supplier_id}>
+                                <td className="px-4 py-1.5 font-medium">{s.name}</td>
+                                <td className="px-4 py-1.5 text-ink-600">{s.contact_person || '—'}{s.email ? ` · ${s.email}` : ''}</td>
+                                <td className="px-4 py-1.5 font-mono text-xs">{s.tax_pin || '—'}</td>
+                                <td className="px-4 py-1.5 text-right">{s.payment_terms_days}</td>
+                                <td className="px-4 py-1.5">
+                                    <span className={'text-xs ' + (s.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                        {s.is_active ? 'active' : 'inactive'}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-1.5 text-right">
+                                    <button onClick={() => { setEditing(s); setOpen(true); }}
+                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DataCard>
+            {open && <SupplierModal initial={editing}
+                                    onClose={() => setOpen(false)}
+                                    onSaved={() => { setOpen(false); load(); }} />}
+        </div>
+    );
+}
+
+function SupplierModal({ initial, onClose, onSaved }) {
+    const isEdit = !!initial;
+    const [accounts, setAccounts] = useState([]);
+    const [form, setForm] = useState(initial || {
+        name: '', contact_person: '', email: '', phone: '', address: '',
+        tax_pin: '', payment_terms_days: 30, default_payable_account_id: '',
+        notes: '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        apiClient.get('/accounting/accounts?include_inactive=false')
+            .then(r => setAccounts((r.data || []).filter(a => a.account_type === 'Liability' && a.is_postable)))
+            .catch(() => {});
+    }, []);
+
+    const submit = async () => {
+        if (!form.name) { toast.error('Name required.'); return; }
+        setSaving(true);
+        try {
+            const payload = {
+                ...form,
+                default_payable_account_id: form.default_payable_account_id || null,
+            };
+            if (isEdit) await apiClient.patch(`/accounting/config/suppliers/${initial.supplier_id}`, payload);
+            else await apiClient.post('/accounting/config/suppliers', payload);
+            toast.success(isEdit ? 'Supplier updated.' : 'Supplier created.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title={isEdit ? 'Edit supplier' : 'New supplier'} onClose={onClose} wide>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="Name *"><input className="input" value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+                <Field label="Contact person"><input className="input" value={form.contact_person || ''}
+                    onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></Field>
+                <Field label="Email"><input type="email" className="input" value={form.email || ''}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+                <Field label="Phone"><input className="input" value={form.phone || ''}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
+                <Field label="KRA PIN"><input className="input" value={form.tax_pin || ''}
+                    onChange={(e) => setForm({ ...form, tax_pin: e.target.value })} /></Field>
+                <Field label="Payment terms (days)"><input type="number" className="input" value={form.payment_terms_days}
+                    onChange={(e) => setForm({ ...form, payment_terms_days: Number(e.target.value) })} /></Field>
+                <Field label="Default payable account">
+                    <select className="input" value={form.default_payable_account_id || ''}
+                            onChange={(e) => setForm({ ...form, default_payable_account_id: e.target.value })}>
+                        <option value="">— default (2110 Accounts Payable) —</option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                    </select>
+                </Field>
+                {isEdit && (
+                    <Field label="Status">
+                        <select className="input" value={form.is_active ? 'active' : 'inactive'}
+                                onChange={(e) => setForm({ ...form, is_active: e.target.value === 'active' })}>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </Field>
+                )}
+            </div>
+            <Field label="Address">
+                <textarea className="input min-h-[60px]" value={form.address || ''}
+                          onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </Field>
+            <Field label="Notes">
+                <textarea className="input min-h-[60px]" value={form.notes || ''}
+                          onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </Field>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
+        </ModalShell>
+    );
+}
+
+/* Insurance providers */
+function InsuranceSection() {
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [open, setOpen] = useState(false);
+    const [editing, setEditing] = useState(null);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const r = await apiClient.get('/accounting/config/insurance-providers?include_inactive=true');
+            setItems(r.data || []);
+        } catch { toast.error('Could not load providers.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); }, []);
+
+    return (
+        <div className="space-y-4">
+            <SectionHeader title="Insurance Providers" subtitle="Insurers your hospital accepts (NHIF, AAR, Jubilee, etc.)."
+                           onNew={() => { setEditing(null); setOpen(true); }} />
+            <DataCard loading={loading} empty={items.length === 0} emptyMsg="No providers yet.">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Name</th>
+                            <th className="text-left px-4 py-2 font-medium">Contact</th>
+                            <th className="text-left px-4 py-2 font-medium">Phone</th>
+                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map((p) => (
+                            <tr key={p.provider_id}>
+                                <td className="px-4 py-1.5 font-medium">{p.name}</td>
+                                <td className="px-4 py-1.5 text-ink-600">{p.contact_person || '—'}{p.email ? ` · ${p.email}` : ''}</td>
+                                <td className="px-4 py-1.5">{p.phone || '—'}</td>
+                                <td className="px-4 py-1.5">
+                                    <span className={'text-xs ' + (p.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                        {p.is_active ? 'active' : 'inactive'}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-1.5 text-right">
+                                    <button onClick={() => { setEditing(p); setOpen(true); }}
+                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DataCard>
+            {open && <ProviderModal initial={editing}
+                                    onClose={() => setOpen(false)}
+                                    onSaved={() => { setOpen(false); load(); }} />}
+        </div>
+    );
+}
+
+function ProviderModal({ initial, onClose, onSaved }) {
+    const isEdit = !!initial;
+    const [accounts, setAccounts] = useState([]);
+    const [form, setForm] = useState(initial || {
+        name: '', contact_person: '', email: '', phone: '', address: '',
+        default_receivable_account_id: '', notes: '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        apiClient.get('/accounting/accounts?include_inactive=false')
+            .then(r => setAccounts((r.data || []).filter(a => a.account_type === 'Asset' && a.is_postable)))
+            .catch(() => {});
+    }, []);
+
+    const submit = async () => {
+        if (!form.name) { toast.error('Name required.'); return; }
+        setSaving(true);
+        try {
+            const payload = { ...form, default_receivable_account_id: form.default_receivable_account_id || null };
+            if (isEdit) await apiClient.patch(`/accounting/config/insurance-providers/${initial.provider_id}`, payload);
+            else await apiClient.post('/accounting/config/insurance-providers', payload);
+            toast.success(isEdit ? 'Provider updated.' : 'Provider created.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title={isEdit ? 'Edit insurance provider' : 'New insurance provider'} onClose={onClose}>
+            <div className="space-y-3">
+                <Field label="Name *"><input className="input" value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+                <div className="grid grid-cols-2 gap-3">
+                    <Field label="Contact person"><input className="input" value={form.contact_person || ''}
+                        onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></Field>
+                    <Field label="Email"><input type="email" className="input" value={form.email || ''}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+                    <Field label="Phone"><input className="input" value={form.phone || ''}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
+                    <Field label="Default receivable account">
+                        <select className="input" value={form.default_receivable_account_id || ''}
+                                onChange={(e) => setForm({ ...form, default_receivable_account_id: e.target.value })}>
+                            <option value="">— default (1150 Insurance Receivable) —</option>
+                            {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        </select>
+                    </Field>
+                </div>
+                <Field label="Address">
+                    <textarea className="input min-h-[60px]" value={form.address || ''}
+                              onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                </Field>
+            </div>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
+        </ModalShell>
+    );
+}
+
+/* Medical schemes */
+function SchemesSection() {
+    const [items, setItems] = useState([]);
+    const [providers, setProviders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [open, setOpen] = useState(false);
+    const [editing, setEditing] = useState(null);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const [sR, pR] = await Promise.all([
+                apiClient.get('/accounting/config/medical-schemes?include_inactive=true'),
+                apiClient.get('/accounting/config/insurance-providers?include_inactive=true'),
+            ]);
+            setItems(sR.data || []);
+            setProviders(pR.data || []);
+        } catch { toast.error('Could not load schemes.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); }, []);
+
+    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '—';
+
+    return (
+        <div className="space-y-4">
+            <SectionHeader title="Medical Schemes" subtitle="Per-provider product variants (e.g. AAR Standard, NHIF Civil Servants)."
+                           onNew={() => { setEditing(null); setOpen(true); }}
+                           disabled={providers.length === 0}
+                           disabledMsg="Add an insurance provider first." />
+            <DataCard loading={loading} empty={items.length === 0} emptyMsg="No schemes yet.">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Provider</th>
+                            <th className="text-left px-4 py-2 font-medium">Scheme</th>
+                            <th className="text-left px-4 py-2 font-medium">Code</th>
+                            <th className="text-right px-4 py-2 font-medium">Coverage limit</th>
+                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map((s) => (
+                            <tr key={s.scheme_id}>
+                                <td className="px-4 py-1.5 text-ink-600">{providerName(s.provider_id)}</td>
+                                <td className="px-4 py-1.5 font-medium">{s.name}</td>
+                                <td className="px-4 py-1.5 font-mono text-xs">{s.scheme_code || '—'}</td>
+                                <td className="px-4 py-1.5 text-right font-mono">
+                                    {s.coverage_limit ? formatAmount(s.coverage_limit) : '—'}
+                                </td>
+                                <td className="px-4 py-1.5">
+                                    <span className={'text-xs ' + (s.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                        {s.is_active ? 'active' : 'inactive'}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-1.5 text-right">
+                                    <button onClick={() => { setEditing(s); setOpen(true); }}
+                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DataCard>
+            {open && <SchemeModal initial={editing} providers={providers}
+                                  onClose={() => setOpen(false)}
+                                  onSaved={() => { setOpen(false); load(); }} />}
+        </div>
+    );
+}
+
+function SchemeModal({ initial, providers, onClose, onSaved }) {
+    const isEdit = !!initial;
+    const [form, setForm] = useState(initial || {
+        provider_id: providers[0]?.provider_id || '',
+        name: '', scheme_code: '', coverage_limit: '', notes: '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    const submit = async () => {
+        if (!form.name || !form.provider_id) { toast.error('Provider and name required.'); return; }
+        setSaving(true);
+        try {
+            const payload = {
+                ...form,
+                provider_id: Number(form.provider_id),
+                coverage_limit: form.coverage_limit ? Number(form.coverage_limit) : null,
+            };
+            if (isEdit) {
+                const patch = { ...payload };
+                delete patch.provider_id;
+                await apiClient.patch(`/accounting/config/medical-schemes/${initial.scheme_id}`, patch);
+            } else await apiClient.post('/accounting/config/medical-schemes', payload);
+            toast.success(isEdit ? 'Scheme updated.' : 'Scheme created.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title={isEdit ? 'Edit scheme' : 'New medical scheme'} onClose={onClose}>
+            <div className="space-y-3">
+                <Field label="Provider *">
+                    <select className="input" value={form.provider_id}
+                            disabled={isEdit}
+                            onChange={(e) => setForm({ ...form, provider_id: e.target.value })}>
+                        {providers.map(p => <option key={p.provider_id} value={p.provider_id}>{p.name}</option>)}
+                    </select>
+                </Field>
+                <Field label="Scheme name *"><input className="input" value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+                <div className="grid grid-cols-2 gap-3">
+                    <Field label="Scheme code"><input className="input" value={form.scheme_code || ''}
+                        onChange={(e) => setForm({ ...form, scheme_code: e.target.value })} /></Field>
+                    <Field label="Coverage limit"><input type="number" step="0.01" className="input"
+                        value={form.coverage_limit || ''}
+                        onChange={(e) => setForm({ ...form, coverage_limit: e.target.value })} /></Field>
+                </div>
+            </div>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
+        </ModalShell>
+    );
+}
+
+/* Price list */
+function PriceListSection() {
+    const [items, setItems] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [filter, setFilter] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [open, setOpen] = useState(false);
+    const [editing, setEditing] = useState(null);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const [pR, cR] = await Promise.all([
+                apiClient.get(`/accounting/config/price-list?include_inactive=true${filter ? `&category=${filter}` : ''}`),
+                apiClient.get('/accounting/config/price-list/categories'),
+            ]);
+            setItems(pR.data || []);
+            setCategories(cR.data || []);
+        } catch { toast.error('Could not load price list.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter]);
+
+    return (
+        <div className="space-y-4">
+            <SectionHeader title="Price List" subtitle="Master list of billable services."
+                           onNew={() => { setEditing(null); setOpen(true); }} />
+            <div className="flex items-center gap-2">
+                <span className="text-xs text-ink-500">Filter:</span>
+                <select className="input max-w-xs" value={filter} onChange={(e) => setFilter(e.target.value)}>
+                    <option value="">All categories</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+            </div>
+            <DataCard loading={loading} empty={items.length === 0} emptyMsg="No price items yet.">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Code</th>
+                            <th className="text-left px-4 py-2 font-medium">Service</th>
+                            <th className="text-left px-4 py-2 font-medium">Category</th>
+                            <th className="text-right px-4 py-2 font-medium">Unit price</th>
+                            <th className="text-right px-4 py-2 font-medium">Tax %</th>
+                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {items.map((p) => (
+                            <tr key={p.price_id}>
+                                <td className="px-4 py-1.5 font-mono text-xs">{p.service_code}</td>
+                                <td className="px-4 py-1.5">{p.name}</td>
+                                <td className="px-4 py-1.5">
+                                    <span className="text-xs px-2 py-0.5 rounded-md bg-ink-50 text-ink-700">{p.category}</span>
+                                </td>
+                                <td className="px-4 py-1.5 text-right font-mono">{formatAmount(p.unit_price)}</td>
+                                <td className="px-4 py-1.5 text-right">{Number(p.tax_rate_pct).toFixed(1)}%</td>
+                                <td className="px-4 py-1.5">
+                                    <span className={'text-xs ' + (p.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                        {p.is_active ? 'active' : 'inactive'}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-1.5 text-right">
+                                    <button onClick={() => { setEditing(p); setOpen(true); }}
+                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DataCard>
+            {open && <PriceModal initial={editing} categories={categories}
+                                 onClose={() => setOpen(false)}
+                                 onSaved={() => { setOpen(false); load(); }} />}
+        </div>
+    );
+}
+
+function PriceModal({ initial, categories, onClose, onSaved }) {
+    const isEdit = !!initial;
+    const [accounts, setAccounts] = useState([]);
+    const [form, setForm] = useState(initial || {
+        service_code: '', name: '', category: categories[0] || 'Consultation',
+        unit_price: '', revenue_account_id: '', tax_rate_pct: 0, description: '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        apiClient.get('/accounting/accounts?account_type=Revenue&include_inactive=false')
+            .then(r => setAccounts((r.data || []).filter(a => a.is_postable)))
+            .catch(() => {});
+    }, []);
+
+    const submit = async () => {
+        if (!form.name || (!isEdit && !form.service_code)) {
+            toast.error('Service code and name required.'); return;
+        }
+        setSaving(true);
+        try {
+            const payload = {
+                ...form,
+                unit_price: Number(form.unit_price || 0),
+                tax_rate_pct: Number(form.tax_rate_pct || 0),
+                revenue_account_id: form.revenue_account_id || null,
+            };
+            if (isEdit) {
+                const patch = { ...payload };
+                delete patch.service_code;
+                await apiClient.patch(`/accounting/config/price-list/${initial.price_id}`, patch);
+            } else await apiClient.post('/accounting/config/price-list', payload);
+            toast.success(isEdit ? 'Item updated.' : 'Item created.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title={isEdit ? 'Edit price item' : 'New price item'} onClose={onClose} wide>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="Service code *"><input className="input" value={form.service_code}
+                    disabled={isEdit}
+                    onChange={(e) => setForm({ ...form, service_code: e.target.value })} /></Field>
+                <Field label="Category *">
+                    <select className="input" value={form.category}
+                            onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </Field>
+                <Field label="Service name *" >
+                    <input className="input" value={form.name}
+                           onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                </Field>
+                <Field label="Unit price *"><input type="number" step="0.01" className="input"
+                    value={form.unit_price}
+                    onChange={(e) => setForm({ ...form, unit_price: e.target.value })} /></Field>
+                <Field label="Tax rate (%)"><input type="number" step="0.01" className="input"
+                    value={form.tax_rate_pct}
+                    onChange={(e) => setForm({ ...form, tax_rate_pct: e.target.value })} /></Field>
+                <Field label="Revenue account">
+                    <select className="input" value={form.revenue_account_id || ''}
+                            onChange={(e) => setForm({ ...form, revenue_account_id: e.target.value })}>
+                        <option value="">— default (per ledger mapping) —</option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                    </select>
+                </Field>
+            </div>
+            <Field label="Description">
+                <textarea className="input min-h-[60px]" value={form.description || ''}
+                          onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </Field>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
+        </ModalShell>
+    );
+}
+
+/* Ledger mappings */
+function MappingsSection() {
+    const [catalogue, setCatalogue] = useState([]);
+    const [accounts, setAccounts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [editing, setEditing] = useState(null);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const [cR, aR] = await Promise.all([
+                apiClient.get('/accounting/config/ledger-mappings/catalogue'),
+                apiClient.get('/accounting/accounts?include_inactive=false'),
+            ]);
+            setCatalogue(cR.data || []);
+            setAccounts((aR.data || []).filter(a => a.is_postable));
+        } catch { toast.error('Could not load ledger mappings.'); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { load(); }, []);
+
+    const codeName = (id) => {
+        if (!id) return '— unset —';
+        const a = accounts.find(x => x.account_id === id);
+        return a ? `${a.code} ${a.name}` : `#${id}`;
+    };
+
+    return (
+        <div className="space-y-4">
+            <div>
+                <h3 className="text-lg font-semibold text-ink-900">Ledger Mappings</h3>
+                <p className="text-sm text-ink-600 mt-1">
+                    These tell auto-posting (Phase 4) which accounts to use for each event. Defaults are seeded
+                    to match the default CoA — re-point them if you renamed or restructured accounts.
+                </p>
+            </div>
+            <DataCard loading={loading} empty={catalogue.length === 0} emptyMsg="No mappings.">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Source key</th>
+                            <th className="text-left px-4 py-2 font-medium">Description</th>
+                            <th className="text-left px-4 py-2 font-medium">Debit (Dr)</th>
+                            <th className="text-left px-4 py-2 font-medium">Credit (Cr)</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {catalogue.map((c) => (
+                            <tr key={c.source_key}>
+                                <td className="px-4 py-1.5 font-mono text-xs">{c.source_key}</td>
+                                <td className="px-4 py-1.5 text-ink-600">{c.description}</td>
+                                <td className="px-4 py-1.5">{codeName(c.mapping?.debit_account_id)}</td>
+                                <td className="px-4 py-1.5">{codeName(c.mapping?.credit_account_id)}</td>
+                                <td className="px-4 py-1.5 text-right">
+                                    {c.mapping ? (
+                                        <button onClick={() => setEditing(c.mapping)}
+                                                className="text-xs text-brand-700 hover:underline">Edit</button>
+                                    ) : (
+                                        <span className="text-xs text-amber-700">missing</span>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DataCard>
+            {editing && <MappingModal initial={editing} accounts={accounts}
+                                      onClose={() => setEditing(null)}
+                                      onSaved={() => { setEditing(null); load(); }} />}
+        </div>
+    );
+}
+
+function MappingModal({ initial, accounts, onClose, onSaved }) {
+    const [form, setForm] = useState({
+        debit_account_id: initial.debit_account_id || '',
+        credit_account_id: initial.credit_account_id || '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    const submit = async () => {
+        setSaving(true);
+        try {
+            await apiClient.patch(`/accounting/config/ledger-mappings/${initial.mapping_id}`, {
+                debit_account_id: form.debit_account_id ? Number(form.debit_account_id) : null,
+                credit_account_id: form.credit_account_id ? Number(form.credit_account_id) : null,
+            });
+            toast.success('Mapping updated.');
+            onSaved();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <ModalShell title={`Edit mapping: ${initial.source_key}`} onClose={onClose}>
+            <p className="text-xs text-ink-500 mb-3">
+                When this event fires, Phase 4 auto-posting will Dr the debit account and Cr the credit account.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="Debit account">
+                    <select className="input" value={form.debit_account_id || ''}
+                            onChange={(e) => setForm({ ...form, debit_account_id: e.target.value })}>
+                        <option value="">— unset —</option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                    </select>
+                </Field>
+                <Field label="Credit account">
+                    <select className="input" value={form.credit_account_id || ''}
+                            onChange={(e) => setForm({ ...form, credit_account_id: e.target.value })}>
+                        <option value="">— unset —</option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                    </select>
+                </Field>
+            </div>
+            <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
+        </ModalShell>
+    );
+}
+
+/* Config helpers */
+function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg }) {
+    return (
+        <div className="flex items-start justify-between">
+            <div>
+                <h3 className="text-lg font-semibold text-ink-900">{title}</h3>
+                {subtitle && <p className="text-sm text-ink-600 mt-1">{subtitle}</p>}
+            </div>
+            <button onClick={onNew} disabled={disabled} title={disabled ? disabledMsg : undefined}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed">
+                <Plus size={16} /> New
+            </button>
+        </div>
+    );
+}
+
+function DataCard({ loading, empty, emptyMsg, children }) {
+    return (
+        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
+            {loading ? (
+                <div className="p-6 text-sm text-ink-500">Loading...</div>
+            ) : empty ? (
+                <div className="p-6 text-sm text-ink-500">{emptyMsg}</div>
+            ) : children}
+        </div>
+    );
+}
+
+
 /* ─── Reports ────────────────────────────────────────────────────────────── */
 
 const REPORT_TYPES = [
@@ -1137,6 +1865,8 @@ function Row({ label, value, bold, tone }) {
         </div>
     );
 }
+
+
 
 
 /* ─── shared shells ──────────────────────────────────────────────────────── */
