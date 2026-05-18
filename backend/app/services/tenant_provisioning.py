@@ -107,56 +107,127 @@ DEFAULT_SETTINGS = [
     ("privacy", "breach_notify_minutes", "Breach window (minutes)", "KDPA Section 43 default is 72 hours = 4320.", "number", "4320", False, 2),
 ]
 
-PERMISSIONS = [
-    "users:manage", "clinical:write", "clinical:read",
-    "patients:read", "patients:write", "history:read", "history:manage",
-    "pharmacy:manage", "pharmacy:read", "laboratory:manage", "laboratory:read",
-    "wards:manage", "billing:read", "billing:manage",
-    "radiology:manage",
-    # Internal staff messaging — every role gets read/write by default so the
-    # whole hospital can chat. Department + custom-role administration is
-    # admin-only.
-    "messaging:read", "messaging:write",
-    "departments:manage", "roles:manage",
-    # Hospital-wide settings: every role can read so the UI can react to
-    # branding/hours/etc, but only Admin can write.
-    "settings:read", "settings:manage",
-    # Specialist referrals — clinical staff write, admin reads
-    "referrals:manage",
-    # Cheque register: admin + receptionist manage; clinical staff read-only
-    "cheques:read", "cheques:manage",
-    # Support tickets to the MediFleet platform team. Admin-only.
-    "support:manage",
-    # Managerial Accounting — split create/post for separation-of-duties.
-    "accounting:view", "accounting:coa.manage",
-    "accounting:journal.create", "accounting:journal.post",
-    "accounting:settings.manage",
-]
+# The catalogue is keyed by codename → human-readable description. Order is
+# preserved for the role editor UI (RolesManager groups by category prefix).
+# Every superadmin-toggleable module in app.core.modules has at least one
+# permission here so admins can grant/revoke access on a per-module basis.
+PERMISSION_CATALOG: tuple[tuple[str, str], ...] = (
+    # ── RBAC infrastructure ──────────────────────────────────────────────
+    ("users:manage",           "Manage staff accounts and role assignments"),
+    ("roles:manage",           "Create and edit custom roles and permissions"),
+    ("departments:manage",     "Define hospital departments"),
 
-# Baseline grants applied to every staff role so messaging works out of the box.
+    # ── Dashboard / home ─────────────────────────────────────────────────
+    ("dashboard:view",         "Access the role-based home dashboard"),
+
+    # ── Patients & appointments ──────────────────────────────────────────
+    ("patients:read",          "View the patient registry and demographics"),
+    ("patients:write",         "Register and edit patient records"),
+    ("appointments:read",      "View the appointment calendar"),
+    ("appointments:manage",    "Book, reschedule, and cancel appointments"),
+
+    # ── Clinical workflow ────────────────────────────────────────────────
+    ("clinical:read",          "Review encounters, diagnoses, prescriptions"),
+    ("clinical:write",         "Create encounters, diagnoses, prescriptions"),
+    ("history:read",           "View longitudinal medical history"),
+    ("history:manage",         "Edit medical history and consent records"),
+
+    # ── Pharmacy & inventory ─────────────────────────────────────────────
+    ("pharmacy:read",          "View pharmacy stock and prescriptions"),
+    ("pharmacy:manage",        "Dispense medication and manage pharmacy stock"),
+    ("inventory:read",         "View stores, suppliers, and stock levels"),
+    ("inventory:manage",       "Manage stores, batches, transfers, purchase orders"),
+
+    # ── Lab & imaging ────────────────────────────────────────────────────
+    ("laboratory:read",        "View lab orders and results"),
+    ("laboratory:manage",      "Process lab orders, results, and billing"),
+    ("radiology:read",         "View imaging orders and reports"),
+    ("radiology:manage",       "Process imaging orders, reports, and DICOM"),
+
+    # ── Wards & in-patient ───────────────────────────────────────────────
+    ("wards:read",             "View ward roster, admissions, and bed status"),
+    ("wards:manage",           "Admit, discharge, transfer patients, manage beds"),
+
+    # ── Cashier / billing / payments ─────────────────────────────────────
+    ("billing:read",           "View invoices and payment ledger"),
+    ("billing:manage",         "Create invoices, take payments, issue refunds"),
+    ("cheques:read",           "View the cheque register"),
+    ("cheques:manage",         "Receipt and reconcile cheques"),
+    ("mpesa:read",             "View M-Pesa transaction log and reconciliation"),
+    ("mpesa:manage",           "Configure Daraja credentials and register C2B"),
+
+    # ── Internal collaboration ───────────────────────────────────────────
+    ("messaging:read",         "Read internal staff messages"),
+    ("messaging:write",        "Send internal staff messages"),
+
+    # ── Specialist referrals ─────────────────────────────────────────────
+    ("referrals:read",         "View incoming and outgoing referrals"),
+    ("referrals:manage",       "Issue and update specialist referrals"),
+
+    # ── Hospital settings ────────────────────────────────────────────────
+    ("settings:read",          "Read hospital configuration"),
+    ("settings:manage",        "Edit hospital configuration and security settings"),
+    ("branding:manage",        "Customise logo, colours, and document templates"),
+    ("notifications:manage",   "Configure notification templates and channels"),
+
+    # ── MediFleet platform ───────────────────────────────────────────────
+    ("support:manage",         "Raise and follow up MediFleet support tickets"),
+
+    # ── Optional add-ons ─────────────────────────────────────────────────
+    ("analytics:view",         "View aggregated dashboards and reports"),
+    ("patient_portal:manage",  "Administer the patient self-service portal"),
+    ("privacy:read",           "Review KDPA consent, DSAR, and privacy logs"),
+    ("privacy:manage",         "Manage KDPA consent, DSAR, and privacy logs"),
+
+    # ── Managerial Accounting — split create/post for separation-of-duties.
+    ("accounting:view",            "View chart of accounts and journals"),
+    ("accounting:coa.manage",      "Edit the chart of accounts"),
+    ("accounting:journal.create",  "Draft journal entries"),
+    ("accounting:journal.post",    "Approve and post journal entries"),
+    ("accounting:settings.manage", "Configure accounting periods, currencies, mappings"),
+)
+
+PERMISSIONS: list[str] = [code for code, _desc in PERMISSION_CATALOG]
+PERMISSION_DESCRIPTIONS: dict[str, str] = dict(PERMISSION_CATALOG)
+
+# Baseline grants applied to every staff role so messaging + the home page
+# work out of the box. dashboard:view is always-on so every authenticated
+# user lands somewhere sensible after login.
 _MESSAGING_BASE = ["messaging:read", "messaging:write"]
 _SETTINGS_READ = ["settings:read"]
-_BASE = [*_MESSAGING_BASE, *_SETTINGS_READ]
+_HOME_BASE = ["dashboard:view", "appointments:read"]
+_BASE = [*_MESSAGING_BASE, *_SETTINGS_READ, *_HOME_BASE]
 
 ROLE_GRANTS = {
     "Admin": PERMISSIONS,
     "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write",
-               "pharmacy:read", "laboratory:read", "history:read", "history:manage",
-               "referrals:manage", "cheques:read", *_BASE],
-    "Nurse": ["clinical:read", "patients:read", "wards:manage", "pharmacy:read", "history:read",
+               "pharmacy:read", "laboratory:read", "laboratory:manage",
+               "radiology:read", "history:read", "history:manage",
+               "inventory:read", "wards:read",
+               "appointments:manage",
+               "referrals:read", "referrals:manage",
+               "cheques:read", *_BASE],
+    "Nurse": ["clinical:read", "patients:read", "wards:read", "wards:manage",
+              "pharmacy:read", "history:read", "inventory:read",
+              "appointments:manage",
               "cheques:read", *_BASE],
-    "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read", *_BASE],
-    "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read", *_BASE],
-    "Radiologist": ["radiology:manage", "clinical:read", "patients:read", *_BASE],
+    "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read",
+                   "inventory:read", "inventory:manage", *_BASE],
+    "Lab Technician": ["laboratory:manage", "laboratory:read", "patients:read",
+                       "inventory:read", *_BASE],
+    "Radiologist": ["radiology:manage", "radiology:read", "clinical:read",
+                    "patients:read", *_BASE],
     "Receptionist": ["patients:read", "patients:write", "billing:read", "billing:manage",
-                     "cheques:read", "cheques:manage", *_BASE],
+                     "cheques:read", "cheques:manage",
+                     "appointments:manage", "mpesa:read", *_BASE],
     # Accountant role — has full view + journal lifecycle but cannot
     # edit the chart of accounts (that's Admin) and gets read-only
-    # access to billing for cross-checking.
+    # access to billing/cheques/M-Pesa for cross-checking.
     "Accountant": [
         "accounting:view", "accounting:journal.create", "accounting:journal.post",
         "accounting:settings.manage",
-        "billing:read", "cheques:read",
+        "billing:read", "cheques:read", "mpesa:read",
+        "analytics:view",
         *_BASE,
     ],
 }
@@ -253,17 +324,26 @@ def _stamp_alembic_head(db_name: str) -> None:
         )
 
 
+def _permission_description(code: str) -> str:
+    """Friendly description for *code*, falling back when not in the catalogue
+    (e.g. a permission seeded by an older migration before we tracked descriptions)."""
+    return PERMISSION_DESCRIPTIONS.get(code, f"Allows {code}")
+
+
 def backfill_admin_permissions(db_name: str) -> dict:
-    """Make sure the Admin role on *db_name* has every permission in PERMISSIONS.
+    """Reconcile the permission catalogue + built-in role grants on *db_name*.
 
     Newly-added codenames (when we ship a new module or finer-grained gate)
     are otherwise stuck on freshly-provisioned tenants only — existing
-    tenants would be missing them on their Admin role and the UI would
-    silently hide modules from an admin who should clearly see them. This
-    function:
+    tenants would be missing them and the UI would silently hide modules
+    from staff who should clearly see them. This function:
 
       1. Inserts any Permission rows that don't yet exist.
-      2. Attaches every PERMISSIONS row to the Admin role.
+      2. Refreshes descriptions for rows where the catalogue improved on
+         the stub "Allows X" used by older seeds.
+      3. Attaches every PERMISSIONS row to the Admin role.
+      4. Backfills the additional grants from ROLE_GRANTS onto the other
+         built-in roles (additive — never revokes).
 
     Idempotent. Safe to run on every boot — when there's nothing to do,
     nothing changes. Returns a small dict of counts for logging.
@@ -272,25 +352,32 @@ def backfill_admin_permissions(db_name: str) -> dict:
     Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = Session()
     created_perms = 0
+    updated_descriptions = 0
     granted_to_admin = 0
+    granted_to_roles = 0
     try:
-        # 1. UPSERT permissions.
+        # 1. UPSERT permissions and refresh stale descriptions.
         existing = {p.codename: p for p in db.query(Permission).all()}
         for code in PERMISSIONS:
+            desc = _permission_description(code)
             if code not in existing:
-                p = Permission(codename=code, description=f"Allows {code}")
+                p = Permission(codename=code, description=desc)
                 db.add(p)
                 existing[code] = p
                 created_perms += 1
+            elif existing[code].description != desc and existing[code].description == f"Allows {code}":
+                # Only overwrite the auto-stub. Don't clobber custom descriptions.
+                existing[code].description = desc
+                updated_descriptions += 1
         db.flush()
 
         # 2. Attach every PERMISSIONS row to the Admin role.
         admin = db.query(Role).filter(Role.name == "Admin").first()
         if admin is None:
-            # Tenants that never had an Admin role can't be auto-healed
-            # safely — return early so the migration loop logs and moves on.
             return {"db_name": db_name, "created_permissions": created_perms,
-                    "granted_to_admin": 0, "skipped": "no Admin role"}
+                    "updated_descriptions": updated_descriptions,
+                    "granted_to_admin": 0, "granted_to_roles": 0,
+                    "skipped": "no Admin role"}
 
         attached = {p.codename for p in admin.permissions}
         for code in PERMISSIONS:
@@ -298,9 +385,28 @@ def backfill_admin_permissions(db_name: str) -> dict:
                 admin.permissions.append(existing[code])
                 granted_to_admin += 1
 
+        # 3. Additive backfill for the other built-in roles.
+        for role_name, codes in ROLE_GRANTS.items():
+            if role_name == "Admin":
+                continue
+            role = db.query(Role).filter(Role.name == role_name).first()
+            if role is None:
+                continue
+            current = {p.codename for p in role.permissions}
+            for code in codes:
+                if code in current:
+                    continue
+                perm = existing.get(code)
+                if perm is None:
+                    continue  # codename not yet inserted; will catch up next pass
+                role.permissions.append(perm)
+                granted_to_roles += 1
+
         db.commit()
         return {"db_name": db_name, "created_permissions": created_perms,
-                "granted_to_admin": granted_to_admin}
+                "updated_descriptions": updated_descriptions,
+                "granted_to_admin": granted_to_admin,
+                "granted_to_roles": granted_to_roles}
     except Exception:
         db.rollback()
         raise
@@ -316,7 +422,7 @@ def _seed_baseline(db_name: str, admin_email: str, admin_full_name: str, temp_pa
     try:
         perms = {}
         for code in PERMISSIONS:
-            p = Permission(codename=code, description=f"Allows {code}")
+            p = Permission(codename=code, description=_permission_description(code))
             db.add(p)
             perms[code] = p
         db.flush()
