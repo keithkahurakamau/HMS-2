@@ -698,16 +698,16 @@ export default function Patients() {
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div className="md:col-span-2">
-                                            <label className="label">Surname <span className="text-red-500">*</span></label>
-                                            <input required type="text" name="surname" value={formData.surname} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-surname" className="label">Surname <span className="text-red-500">*</span></label>
+                                            <input required id="reg-surname" type="text" name="surname" value={formData.surname} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label className="label">Other Names <span className="text-red-500">*</span></label>
-                                            <input required type="text" name="other_names" value={formData.other_names} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-other-names" className="label">Other Names <span className="text-red-500">*</span></label>
+                                            <input required id="reg-other-names" type="text" name="other_names" value={formData.other_names} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div>
-                                            <label className="label">Sex <span className="text-red-500">*</span></label>
-                                            <select name="sex" value={formData.sex} onChange={handleInputChange} className="input">
+                                            <label htmlFor="reg-sex" className="label">Sex <span className="text-red-500">*</span></label>
+                                            <select id="reg-sex" name="sex" value={formData.sex} onChange={handleInputChange} className="input">
                                                 <option>Male</option>
                                                 <option>Female</option>
                                             </select>
@@ -748,8 +748,8 @@ export default function Patients() {
                                             )}
                                         </div>
                                         <div>
-                                            <label className="label">ID Type</label>
-                                            <select name="id_type" value={formData.id_type} onChange={handleInputChange} className="input">
+                                            <label htmlFor="reg-id-type" className="label">ID Type</label>
+                                            <select id="reg-id-type" name="id_type" value={formData.id_type} onChange={handleInputChange} className="input">
                                                 <option>National ID</option>
                                                 <option>Passport</option>
                                                 <option>Birth Certificate</option>
@@ -757,16 +757,16 @@ export default function Patients() {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="label">ID Number</label>
-                                            <input type="text" name="id_number" value={formData.id_number} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-id-number" className="label">ID Number</label>
+                                            <input id="reg-id-number" type="text" name="id_number" value={formData.id_number} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div>
-                                            <label className="label">Nationality</label>
-                                            <input type="text" name="nationality" value={formData.nationality} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-nationality" className="label">Nationality</label>
+                                            <input id="reg-nationality" type="text" name="nationality" value={formData.nationality} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div>
-                                            <label className="label">Marital Status</label>
-                                            <select name="marital_status" value={formData.marital_status} onChange={handleInputChange} className="input">
+                                            <label htmlFor="reg-marital" className="label">Marital Status</label>
+                                            <select id="reg-marital" name="marital_status" value={formData.marital_status} onChange={handleInputChange} className="input">
                                                 <option>Single</option>
                                                 <option>Married</option>
                                                 <option>Divorced</option>
@@ -774,12 +774,12 @@ export default function Patients() {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="label">Religion</label>
-                                            <input type="text" name="religion" value={formData.religion} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-religion" className="label">Religion</label>
+                                            <input id="reg-religion" type="text" name="religion" value={formData.religion} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div>
-                                            <label className="label">Primary Language</label>
-                                            <input type="text" name="primary_language" value={formData.primary_language} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-language" className="label">Primary Language</label>
+                                            <input id="reg-language" type="text" name="primary_language" value={formData.primary_language} onChange={handleInputChange} className="input" />
                                         </div>
                                     </div>
                                 </div>
@@ -791,28 +791,28 @@ export default function Patients() {
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div>
-                                            <label className="label">Primary Phone <span className="text-red-500">*</span></label>
-                                            <input required type="text" name="telephone_1" value={formData.telephone_1} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-tel-1" className="label">Primary Phone <span className="text-red-500">*</span></label>
+                                            <input required id="reg-tel-1" type="text" name="telephone_1" value={formData.telephone_1} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div>
-                                            <label className="label">Alternative Phone</label>
-                                            <input type="text" name="telephone_2" value={formData.telephone_2} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-tel-2" className="label">Alternative Phone</label>
+                                            <input id="reg-tel-2" type="text" name="telephone_2" value={formData.telephone_2} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label className="label">Email Address</label>
-                                            <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-email" className="label">Email Address</label>
+                                            <input id="reg-email" type="email" name="email" value={formData.email} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label className="label">Residence (Estate/Area)</label>
-                                            <input type="text" name="residence" value={formData.residence} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-residence" className="label">Residence (Estate/Area)</label>
+                                            <input id="reg-residence" type="text" name="residence" value={formData.residence} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div>
-                                            <label className="label">Town</label>
-                                            <input type="text" name="town" value={formData.town} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-town" className="label">Town</label>
+                                            <input id="reg-town" type="text" name="town" value={formData.town} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div>
-                                            <label className="label">Postal Address</label>
-                                            <input type="text" name="postal_address" value={formData.postal_address} onChange={handleInputChange} className="input" placeholder="P.O Box - Code" />
+                                            <label htmlFor="reg-postal" className="label">Postal Address</label>
+                                            <input id="reg-postal" type="text" name="postal_address" value={formData.postal_address} onChange={handleInputChange} className="input" placeholder="P.O Box - Code" />
                                         </div>
                                     </div>
                                 </div>
@@ -825,16 +825,16 @@ export default function Patients() {
                                         </h3>
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="label">Occupation</label>
-                                                <input type="text" name="occupation" value={formData.occupation} onChange={handleInputChange} className="input" />
+                                                <label htmlFor="reg-occupation" className="label">Occupation</label>
+                                                <input id="reg-occupation" type="text" name="occupation" value={formData.occupation} onChange={handleInputChange} className="input" />
                                             </div>
                                             <div>
-                                                <label className="label">Employer Name</label>
-                                                <input type="text" name="employer_name" value={formData.employer_name} onChange={handleInputChange} className="input" />
+                                                <label htmlFor="reg-employer" className="label">Employer Name</label>
+                                                <input id="reg-employer" type="text" name="employer_name" value={formData.employer_name} onChange={handleInputChange} className="input" />
                                             </div>
                                             <div>
-                                                <label className="label">Reference/Staff Number</label>
-                                                <input type="text" name="reference_number" value={formData.reference_number} onChange={handleInputChange} className="input" />
+                                                <label htmlFor="reg-ref-no" className="label">Reference/Staff Number</label>
+                                                <input id="reg-ref-no" type="text" name="reference_number" value={formData.reference_number} onChange={handleInputChange} className="input" />
                                             </div>
                                         </div>
                                     </div>
@@ -844,16 +844,16 @@ export default function Patients() {
                                         </h3>
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="label">NOK Name</label>
-                                                <input type="text" name="nok_name" value={formData.nok_name} onChange={handleInputChange} className="input" />
+                                                <label htmlFor="reg-nok-name" className="label">NOK Name</label>
+                                                <input id="reg-nok-name" type="text" name="nok_name" value={formData.nok_name} onChange={handleInputChange} className="input" />
                                             </div>
                                             <div>
-                                                <label className="label">Relationship</label>
-                                                <input type="text" name="nok_relationship" value={formData.nok_relationship} onChange={handleInputChange} className="input" />
+                                                <label htmlFor="reg-nok-rel" className="label">Relationship</label>
+                                                <input id="reg-nok-rel" type="text" name="nok_relationship" value={formData.nok_relationship} onChange={handleInputChange} className="input" />
                                             </div>
                                             <div>
-                                                <label className="label">NOK Contact Number</label>
-                                                <input type="text" name="nok_contact" value={formData.nok_contact} onChange={handleInputChange} className="input" />
+                                                <label htmlFor="reg-nok-contact" className="label">NOK Contact Number</label>
+                                                <input id="reg-nok-contact" type="text" name="nok_contact" value={formData.nok_contact} onChange={handleInputChange} className="input" />
                                             </div>
                                         </div>
                                     </div>
@@ -866,24 +866,24 @@ export default function Patients() {
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
-                                            <label className="label">Blood Group</label>
-                                            <select name="blood_group" value={formData.blood_group} onChange={handleInputChange} className="input">
+                                            <label htmlFor="reg-blood-group" className="label">Blood Group</label>
+                                            <select id="reg-blood-group" name="blood_group" value={formData.blood_group} onChange={handleInputChange} className="input">
                                                 <option>Unknown</option><option>A+</option><option>A-</option>
                                                 <option>B+</option><option>B-</option><option>O+</option>
                                                 <option>O-</option><option>AB+</option><option>AB-</option>
                                             </select>
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label className="label">Known Allergies</label>
-                                            <input type="text" name="allergies" value={formData.allergies} onChange={handleInputChange} className="input" placeholder="e.g., Penicillin, Peanuts" />
+                                            <label htmlFor="reg-allergies" className="label">Known Allergies</label>
+                                            <input id="reg-allergies" type="text" name="allergies" value={formData.allergies} onChange={handleInputChange} className="input" placeholder="e.g., Penicillin, Peanuts" />
                                         </div>
                                         <div className="md:col-span-3">
-                                            <label className="label">Chronic Conditions</label>
-                                            <input type="text" name="chronic_conditions" value={formData.chronic_conditions} onChange={handleInputChange} className="input" placeholder="e.g., Hypertension, Type 2 Diabetes" />
+                                            <label htmlFor="reg-chronic" className="label">Chronic Conditions</label>
+                                            <input id="reg-chronic" type="text" name="chronic_conditions" value={formData.chronic_conditions} onChange={handleInputChange} className="input" placeholder="e.g., Hypertension, Type 2 Diabetes" />
                                         </div>
                                         <div className="md:col-span-3">
-                                            <label className="label">Front Desk Notes</label>
-                                            <textarea name="notes" value={formData.notes} onChange={handleInputChange} rows="2" className="input" placeholder="Any additional registration remarks..." />
+                                            <label htmlFor="reg-notes" className="label">Front Desk Notes</label>
+                                            <textarea id="reg-notes" name="notes" value={formData.notes} onChange={handleInputChange} rows="2" className="input" placeholder="Any additional registration remarks..." />
                                         </div>
                                     </div>
                                 </div>
