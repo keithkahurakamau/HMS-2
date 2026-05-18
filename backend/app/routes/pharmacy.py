@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import List, Union
+from typing import Union
 import json
 import logging
 import os
@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
-# ADDED Location to the imports here
 from app.models.inventory import InventoryItem, StockBatch, DispenseLog, Location
 from app.models.billing import Invoice, InvoiceItem, Payment
 from app.models.idempotency import IdempotencyKey
@@ -96,15 +95,25 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
         # invoice; for walk-ins we mint a fresh single-dispense invoice
         # with patient_id NULL.
         if req.patient_id:
-            invoice = db.query(Invoice).filter(
-                Invoice.patient_id == req.patient_id, Invoice.status == "Pending"
-            ).first()
+            # SELECT ... FOR UPDATE so two concurrent dispenses against the
+            # same patient can't both miss the existing Pending invoice and
+            # each create a new one (which would leave the patient with
+            # duplicate Pending invoices and split payment allocation).
+            invoice = (
+                db.query(Invoice)
+                .filter(Invoice.patient_id == req.patient_id, Invoice.status == "Pending")
+                .order_by(Invoice.invoice_id.asc())
+                .with_for_update()
+                .first()
+            )
             if not invoice:
                 invoice = Invoice(patient_id=req.patient_id, total_amount=0,
                                   created_by=current_user["user_id"])
                 db.add(invoice)
                 db.flush()
         else:
+            # Walk-in: by design we mint a fresh per-dispense invoice so
+            # each retail sale has its own receipt. No aggregation.
             invoice = Invoice(patient_id=None, total_amount=0,
                               created_by=current_user["user_id"])
             db.add(invoice)
@@ -284,8 +293,19 @@ def collect_dispense_payment(
         )
 
     # Build a callback URL. Production: the operator wires PUBLIC_BASE_URL.
-    base = os.environ.get("PUBLIC_BASE_URL", request.base_url.rstrip("/") if hasattr(request, "base_url") else "")
-    callback_url = f"{base}/api/payments/mpesa/callback" if base else "https://placeholder.invalid/callback"
+    # If neither PUBLIC_BASE_URL nor a meaningful request.base_url is set,
+    # Safaricom will reject the placeholder and the dispense's STK pending
+    # row gets stranded — refuse to initiate instead of silently sending
+    # a doomed request.
+    base = os.environ.get("PUBLIC_BASE_URL") or (
+        str(request.base_url).rstrip("/") if hasattr(request, "base_url") else ""
+    )
+    if not base or "placeholder.invalid" in base or "localhost" in base or "127.0.0.1" in base:
+        raise HTTPException(
+            status_code=503,
+            detail="M-Pesa is not configured — set PUBLIC_BASE_URL to a publicly-reachable HTTPS host so Safaricom can deliver the callback.",
+        )
+    callback_url = f"{base}/api/payments/mpesa/callback"
 
     try:
         txn_payload = initiate_stk_push(
@@ -454,60 +474,93 @@ def pharmacy_transactions(
 
     One row per dispense: rolls up its invoice + payments. Filters:
     - from_date / to_date (YYYY-MM-DD) match against dispensed_at
-    - method matches the dominant payment method on the invoice
-      ('Cash', 'M-Pesa', 'Card', or unpaid)
+    - method matches the *primary* (first) payment method on the invoice
+      ('Cash', 'M-Pesa', 'Card', or 'Unpaid' for no-payment-yet)
     - status: 'Paid' | 'Partially Paid' | 'Pending' | 'Pending M-Pesa'
+
+    All filters apply in SQL **before** pagination so each page reliably
+    returns up to `limit` rows that match, and ``total`` reflects the
+    filtered cardinality.
     """
-    from datetime import date as _date
+    from datetime import date as _date, timedelta, datetime
+    from sqlalchemy import func, and_
     from app.models.user import User
 
     limit = max(1, min(limit, 500))
 
-    q = (
-        db.query(DispenseLog)
-        .order_by(DispenseLog.dispensed_at.desc())
-    )
+    # Parse the date range strictly as YYYY-MM-DD so to_date doesn't quietly
+    # accept a full ISO timestamp and read past the user's intent.
+    parsed_from = parsed_to_cutoff = None
     if from_date:
         try:
-            q = q.filter(DispenseLog.dispensed_at >= _date.fromisoformat(from_date))
+            parsed_from = _date.fromisoformat(from_date)
         except ValueError:
-            raise HTTPException(400, detail=f"Bad from_date: {from_date}")
+            raise HTTPException(400, detail=f"Bad from_date: {from_date} (expected YYYY-MM-DD)")
     if to_date:
         try:
-            # End-of-day cutoff: <= to_date + 1 day strictly less
-            from datetime import timedelta, datetime
-            cutoff = datetime.fromisoformat(to_date) + timedelta(days=1)
-            q = q.filter(DispenseLog.dispensed_at < cutoff)
+            parsed_to_cutoff = datetime.combine(_date.fromisoformat(to_date), datetime.min.time()) + timedelta(days=1)
         except ValueError:
-            raise HTTPException(400, detail=f"Bad to_date: {to_date}")
+            raise HTTPException(400, detail=f"Bad to_date: {to_date} (expected YYYY-MM-DD)")
+
+    # Correlated subquery: the first payment_method for each invoice. NULL
+    # when no Payment row exists yet (= "Unpaid"). LIMIT 1 keeps it cheap;
+    # the index on payments.invoice_id makes it index-only.
+    first_pm_subq = (
+        db.query(Payment.payment_method)
+        .filter(Payment.invoice_id == Invoice.invoice_id)
+        .order_by(Payment.payment_id.asc())
+        .limit(1)
+        .correlate(Invoice)
+        .scalar_subquery()
+    )
+
+    # Base join — DispenseLog left-joined to its invoice (some dispenses may
+    # predate the always-create-an-invoice contract), item, cashier.
+    q = (
+        db.query(DispenseLog, Invoice, InventoryItem, User, first_pm_subq.label("primary_method"))
+        .outerjoin(InvoiceItem, and_(
+            InvoiceItem.reference_id == DispenseLog.dispense_id,
+            InvoiceItem.item_type == "Pharmacy",
+        ))
+        .outerjoin(Invoice, Invoice.invoice_id == InvoiceItem.invoice_id)
+        .outerjoin(InventoryItem, InventoryItem.item_id == DispenseLog.item_id)
+        .outerjoin(User, User.user_id == DispenseLog.dispensed_by)
+    )
+
+    if parsed_from is not None:
+        q = q.filter(DispenseLog.dispensed_at >= parsed_from)
+    if parsed_to_cutoff is not None:
+        q = q.filter(DispenseLog.dispensed_at < parsed_to_cutoff)
+
+    if status:
+        # Treat missing invoice as 'Pending' so the filter is honest for
+        # legacy rows that pre-date the always-mint-an-invoice contract.
+        q = q.filter(func.coalesce(Invoice.status, "Pending") == status)
+
+    if method:
+        if method == "Unpaid":
+            q = q.filter(first_pm_subq.is_(None))
+        else:
+            q = q.filter(first_pm_subq == method)
+
+    q = q.order_by(DispenseLog.dispensed_at.desc())
+
+    # Total reflects the same filter set; skip on offset>0 to save the
+    # round-trip when the frontend is just paging deeper.
+    total = q.with_entities(func.count(DispenseLog.dispense_id)).scalar() if offset == 0 else None
 
     rows = q.offset(offset).limit(limit).all()
-    total = q.count() if offset == 0 else None  # cheap: skip on pagination
 
     out = []
-    for d in rows:
-        invoice = (
-            db.query(Invoice)
-            .join(InvoiceItem, InvoiceItem.invoice_id == Invoice.invoice_id)
-            .filter(InvoiceItem.reference_id == d.dispense_id,
-                    InvoiceItem.item_type == "Pharmacy")
-            .order_by(Invoice.invoice_id.desc())
-            .first()
+    for d, invoice, item, cashier, primary_method in rows:
+        # Payment count comes from a single targeted query rather than
+        # joining payments into the main query, which would multiply rows.
+        payment_count = (
+            db.query(func.count(Payment.payment_id))
+              .filter(Payment.invoice_id == invoice.invoice_id)
+              .scalar()
+            if invoice else 0
         )
-        item = db.query(InventoryItem).filter(InventoryItem.item_id == d.item_id).first()
-        cashier = db.query(User).filter(User.user_id == d.dispensed_by).first()
-        payments = (
-            db.query(Payment).filter(Payment.invoice_id == invoice.invoice_id).all()
-            if invoice else []
-        )
-        primary_method = next((p.payment_method for p in payments), None)
-
-        # Apply post-query filters (cheaper than complex SQL).
-        if status and (invoice.status if invoice else "Pending") != status:
-            continue
-        if method and (primary_method or "Unpaid") != method:
-            continue
-
         out.append({
             "dispense_id": d.dispense_id,
             "dispensed_at": d.dispensed_at.isoformat() if d.dispensed_at else None,
@@ -520,7 +573,7 @@ def pharmacy_transactions(
             "invoice_status": invoice.status if invoice else "Pending",
             "amount_paid": float(invoice.amount_paid or 0) if invoice else 0,
             "payment_method": primary_method,
-            "payment_count": len(payments),
+            "payment_count": payment_count,
         })
 
     return {"items": out, "total": total, "limit": limit, "offset": offset}
