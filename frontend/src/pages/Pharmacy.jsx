@@ -303,7 +303,10 @@ export default function Pharmacy() {
                                         {queue.map((order) => {
                                             const active = activeOrder?.id === order.id;
                                             return (
-                                                <button key={order.id} type="button" onClick={() => {setActiveOrder(order); setIsQueueOpen(false);}} className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white border-ink-200 hover:border-brand-300 hover:-translate-y-0.5'}`}>
+                                                <button key={order.id} type="button"
+                                                    aria-label={`Open prescription ${order.id} for ${order.patient}`}
+                                                    onClick={() => {setActiveOrder(order); setIsQueueOpen(false);}}
+                                                    className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white border-ink-200 hover:border-brand-300 hover:-translate-y-0.5'}`}>
                                                     <div className="flex justify-between items-start mb-2">
                                                         <h3 className="font-semibold text-sm text-ink-900">{order.patient}</h3>
                                                         {order.priority === 'High' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft" />}
@@ -438,6 +441,7 @@ export default function Pharmacy() {
                                             <button
                                                 onClick={() => addToCart(item)}
                                                 disabled={item.quantity === 0}
+                                                aria-label={`Add ${item.name} (batch ${item.batch_number}) to cart`}
                                                 className="mt-3 w-full py-1.5 bg-ink-50 border border-ink-200 hover:bg-accent-50 hover:border-accent-300 hover:text-accent-700 text-ink-700 text-sm font-semibold rounded-lg flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                             >
                                                 <Plus size={14} /> Add
@@ -743,7 +747,9 @@ function TransactionsTab() {
                                 <td className="px-3 py-1.5">{r.patient_id ? `#${r.patient_id}` : 'Walk-in'}</td>
                                 <td className="px-3 py-1.5">{r.payment_method || '—'}</td>
                                 <td className="px-3 py-1.5">
-                                    <span className={'text-xs px-2 py-0.5 rounded-md ' + (
+                                    <span
+                                        aria-label={`Invoice status: ${r.invoice_status}`}
+                                        className={'text-xs px-2 py-0.5 rounded-md ' + (
                                         r.invoice_status === 'Paid' ? 'bg-emerald-50 text-emerald-700' :
                                         r.invoice_status === 'Partially Paid' ? 'bg-amber-50 text-amber-700' :
                                         r.invoice_status?.includes('Pending') ? 'bg-sky-50 text-sky-700' :
