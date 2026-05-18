@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, desc
+from sqlalchemy import or_, desc, text
+from sqlalchemy.exc import IntegrityError, DataError
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
@@ -27,10 +28,21 @@ def _bust_dashboard(request: Request) -> None:
 router = APIRouter(prefix="/api/patients", tags=["Patient Registry"])
 
 def generate_op_number(db: Session) -> str:
-    """Generates a sequential Outpatient Number like OP-2026-0045"""
+    """Generates a sequential Outpatient Number like OP-2026-0045.
+
+    Held under a Postgres transaction-scoped advisory lock so two concurrent
+    registrations can't both read the same "latest" row and mint identical
+    OP numbers (which would then collide on the unique index).
+
+    The lock key is per-year so registrations in different calendar years
+    don't serialize against each other. The lock auto-releases on commit
+    or rollback.
+    """
     current_year = datetime.now().year
     prefix = f"OP-{current_year}-"
-    
+
+    db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": current_year})
+
     latest_patient = db.query(Patient).filter(
         Patient.outpatient_no.like(f"{prefix}%")
     ).order_by(desc(Patient.patient_id)).first()
@@ -42,6 +54,24 @@ def generate_op_number(db: Session) -> str:
         new_number = 1
 
     return f"{prefix}{new_number:04d}"
+
+
+# Fields whose unique/indexed contract treats empty-string the same as NULL.
+# Storing "" on these would later collide on the next registration with the
+# same blank field, since two equal strings DO equal each other under the
+# unique index, while two NULLs do not.
+_NORMALIZE_TO_NULL = ("id_number", "telephone_2", "email", "reference_number")
+
+
+def _normalize_blanks(data: dict) -> dict:
+    """Collapse trimmed-empty strings to ``None`` for fields where the DB
+    treats blank-vs-null as semantically different. Mutates and returns
+    *data* so callers can chain."""
+    for k in _NORMALIZE_TO_NULL:
+        v = data.get(k)
+        if isinstance(v, str) and not v.strip():
+            data[k] = None
+    return data
 
 # ==========================================
 # 1. SEARCH & LIST PATIENTS
@@ -79,21 +109,24 @@ def get_patient_by_id(patient_id: int, db: Session = Depends(get_db)):
 # ==========================================
 @router.post("/", dependencies=[Depends(RequirePermission("patients:write"))])
 def register_patient(patient_data: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    try:
-        # Collapse "" → None for fields that have unique indexes (or are
-        # indexed and compared by ==) so two blank submissions don't collide.
-        # Same defensive pattern as the users.license_number fix.
-        for k in ("id_number", "telephone_2", "email", "reference_number"):
-            if isinstance(patient_data.get(k), str) and not patient_data[k].strip():
-                patient_data[k] = None
+    _normalize_blanks(patient_data)
 
+    # Minimal required-field validation. The model has nullable=False on these
+    # columns, so the DB would reject anyway — but a 400 here is friendlier
+    # than the generic IntegrityError → 500 path.
+    for required in ("surname", "other_names", "sex", "date_of_birth", "telephone_1"):
+        v = patient_data.get(required)
+        if v is None or (isinstance(v, str) and not v.strip()):
+            raise HTTPException(status_code=400, detail=f"'{required}' is required.")
+
+    try:
         existing_patient = db.query(Patient).filter(
             or_(
                 Patient.telephone_1 == patient_data.get("telephone_1"),
                 (Patient.id_number == patient_data.get("id_number")) & (Patient.id_number.isnot(None))
             )
         ).first()
-        
+
         if existing_patient:
             raise HTTPException(status_code=400, detail="A patient with this Phone Number or ID already exists.")
 
@@ -146,9 +179,16 @@ def register_patient(patient_data: dict, request: Request, db: Session = Depends
         _bust_dashboard(request)
         return new_patient
 
+    except HTTPException:
+        db.rollback()
+        raise
+    except (IntegrityError, DataError) as e:
+        # Unique-index violation or bad column data — return 400 with a
+        # cleaner message instead of leaking the Postgres error in a 500.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Patient could not be saved — duplicate or invalid field. Please review the form.")
     except Exception as e:
         db.rollback()
-        if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Failed to register patient: {str(e)}")
 
 # ==========================================
@@ -159,20 +199,29 @@ def update_patient(patient_id: int, patient_data: dict, request: Request, db: Se
     patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
-        
+
+    # Same blank-string → NULL normalization as register, so a PUT setting
+    # ``id_number=""`` doesn't write an empty string that then collides with
+    # the next registration's blank field on the unique index.
+    _normalize_blanks(patient_data)
+
     old_data = {key: getattr(patient, key) for key in patient_data.keys() if hasattr(patient, key)}
-    
+
     for key, value in patient_data.items():
         if hasattr(patient, key):
             setattr(patient, key, value)
-            
+
     log_audit(
-        db=db, user_id=current_user["user_id"], action="UPDATE", 
-        entity_type="Patient", entity_id=str(patient.patient_id), 
-        old_value=old_data, new_value=patient_data, 
-        ip_address=request.client.host
+        db=db, user_id=current_user["user_id"], action="UPDATE",
+        entity_type="Patient", entity_id=str(patient.patient_id),
+        old_value=old_data, new_value=patient_data,
+        ip_address=request.client.host if request.client else None,
     )
-    db.commit()
+    try:
+        db.commit()
+    except (IntegrityError, DataError):
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Update rejected — duplicate or invalid field.")
     db.refresh(patient)
     return patient
 
@@ -338,10 +387,12 @@ def list_staff_by_role(role: str = "", db: Session = Depends(get_db)):
     Available with patients:write so receptionists and clinical staff can
     populate the picker without needing users:manage.
     """
+    from sqlalchemy.orm import contains_eager
     from app.models.user import User, Role
     q = (
         db.query(User)
           .join(Role, User.role_id == Role.role_id)
+          .options(contains_eager(User.role))
           .filter(User.is_active == True)
     )
     if role:

@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.config.database import get_db
 from app.core.dependencies import get_current_user, RequirePermission
@@ -102,8 +102,8 @@ def get_doctor_availability(
 
 def _enrich(db: Session, appt: Appointment) -> dict:
     """Pull patient + doctor names so the calendar UI doesn't need extra round-trips."""
-    patient = db.query(Patient).filter(Patient.patient_id == appt.patient_id).first()
-    doctor = db.query(User).filter(User.user_id == appt.doctor_id).first()
+    patient = appt.patient
+    doctor = appt.doctor
     return {
         "appointment_id": appt.appointment_id,
         "patient_id": appt.patient_id,
@@ -125,6 +125,37 @@ def create_appointment(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
+    # Doctor must exist, be active, and hold the Doctor role. Without this
+    # check the form can book against an Admin, an inactive user, or a
+    # nonexistent user_id (the FK constraint catches the last case but with
+    # a less helpful 500).
+    doctor = (
+        db.query(User)
+          .join(Role, User.role_id == Role.role_id)
+          .filter(User.user_id == appt_in.doctor_id)
+          .first()
+    )
+    if not doctor or not doctor.is_active:
+        raise HTTPException(status_code=400, detail="Selected doctor is not available for booking.")
+    if not doctor.role or doctor.role.name != "Doctor":
+        raise HTTPException(status_code=400, detail="Appointments can only be booked against a Doctor role.")
+
+    # Patient must exist.
+    if not db.query(Patient).filter(Patient.patient_id == appt_in.patient_id).first():
+        raise HTTPException(status_code=400, detail="Patient not found.")
+
+    # Past-dated appointments are almost always operator error. Allow a small
+    # tolerance so a slot that's "right now" doesn't get rejected by a
+    # second-difference clock skew.
+    appt_when = appt_in.appointment_date
+    if appt_when.tzinfo is None:
+        now = datetime.now()
+    else:
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+    if appt_when < now - timedelta(minutes=1):
+        raise HTTPException(status_code=400, detail="Appointment date cannot be in the past.")
+
     # Conflict check: doctor cannot have two appointments scheduled at the same minute.
     conflict = db.query(Appointment).filter(
         Appointment.doctor_id == appt_in.doctor_id,
@@ -157,25 +188,35 @@ def list_appointments(
     status: Optional[str] = Query(None),
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
 ):
-    q = db.query(Appointment)
+    q = db.query(Appointment).options(
+        joinedload(Appointment.patient),
+        joinedload(Appointment.doctor)
+    )
     if doctor_id is not None:
         q = q.filter(Appointment.doctor_id == doctor_id)
     if patient_id is not None:
         q = q.filter(Appointment.patient_id == patient_id)
     if status:
+        if status not in VALID_STATUSES:
+            raise HTTPException(status_code=400, detail=f"Status must be one of {sorted(VALID_STATUSES)}.")
         q = q.filter(Appointment.status == status)
     if date_from:
         q = q.filter(Appointment.appointment_date >= date_from)
     if date_to:
         q = q.filter(Appointment.appointment_date <= date_to)
-    appointments = q.order_by(Appointment.appointment_date.asc()).all()
+    appointments = q.order_by(Appointment.appointment_date.asc()).offset(skip).limit(limit).all()
     return [_enrich(db, a) for a in appointments]
 
 
 @router.get("/{appointment_id}", dependencies=[Depends(RequirePermission("patients:write"))])
 def get_appointment(appointment_id: int, db: Session = Depends(get_db)):
-    appt = db.query(Appointment).filter(Appointment.appointment_id == appointment_id).first()
+    appt = db.query(Appointment).options(
+        joinedload(Appointment.patient),
+        joinedload(Appointment.doctor)
+    ).filter(Appointment.appointment_id == appointment_id).first()
     if not appt:
         raise HTTPException(status_code=404, detail="Appointment not found.")
     return _enrich(db, appt)
