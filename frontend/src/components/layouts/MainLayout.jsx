@@ -38,13 +38,13 @@ export default function MainLayout() {
         { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={18} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'],                 requiredPermission: 'radiology:manage', moduleKey: 'radiology' },
         { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={18} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'],                  requiredPermission: 'pharmacy:read',    moduleKey: 'pharmacy' },
         { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={18} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'wards:manage',     moduleKey: 'wards' },
-        { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'patients:read',    moduleKey: 'appointments' },
-        { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'pharmacy:read',    moduleKey: 'inventory' },
+        { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'appointments:read',moduleKey: 'appointments' },
+        { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'inventory:read',   moduleKey: 'inventory' },
         { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={18} />,         allowedRoles: ['Admin', 'Receptionist'],                          requiredPermission: 'billing:read',     moduleKey: 'billing' },
         { name: 'Cheque Register',   path: '/app/cheques',         icon: <Banknote size={18} />,        allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'cheques:read',     moduleKey: 'cheques' },
         { name: 'Accounting',        path: '/app/accounting',      icon: <BookOpen size={18} />,        allowedRoles: ['Admin', 'Accountant'],                            requiredPermission: 'accounting:view',  moduleKey: 'accounting' },
         { name: 'MediFleet Support', path: '/app/support',         icon: <LifeBuoy size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'support:manage',   moduleKey: 'support' },
-        { name: 'M-Pesa Settings',   path: '/app/mpesa-settings',  icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: 'users:manage',     moduleKey: 'mpesa' },
+        { name: 'M-Pesa Settings',   path: '/app/mpesa-settings',  icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: 'mpesa:manage',     moduleKey: 'mpesa' },
         { name: 'Settings',          path: '/app/settings',        icon: <Settings size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'settings:read',    moduleKey: 'settings' },
     ];
 
