@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List
 import json
 
@@ -19,9 +19,18 @@ class ConsultationFeeRequest(BaseModel):
 router = APIRouter(prefix="/api/billing", tags=["Billing & Cashier"])
 
 @router.get("/queue", response_model=List[InvoiceResponse], dependencies=[Depends(RequirePermission("billing:manage"))])
-def get_billing_queue(db: Session = Depends(get_db)):
+def get_billing_queue(
+    db: Session = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000)
+):
     """Returns all patients with Pending invoices."""
-    invoices = db.query(Invoice).filter(Invoice.status.in_(["Pending", "Partially Paid", "Pending M-Pesa"])).order_by(Invoice.billing_date.asc()).all()
+    invoices = db.query(Invoice).options(
+        joinedload(Invoice.patient),
+        selectinload(Invoice.items)
+    ).filter(
+        Invoice.status.in_(["Pending", "Partially Paid", "Pending M-Pesa"])
+    ).order_by(Invoice.billing_date.asc()).offset(skip).limit(limit).all()
     
     result = []
     for inv in invoices:
