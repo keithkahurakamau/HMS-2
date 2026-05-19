@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Depends, HTTPException, Request, status
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
@@ -5,6 +7,8 @@ from app.config.database import get_db, get_master_db
 from app.config.settings import settings
 from app.models.master import SuperAdmin
 from app.models.user import User, Role, Permission, UserPermissionOverride
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_effective_permissions(db: Session, user: User) -> list[str]:
@@ -31,23 +35,24 @@ def resolve_effective_permissions(db: Session, user: User) -> list[str]:
 
 
 def require_superadmin(request: Request, db: Session = Depends(get_master_db)) -> dict:
-    """Authenticates a platform-level superadmin via Bearer token.
+    """Authenticates a platform-level superadmin via HttpOnly cookie.
 
-    Superadmin tokens are not tenant-scoped: they're issued by
-    POST /api/public/superadmin/login and carry role='superadmin'. The token
-    arrives in the Authorization header (the front-office UI keeps it in
-    localStorage rather than the HttpOnly tenant cookie used by hospital users).
+    The cookie 'superadmin_token' is set by POST /api/public/superadmin/login
+    and lives outside JS reach, so an XSS in the platform console can't
+    exfiltrate the JWT (the old implementation kept it in localStorage where
+    any compromised dependency could read window.localStorage and steal it).
+    Superadmin tokens are not tenant-scoped: they carry role='superadmin' and
+    grant platform-level powers (tenant provisioning, hospital suspension).
     """
-    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
-    if not auth_header or not auth_header.lower().startswith("bearer "):
+    token = request.cookies.get("superadmin_token")
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Superadmin authentication required",
         )
-    token = auth_header.split(" ", 1)[1].strip()
 
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.ALGORITHM])
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -71,44 +76,45 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
     """
     Extracts the JWT access token from the HttpOnly cookie.
     """
+    # Audit SEC-003: previously every auth event was emitted via print() to
+    # stdout — including the decoded JWT payload, tenant IDs, and "user not
+    # found" outcomes. On Render that stdout is captured by the platform log
+    # store, so any operator with log-read access could harvest live JWT
+    # claims. We now log at debug/warning with no token contents.
     token = request.cookies.get("access_token")
     if not token:
-        print("AUTH_ERROR: No access_token cookie found")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated. No access token cookie found."
         )
-        
+
     if token.startswith("Bearer "):
         token = token.split("Bearer ")[1]
-        
+
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        print(f"DECODED PAYLOAD: {payload}")
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.ALGORITHM])
         user_id = payload.get("user_id") or payload.get("sub")
         token_tenant_id = payload.get("tenant_id")
-        
+
         if user_id is None or token_tenant_id is None:
-            print("AUTH_ERROR: Invalid payload structure")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-            
+
         request_tenant_id = request.headers.get("X-Tenant-ID")
         if request_tenant_id != token_tenant_id:
-            print(f"AUTH_ERROR: Tenant mismatch: req={request_tenant_id}, tok={token_tenant_id}")
+            # Cross-tenant attempts are interesting; log the user id but never
+            # the raw tenant strings (they can carry inferable schema hints).
+            logger.warning("Cross-tenant access denied for user_id=%s", user_id)
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant access strictly forbidden")
-            
-    except JWTError as e:
-        print(f"AUTH_ERROR: JWT decode failed: {e}")
+
+    except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
-        
+
     # Verify user exists and fetch live permissions
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
-        print("AUTH_ERROR: User not found in DB")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-        
+
     if not user.is_active:
-        print("AUTH_ERROR: User is not active")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User no longer active")
 
     role = db.query(Role).filter(Role.role_id == user.role_id).first()

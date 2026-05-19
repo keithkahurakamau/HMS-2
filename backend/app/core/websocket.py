@@ -92,7 +92,7 @@ class ConnectionManager:
             return False
 
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.ALGORITHM])
             if payload.get("user_id") != user_id:
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return False

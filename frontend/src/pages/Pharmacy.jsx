@@ -96,7 +96,10 @@ export default function Pharmacy() {
     const cartTotal = cart.reduce((sum, item) => sum + (item.unit_price * item.qty), 0);
 
     // --- API SUBMISSION HANDLERS ---
-    const genKey = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // crypto.randomUUID() is collision-resistant; the prior Math.random
+    // construction could repeat under load and let a double-click look like
+    // a single idempotent retry on the server side.
+    const genKey = () => crypto.randomUUID();
 
     // Loops the cart and posts one /pharmacy/dispense call per line.
     // Returns the array of API responses (each carries invoice_id +

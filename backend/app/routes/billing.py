@@ -148,11 +148,15 @@ def charge_consultation_fee(req: ConsultationFeeRequest, request: Request, db: S
     db.commit()
     return {"message": "Consultation fee successfully charged."}
 
-@router.get("/mpesa-transactions")
+@router.get("/mpesa-transactions", dependencies=[Depends(RequirePermission("billing:read"))])
 def get_billing_mpesa_transactions(db: Session = Depends(get_db)):
-    """
-    Returns M-Pesa transactions for cashiers and pharmacists to verify receipts.
-    No strict permissions here since multiple roles (billing, pharmacy, admin) might need to verify receipts.
+    """Returns M-Pesa transactions for cashiers and pharmacists to verify receipts.
+
+    AUTH-002: previously this endpoint had NO auth dependency, so any
+    unauthenticated caller on a known tenant could read every M-Pesa
+    transaction (phone numbers, amounts, receipt numbers — PII + payment
+    data). Now gated on billing:read which is held by Doctor, Pharmacist,
+    Receptionist, and Accountant roles per the canonical catalogue.
     """
     from app.models.mpesa import MpesaTransaction
     transactions = db.query(MpesaTransaction).order_by(MpesaTransaction.transaction_date.desc()).limit(100).all()

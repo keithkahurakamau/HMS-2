@@ -1,7 +1,21 @@
+"""Legacy MPesaService stub kept alive only because backend/app/routes/billing.py
+imports the module-level ``mpesa_service`` symbol. The real Daraja integration
+lives in app/services/mpesa_service.py — this stub is a no-op that returns a
+synthetic success response for code paths the new service has not yet reached.
+
+Audit SEC-003 / RES-003: previously this stub print()-ed the formatted phone
+number and amount of every STK push to stdout, which on Render lands in the
+platform log store unredacted. Now it logs at debug only and never emits the
+phone number — diagnostics belong in structured logs, not stdout.
+"""
 import base64
+import logging
 from datetime import datetime
-import requests
+
 from app.config.settings import settings
+
+logger = logging.getLogger(__name__)
+
 
 class MPesaService:
     def __init__(self):
@@ -24,20 +38,16 @@ class MPesaService:
         return base64.b64encode(data_to_encode.encode()).decode('utf-8')
 
     def trigger_stk_push(self, phone_number: str, amount: float, reference: str, description: str):
-        """
-        Triggers the STK push prompt on the patient's phone.
-        NOTE: You will need to implement the actual OAuth token generation here 
-        using MPESA_CONSUMER_KEY and MPESA_CONSUMER_SECRET.
-        """
-        # Placeholder for actual API call to keep MVP running
-        formatted_phone = self.format_phone_number(phone_number)
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        
-        print(f"💰 M-PESA STK PUSH TRIGGERED:")
-        print(f"Phone: {formatted_phone} | Amount: KES {amount} | Ref: {reference}")
-        
-        # In production, return the response from Safaricom:
-        # return response.json()
-        return {"ResponseCode": "0", "CheckoutRequestID": "ws_CO_1234567890", "CustomerMessage": "Success. Request accepted for processing"}
+        """Stub — see module docstring. Returns a synthetic Safaricom-shaped
+        success envelope so the billing flow can complete in dev."""
+        _ = self.format_phone_number(phone_number)  # validate shape, discard
+        _ = datetime.now().strftime('%Y%m%d%H%M%S')
+        logger.debug("MPesaService stub STK push: ref=%s amount=%s", reference, amount)
+        return {
+            "ResponseCode": "0",
+            "CheckoutRequestID": "ws_CO_1234567890",
+            "CustomerMessage": "Success. Request accepted for processing",
+        }
+
 
 mpesa_service = MPesaService()

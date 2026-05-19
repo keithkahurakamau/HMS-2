@@ -255,55 +255,52 @@ const buildDocument = (title, bodyHtml) => `
 </html>
 `;
 
-// Open a hidden popup, write the document, trigger print, close on completion.
-// If popups are blocked, we fall back to an inline iframe.
+// Open a hidden popup, navigate to a blob: URL holding the document, trigger
+// print, then revoke the URL. The prior implementation used document.write
+// into an about:blank popup, which (a) violates Trusted Types under the
+// strict CSP we just shipped and (b) gives the printed page full opener
+// access back to the SPA. Loading via a blob URL keeps the popup
+// same-origin enough for parent-driven print() while letting us null out
+// popup.opener so the printed document can't pivot back into auth state.
 export const printDocument = (title, bodyHtml) => {
   const html = buildDocument(title, bodyHtml);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
 
-  const popup = window.open('', '_blank', 'width=900,height=1100');
+  const popup = window.open(url, '_blank', 'width=900,height=1100');
   if (popup) {
-    popup.document.open();
-    popup.document.write(html);
-    popup.document.close();
-
+    try { popup.opener = null; } catch (e) { /* ignore */ }
     const triggerPrint = () => {
-      popup.focus();
-      popup.print();
-      // Close shortly after the print dialog resolves. Some browsers fire
-      // afterprint synchronously when cancelled, others asynchronously.
-      const close = () => { try { popup.close(); } catch (e) {} };
-      popup.onafterprint = close;
-      setTimeout(close, 500);
+      try { popup.focus(); popup.print(); } catch (e) { /* ignore */ }
+      const close = () => {
+        try { popup.close(); } catch (e) { /* ignore */ }
+        URL.revokeObjectURL(url);
+      };
+      try { popup.onafterprint = close; } catch (e) { /* ignore */ }
+      setTimeout(close, 1500);
     };
-
-    if (popup.document.readyState === 'complete') {
-      triggerPrint();
-    } else {
-      popup.onload = triggerPrint;
-    }
+    popup.onload = triggerPrint;
     return;
   }
 
   // Fallback: hidden iframe (used when popups are blocked).
   const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
   iframe.style.bottom = '0';
   iframe.style.width = '0';
   iframe.style.height = '0';
   iframe.style.border = '0';
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
-
   iframe.onload = () => {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-    setTimeout(() => document.body.removeChild(iframe), 1000);
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch (e) { /* ignore */ }
+    setTimeout(() => {
+      try { document.body.removeChild(iframe); } catch (e) { /* ignore */ }
+      URL.revokeObjectURL(url);
+    }, 1500);
   };
+  iframe.src = url;
+  document.body.appendChild(iframe);
 };
 
 export const printUtils = {

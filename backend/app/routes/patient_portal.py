@@ -50,7 +50,7 @@ def _issue_portal_token(patient_id: int) -> tuple[str, datetime]:
             "type": "patient_portal",
             "exp": expires_at,
         },
-        settings.SECRET_KEY,
+        settings.jwt_secret,
         algorithm=settings.ALGORITHM,
     )
     return token, expires_at
@@ -60,7 +60,7 @@ def _resolve_portal_patient(token: Optional[str], db: Session) -> Patient:
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Portal session required.")
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.ALGORITHM])
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Portal session invalid or expired.")
     if payload.get("type") != "patient_portal":
@@ -125,7 +125,10 @@ async def portal_lookup(
 
     token, expires_at = _issue_portal_token(patient.patient_id)
 
-    is_production = settings.MPESA_ENV.lower() == "production"
+    # Audit SEC-004: cookie hardening must follow the authoritative APP_ENV
+    # flag, never the M-Pesa environment which legitimately runs sandbox in
+    # prod for some tenants.
+    is_production = settings.is_production
     response.set_cookie(
         key=PORTAL_COOKIE_NAME,
         value=token,
@@ -148,7 +151,7 @@ async def portal_lookup(
 
 @router.post("/logout")
 def portal_logout(response: Response):
-    is_production = settings.MPESA_ENV.lower() == "production"
+    is_production = settings.is_production
     response.delete_cookie(
         PORTAL_COOKIE_NAME,
         httponly=True,

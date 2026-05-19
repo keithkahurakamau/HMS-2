@@ -132,7 +132,60 @@ async def process_time_middleware(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
+# 6a. Security Headers Middleware
+# Defense-in-depth: CSP locks the execution model, HSTS forces TLS, COOP
+# isolates the window from cross-origin openers, Permissions-Policy denies
+# powerful browser APIs we never use. These also cover any direct browser
+# visits to the API surface (e.g. someone opening /api/dashboard in a tab);
+# the SPA itself receives a mirrored set from Vercel/nginx.
+_CSP_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: https:; "
+    "font-src 'self' data:; "
+    "connect-src 'self' wss: https:; "
+    "frame-ancestors 'none'; "
+    "form-action 'self'; "
+    "base-uri 'none'; "
+    "object-src 'none'; "
+    "media-src 'self'"
+)
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = _CSP_POLICY
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=(), payment=(), usb=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
+
 # 6b. CSRF Protection Middleware
+# Paths excluded from CSRF validation on unsafe methods. Limited to:
+#   - Login endpoints that fire before any safe GET has seeded the cookie
+#     (Login.jsx + SuperAdminLogin.jsx submit POST before doing a GET, so
+#     requiring a token here would brick first-load auth). The other
+#     defences on these routes — bcrypt + rate limiting + per-route locks —
+#     hold the line on credential stuffing while CSRF stays excluded.
+#   - External webhooks (M-Pesa C2B callbacks) that can't possibly carry a
+#     CSRF header because they're called by Safaricom's servers, not browsers.
+#     Authentication on those paths is signature-based, not session-based.
+# Everything else — including the superadmin /hospitals admin surface, which
+# uses Bearer auth but still benefits from CSRF as defence-in-depth — must
+# present a matching token.
+_CSRF_EXEMPT_PATHS = (
+    "/api/auth/login",
+    "/api/public/superadmin/login",
+    "/api/payments/mpesa/callback",
+    "/api/payments/mpesa/c2b/",
+)
+
+
 @app.middleware("http")
 async def csrf_middleware(request: Request, call_next):
     # Set CSRF cookie for safe methods if missing
@@ -148,26 +201,22 @@ async def csrf_middleware(request: Request, call_next):
                 samesite="none" if is_production else "lax",
             )
         return response
-    
-    # Exclude login and webhooks/public endpoints from CSRF check.
-    # The public router lives under /api/public (the prior /public prefix was a
-    # typo that left the superadmin login unreachable from a fresh tab).
-    if (
-        request.url.path.startswith("/api/auth/login")
-        or request.url.path.startswith("/api/public/")
-    ):
+
+    if any(request.url.path.startswith(p) for p in _CSRF_EXEMPT_PATHS):
         return await call_next(request)
 
-    # Validate Double Submit Cookie for state-changing methods
+    # Validate Double Submit Cookie for state-changing methods. Use
+    # secrets.compare_digest to defeat the (admittedly tiny) timing side
+    # channel from a plain `==` on hex tokens of fixed length.
     csrf_cookie = request.cookies.get("csrf_token")
     csrf_header = request.headers.get("x-csrf-token")
-    
-    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+
+    if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
         return JSONResponse(
-            status_code=403, 
+            status_code=403,
             content={"detail": "CSRF verification failed. Missing or invalid token."}
         )
-        
+
     return await call_next(request)
 
 # 7. Proper Global Exception Handler (Preserves CORS headers)

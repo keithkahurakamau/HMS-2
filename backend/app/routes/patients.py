@@ -12,6 +12,7 @@ from app.models.laboratory import LabTest
 from app.core.dependencies import get_current_user, RequirePermission
 from app.core.limiter import limiter
 from app.core import cache
+from app.schemas.patient import PatientCreate, PatientUpdate
 from app.utils.audit import log_audit
 from app.models.billing import Invoice, InvoiceItem
 
@@ -78,8 +79,12 @@ def get_patient_by_id(patient_id: int, db: Session = Depends(get_db)):
 # 3. REGISTER NEW PATIENT
 # ==========================================
 @router.post("/", dependencies=[Depends(RequirePermission("patients:write"))])
-def register_patient(patient_data: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def register_patient(patient_in: PatientCreate, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    # Audit PER-001: previously this took `patient_data: dict` and mass-assigned
+    # every supplied key onto the Patient ORM model. PatientCreate now locks the
+    # write surface — unknown fields raise 422 at the boundary.
     try:
+        patient_data = patient_in.model_dump(exclude_unset=True)
         # Collapse "" → None for fields that have unique indexes (or are
         # indexed and compared by ==) so two blank submissions don't collide.
         # Same defensive pattern as the users.license_number fix.
@@ -93,42 +98,31 @@ def register_patient(patient_data: dict, request: Request, db: Session = Depends
                 (Patient.id_number == patient_data.get("id_number")) & (Patient.id_number.isnot(None))
             )
         ).first()
-        
+
         if existing_patient:
             raise HTTPException(status_code=400, detail="A patient with this Phone Number or ID already exists.")
 
         op_number = generate_op_number(db)
-        
+
+        # Allowlist of columns the create path is permitted to set. Anything
+        # not in this set (patient_id, outpatient_no, inpatient_no,
+        # registered_on, is_active, registered_by) is server-controlled.
+        _ALLOWED = {
+            "surname", "other_names", "sex", "date_of_birth",
+            "marital_status", "religion", "primary_language",
+            "blood_group", "allergies", "chronic_conditions",
+            "id_type", "id_number", "nationality",
+            "telephone_1", "telephone_2", "email",
+            "postal_address", "postal_code", "residence", "town",
+            "occupation", "employer_name", "reference_number",
+            "nok_name", "nok_relationship", "nok_contact", "notes",
+            "insurance_provider", "insurance_policy_number",
+        }
+        safe_fields = {k: v for k, v in patient_data.items() if k in _ALLOWED}
         new_patient = Patient(
             outpatient_no=op_number,
-            surname=patient_data.get("surname"),
-            other_names=patient_data.get("other_names"),
-            sex=patient_data.get("sex"),
-            date_of_birth=patient_data.get("date_of_birth"),
-            marital_status=patient_data.get("marital_status"),
-            religion=patient_data.get("religion"),
-            primary_language=patient_data.get("primary_language"),
-            blood_group=patient_data.get("blood_group"),
-            allergies=patient_data.get("allergies"),
-            chronic_conditions=patient_data.get("chronic_conditions"),
-            id_type=patient_data.get("id_type"),
-            id_number=patient_data.get("id_number"),
-            nationality=patient_data.get("nationality"),
-            telephone_1=patient_data.get("telephone_1"),
-            telephone_2=patient_data.get("telephone_2"),
-            email=patient_data.get("email"),
-            postal_address=patient_data.get("postal_address"),
-            postal_code=patient_data.get("postal_code"),
-            residence=patient_data.get("residence"),
-            town=patient_data.get("town"),
-            occupation=patient_data.get("occupation"),
-            employer_name=patient_data.get("employer_name"),
-            reference_number=patient_data.get("reference_number"),
-            nok_name=patient_data.get("nok_name"),
-            nok_relationship=patient_data.get("nok_relationship"),
-            nok_contact=patient_data.get("nok_contact"),
-            notes=patient_data.get("notes"),
-            registered_by=current_user["user_id"]
+            registered_by=current_user["user_id"],
+            **safe_fields,
         )
         
         db.add(new_patient)
@@ -155,21 +149,29 @@ def register_patient(patient_data: dict, request: Request, db: Session = Depends
 # 4. UPDATE PATIENT
 # ==========================================
 @router.put("/{patient_id}", dependencies=[Depends(RequirePermission("patients:write"))])
-def update_patient(patient_id: int, patient_data: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def update_patient(patient_id: int, patient_in: PatientUpdate, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    # Audit PER-001: the prior update path took `patient_data: dict` and
+    # did `setattr(patient, key, value) if hasattr(patient, key)`, which
+    # allowed anyone with patients:write to rewrite any ORM-defined column
+    # (e.g. outpatient_no, registered_by). PatientUpdate confines the write
+    # surface to declared, optional fields.
     patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
-        
+
+    patient_data = patient_in.model_dump(exclude_unset=True)
     old_data = {key: getattr(patient, key) for key in patient_data.keys() if hasattr(patient, key)}
-    
+
     for key, value in patient_data.items():
+        # hasattr keeps us safe if the schema ever introduces a virtual
+        # field that doesn't map onto a column. The schema is the gate.
         if hasattr(patient, key):
             setattr(patient, key, value)
-            
+
     log_audit(
-        db=db, user_id=current_user["user_id"], action="UPDATE", 
-        entity_type="Patient", entity_id=str(patient.patient_id), 
-        old_value=old_data, new_value=patient_data, 
+        db=db, user_id=current_user["user_id"], action="UPDATE",
+        entity_type="Patient", entity_id=str(patient.patient_id),
+        old_value=old_data, new_value=patient_data,
         ip_address=request.client.host
     )
     db.commit()

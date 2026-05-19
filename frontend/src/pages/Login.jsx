@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import ChangePassword from './ChangePassword';
 import { TenantLogo } from '../components/Logo';
-import { useBranding } from '../context/BrandingContext';
+import { useBranding, safeImageUrl } from '../context/BrandingContext';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -16,13 +16,14 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { login, mustChangePassword, pendingUserId, clearMustChange } = useAuth();
+    const { login, mustChangePassword, pendingEmail, pendingPassword, clearMustChange } = useAuth();
     const navigate = useNavigate();
     const { branding } = useBranding();
 
     const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
     const tenantId = localStorage.getItem('hms_tenant_id');
-    const hasTenantBg = !!branding.background_data_url;
+    const safeBg = safeImageUrl(branding.background_data_url);
+    const hasTenantBg = !!safeBg;
 
     // If the operator reached /login by typing the URL directly, we have no
     // tenant context — the API client wouldn't attach X-Tenant-ID and the
@@ -50,8 +51,14 @@ export default function Login() {
         setIsSubmitting(false);
     };
 
-    if (mustChangePassword && pendingUserId) {
-        return <ChangePassword userId={pendingUserId} onSuccess={() => { clearMustChange(); }} />;
+    if (mustChangePassword && pendingEmail && pendingPassword) {
+        return (
+            <ChangePassword
+                email={pendingEmail}
+                currentPassword={pendingPassword}
+                onSuccess={() => { clearMustChange(); }}
+            />
+        );
     }
 
     return (
@@ -62,7 +69,7 @@ export default function Login() {
                 {hasTenantBg && (
                     <div
                         className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-overlay pointer-events-none"
-                        style={{ backgroundImage: `url("${branding.background_data_url}")` }}
+                        style={{ backgroundImage: `url("${safeBg}")` }}
                         aria-hidden="true"
                     />
                 )}
