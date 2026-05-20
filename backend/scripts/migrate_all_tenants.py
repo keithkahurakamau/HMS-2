@@ -59,7 +59,7 @@ from app.config.database import Base, DATABASE_URL  # noqa: E402,F401
 from app.models import (  # noqa: E402,F401
     accounting, audit, auth_tokens, billing, breach, cheque, clinical,
     idempotency, inventory, laboratory, master, medical_history, messaging,
-    mpesa, notification, patient, radiology, referral, settings as _settings,
+    notification, patient, payhero, radiology, referral, settings as _settings,
     support, user, wards,
 )
 

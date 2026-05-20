@@ -1,12 +1,12 @@
 """Pharmacy post-dispense payment flow.
 
-Exercises the cash + M-Pesa branches of /api/pharmacy/dispense/{id}/pay
-without going over HTTP — we call the route function directly with a
-fake `current_user` dict. Each test sets up the inventory + patient +
-dispense scaffolding it needs.
+Exercises the cash + M-Pesa (via Pay Hero) branches of
+/api/pharmacy/dispense/{id}/pay without going over HTTP — we call the
+route function directly with a fake ``current_user`` dict. Each test
+sets up the inventory + patient + dispense scaffolding it needs.
 
-What we DON'T test here: the actual Safaricom STK push (it's mocked at
-the service boundary), because that's an external API call.
+What we DON'T test here: the actual Pay Hero / Safaricom STK push (it's
+mocked at the service boundary), because that's an external API call.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from fastapi import HTTPException
 
 from app.models.billing import Invoice, InvoiceItem, Payment
 from app.models.inventory import DispenseLog, InventoryItem, Location, StockBatch
-from app.models.mpesa import MpesaTransaction
+from app.models.payhero import PayHeroTransaction
 from app.models.patient import Patient
 from app.routes.pharmacy import collect_dispense_payment, dispense_payment_status
 from app.schemas.pharmacy import DispensePaymentRequest
@@ -265,23 +265,28 @@ def test_mpesa_requires_phone_number(db):
 
 
 def test_mpesa_stk_push_creates_pending_transaction_and_links_dispense(db):
-    """Mock the Safaricom call; just verify our state transitions."""
+    """Mock the Pay Hero call; just verify our state transitions."""
     dispense, invoice = _seed_dispense_with_invoice(db, total=Decimal("300"))
 
-    def _fake_stk(*, db, phone_number, amount, invoice_id, callback_url):
-        # Mirror what the real service does: insert an MpesaTransaction row
-        # with the checkout_request_id and Pending status.
-        txn = MpesaTransaction(
+    def _fake_stk(db, *, phone_number, amount, invoice_id, dispense_id=None, **_):
+        # Mirror what the real service does: insert a PayHeroTransaction row
+        # with the external_reference + payhero_reference and Pending status.
+        txn = PayHeroTransaction(
             invoice_id=invoice_id,
+            dispense_id=dispense_id,
             phone_number=phone_number,
             amount=Decimal(str(amount)),
-            merchant_request_id="MRQ-TEST-001",
-            checkout_request_id="CKO-TEST-001",
+            external_reference="INV-TEST-001",
+            payhero_reference="PH-TEST-001",
             status="Pending",
         )
         db.add(txn)
         db.commit()
-        return {"checkout_request_id": "CKO-TEST-001"}
+        return {
+            "external_reference": "INV-TEST-001",
+            "reference": "PH-TEST-001",
+            "transaction_id": txn.id,
+        }
 
     with patch("app.routes.pharmacy.initiate_stk_push", side_effect=_fake_stk):
         resp = collect_dispense_payment(
@@ -291,9 +296,9 @@ def test_mpesa_stk_push_creates_pending_transaction_and_links_dispense(db):
         )
 
     assert resp.status == "stk_push_sent"
-    assert resp.checkout_request_id == "CKO-TEST-001"
+    assert resp.external_reference == "INV-TEST-001"
 
-    txn = db.query(MpesaTransaction).filter(MpesaTransaction.id == resp.mpesa_transaction_id).first()
+    txn = db.query(PayHeroTransaction).filter(PayHeroTransaction.id == resp.transaction_id).first()
     assert txn is not None
     assert txn.dispense_id == dispense.dispense_id
     assert txn.status == "Pending"
@@ -305,24 +310,24 @@ def test_mpesa_stk_push_creates_pending_transaction_and_links_dispense(db):
 
 def test_mpesa_idempotent_returns_existing_pending(db):
     """Second STK push attempt for the same dispense returns the existing
-    pending txn (no fresh Safaricom call)."""
+    pending txn (no fresh Pay Hero call)."""
     dispense, invoice = _seed_dispense_with_invoice(db, total=Decimal("100"))
-    txn = MpesaTransaction(
+    txn = PayHeroTransaction(
         invoice_id=invoice.invoice_id,
         dispense_id=dispense.dispense_id,
         phone_number="254712345678",
         amount=Decimal("100"),
-        merchant_request_id="MRQ-X",
-        checkout_request_id="CKO-EXISTING",
+        external_reference="INV-EXISTING",
+        payhero_reference="PH-EXISTING",
         status="Pending",
     )
     db.add(txn)
     db.commit()
 
     call_count = {"n": 0}
-    def _fake_stk(**kwargs):
+    def _fake_stk(*args, **kwargs):
         call_count["n"] += 1
-        return {"checkout_request_id": "CKO-NEW"}
+        return {"external_reference": "INV-NEW", "reference": "PH-NEW", "transaction_id": 0}
 
     with patch("app.routes.pharmacy.initiate_stk_push", side_effect=_fake_stk):
         resp = collect_dispense_payment(
@@ -331,19 +336,19 @@ def test_mpesa_idempotent_returns_existing_pending(db):
             _FakeRequest(), db, CURRENT_USER,
         )
 
-    assert resp.checkout_request_id == "CKO-EXISTING"
-    assert call_count["n"] == 0, "Safaricom should NOT be re-called for a pending txn"
+    assert resp.external_reference == "INV-EXISTING"
+    assert call_count["n"] == 0, "Pay Hero should NOT be re-called for a pending txn"
 
 
 # ─── Status endpoint ───────────────────────────────────────────────────────
 
 def test_payment_status_reflects_invoice_and_mpesa(db):
     dispense, invoice = _seed_dispense_with_invoice(db, total=Decimal("100"))
-    db.add(MpesaTransaction(
+    db.add(PayHeroTransaction(
         dispense_id=dispense.dispense_id, invoice_id=invoice.invoice_id,
         phone_number="254712345678", amount=Decimal("100"),
-        checkout_request_id="CKO-S", status="Success",
-        receipt_number="QKT123",
+        external_reference="INV-S", payhero_reference="PH-S",
+        status="Success", receipt_number="QKT123",
     ))
     db.commit()
 

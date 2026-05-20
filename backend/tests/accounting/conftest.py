@@ -56,7 +56,7 @@ import app.models.medical_history as _med_history          # noqa: F401
 import app.models.audit as _audit                          # noqa: F401
 import app.models.auth_tokens as _auth_tokens              # noqa: F401
 import app.models.idempotency as _idempotency              # noqa: F401
-import app.models.mpesa as _mpesa                          # noqa: F401
+import app.models.payhero as _payhero                      # noqa: F401
 import app.models.breach as _breach                        # noqa: F401
 import app.models.notification as _notification            # noqa: F401
 import app.models.messaging as _messaging                  # noqa: F401
@@ -208,7 +208,7 @@ def db(_engine) -> Iterator[Session]:
         "acc_insurance_providers", "acc_suppliers",
         "acc_journal_lines", "acc_journal_entries", "acc_fiscal_periods",
         "acc_fx_rates", "acc_accounts", "acc_settings", "acc_currencies",
-        "mpesa_transactions",
+        "payhero_transactions",
         "payments", "invoice_items", "invoices",
         "dispense_logs", "stock_batches", "inventory_items", "locations",
         "patients",

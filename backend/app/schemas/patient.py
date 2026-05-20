@@ -1,8 +1,18 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Optional
 from datetime import date, datetime
 
+# Audit PER-001: the patient registration / update routes previously took
+# `patient_data: dict`, then mass-assigned every supplied key onto the
+# SQLAlchemy Patient model via setattr(...). Anything the Patient ORM has
+# (e.g. is_active, registered_by, outpatient_no) was rewritable from a
+# client request. Locking `extra="forbid"` here makes the request contract
+# explicit — any unknown field is a 422, not a silent mass-assign.
+_STRICT = ConfigDict(extra="forbid")
+
+
 class PatientCreate(BaseModel):
+    model_config = _STRICT
     # Demographics
     surname: str
     other_names: str
@@ -45,6 +55,7 @@ class PatientCreate(BaseModel):
     insurance_policy_number: Optional[str] = None
 
 class PatientUpdate(BaseModel):
+    model_config = _STRICT
     surname: Optional[str] = None
     other_names: Optional[str] = None
     sex: Optional[str] = None

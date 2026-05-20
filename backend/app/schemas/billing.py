@@ -6,13 +6,7 @@ class PaymentRequest(BaseModel):
     idempotency_key: str
     invoice_id: int
     amount: float
-    payment_method: str # "Cash" or "Card" (M-Pesa uses a different route)
-
-class MPesaRequest(BaseModel):
-    idempotency_key: str
-    invoice_id: int
-    phone_number: str # e.g., 0712345678 or 254712345678
-    amount: float
+    payment_method: str  # "Cash" or "Card"; M-Pesa flows via /api/payments/payhero/stk-push
 
 class InvoiceItemResponse(BaseModel):
     id: int

@@ -27,7 +27,7 @@ from app.models.billing import Invoice, InvoiceItem, Payment
 from app.models.idempotency import IdempotencyKey
 from app.models.audit import AuditLog
 from app.models.medical_history import MedicalHistoryEntry, DataAccessLog, ConsentRecord
-from app.models.mpesa import MpesaConfig, MpesaTransaction
+from app.models.payhero import PayHeroConfig, PayHeroTransaction
 from app.models.radiology import RadiologyRequest, RadiologyResult
 from app.models.auth_tokens import RefreshToken, PasswordResetToken
 from app.models.breach import BreachIncident

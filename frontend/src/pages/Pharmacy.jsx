@@ -96,7 +96,10 @@ export default function Pharmacy() {
     const cartTotal = cart.reduce((sum, item) => sum + (item.unit_price * item.qty), 0);
 
     // --- API SUBMISSION HANDLERS ---
-    const genKey = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // crypto.randomUUID() is collision-resistant; the prior Math.random
+    // construction could repeat under load and let a double-click look like
+    // a single idempotent retry on the server side.
+    const genKey = () => crypto.randomUUID();
 
     // Loops the cart and posts one /pharmacy/dispense call per line.
     // Returns the array of API responses (each carries invoice_id +
@@ -153,8 +156,9 @@ export default function Pharmacy() {
                     dispenseId: last.dispense_id,
                     amount,
                     patientName: 'Walk-in',
-                    pendingMpesa: { checkout_request_id: res.data?.checkout_request_id,
-                                    mpesa_transaction_id: res.data?.mpesa_transaction_id },
+                    pendingMpesa: { external_reference: res.data?.external_reference,
+                                    payhero_reference: res.data?.payhero_reference,
+                                    transaction_id: res.data?.transaction_id },
                 });
             } else {
                 toast.success(`${method === 'card' ? 'Card' : 'Cash'} payment recorded.`);
@@ -303,7 +307,10 @@ export default function Pharmacy() {
                                         {queue.map((order) => {
                                             const active = activeOrder?.id === order.id;
                                             return (
-                                                <button key={order.id} type="button" onClick={() => {setActiveOrder(order); setIsQueueOpen(false);}} className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white border-ink-200 hover:border-brand-300 hover:-translate-y-0.5'}`}>
+                                                <button key={order.id} type="button"
+                                                    aria-label={`Open prescription ${order.id} for ${order.patient}`}
+                                                    onClick={() => {setActiveOrder(order); setIsQueueOpen(false);}}
+                                                    className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white border-ink-200 hover:border-brand-300 hover:-translate-y-0.5'}`}>
                                                     <div className="flex justify-between items-start mb-2">
                                                         <h3 className="font-semibold text-sm text-ink-900">{order.patient}</h3>
                                                         {order.priority === 'High' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft" />}
@@ -438,6 +445,7 @@ export default function Pharmacy() {
                                             <button
                                                 onClick={() => addToCart(item)}
                                                 disabled={item.quantity === 0}
+                                                aria-label={`Add ${item.name} (batch ${item.batch_number}) to cart`}
                                                 className="mt-3 w-full py-1.5 bg-ink-50 border border-ink-200 hover:bg-accent-50 hover:border-accent-300 hover:text-accent-700 text-ink-700 text-sm font-semibold rounded-lg flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                             >
                                                 <Plus size={14} /> Add
@@ -743,7 +751,9 @@ function TransactionsTab() {
                                 <td className="px-3 py-1.5">{r.patient_id ? `#${r.patient_id}` : 'Walk-in'}</td>
                                 <td className="px-3 py-1.5">{r.payment_method || '—'}</td>
                                 <td className="px-3 py-1.5">
-                                    <span className={'text-xs px-2 py-0.5 rounded-md ' + (
+                                    <span
+                                        aria-label={`Invoice status: ${r.invoice_status}`}
+                                        className={'text-xs px-2 py-0.5 rounded-md ' + (
                                         r.invoice_status === 'Paid' ? 'bg-emerald-50 text-emerald-700' :
                                         r.invoice_status === 'Partially Paid' ? 'bg-amber-50 text-amber-700' :
                                         r.invoice_status?.includes('Pending') ? 'bg-sky-50 text-sky-700' :
@@ -787,7 +797,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
     const [phone, setPhone] = useState('');
     const [reference, setReference] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [pollingTxnId, setPollingTxnId] = useState(pendingMpesa?.mpesa_transaction_id ?? null);
+    const [pollingTxnId, setPollingTxnId] = useState(pendingMpesa?.transaction_id ?? null);
     const [pollStatus, setPollStatus] = useState(null);
 
     // Poll the dispense's payment status while M-Pesa is pending.
@@ -838,7 +848,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                 onSettled();
             } else if (method === 'mpesa') {
                 toast.success('STK push sent. Customer to confirm on their phone.');
-                setPollingTxnId(res.data?.mpesa_transaction_id);
+                setPollingTxnId(res.data?.transaction_id);
             }
         } catch (err) {
             toast.error(err?.response?.data?.detail || 'Payment failed.');

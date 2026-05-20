@@ -47,7 +47,7 @@ from app.models import medical_history as _medical_history  # noqa: F401
 from app.models import radiology as _radiology  # noqa: F401
 from app.models import auth_tokens as _auth_tokens  # noqa: F401
 from app.models import idempotency as _idempotency  # noqa: F401
-from app.models import mpesa as _mpesa  # noqa: F401
+from app.models import payhero as _payhero  # noqa: F401
 from app.models import breach as _breach  # noqa: F401
 from app.models import notification as _notification  # noqa: F401
 from app.models import messaging as _messaging  # noqa: F401
@@ -153,8 +153,8 @@ PERMISSION_CATALOG: tuple[tuple[str, str], ...] = (
     ("billing:manage",         "Create invoices, take payments, issue refunds"),
     ("cheques:read",           "View the cheque register"),
     ("cheques:manage",         "Receipt and reconcile cheques"),
-    ("mpesa:read",             "View M-Pesa transaction log and reconciliation"),
-    ("mpesa:manage",           "Configure Daraja credentials and register C2B"),
+    ("mpesa:read",             "View Pay Hero (M-Pesa rail) transaction log and reconciliation"),
+    ("payhero:manage",         "Configure the Pay Hero payment gateway"),
 
     # ── Internal collaboration ───────────────────────────────────────────
     ("messaging:read",         "Read internal staff messages"),
@@ -226,7 +226,7 @@ ROLE_GRANTS = {
     "Accountant": [
         "accounting:view", "accounting:journal.create", "accounting:journal.post",
         "accounting:settings.manage",
-        "billing:read", "cheques:read", "mpesa:read",
+        "billing:read", "cheques:read", "mpesa:read", "payhero:manage",
         "analytics:view",
         *_BASE,
     ],

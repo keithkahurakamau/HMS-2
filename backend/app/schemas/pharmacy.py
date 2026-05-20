@@ -69,7 +69,8 @@ class CashPaymentResponse(BaseModel):
     invoice_status: str
 
 
-class MpesaInitResponse(BaseModel):
+class PayHeroInitResponse(BaseModel):
     status: Literal["stk_push_sent"]
-    checkout_request_id: str
-    mpesa_transaction_id: int
+    external_reference: str
+    payhero_reference: Optional[str] = None
+    transaction_id: int

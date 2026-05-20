@@ -1,0 +1,10 @@
+title = "gitleaks repo config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow the placeholder template values in .env.example. The file is an onboarding template — operators are expected to replace each value before boot. Settings strength validators (SEC-001) fail-fast on weak real values, so leaving these strings in place will not produce a working environment."
+paths = [
+    '''\.env\.example$''',
+]

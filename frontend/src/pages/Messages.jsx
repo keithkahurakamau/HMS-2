@@ -22,6 +22,27 @@ const KIND_ICON = {
     department: Building2,
 };
 
+// Hand-rolled validator for WS frames. Anything that doesn't fit the known
+// envelope (compromised tenant pubsub, misbehaving extension, fuzzer) gets
+// dropped silently instead of being spread into React state — where stray
+// fields like a wrongly typed `body` could cascade into the render path.
+const KNOWN_EVENT_TYPES = new Set(['message:new', 'conversation:joined', 'conversation:left']);
+
+function isValidWsEvent(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+    if (typeof raw.type !== 'string' || !KNOWN_EVENT_TYPES.has(raw.type)) return false;
+    if (raw.type === 'message:new') {
+        if (typeof raw.conversation_id !== 'number') return false;
+        const m = raw.message;
+        if (!m || typeof m !== 'object' || Array.isArray(m)) return false;
+        if (typeof m.message_id !== 'number') return false;
+        if (typeof m.sender_id !== 'number') return false;
+        if (typeof m.body !== 'string' || m.body.length > 8000) return false;
+        if (typeof m.created_at !== 'string' || m.created_at.length > 64) return false;
+    }
+    return true;
+}
+
 export default function Messages() {
     const { user } = useAuth();
     const me = user?.user_id;
@@ -80,17 +101,25 @@ export default function Messages() {
         }
 
         socket.onmessage = (ev) => {
+            if (typeof ev.data !== 'string' || ev.data.length > 32000) return;
             let evt;
             try { evt = JSON.parse(ev.data); } catch { return; }
-            if (evt.type === 'message:new' && evt.message) {
+            if (!isValidWsEvent(evt)) return;
+            if (evt.type === 'message:new') {
                 const cid = evt.conversation_id;
-                // If the user is looking at this conversation, append immediately
-                // and mark read on the server.
+                // Only the validated subset of fields lands in state — we
+                // never spread `evt.message` itself so a server compromise
+                // can't inject extra keys into React's diff.
+                const safeMsg = {
+                    message_id: evt.message.message_id,
+                    sender_id: evt.message.sender_id,
+                    body: evt.message.body,
+                    created_at: evt.message.created_at,
+                };
                 if (cid === activeId) {
-                    setMessages((prev) => [...prev, evt.message]);
+                    setMessages((prev) => [...prev, safeMsg]);
                     apiClient.post(`/messaging/conversations/${cid}/read`).catch(() => {});
                 }
-                // Refresh the sidebar so unread counts + last-message previews update.
                 fetchConversations();
             } else if (evt.type === 'conversation:joined' || evt.type === 'conversation:left') {
                 fetchConversations();

@@ -44,7 +44,7 @@ export default function MainLayout() {
         { name: 'Cheque Register',   path: '/app/cheques',         icon: <Banknote size={18} />,        allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'cheques:read',     moduleKey: 'cheques' },
         { name: 'Accounting',        path: '/app/accounting',      icon: <BookOpen size={18} />,        allowedRoles: ['Admin', 'Accountant'],                            requiredPermission: 'accounting:view',  moduleKey: 'accounting' },
         { name: 'MediFleet Support', path: '/app/support',         icon: <LifeBuoy size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'support:manage',   moduleKey: 'support' },
-        { name: 'M-Pesa Settings',   path: '/app/mpesa-settings',  icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: 'mpesa:manage',     moduleKey: 'mpesa' },
+        { name: 'Pay Hero Settings', path: '/app/payhero-settings',icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: ['payhero:manage', 'mpesa:manage'], moduleKey: 'payhero' },
         { name: 'Settings',          path: '/app/settings',        icon: <Settings size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'settings:read',    moduleKey: 'settings' },
     ];
 
@@ -62,7 +62,10 @@ export default function MainLayout() {
         //    data yet (older client/server build), fall back to legacy role
         //    list.
         if (userPerms.length > 0 && item.requiredPermission) {
-            return userPerms.includes(item.requiredPermission);
+            const required = Array.isArray(item.requiredPermission)
+                ? item.requiredPermission
+                : [item.requiredPermission];
+            return required.some(p => userPerms.includes(p));
         }
         return item.allowedRoles.includes(userRole);
     });
