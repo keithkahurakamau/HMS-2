@@ -1,17 +1,35 @@
+from decimal import Decimal
+from typing import List, Union
+import json
+import logging
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from typing import List
-import json
 
 from app.config.database import get_db
 # ADDED Location to the imports here
 from app.models.inventory import InventoryItem, StockBatch, DispenseLog, Location
-from app.models.billing import Invoice, InvoiceItem
+from app.models.billing import Invoice, InvoiceItem, Payment
 from app.models.idempotency import IdempotencyKey
-from app.schemas.pharmacy import DispenseRequest, DispenseResponse
+from app.models.mpesa import MpesaTransaction
+from app.schemas.pharmacy import (
+    CashPaymentResponse,
+    DispensePaymentRequest,
+    DispenseRequest,
+    DispenseResponse,
+    MpesaInitResponse,
+)
 from app.core.dependencies import get_current_user, RequirePermission
+from app.services.accounting_posting import (
+    payment_method_to_key,
+    post_dispense_pair,
+    post_from_event,
+)
+from app.services.mpesa_service import initiate_stk_push
 from app.utils.audit import log_audit
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/pharmacy", tags=["Pharmacy"])
 
 @router.get("/inventory", dependencies=[Depends(RequirePermission("pharmacy:read"))])
@@ -72,33 +90,66 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
         db.add(log_entry)
         db.flush()
 
-        # 4. Billing Integration (If patient is known, route to their bill)
+        # 4. Billing Integration — always create an invoice so the same
+        # payment + receipt pipeline works for walk-in OTC and patient Rx
+        # alike. For known patients we roll into their open Pending
+        # invoice; for walk-ins we mint a fresh single-dispense invoice
+        # with patient_id NULL.
         if req.patient_id:
-            # Find an active pending invoice or create one
-            invoice = db.query(Invoice).filter(Invoice.patient_id == req.patient_id, Invoice.status == "Pending").first()
+            invoice = db.query(Invoice).filter(
+                Invoice.patient_id == req.patient_id, Invoice.status == "Pending"
+            ).first()
             if not invoice:
-                invoice = Invoice(patient_id=req.patient_id, total_amount=0, created_by=current_user["user_id"])
+                invoice = Invoice(patient_id=req.patient_id, total_amount=0,
+                                  created_by=current_user["user_id"])
                 db.add(invoice)
                 db.flush()
-            
-            invoice.total_amount += total_cost
-            
-            # Add line item detailing the exact drug dispensed
-            line_item = InvoiceItem(
-                invoice_id=invoice.invoice_id,
-                description=f"Pharmacy: {item.name} x{req.quantity}",
-                amount=total_cost, item_type="Pharmacy", reference_id=log_entry.dispense_id
-            )
-            db.add(line_item)
+        else:
+            invoice = Invoice(patient_id=None, total_amount=0,
+                              created_by=current_user["user_id"])
+            db.add(invoice)
+            db.flush()
 
-        # 5. Audit & Idempotency Save
-        resp_data = {"dispense_id": log_entry.dispense_id, "item_id": item.item_id, "quantity_dispensed": req.quantity, "total_cost": total_cost, "dispensed_at": str(log_entry.dispensed_at)}
-        
+        invoice.total_amount += total_cost
+        db.add(InvoiceItem(
+            invoice_id=invoice.invoice_id,
+            description=f"Pharmacy: {item.name} x{req.quantity}",
+            amount=total_cost, item_type="Pharmacy",
+            reference_id=log_entry.dispense_id,
+        ))
+
+        # 4b. Auto-post the dispensation to the ledger.
+        # Revenue side uses unit_price (what we charged), COGS side uses
+        # unit_cost (what we paid). Both post in the same transaction.
+        cogs_amount = float(item.unit_cost or 0) * req.quantity
+        post_dispense_pair(
+            db,
+            dispense_id=log_entry.dispense_id,
+            revenue_amount=total_cost,
+            cogs_amount=cogs_amount,
+            memo=f"Pharmacy: {item.name} x{req.quantity}",
+            user_id=current_user["user_id"],
+        )
+
+        # 5. Audit & Idempotency Save.
+        invoice_id = invoice.invoice_id
+        invoice_balance = float((invoice.total_amount or Decimal(0)) - (invoice.amount_paid or Decimal(0)))
+
+        resp_data = {
+            "dispense_id": log_entry.dispense_id,
+            "item_id": item.item_id,
+            "quantity_dispensed": req.quantity,
+            "total_cost": total_cost,
+            "dispensed_at": str(log_entry.dispensed_at),
+            "invoice_id": invoice_id,
+            "invoice_balance": invoice_balance,
+        }
+
         db.add(IdempotencyKey(key=req.idempotency_key, response_body=json.dumps(resp_data)))
         log_audit(db, current_user["user_id"], "CREATE", "DispenseLog", log_entry.dispense_id, None, {"item": item.name, "qty": req.quantity}, request.client.host)
-        
+
         db.commit()
-        return log_entry
+        return resp_data
 
     except HTTPException:
         db.rollback()
@@ -106,3 +157,370 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Payment collection (post-dispense) ─────────────────────────────────────
+
+def _resolve_dispense_invoice(db: Session, dispense_id: int) -> tuple[DispenseLog, Invoice]:
+    """Find a dispense and the invoice that holds its line item.
+    Works for both known-patient and walk-in dispenses — both now have
+    an Invoice row (walk-ins have patient_id NULL)."""
+    dispense = db.query(DispenseLog).filter(DispenseLog.dispense_id == dispense_id).first()
+    if not dispense:
+        raise HTTPException(404, detail="Dispense record not found.")
+    invoice = (
+        db.query(Invoice)
+        .join(InvoiceItem, InvoiceItem.invoice_id == Invoice.invoice_id)
+        .filter(InvoiceItem.reference_id == dispense.dispense_id,
+                InvoiceItem.item_type == "Pharmacy")
+        .order_by(Invoice.invoice_id.desc())
+        .first()
+    )
+    if not invoice:
+        raise HTTPException(404, detail="No invoice found for this dispense.")
+    return dispense, invoice
+
+
+@router.post(
+    "/dispense/{dispense_id}/pay",
+    response_model=Union[CashPaymentResponse, MpesaInitResponse],
+    dependencies=[Depends(RequirePermission("pharmacy:manage"))],
+)
+def collect_dispense_payment(
+    dispense_id: int,
+    req: DispensePaymentRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Collect payment for a pharmacy dispensation.
+
+    cash  — record a Payment row, mark invoice (partially) paid, post
+            billing.payment.cash to the ledger.
+    card  — same shape as cash, but payment_method='Card' and posts
+            billing.payment.bank (cards settle into the bank account
+            same as bank transfers). transaction_reference holds the
+            card terminal auth code if supplied. Card-terminal API
+            integration (Pesapal / Stripe Terminal / etc.) can be wired
+            later — for now this records the receipt manually.
+    mpesa — initiate an STK push tied to (dispense_id, invoice_id).
+            Returns checkout_request_id; the actual ledger posting
+            happens in the M-Pesa callback when the customer confirms.
+    """
+    dispense, invoice = _resolve_dispense_invoice(db, dispense_id)
+
+    if invoice.status == "Paid":
+        raise HTTPException(400, detail="Invoice is already fully paid.")
+
+    amt = Decimal(str(req.amount))
+    outstanding = (invoice.total_amount or Decimal(0)) - (invoice.amount_paid or Decimal(0))
+    if amt > outstanding:
+        raise HTTPException(
+            400,
+            detail=f"Amount {amt} exceeds outstanding balance {outstanding}.",
+        )
+
+    # ── Cash + Card (immediate settlement) ──────────────────────────────────
+    if req.method in ("cash", "card"):
+        method_label = "Cash" if req.method == "cash" else "Card"
+        payment = Payment(
+            invoice_id=invoice.invoice_id,
+            amount=amt,
+            payment_method=method_label,
+            transaction_reference=req.transaction_reference,
+        )
+        db.add(payment)
+        db.flush()
+
+        invoice.amount_paid = (invoice.amount_paid or Decimal(0)) + amt
+        invoice.status = "Paid" if invoice.amount_paid >= invoice.total_amount else "Partially Paid"
+        if invoice.status == "Paid":
+            invoice.payment_method = method_label
+
+        # Ledger: cash → 1110 Cash; card → 1120 Bank (settles into bank
+        # account same as a transfer). payment_method_to_key picks the
+        # right source_key for each.
+        post_from_event(
+            db,
+            source_key=payment_method_to_key(method_label),
+            source_id=payment.payment_id,
+            amount=amt,
+            memo=f"Pharmacy dispense #{dispense_id} — {method_label.lower()} payment",
+            reference=f"INV-{invoice.invoice_id}",
+            user_id=current_user["user_id"],
+        )
+
+        log_audit(db, current_user["user_id"], "CREATE", "Payment", payment.payment_id, None,
+                  {"dispense_id": dispense_id, "amount": float(amt), "method": method_label},
+                  request.client.host)
+        db.commit()
+        return CashPaymentResponse(
+            status="paid" if invoice.status == "Paid" else "partial",
+            payment_id=payment.payment_id,
+            invoice_id=invoice.invoice_id,
+            amount_paid_total=float(invoice.amount_paid),
+            invoice_status=invoice.status,
+        )
+
+    # ── M-Pesa ──────────────────────────────────────────────────────────────
+    # method == 'mpesa'
+    if not req.phone_number:
+        raise HTTPException(400, detail="phone_number is required for M-Pesa payments.")
+
+    # Idempotency: if there's an existing pending STK for this dispense, return it.
+    existing = (
+        db.query(MpesaTransaction)
+        .filter(
+            MpesaTransaction.dispense_id == dispense_id,
+            MpesaTransaction.status == "Pending",
+        )
+        .first()
+    )
+    if existing and existing.checkout_request_id:
+        return MpesaInitResponse(
+            status="stk_push_sent",
+            checkout_request_id=existing.checkout_request_id,
+            mpesa_transaction_id=existing.id,
+        )
+
+    # Build a callback URL. Production: the operator wires PUBLIC_BASE_URL.
+    base = os.environ.get("PUBLIC_BASE_URL", request.base_url.rstrip("/") if hasattr(request, "base_url") else "")
+    callback_url = f"{base}/api/payments/mpesa/callback" if base else "https://placeholder.invalid/callback"
+
+    try:
+        txn_payload = initiate_stk_push(
+            db=db,
+            phone_number=req.phone_number,
+            amount=float(amt),
+            invoice_id=invoice.invoice_id,
+            callback_url=callback_url,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Pharmacy M-Pesa STK push failed for dispense=%s", dispense_id)
+        raise HTTPException(status_code=502, detail=f"Could not contact M-Pesa: {exc}")
+
+    # initiate_stk_push inserted a row keyed by invoice_id; attach the
+    # dispense_id back-ref so the callback can resolve to this dispense.
+    txn = (
+        db.query(MpesaTransaction)
+        .filter(MpesaTransaction.checkout_request_id == txn_payload.get("checkout_request_id"))
+        .order_by(MpesaTransaction.id.desc())
+        .first()
+    )
+    if txn:
+        txn.dispense_id = dispense_id
+        db.commit()
+
+    log_audit(db, current_user["user_id"], "CREATE", "MpesaTransaction", txn.id if txn else 0, None,
+              {"dispense_id": dispense_id, "amount": float(amt), "phone": req.phone_number},
+              request.client.host)
+
+    return MpesaInitResponse(
+        status="stk_push_sent",
+        checkout_request_id=txn_payload.get("checkout_request_id", ""),
+        mpesa_transaction_id=txn.id if txn else 0,
+    )
+
+
+@router.get(
+    "/dispense/{dispense_id}/payment-status",
+    dependencies=[Depends(RequirePermission("pharmacy:read"))],
+)
+def dispense_payment_status(dispense_id: int, db: Session = Depends(get_db)):
+    """Lightweight status endpoint the frontend can poll while waiting for
+    an STK push to resolve."""
+    _, invoice = _resolve_dispense_invoice(db, dispense_id)
+    pending_mpesa = (
+        db.query(MpesaTransaction)
+        .filter(MpesaTransaction.dispense_id == dispense_id)
+        .order_by(MpesaTransaction.id.desc())
+        .first()
+    )
+    return {
+        "invoice_id": invoice.invoice_id,
+        "invoice_status": invoice.status,
+        "amount_paid": float(invoice.amount_paid or 0),
+        "total_amount": float(invoice.total_amount or 0),
+        "mpesa_status": pending_mpesa.status if pending_mpesa else None,
+        "mpesa_receipt_number": pending_mpesa.receipt_number if pending_mpesa else None,
+        "mpesa_result_desc": pending_mpesa.result_desc if pending_mpesa else None,
+    }
+
+
+# ─── Receipt ────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/dispense/{dispense_id}/receipt",
+    dependencies=[Depends(RequirePermission("pharmacy:read"))],
+)
+def dispense_receipt(dispense_id: int, db: Session = Depends(get_db)):
+    """Receipt payload for printing. Includes hospital branding settings,
+    all line items on the invoice, all payments collected, and totals.
+
+    The frontend renders this through utils/printTemplates so the look
+    stays consistent with prescriptions / cheques / etc."""
+    dispense, invoice = _resolve_dispense_invoice(db, dispense_id)
+
+    items = (
+        db.query(InvoiceItem)
+        .filter(InvoiceItem.invoice_id == invoice.invoice_id)
+        .order_by(InvoiceItem.id)
+        .all()
+    )
+    payments = (
+        db.query(Payment)
+        .filter(Payment.invoice_id == invoice.invoice_id)
+        .order_by(Payment.payment_id)
+        .all()
+    )
+
+    # Hospital branding from settings — fall back gracefully if not set.
+    from app.models.settings import HospitalSetting
+    branding = {
+        row.key: row.value
+        for row in db.query(HospitalSetting)
+        .filter(HospitalSetting.category == "branding").all()
+    }
+    receipt_no = f"RCP-{invoice.invoice_id:08d}"
+
+    cashier = None
+    if invoice.created_by:
+        from app.models.user import User
+        u = db.query(User).filter(User.user_id == invoice.created_by).first()
+        cashier = u.full_name if u else None
+
+    patient_label = "Walk-in"
+    if dispense.patient_id:
+        from app.models.patient import Patient
+        p = db.query(Patient).filter(Patient.patient_id == dispense.patient_id).first()
+        if p:
+            patient_label = f"{p.surname}, {p.other_names}".strip(", ")
+
+    return {
+        "receipt_no": receipt_no,
+        "invoice_id": invoice.invoice_id,
+        "issued_at": invoice.billing_date.isoformat() if invoice.billing_date else None,
+        "dispense_id": dispense.dispense_id,
+        "patient": patient_label,
+        "cashier": cashier,
+        "hospital": {
+            "name": branding.get("hospital_name") or "MediFleet",
+            "tagline": branding.get("tagline") or "",
+            "logo_url": branding.get("logo_url") or "",
+        },
+        "items": [
+            {
+                "description": it.description,
+                "amount": float(it.amount),
+                "item_type": it.item_type,
+            } for it in items
+        ],
+        "payments": [
+            {
+                "method": p.payment_method,
+                "amount": float(p.amount),
+                "reference": p.transaction_reference,
+                "paid_at": p.payment_date.isoformat() if p.payment_date else None,
+            } for p in payments
+        ],
+        "totals": {
+            "total": float(invoice.total_amount or 0),
+            "paid": float(invoice.amount_paid or 0),
+            "balance": float((invoice.total_amount or Decimal(0))
+                             - (invoice.amount_paid or Decimal(0))),
+            "status": invoice.status,
+        },
+    }
+
+
+# ─── Transaction ledger ────────────────────────────────────────────────────
+
+@router.get(
+    "/transactions",
+    dependencies=[Depends(RequirePermission("pharmacy:read"))],
+)
+def pharmacy_transactions(
+    db: Session = Depends(get_db),
+    from_date: str | None = None,
+    to_date: str | None = None,
+    method: str | None = None,
+    status: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """Paginated ledger of pharmacy transactions.
+
+    One row per dispense: rolls up its invoice + payments. Filters:
+    - from_date / to_date (YYYY-MM-DD) match against dispensed_at
+    - method matches the dominant payment method on the invoice
+      ('Cash', 'M-Pesa', 'Card', or unpaid)
+    - status: 'Paid' | 'Partially Paid' | 'Pending' | 'Pending M-Pesa'
+    """
+    from datetime import date as _date
+    from app.models.user import User
+
+    limit = max(1, min(limit, 500))
+
+    q = (
+        db.query(DispenseLog)
+        .order_by(DispenseLog.dispensed_at.desc())
+    )
+    if from_date:
+        try:
+            q = q.filter(DispenseLog.dispensed_at >= _date.fromisoformat(from_date))
+        except ValueError:
+            raise HTTPException(400, detail=f"Bad from_date: {from_date}")
+    if to_date:
+        try:
+            # End-of-day cutoff: <= to_date + 1 day strictly less
+            from datetime import timedelta, datetime
+            cutoff = datetime.fromisoformat(to_date) + timedelta(days=1)
+            q = q.filter(DispenseLog.dispensed_at < cutoff)
+        except ValueError:
+            raise HTTPException(400, detail=f"Bad to_date: {to_date}")
+
+    rows = q.offset(offset).limit(limit).all()
+    total = q.count() if offset == 0 else None  # cheap: skip on pagination
+
+    out = []
+    for d in rows:
+        invoice = (
+            db.query(Invoice)
+            .join(InvoiceItem, InvoiceItem.invoice_id == Invoice.invoice_id)
+            .filter(InvoiceItem.reference_id == d.dispense_id,
+                    InvoiceItem.item_type == "Pharmacy")
+            .order_by(Invoice.invoice_id.desc())
+            .first()
+        )
+        item = db.query(InventoryItem).filter(InventoryItem.item_id == d.item_id).first()
+        cashier = db.query(User).filter(User.user_id == d.dispensed_by).first()
+        payments = (
+            db.query(Payment).filter(Payment.invoice_id == invoice.invoice_id).all()
+            if invoice else []
+        )
+        primary_method = next((p.payment_method for p in payments), None)
+
+        # Apply post-query filters (cheaper than complex SQL).
+        if status and (invoice.status if invoice else "Pending") != status:
+            continue
+        if method and (primary_method or "Unpaid") != method:
+            continue
+
+        out.append({
+            "dispense_id": d.dispense_id,
+            "dispensed_at": d.dispensed_at.isoformat() if d.dispensed_at else None,
+            "item_name": item.name if item else "—",
+            "quantity": d.quantity_dispensed,
+            "total_cost": float(d.total_cost),
+            "patient_id": d.patient_id,
+            "cashier": cashier.full_name if cashier else None,
+            "invoice_id": invoice.invoice_id if invoice else None,
+            "invoice_status": invoice.status if invoice else "Pending",
+            "amount_paid": float(invoice.amount_paid or 0) if invoice else 0,
+            "payment_method": primary_method,
+            "payment_count": len(payments),
+        })
+
+    return {"items": out, "total": total, "limit": limit, "offset": offset}

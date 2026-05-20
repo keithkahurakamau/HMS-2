@@ -33,6 +33,7 @@ const MODULE_LABELS = {
     referrals: 'Referrals',
     privacy: 'Privacy',
     clinical: 'Clinical Desk',
+    accounting: 'Managerial Accounting',
 };
 
 export default function ModuleGuard({ moduleKey, children }) {

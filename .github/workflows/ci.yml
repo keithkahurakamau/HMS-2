@@ -16,13 +16,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # NOTE: backend pytest job is intentionally not here yet. The
-  # current tests in backend/tests/* are integration tests that
-  # require a seeded tenant DB and a running uvicorn server — not
-  # something we want to spin up on every PR until the test setup
-  # is split into unit vs integration tiers. Migration-check.yml
-  # exercises the boot path; that's our backend signal for now.
-  # TODO: add a `backend-unit` job once pure unit tests exist.
+  # NOTE: the historic tests in backend/tests/test_api.py + siblings are
+  # integration tests that need a seeded tenant DB and a running uvicorn
+  # server — they're NOT what this job runs. The accounting suite under
+  # backend/tests/accounting/ is self-contained: it spins up its own test
+  # database, creates the schema via Base.metadata.create_all, and seeds
+  # the minimum reference data. Migration-check.yml is still our
+  # canonical backend-boot signal.
+
+  backend-accounting:
+    name: backend (accounting unit tests)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medifleet
+          POSTGRES_PASSWORD: medifleet
+          POSTGRES_DB: hms_master
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medifleet -d hms_master"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://medifleet:medifleet@localhost:5432/hms_master
+      ACCOUNTING_TEST_DB_URL: postgresql://medifleet:medifleet@localhost:5432/hms_accounting_test
+      SECRET_KEY: ci-secret-key-not-used-in-prod
+      ENCRYPTION_KEY: "00000000000000000000000000000000"
+      CORS_ORIGINS: http://localhost:5173
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps + pytest
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run accounting tests
+        working-directory: backend
+        run: pytest tests/accounting/ -q
 
   frontend:
     name: frontend (lint + build)

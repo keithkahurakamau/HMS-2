@@ -51,10 +51,16 @@ from sqlalchemy import create_engine, inspect, text  # noqa: E402
 # Triggers SQLAlchemy metadata population for every model so create_all
 # below covers tables added by future migrations.
 from app.config.database import Base, DATABASE_URL  # noqa: E402,F401
+# Triggers SQLAlchemy metadata population for EVERY model so the legacy-tenant
+# create_all path below adds tables introduced by later migrations (e.g.
+# accounting Phase 6's acc_bank_accounts). Missing imports here mean the
+# corresponding tables are silently skipped and only surface as runtime 500s.
+# Keep this list in sync with app/models/ — every .py file there belongs here.
 from app.models import (  # noqa: E402,F401
-    audit, auth_tokens, billing, breach, clinical, idempotency, inventory,
-    laboratory, master, medical_history, messaging, mpesa, notification,
-    patient, radiology, user, wards,
+    accounting, audit, auth_tokens, billing, breach, cheque, clinical,
+    idempotency, inventory, laboratory, master, medical_history, messaging,
+    mpesa, notification, patient, radiology, referral, settings as _settings,
+    support, user, wards,
 )
 
 
@@ -376,15 +382,19 @@ def main() -> int:
         try:
             from app.services.tenant_provisioning import backfill_admin_permissions
             result = backfill_admin_permissions(db_name)
-            if result.get("created_permissions") or result.get("granted_to_admin"):
+            if (result.get("created_permissions") or result.get("granted_to_admin")
+                    or result.get("granted_to_roles") or result.get("updated_descriptions")):
                 LOG.info(
-                    "[%s] admin backfill: +%d permission(s), +%d Admin grant(s)",
+                    "[%s] rbac backfill: +%d permission(s), +%d desc update(s), "
+                    "+%d Admin grant(s), +%d built-in role grant(s)",
                     db_name,
-                    result["created_permissions"],
-                    result["granted_to_admin"],
+                    result.get("created_permissions", 0),
+                    result.get("updated_descriptions", 0),
+                    result.get("granted_to_admin", 0),
+                    result.get("granted_to_roles", 0),
                 )
         except Exception as exc:  # noqa: BLE001 — non-fatal
-            LOG.warning("[%s] admin permission backfill failed: %s", db_name, exc)
+            LOG.warning("[%s] rbac backfill failed: %s", db_name, exc)
 
     if failures:
         LOG.error("Migration completed with %d failure(s):", len(failures))
