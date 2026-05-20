@@ -32,6 +32,32 @@ const DEFAULT_STATE = {
     tenant_name: null,
 };
 
+// Allow-list URLs that are safe to interpolate into `url("...")`. Tenant
+// branding can ship a data:image URL (small logos) or an https:// CDN URL.
+// SVG is excluded because data:image/svg+xml can carry <script>. Anything
+// containing quotes/backslashes/parentheses could break out of the CSS
+// value and inject arbitrary declarations, so it's rejected.
+export function safeImageUrl(url) {
+    if (typeof url !== 'string' || url.length === 0) return null;
+    if (url.length > 5_000_000) return null;
+    if (/["\\\r\n)]/.test(url)) return null;
+    const dataUrl = /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/i;
+    const httpsUrl = /^https:\/\/[A-Za-z0-9.\-_~:/?#@!$&'*+,;=%]+$/;
+    return dataUrl.test(url) || httpsUrl.test(url) ? url : null;
+}
+
+// CSS colours land in `color:` declarations, so reject anything that isn't
+// a hex literal or a simple rgb()/hsl() functional form — that blocks
+// "; background-image: url(evil); --x: " style breakouts.
+export function safeCssColor(value) {
+    if (typeof value !== 'string') return null;
+    const v = value.trim();
+    if (v.length > 64) return null;
+    return /^#[0-9A-Fa-f]{3,8}$/.test(v) || /^(rgb|rgba|hsl|hsla)\(\s*[0-9.\s,%]+\)$/i.test(v)
+        ? v
+        : null;
+}
+
 const BrandingContext = createContext({
     branding: DEFAULT_STATE,
     isLoading: false,
@@ -80,17 +106,19 @@ export function BrandingProvider({ children }) {
 
     // Inject brand colours + tenant background as CSS variables. Surfaces opt
     // in via the .bg-tenant utility (defined in index.css) and var(--brand-*).
+    // Every value is allow-listed before reaching the CSSOM — a tenant cannot
+    // smuggle `; background-image:url(javascript:...)` through a colour field.
     useEffect(() => {
         const root = document.documentElement;
-        if (branding.brand_primary) root.style.setProperty('--brand-primary', branding.brand_primary);
+        const primary = safeCssColor(branding.brand_primary);
+        if (primary) root.style.setProperty('--brand-primary', primary);
         else root.style.removeProperty('--brand-primary');
-        if (branding.brand_accent) root.style.setProperty('--brand-accent', branding.brand_accent);
+        const accent = safeCssColor(branding.brand_accent);
+        if (accent) root.style.setProperty('--brand-accent', accent);
         else root.style.removeProperty('--brand-accent');
-        if (branding.background_data_url) {
-            root.style.setProperty('--tenant-bg', `url("${branding.background_data_url}")`);
-        } else {
-            root.style.removeProperty('--tenant-bg');
-        }
+        const bg = safeImageUrl(branding.background_data_url);
+        if (bg) root.style.setProperty('--tenant-bg', `url("${bg}")`);
+        else root.style.removeProperty('--tenant-bg');
     }, [branding.brand_primary, branding.brand_accent, branding.background_data_url]);
 
     const updateLocal = useCallback((next) => {

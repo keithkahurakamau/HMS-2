@@ -46,7 +46,10 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
       - name: Audit backend/requirements.txt
-        run: pip-audit -r backend/requirements.txt --strict
+        # PYSEC-2025-185 (python-jose): no fixed version published upstream as
+        # of 3.5.0. Revisit when the maintainer cuts a patch release, or when
+        # we migrate JWT handling to PyJWT.
+        run: pip-audit -r backend/requirements.txt --strict --ignore-vuln PYSEC-2025-185
 
   npm-audit:
     name: npm audit (frontend deps)

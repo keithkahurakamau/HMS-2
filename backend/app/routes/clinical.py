@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/clinical", tags=["Clinical Desk"])
 # ==========================================
 # 1. DOCTOR'S WORKSPACE & QUEUE
 # ==========================================
-@router.get("/queue")
+@router.get("/queue", dependencies=[Depends(RequirePermission("clinical:read"))])
 def get_clinical_queue(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Fetches the active Consultation queue for the logged-in doctor.
 
@@ -141,9 +141,16 @@ def get_patient_history(patient_id: int, db: Session = Depends(get_db)):
 # ==========================================
 # 4. PHARMACY ROUTING
 # ==========================================
-@router.get("/prescriptions/pending")
+@router.get("/prescriptions/pending", dependencies=[Depends(RequirePermission("pharmacy:read"))])
 def get_pending_prescriptions(db: Session = Depends(get_db)):
-    """Fetches all Medical Records that have been routed to the Pharmacy."""
+    """Fetches all Medical Records that have been routed to the Pharmacy.
+
+    AUTH-002: previously this endpoint had no auth dependency at all, so any
+    unauthenticated caller could enumerate active prescriptions (patient
+    names, OP numbers, allergies, treatment plans) for the entire tenant.
+    Now gated on pharmacy:read — both Pharmacist and Doctor roles carry it
+    per the canonical PERMISSION_CATALOG.
+    """
     
     pending_records = db.query(
         MedicalRecord.record_id,

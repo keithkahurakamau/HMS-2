@@ -42,13 +42,16 @@ def superadmin_token():
             "type": "access",
             "exp": datetime.now(timezone.utc) + timedelta(minutes=20),
         }
-        return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+        return jwt.encode(payload, settings.jwt_secret, algorithm=settings.ALGORITHM)
     finally:
         db.close()
 
 
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+def _sa_cookies(token: str) -> dict:
+    # Superadmin auth moved off Bearer headers onto an HttpOnly cookie so an
+    # XSS in the platform console can't exfiltrate the JWT. Tests hand the
+    # cookie the same way the browser would.
+    return {"superadmin_token": token}
 
 
 # ─── /api/public/hospitals ─────────────────────────────────────────────────
@@ -74,32 +77,32 @@ class TestTenantFlexibility:
     def test_patch_tenant_feature_flags(self, client, superadmin_token):
         # Find a tenant to patch (Mayo Clinic demo)
         hospitals = client.get("/api/public/hospitals?include_inactive=true",
-                               headers=_auth(superadmin_token)).json()
+                               cookies=_sa_cookies(superadmin_token)).json()
         mayo = next((h for h in hospitals if h["db_name"] == "mayoclinic_db"), None)
         if not mayo:
             pytest.skip("Demo seed not present — run seed_demo.py first.")
 
         original_flags = mayo.get("feature_flags") or {}
         r = client.patch(f"/api/public/hospitals/{mayo['tenant_id']}",
-                         headers=_auth(superadmin_token),
+                         cookies=_sa_cookies(superadmin_token),
                          json={"feature_flags": {**original_flags, "auto_test_flag": True}})
         assert r.status_code == 200, r.text
         assert r.json()["feature_flags"]["auto_test_flag"] is True
 
         # Restore
         client.patch(f"/api/public/hospitals/{mayo['tenant_id']}",
-                     headers=_auth(superadmin_token),
+                     cookies=_sa_cookies(superadmin_token),
                      json={"feature_flags": original_flags})
 
     def test_patch_tenant_plan_limits(self, client, superadmin_token):
         hospitals = client.get("/api/public/hospitals?include_inactive=true",
-                               headers=_auth(superadmin_token)).json()
+                               cookies=_sa_cookies(superadmin_token)).json()
         mayo = next((h for h in hospitals if h["db_name"] == "mayoclinic_db"), None)
         if not mayo:
             pytest.skip("Demo seed not present.")
 
         r = client.patch(f"/api/public/hospitals/{mayo['tenant_id']}",
-                         headers=_auth(superadmin_token),
+                         cookies=_sa_cookies(superadmin_token),
                          json={"plan_limits": {"max_users": 50, "storage_gb": 200}})
         assert r.status_code == 200
         body = r.json()
@@ -108,20 +111,20 @@ class TestTenantFlexibility:
 
     def test_patch_tenant_notes(self, client, superadmin_token):
         hospitals = client.get("/api/public/hospitals?include_inactive=true",
-                               headers=_auth(superadmin_token)).json()
+                               cookies=_sa_cookies(superadmin_token)).json()
         mayo = next((h for h in hospitals if h["db_name"] == "mayoclinic_db"), None)
         if not mayo:
             pytest.skip("Demo seed not present.")
 
         r = client.patch(f"/api/public/hospitals/{mayo['tenant_id']}",
-                         headers=_auth(superadmin_token),
+                         cookies=_sa_cookies(superadmin_token),
                          json={"notes": "Auto-test operator note"})
         assert r.status_code == 200
         assert r.json()["notes"] == "Auto-test operator note"
 
         # Clear so re-runs are idempotent
         client.patch(f"/api/public/hospitals/{mayo['tenant_id']}",
-                     headers=_auth(superadmin_token), json={"notes": None})
+                     cookies=_sa_cookies(superadmin_token), json={"notes": None})
 
 
 # ─── Cross-tenant patient browser (read-only) ──────────────────────────────
@@ -133,7 +136,7 @@ class TestSuperadminPatientBrowser:
 
     def test_lists_patients_across_tenants(self, client, superadmin_token):
         r = client.get("/api/public/superadmin/patients",
-                       headers=_auth(superadmin_token))
+                       cookies=_sa_cookies(superadmin_token))
         assert r.status_code == 200, r.text
         body = r.json()
         assert "patients" in body and "count" in body
@@ -142,7 +145,7 @@ class TestSuperadminPatientBrowser:
 
     def test_search_filter(self, client, superadmin_token):
         r = client.get("/api/public/superadmin/patients?search=Kamau",
-                       headers=_auth(superadmin_token))
+                       cookies=_sa_cookies(superadmin_token))
         assert r.status_code == 200
         names = " ".join(p["surname"] + " " + (p["other_names"] or "") for p in r.json()["patients"])
         # Demo seed has a Kamau, John Mwangi; only assert when seed is present.
@@ -152,13 +155,13 @@ class TestSuperadminPatientBrowser:
     def test_tenant_filter(self, client, superadmin_token):
         # Use a known tenant_id when the demo seed is present.
         hospitals = client.get("/api/public/hospitals?include_inactive=true",
-                               headers=_auth(superadmin_token)).json()
+                               cookies=_sa_cookies(superadmin_token)).json()
         mayo = next((h for h in hospitals if h["db_name"] == "mayoclinic_db"), None)
         if not mayo:
             pytest.skip("Demo seed not present.")
 
         r = client.get(f"/api/public/superadmin/patients?tenant_id={mayo['tenant_id']}",
-                       headers=_auth(superadmin_token))
+                       cookies=_sa_cookies(superadmin_token))
         assert r.status_code == 200
         for p in r.json()["patients"]:
             assert p["tenant_id"] == mayo["tenant_id"]
@@ -166,12 +169,12 @@ class TestSuperadminPatientBrowser:
     def test_patient_detail_read_only_payload(self, client, superadmin_token):
         # Find a patient to detail
         listing = client.get("/api/public/superadmin/patients?limit_per_tenant=1",
-                             headers=_auth(superadmin_token)).json()
+                             cookies=_sa_cookies(superadmin_token)).json()
         if listing["count"] == 0:
             pytest.skip("No patients to test against.")
         p = listing["patients"][0]
         r = client.get(f"/api/public/superadmin/patients/{p['tenant_id']}/{p['patient_id']}",
-                       headers=_auth(superadmin_token))
+                       cookies=_sa_cookies(superadmin_token))
         assert r.status_code == 200
         detail = r.json()
         assert "tenant" in detail

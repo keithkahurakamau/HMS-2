@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session, sessionmaker
 from jose import jwt
 from pydantic import BaseModel, EmailStr, field_validator
@@ -411,7 +411,7 @@ class SuperAdminLogin(BaseModel):
 
 
 @router.post("/superadmin/login")
-def superadmin_login(payload: SuperAdminLogin, db: Session = Depends(get_master_db)):
+def superadmin_login(payload: SuperAdminLogin, response: Response, db: Session = Depends(get_master_db)):
     """Authenticates the MediFleet platform superadmin."""
     admin = db.query(SuperAdmin).filter(SuperAdmin.email == payload.email).first()
     if not admin or not verify_password(payload.password, admin.hashed_password):
@@ -430,11 +430,42 @@ def superadmin_login(payload: SuperAdminLogin, db: Session = Depends(get_master_
             "type": "access",
             "exp": expire,
         },
-        settings.SECRET_KEY,
+        settings.jwt_secret,
         algorithm=settings.ALGORITHM,
     )
+
+    # HttpOnly cookie keeps the JWT off page JS — previously this token sat in
+    # localStorage where any XSS on the platform console could read the key
+    # and impersonate the superadmin. SameSite=None is required because the
+    # SPA on Vercel reaches the API on Render cross-origin (Secure is then
+    # mandatory). `expires_in` is still returned so the SPA can show a
+    # "session expires in N minutes" indicator without reading the cookie.
+    is_production = settings.is_production
+    response.set_cookie(
+        "superadmin_token",
+        token,
+        max_age=int(ttl.total_seconds()),
+        httponly=True,
+        secure=is_production,
+        samesite="none" if is_production else "lax",
+        path="/",
+    )
     return {
-        "access_token": token,
         "full_name": admin.full_name,
         "expires_in": int(ttl.total_seconds()),
     }
+
+
+@router.post("/superadmin/logout")
+def superadmin_logout(response: Response):
+    """Clears the superadmin session cookie."""
+    response.delete_cookie("superadmin_token", path="/")
+    return {"detail": "Logged out"}
+
+
+@router.get("/superadmin/me")
+def superadmin_me(admin: dict = Depends(require_superadmin)):
+    """Returns the current superadmin session. The SPA calls this on platform
+    bootstrap to verify the cookie is still valid (the JWT itself is HttpOnly
+    so the SPA can't decode it locally)."""
+    return admin
