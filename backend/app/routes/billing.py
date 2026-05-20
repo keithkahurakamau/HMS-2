@@ -1,17 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
-import json
 
 from app.config.database import get_db
 from app.models.billing import Invoice, Payment
-from app.models.idempotency import IdempotencyKey
-from app.schemas.billing import PaymentRequest, MPesaRequest, InvoiceResponse
+from app.core.idempotency import idempotent_guard
+from app.schemas.billing import PaymentRequest, InvoiceResponse
 from app.core.dependencies import get_current_user, RequirePermission
-from app.services.payment_service import mpesa_service
 from app.services.accounting_posting import post_from_event, payment_method_to_key
 from app.utils.audit import log_audit
 from pydantic import BaseModel
+from sqlalchemy.orm import joinedload, selectinload
 
 class ConsultationFeeRequest(BaseModel):
     patient_id: int
@@ -21,8 +20,18 @@ router = APIRouter(prefix="/api/billing", tags=["Billing & Cashier"])
 
 @router.get("/queue", response_model=List[InvoiceResponse], dependencies=[Depends(RequirePermission("billing:manage"))])
 def get_billing_queue(db: Session = Depends(get_db)):
-    """Returns all patients with Pending invoices."""
-    invoices = db.query(Invoice).filter(Invoice.status.in_(["Pending", "Partially Paid", "Pending M-Pesa"])).order_by(Invoice.billing_date.asc()).all()
+    """Returns all patients with Pending invoices.
+
+    DB-002: eagerly loads patient + items so the per-row attribute accesses
+    in the loop below don't trigger N+1 queries (one per invoice).
+    """
+    invoices = (
+        db.query(Invoice)
+        .options(joinedload(Invoice.patient), selectinload(Invoice.items))
+        .filter(Invoice.status.in_(["Pending", "Partially Paid", "Pending M-Pesa"]))
+        .order_by(Invoice.billing_date.asc())
+        .all()
+    )
     
     result = []
     for inv in invoices:
@@ -43,9 +52,18 @@ def get_billing_queue(db: Session = Depends(get_db)):
 @router.post("/process-payment", dependencies=[Depends(RequirePermission("billing:manage"))])
 def process_cash_card_payment(req: PaymentRequest, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     try:
-        idem_key = db.query(IdempotencyKey).filter(IdempotencyKey.key == req.idempotency_key).first()
-        if idem_key:
-            return json.loads(idem_key.response_body)
+        # IDEM-001: scoped to (user_id, endpoint, key) so attackers can't
+        # replay another user's key. idempotent_guard also takes a pg
+        # advisory lock to serialise concurrent duplicates.
+        cached, persist = idempotent_guard(
+            db,
+            user_id=current_user["user_id"],
+            endpoint="billing.process-payment",
+            key=req.idempotency_key,
+            body=req.model_dump() if hasattr(req, "model_dump") else req.dict(),
+        )
+        if cached is not None:
+            return cached
 
         invoice = db.query(Invoice).with_for_update().filter(Invoice.invoice_id == req.invoice_id).first()
         if not invoice or invoice.status == "Paid":
@@ -74,37 +92,18 @@ def process_cash_card_payment(req: PaymentRequest, request: Request, db: Session
         )
 
         resp_data = {"status": "Success", "invoice_status": invoice.status, "payment_id": payment.payment_id}
-        db.add(IdempotencyKey(key=req.idempotency_key, response_body=json.dumps(resp_data)))
+        persist(resp_data)
         log_audit(db, current_user["user_id"], "CREATE", "Payment", payment.payment_id, None, {"amount": req.amount, "method": req.payment_method}, request.client.host)
 
         db.commit()
         return resp_data
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-
-@router.post("/process-mpesa", dependencies=[Depends(RequirePermission("billing:manage"))])
-def initiate_mpesa_payment(req: MPesaRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    invoice = db.query(Invoice).filter(Invoice.invoice_id == req.invoice_id).first()
-    if not invoice or invoice.status == "Paid":
-        raise HTTPException(status_code=400, detail="Invalid or already paid invoice")
-
-    # Trigger STK Push
-    response = mpesa_service.trigger_stk_push(
-        phone_number=req.phone_number,
-        amount=req.amount,
-        reference=f"INV-{invoice.invoice_id}",
-        description="Hospital Bill Payment"
-    )
-
-    if response.get("ResponseCode") == "0":
-        invoice.status = "Pending M-Pesa"
-        db.commit()
-        return {"status": "STK Push Sent", "checkout_request_id": response.get("CheckoutRequestID")}
-    
-    
-    raise HTTPException(status_code=400, detail="M-Pesa request failed")
 
 @router.post("/consultation-fee", dependencies=[Depends(RequirePermission("clinical:write"))])
 def charge_consultation_fee(req: ConsultationFeeRequest, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -150,17 +149,19 @@ def charge_consultation_fee(req: ConsultationFeeRequest, request: Request, db: S
 
 @router.get("/mpesa-transactions", dependencies=[Depends(RequirePermission("billing:read"))])
 def get_billing_mpesa_transactions(db: Session = Depends(get_db)):
-    """Returns M-Pesa transactions for cashiers and pharmacists to verify receipts.
+    """Returns Pay Hero (M-Pesa rail) transactions for cashiers to verify receipts.
 
-    AUTH-002: previously this endpoint had NO auth dependency, so any
-    unauthenticated caller on a known tenant could read every M-Pesa
-    transaction (phone numbers, amounts, receipt numbers — PII + payment
-    data). Now gated on billing:read which is held by Doctor, Pharmacist,
-    Receptionist, and Accountant roles per the canonical catalogue.
+    Route path keeps the legacy ``/mpesa-transactions`` name for frontend
+    compatibility; the rail is Pay Hero. AUTH-002 hardened access to
+    ``billing:read`` (Doctor / Pharmacist / Receptionist / Accountant).
     """
-    from app.models.mpesa import MpesaTransaction
-    transactions = db.query(MpesaTransaction).order_by(MpesaTransaction.transaction_date.desc()).limit(100).all()
-    
+    from app.models.payhero import PayHeroTransaction
+    transactions = (
+        db.query(PayHeroTransaction)
+        .order_by(PayHeroTransaction.transaction_date.desc())
+        .limit(100)
+        .all()
+    )
     return [
         {
             "id": txn.id,
@@ -170,7 +171,7 @@ def get_billing_mpesa_transactions(db: Session = Depends(get_db)):
             "status": txn.status,
             "receipt_number": txn.receipt_number,
             "result_desc": txn.result_desc,
-            "created_at": txn.transaction_date.isoformat() if txn.transaction_date else None
+            "created_at": txn.transaction_date.isoformat() if txn.transaction_date else None,
         }
         for txn in transactions
     ]

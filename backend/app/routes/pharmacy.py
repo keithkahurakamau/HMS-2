@@ -1,23 +1,21 @@
 from decimal import Decimal
 from typing import Union
-import json
 import logging
-import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
+from app.core.idempotency import idempotent_guard
 from app.models.inventory import InventoryItem, StockBatch, DispenseLog, Location
 from app.models.billing import Invoice, InvoiceItem, Payment
-from app.models.idempotency import IdempotencyKey
-from app.models.mpesa import MpesaTransaction
+from app.models.payhero import PayHeroTransaction
 from app.schemas.pharmacy import (
     CashPaymentResponse,
     DispensePaymentRequest,
     DispenseRequest,
     DispenseResponse,
-    MpesaInitResponse,
+    PayHeroInitResponse,
 )
 from app.core.dependencies import get_current_user, RequirePermission
 from app.services.accounting_posting import (
@@ -25,7 +23,7 @@ from app.services.accounting_posting import (
     post_dispense_pair,
     post_from_event,
 )
-from app.services.mpesa_service import initiate_stk_push
+from app.services.payhero_service import initiate_stk_push
 from app.utils.audit import log_audit
 
 logger = logging.getLogger(__name__)
@@ -61,10 +59,16 @@ def get_pharmacy_inventory(db: Session = Depends(get_db)):
 @router.post("/dispense", response_model=DispenseResponse, dependencies=[Depends(RequirePermission("pharmacy:manage"))])
 def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     try:
-        # 1. Idempotency Check (Prevent accidental double-clicks from charging twice)
-        idem_key = db.query(IdempotencyKey).filter(IdempotencyKey.key == req.idempotency_key).first()
-        if idem_key:
-            return json.loads(idem_key.response_body) # Return the exact same response as the first time
+        # 1. Idempotency Check (IDEM-001 scoped per-user + advisory lock)
+        cached, persist = idempotent_guard(
+            db,
+            user_id=current_user["user_id"],
+            endpoint="pharmacy.dispense",
+            key=req.idempotency_key,
+            body=req.model_dump() if hasattr(req, "model_dump") else req.dict(),
+        )
+        if cached is not None:
+            return cached
 
         # 2. Inventory Check & Deduction (Using Specific StockBatch for FEFO)
         batch = db.query(StockBatch).with_for_update().filter(StockBatch.batch_id == req.batch_id).first()
@@ -78,7 +82,10 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
         
         # Deduct Physical Stock
         batch.quantity -= req.quantity
-        total_cost = float(item.unit_price) * req.quantity
+        # Money stays in Decimal so the Numeric(10,2) columns aren't silently
+        # upcast to float — that mismatch broke (total_amount - amount_paid)
+        # below when one operand had been mutated to float.
+        total_cost = Decimal(item.unit_price) * req.quantity
 
         # 3. Create Dispense Log
         log_entry = DispenseLog(
@@ -148,13 +155,13 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
             "dispense_id": log_entry.dispense_id,
             "item_id": item.item_id,
             "quantity_dispensed": req.quantity,
-            "total_cost": total_cost,
+            "total_cost": float(total_cost),
             "dispensed_at": str(log_entry.dispensed_at),
             "invoice_id": invoice_id,
             "invoice_balance": invoice_balance,
         }
 
-        db.add(IdempotencyKey(key=req.idempotency_key, response_body=json.dumps(resp_data)))
+        persist(resp_data)
         log_audit(db, current_user["user_id"], "CREATE", "DispenseLog", log_entry.dispense_id, None, {"item": item.name, "qty": req.quantity}, request.client.host)
 
         db.commit()
@@ -165,6 +172,7 @@ def dispense_drug(req: DispenseRequest, request: Request, db: Session = Depends(
         raise
     except Exception as e:
         db.rollback()
+        logger.exception("pharmacy.dispense failed (idem=%s)", getattr(req, "idempotency_key", None))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -192,7 +200,7 @@ def _resolve_dispense_invoice(db: Session, dispense_id: int) -> tuple[DispenseLo
 
 @router.post(
     "/dispense/{dispense_id}/pay",
-    response_model=Union[CashPaymentResponse, MpesaInitResponse],
+    response_model=Union[CashPaymentResponse, PayHeroInitResponse],
     dependencies=[Depends(RequirePermission("pharmacy:manage"))],
 )
 def collect_dispense_payment(
@@ -209,12 +217,12 @@ def collect_dispense_payment(
     card  — same shape as cash, but payment_method='Card' and posts
             billing.payment.bank (cards settle into the bank account
             same as bank transfers). transaction_reference holds the
-            card terminal auth code if supplied. Card-terminal API
-            integration (Pesapal / Stripe Terminal / etc.) can be wired
-            later — for now this records the receipt manually.
-    mpesa — initiate an STK push tied to (dispense_id, invoice_id).
-            Returns checkout_request_id; the actual ledger posting
-            happens in the M-Pesa callback when the customer confirms.
+            card terminal auth code if supplied.
+    mpesa — initiate a Pay Hero STK push tied to (dispense_id, invoice_id).
+            "mpesa" remains the customer-facing label because that is
+            what the patient sees on their phone; the rail is Pay Hero.
+            The actual ledger posting happens in the Pay Hero callback
+            when the customer confirms the prompt.
     """
     dispense, invoice = _resolve_dispense_invoice(db, dispense_id)
 
@@ -271,76 +279,58 @@ def collect_dispense_payment(
             invoice_status=invoice.status,
         )
 
-    # ── M-Pesa ──────────────────────────────────────────────────────────────
-    # method == 'mpesa'
+    # ── M-Pesa via Pay Hero aggregator ──────────────────────────────────
+    # method == 'mpesa' (customer-facing label; the rail is Pay Hero)
     if not req.phone_number:
         raise HTTPException(400, detail="phone_number is required for M-Pesa payments.")
 
     # Idempotency: if there's an existing pending STK for this dispense, return it.
     existing = (
-        db.query(MpesaTransaction)
+        db.query(PayHeroTransaction)
         .filter(
-            MpesaTransaction.dispense_id == dispense_id,
-            MpesaTransaction.status == "Pending",
+            PayHeroTransaction.dispense_id == dispense_id,
+            PayHeroTransaction.status == "Pending",
         )
         .first()
     )
-    if existing and existing.checkout_request_id:
-        return MpesaInitResponse(
+    if existing and existing.external_reference:
+        return PayHeroInitResponse(
             status="stk_push_sent",
-            checkout_request_id=existing.checkout_request_id,
-            mpesa_transaction_id=existing.id,
+            external_reference=existing.external_reference,
+            payhero_reference=existing.payhero_reference,
+            transaction_id=existing.id,
         )
-
-    # Build a callback URL. Production: the operator wires PUBLIC_BASE_URL.
-    # If neither PUBLIC_BASE_URL nor a meaningful request.base_url is set,
-    # Safaricom will reject the placeholder and the dispense's STK pending
-    # row gets stranded — refuse to initiate instead of silently sending
-    # a doomed request.
-    base = os.environ.get("PUBLIC_BASE_URL") or (
-        str(request.base_url).rstrip("/") if hasattr(request, "base_url") else ""
-    )
-    if not base or "placeholder.invalid" in base or "localhost" in base or "127.0.0.1" in base:
-        raise HTTPException(
-            status_code=503,
-            detail="M-Pesa is not configured — set PUBLIC_BASE_URL to a publicly-reachable HTTPS host so Safaricom can deliver the callback.",
-        )
-    callback_url = f"{base}/api/payments/mpesa/callback"
 
     try:
         txn_payload = initiate_stk_push(
-            db=db,
+            db,
             phone_number=req.phone_number,
             amount=float(amt),
             invoice_id=invoice.invoice_id,
-            callback_url=callback_url,
+            dispense_id=dispense_id,
         )
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Pharmacy M-Pesa STK push failed for dispense=%s", dispense_id)
-        raise HTTPException(status_code=502, detail=f"Could not contact M-Pesa: {exc}")
+        logger.exception("Pay Hero STK push failed for dispense=%s", dispense_id)
+        raise HTTPException(status_code=502, detail=f"Could not contact Pay Hero: {exc}")
 
-    # initiate_stk_push inserted a row keyed by invoice_id; attach the
-    # dispense_id back-ref so the callback can resolve to this dispense.
-    txn = (
-        db.query(MpesaTransaction)
-        .filter(MpesaTransaction.checkout_request_id == txn_payload.get("checkout_request_id"))
-        .order_by(MpesaTransaction.id.desc())
-        .first()
+    log_audit(
+        db,
+        current_user["user_id"],
+        "CREATE",
+        "PayHeroTransaction",
+        txn_payload.get("transaction_id") or 0,
+        None,
+        {"dispense_id": dispense_id, "amount": float(amt), "phone": req.phone_number},
+        request.client.host,
     )
-    if txn:
-        txn.dispense_id = dispense_id
-        db.commit()
 
-    log_audit(db, current_user["user_id"], "CREATE", "MpesaTransaction", txn.id if txn else 0, None,
-              {"dispense_id": dispense_id, "amount": float(amt), "phone": req.phone_number},
-              request.client.host)
-
-    return MpesaInitResponse(
+    return PayHeroInitResponse(
         status="stk_push_sent",
-        checkout_request_id=txn_payload.get("checkout_request_id", ""),
-        mpesa_transaction_id=txn.id if txn else 0,
+        external_reference=txn_payload.get("external_reference", ""),
+        payhero_reference=txn_payload.get("reference"),
+        transaction_id=txn_payload.get("transaction_id") or 0,
     )
 
 
@@ -352,10 +342,10 @@ def dispense_payment_status(dispense_id: int, db: Session = Depends(get_db)):
     """Lightweight status endpoint the frontend can poll while waiting for
     an STK push to resolve."""
     _, invoice = _resolve_dispense_invoice(db, dispense_id)
-    pending_mpesa = (
-        db.query(MpesaTransaction)
-        .filter(MpesaTransaction.dispense_id == dispense_id)
-        .order_by(MpesaTransaction.id.desc())
+    pending = (
+        db.query(PayHeroTransaction)
+        .filter(PayHeroTransaction.dispense_id == dispense_id)
+        .order_by(PayHeroTransaction.id.desc())
         .first()
     )
     return {
@@ -363,9 +353,9 @@ def dispense_payment_status(dispense_id: int, db: Session = Depends(get_db)):
         "invoice_status": invoice.status,
         "amount_paid": float(invoice.amount_paid or 0),
         "total_amount": float(invoice.total_amount or 0),
-        "mpesa_status": pending_mpesa.status if pending_mpesa else None,
-        "mpesa_receipt_number": pending_mpesa.receipt_number if pending_mpesa else None,
-        "mpesa_result_desc": pending_mpesa.result_desc if pending_mpesa else None,
+        "mpesa_status": pending.status if pending else None,
+        "mpesa_receipt_number": pending.receipt_number if pending else None,
+        "mpesa_result_desc": pending.result_desc if pending else None,
     }
 
 
@@ -543,13 +533,13 @@ def pharmacy_transactions(
         else:
             q = q.filter(first_pm_subq == method)
 
-    q = q.order_by(DispenseLog.dispensed_at.desc())
-
     # Total reflects the same filter set; skip on offset>0 to save the
-    # round-trip when the frontend is just paging deeper.
+    # round-trip when the frontend is just paging deeper. Computed *before*
+    # the ORDER BY is added — Postgres rejects an ORDER BY on a non-grouped
+    # column when the SELECT collapses to an aggregate.
     total = q.with_entities(func.count(DispenseLog.dispense_id)).scalar() if offset == 0 else None
 
-    rows = q.offset(offset).limit(limit).all()
+    rows = q.order_by(DispenseLog.dispensed_at.desc()).offset(offset).limit(limit).all()
 
     out = []
     for d, invoice, item, cashier, primary_method in rows:

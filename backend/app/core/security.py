@@ -1,46 +1,119 @@
+"""Auth primitives: password hashing, JWT issuance, opaque-token hashing.
+
+AUTH-001: forward path is Argon2id (peppered). Existing bcrypt hashes still
+verify so the migration is transparent — every successful login through the
+legacy bcrypt branch quietly re-hashes under Argon2id. Once all users have
+rotated through one login, the bcrypt branch can be deleted.
+"""
+from __future__ import annotations
+
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
-from jose import jwt
+
 import bcrypt
+from argon2 import PasswordHasher, Type
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
+from jose import jwt
+
 from app.config.settings import settings
 
+# OWASP 2023 baseline: m=64MiB, t=3, p=2 — empirically ~80ms on a modern
+# small instance, well within Render's per-request budget and several orders
+# of magnitude harder offline than bcrypt cost-12.
+_ARGON2 = PasswordHasher(
+    time_cost=3,
+    memory_cost=64 * 1024,
+    parallelism=2,
+    hash_len=32,
+    salt_len=16,
+    type=Type.ID,
+)
+_ARGON2_PREFIX = "$argon2"
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifies a plaintext password against a bcrypt hash."""
-    password_byte_enc = plain_password.encode('utf-8')
-    hashed_password_byte_enc = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(password_byte_enc, hashed_password_byte_enc)
+
+def _peppered(password: str) -> bytes:
+    pepper = settings.password_pepper.encode("utf-8")
+    pw_bytes = password.encode("utf-8")
+    if not pepper:
+        return pw_bytes
+    # HMAC-SHA256 keeps the input length bounded (32 bytes) regardless of
+    # what the user typed, and means the pepper never appears in the Argon2
+    # input directly.
+    return hmac.new(pepper, pw_bytes, hashlib.sha256).digest()
 
 
 def get_password_hash(password: str) -> str:
-    """Generates a bcrypt hash from a plaintext password."""
-    password_byte_enc = password.encode('utf-8')
-    salt = bcrypt.gensalt()
-    hashed_password = bcrypt.hashpw(password_byte_enc, salt)
-    return hashed_password.decode('utf-8')
+    """Issue a new Argon2id hash. New passwords always take this path."""
+    return _ARGON2.hash(_peppered(password))
 
 
-def create_access_token(data: dict):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify against either Argon2id (forward path) or bcrypt (legacy).
+
+    Returns False on any mismatch / corrupt hash. Never raises — callers
+    must not branch on exception types.
+    """
+    if not hashed_password:
+        return False
+    try:
+        if hashed_password.startswith(_ARGON2_PREFIX):
+            try:
+                _ARGON2.verify(hashed_password, _peppered(plain_password))
+                return True
+            except (VerifyMismatchError, VerificationError, InvalidHashError):
+                return False
+        # Legacy bcrypt path — the unpeppered password is what's stored.
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
+
+
+def needs_rehash(hashed_password: str) -> bool:
+    """True when the stored hash is bcrypt or an outdated Argon2 parameter set."""
+    if not hashed_password:
+        return False
+    if not hashed_password.startswith(_ARGON2_PREFIX):
+        return True
+    try:
+        return _ARGON2.check_needs_rehash(hashed_password)
+    except Exception:  # noqa: BLE001 — defensive; never block a login on this
+        return False
+
+
+def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire, "type": "access"})
-    encoded_jwt = jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.ALGORITHM)
-    return encoded_jwt
+    # AUTH-002: include audience = tenant_id so a token minted for tenant A
+    # cannot be replayed at tenant B even if the signing key leaks; jti lets
+    # us cache permission lookups (DB-001) without revealing user_id.
+    to_encode.update({
+        "exp": expire,
+        "type": "access",
+        "iss": "hms",
+        "aud": data.get("tenant_id", "unscoped"),
+        "jti": generate_jti(),
+    })
+    return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.ALGORITHM)
 
 
-def create_refresh_token(data: dict, jti: str):
-    """Refresh tokens carry a unique jti so we can revoke specific sessions."""
+def create_refresh_token(data: dict, jti: str) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh", "jti": jti})
-    encoded_jwt = jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.ALGORITHM)
-    return encoded_jwt
+    to_encode.update({
+        "exp": expire,
+        "type": "refresh",
+        "iss": "hms",
+        "aud": data.get("tenant_id", "unscoped"),
+        "jti": jti,
+    })
+    return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.ALGORITHM)
 
 
 def hash_token(token: str) -> str:
     """SHA-256 hash for storing tokens in the DB without leaking the original."""
-    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def generate_jti() -> str:

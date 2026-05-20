@@ -156,8 +156,9 @@ export default function Pharmacy() {
                     dispenseId: last.dispense_id,
                     amount,
                     patientName: 'Walk-in',
-                    pendingMpesa: { checkout_request_id: res.data?.checkout_request_id,
-                                    mpesa_transaction_id: res.data?.mpesa_transaction_id },
+                    pendingMpesa: { external_reference: res.data?.external_reference,
+                                    payhero_reference: res.data?.payhero_reference,
+                                    transaction_id: res.data?.transaction_id },
                 });
             } else {
                 toast.success(`${method === 'card' ? 'Card' : 'Cash'} payment recorded.`);
@@ -796,7 +797,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
     const [phone, setPhone] = useState('');
     const [reference, setReference] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [pollingTxnId, setPollingTxnId] = useState(pendingMpesa?.mpesa_transaction_id ?? null);
+    const [pollingTxnId, setPollingTxnId] = useState(pendingMpesa?.transaction_id ?? null);
     const [pollStatus, setPollStatus] = useState(null);
 
     // Poll the dispense's payment status while M-Pesa is pending.
@@ -847,7 +848,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                 onSettled();
             } else if (method === 'mpesa') {
                 toast.success('STK push sent. Customer to confirm on their phone.');
-                setPollingTxnId(res.data?.mpesa_transaction_id);
+                setPollingTxnId(res.data?.transaction_id);
             }
         } catch (err) {
             toast.error(err?.response?.data?.detail || 'Payment failed.');

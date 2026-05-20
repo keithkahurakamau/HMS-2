@@ -396,8 +396,9 @@ describe('Pharmacy — payment flow', () => {
                 return Promise.resolve({
                     data: {
                         status: 'stk_push_sent',
-                        checkout_request_id: 'ws_CO_123',
-                        mpesa_transaction_id: 77,
+                        external_reference: 'INV-999-abc',
+                        payhero_reference: 'PH-77',
+                        transaction_id: 77,
                         invoice_status: 'Pending M-Pesa',
                     },
                 });
@@ -514,8 +515,9 @@ describe('Pharmacy — payment flow', () => {
                 return Promise.resolve({
                     data: {
                         status: 'stk_push_sent',
-                        checkout_request_id: 'ws_CO_700',
-                        mpesa_transaction_id: 7700,
+                        external_reference: 'INV-800-xyz',
+                        payhero_reference: 'PH-7700',
+                        transaction_id: 7700,
                         invoice_status: 'Pending M-Pesa',
                     },
                 });

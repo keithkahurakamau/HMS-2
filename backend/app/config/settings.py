@@ -20,9 +20,25 @@ class Settings(BaseSettings):
     # raises at import-time if either is missing or weak (audit SEC-001).
     SECRET_KEY: SecretStr
     ENCRYPTION_KEY: SecretStr
+    # AUTH-001: server-side pepper HMACed into every password before Argon2id
+    # hashing. Required in production; empty allowed in dev so existing
+    # bcrypt-only hashes keep verifying.
+    PASSWORD_PEPPER: SecretStr = SecretStr("")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # ── Pay Hero aggregator (PAY-001) ──────────────────────────────────
+    PAYHERO_ENV: str = "sandbox"               # 'sandbox' | 'production'
+    PAYHERO_BASE_URL: str = "https://backend.payhero.co.ke/api/v2"
+    PAYHERO_USERNAME: SecretStr = SecretStr("")
+    PAYHERO_PASSWORD: SecretStr = SecretStr("")
+    PAYHERO_CHANNEL_ID: str = ""               # Till / Paybill / Bank channel
+    PAYHERO_WEBHOOK_SECRET: SecretStr = SecretStr("")
+    # Comma-separated CIDR allow-list (PAY-002). Empty disables IP check —
+    # only acceptable in development; verify_payhero raises in production.
+    PAYHERO_WEBHOOK_CIDRS: str = ""
+    PUBLIC_BASE_URL: str = ""                  # https://… used for callback URLs
 
     @field_validator("SECRET_KEY")
     @classmethod
@@ -61,8 +77,24 @@ class Settings(BaseSettings):
     # back to the in-process dictionary and log a warning at boot.
     REDIS_URL: str = ""
 
-    # M-Pesa
-    MPESA_ENV: str = "sandbox"
+    # Infrastructure / orchestration values consumed by docker-compose from the
+    # same .env file. Declared here (rather than relaxing extra="forbid") so
+    # SEC-005 still catches typos on security-critical fields.
+    POSTGRES_USER: str = ""
+    POSTGRES_PASSWORD: str = ""
+    POSTGRES_DB: str = ""
+    POSTGRES_HOST_PORT: str = ""
+    REDIS_HOST_PORT: str = ""
+    BACKEND_HOST_PORT: str = ""
+    FRONTEND_HOST_PORT: str = ""
+    MIGRATE_ON_BOOT: str = ""
+    SEED_SUPERADMIN_EMAIL: str = ""
+    SEED_SUPERADMIN_PASSWORD: str = ""
+
+    # Legacy Daraja keys. NO CODE READS THESE — declared only so existing
+    # .env files don't trip ``extra="forbid"`` after the Pay Hero swap.
+    # Safe to delete from .env; safe to leave in place.
+    MPESA_ENV: str = ""
     MPESA_CONSUMER_KEY: str = ""
     MPESA_CONSUMER_SECRET: str = ""
     MPESA_PASSKEY: str = ""
@@ -71,6 +103,15 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> List[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def password_pepper(self) -> str:
+        """Server-side pepper; empty bytes if not configured (dev only)."""
+        return self.PASSWORD_PEPPER.get_secret_value()
+
+    @property
+    def payhero_webhook_secret(self) -> str:
+        return self.PAYHERO_WEBHOOK_SECRET.get_secret_value()
 
     @property
     def jwt_secret(self) -> str:

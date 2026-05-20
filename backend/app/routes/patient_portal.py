@@ -60,7 +60,14 @@ def _resolve_portal_patient(token: Optional[str], db: Session) -> Patient:
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Portal session required.")
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.ALGORITHM])
+        # Patient portal tokens carry type='patient_portal' rather than the
+        # AUTH-002 tenant aud — disable aud verification here.
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_aud": False},
+        )
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Portal session invalid or expired.")
     if payload.get("type") != "patient_portal":

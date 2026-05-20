@@ -9,6 +9,7 @@ from app.models.auth_tokens import RefreshToken, PasswordResetToken
 from app.core.security import (
     verify_password,
     get_password_hash,
+    needs_rehash,
     create_tokens,
     create_access_token,
     create_refresh_token,
@@ -182,6 +183,10 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
     # Success reset
     user.failed_login_attempts = 0
     user.locked_until = None
+    # AUTH-001: transparently re-hash legacy bcrypt / outdated-param hashes
+    # under Argon2id now that we have the plaintext password verified.
+    if needs_rehash(user.hashed_password):
+        user.hashed_password = get_password_hash(payload.password)
     db.commit()
 
     # Block login if forced password change is required
@@ -223,7 +228,12 @@ async def refresh(request: Request, response: Response, db: Session = Depends(ge
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token")
 
     try:
-        payload = jwt.decode(raw_refresh, settings.jwt_secret, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            raw_refresh,
+            settings.jwt_secret,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_aud": False},  # AUTH-002 rollover; tenant_id is the aud
+        )
     except JWTError:
         _clear_session_cookies(response)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
@@ -300,7 +310,9 @@ async def logout(request: Request, response: Response, db: Session = Depends(get
                 raw_refresh,
                 settings.jwt_secret,
                 algorithms=[settings.ALGORITHM],
-                options={"verify_exp": False},  # we want to revoke even expired tokens
+                # We want to revoke even expired tokens; ditto don't gate
+                # logout on AUTH-002's aud check during rollover.
+                options={"verify_exp": False, "verify_aud": False},
             )
             jti = payload.get("jti")
             if jti:
@@ -421,7 +433,9 @@ async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: 
 
         # In production, dispatch an email here. Until SMTP is wired, surface
         # the token in non-production environments only.
-        if settings.MPESA_ENV.lower() != "production":
+        # AUTH-005: gate on APP_ENV (single source of truth), not MPESA_ENV —
+        # a prod deploy with sandbox Daraja previously leaked reset tokens.
+        if not settings.is_production:
             response["dev_token"] = raw_token
 
     return response

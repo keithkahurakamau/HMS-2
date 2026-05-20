@@ -33,8 +33,8 @@ import app.routes.websockets as websockets_module
 import app.routes.radiology as radiology_module
 import app.routes.medical_history as medical_history_module
 import app.routes.public as public_module
-import app.routes.mpesa_admin as mpesa_admin_module
-import app.routes.mpesa_payment as mpesa_payment_module
+import app.routes.payhero_admin as payhero_admin_module
+import app.routes.payhero_payment as payhero_payment_module
 import app.routes.privacy as privacy_module
 import app.routes.notifications as notifications_module
 import app.routes.patient_portal as patient_portal_module
@@ -119,8 +119,20 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # RL-002: tightened from wildcard. CONNECT/TRACE never need to traverse
+    # the API; explicit header allow-list also stops a misconfigured preview
+    # domain from sending arbitrary headers under credential cookies.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Tenant-ID",
+        "X-CSRF-Token",
+        "Idempotency-Key",
+        "X-Requested-With",
+    ],
+    expose_headers=["X-Process-Time"],
+    max_age=600,
 )
 
 # 6. Global Middleware: Process Time (Removed Exception Catcher from here)
@@ -138,18 +150,23 @@ async def process_time_middleware(request: Request, call_next):
 # powerful browser APIs we never use. These also cover any direct browser
 # visits to the API surface (e.g. someone opening /api/dashboard in a tab);
 # the SPA itself receives a mirrored set from Vercel/nginx.
+# FE-002: connect-src is the only directive the API surface itself can be
+# reached on by a browser; pin to the same origin (the API talks to itself
+# via /api routes only). Style 'unsafe-inline' is retained because the API
+# rarely serves HTML — the SPA's own vercel.json CSP is stricter.
 _CSP_POLICY = (
     "default-src 'self'; "
     "script-src 'self'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data: https:; "
     "font-src 'self' data:; "
-    "connect-src 'self' wss: https:; "
+    "connect-src 'self'; "
     "frame-ancestors 'none'; "
     "form-action 'self'; "
     "base-uri 'none'; "
     "object-src 'none'; "
-    "media-src 'self'"
+    "media-src 'self'; "
+    "require-trusted-types-for 'script'"
 )
 
 
@@ -160,6 +177,9 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
     response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=(), payment=(), usb=()"
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    # RL-003: COEP+CORP isolate the API surface from cross-origin embedders.
+    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["X-Frame-Options"] = "DENY"
@@ -173,16 +193,16 @@ async def security_headers_middleware(request: Request, call_next):
 #     defences on these routes — bcrypt + rate limiting + per-route locks —
 #     hold the line on credential stuffing while CSRF stays excluded.
 #   - External webhooks (M-Pesa C2B callbacks) that can't possibly carry a
-#     CSRF header because they're called by Safaricom's servers, not browsers.
-#     Authentication on those paths is signature-based, not session-based.
+#     CSRF header because they're called by Pay Hero's servers, not browsers.
+#     Authentication on those paths is HMAC signature based, not session based
+#     (see core/payhero_webhook.verify_payhero).
 # Everything else — including the superadmin /hospitals admin surface, which
 # uses Bearer auth but still benefits from CSRF as defence-in-depth — must
 # present a matching token.
 _CSRF_EXEMPT_PATHS = (
     "/api/auth/login",
     "/api/public/superadmin/login",
-    "/api/payments/mpesa/callback",
-    "/api/payments/mpesa/c2b/",
+    "/api/payments/payhero/callback",
 )
 
 
@@ -247,8 +267,8 @@ app.include_router(websockets_module.router)
 app.include_router(radiology_module.router)
 app.include_router(medical_history_module.router)
 app.include_router(public_module.router)
-app.include_router(mpesa_admin_module.router)
-app.include_router(mpesa_payment_module.router)
+app.include_router(payhero_admin_module.router)  # PAY-001: per-tenant Pay Hero config
+app.include_router(payhero_payment_module.router)  # PAY-001: Pay Hero aggregator
 app.include_router(privacy_module.router)
 app.include_router(notifications_module.router)
 app.include_router(patient_portal_module.router)
