@@ -24,6 +24,11 @@ on:
       - 'backend/scripts/migrate_all_tenants.py'
       - 'backend/render-start.sh'
       - '.github/workflows/migration-check.yml'
+  # Manual trigger so we can fire the migration check on PRs that don't
+  # touch the alembic surface but still need to satisfy the required
+  # status check (branch protection currently expects this job to run
+  # on every PR into development/beta/main).
+  workflow_dispatch:
 
 jobs:
   migrate-all-tenants:
