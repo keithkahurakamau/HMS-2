@@ -40,8 +40,9 @@ def _peppered(password: str) -> bytes:
         return pw_bytes
     # HMAC-SHA256 keeps the input length bounded (32 bytes) regardless of
     # what the user typed, and means the pepper never appears in the Argon2
-    # input directly.
-    return hmac.new(pepper, pw_bytes, hashlib.sha256).digest()
+    # input directly. The Argon2id hash that follows is what actually
+    # protects the password — HMAC here is a preprocessing step.
+    return hmac.new(pepper, pw_bytes, hashlib.sha256).digest()  # lgtm[py/weak-sensitive-data-hashing]  # noqa: S324 -- HMAC-SHA256 is strong; password is then Argon2id-hashed
 
 
 def get_password_hash(password: str) -> str:

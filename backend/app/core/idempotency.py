@@ -87,7 +87,9 @@ def idempotent_guard(
     # Serialise concurrent duplicates on the same (user, key) tuple. The lock
     # is held for the rest of the transaction so a second request arriving
     # while the first is still executing will block here, then read the cache.
-    lock_id = int(hashlib.sha1(f"{user_id}:{endpoint}:{key}".encode()).hexdigest()[:15], 16)
+    # Non-cryptographic use: derive a stable Postgres advisory-lock id from
+    # the (user, endpoint, key) tuple. SHA-256 here is overkill but free.
+    lock_id = int(hashlib.sha256(f"{user_id}:{endpoint}:{key}".encode()).hexdigest()[:15], 16)
     db.execute(text("SELECT pg_advisory_xact_lock(:lid)"), {"lid": lock_id})
 
     # Re-check after acquiring the lock — the previous holder may have just
