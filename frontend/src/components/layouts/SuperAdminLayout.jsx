@@ -6,6 +6,7 @@ import {
     Menu, X,
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/SuperAdminLogin';
+import { apiClient } from '../../api/client';
 import Logo from '../Logo';
 
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -22,7 +23,10 @@ export default function SuperAdminLayout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const adminName = localStorage.getItem('hms_superadmin_name');
 
-    const handleExit = () => {
+    const handleExit = async () => {
+        // Ask the backend to clear the HttpOnly cookie; swallow errors so a
+        // stuck session can't trap the user on the console.
+        try { await apiClient.post('/public/superadmin/logout'); } catch (_) { /* noop */ }
         clearSuperAdminSession();
         navigate('/superadmin/login', { replace: true });
     };

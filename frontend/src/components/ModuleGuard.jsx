@@ -26,13 +26,14 @@ const MODULE_LABELS = {
     billing: 'Billing',
     cheques: 'Cheques',
     medical_history: 'Medical History',
-    mpesa: 'M-Pesa',
+    payhero: 'Pay Hero (M-Pesa)',
     analytics: 'Analytics',
     patient_portal: 'Patient Portal',
     branding: 'Branding',
     referrals: 'Referrals',
     privacy: 'Privacy',
     clinical: 'Clinical Desk',
+    accounting: 'Managerial Accounting',
 };
 
 export default function ModuleGuard({ moduleKey, children }) {

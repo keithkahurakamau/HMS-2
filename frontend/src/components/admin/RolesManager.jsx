@@ -3,6 +3,60 @@ import { ShieldCheck, Plus, Trash2, X, Lock, Activity, Save } from 'lucide-react
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
 
+// Friendly section labels for permission categories. Keys match the prefix
+// before the `:` in a codename (e.g. `mpesa:read` → "M-Pesa"). Unknown
+// prefixes fall through to a title-cased version of the prefix itself.
+const CATEGORY_LABELS = {
+    users: 'User Management',
+    roles: 'Roles & Custom Permissions',
+    departments: 'Departments',
+    dashboard: 'Dashboard',
+    patients: 'Patient Registry',
+    appointments: 'Appointments',
+    clinical: 'Clinical Desk',
+    history: 'Medical History',
+    pharmacy: 'Pharmacy',
+    inventory: 'Inventory',
+    laboratory: 'Laboratory',
+    radiology: 'Radiology',
+    wards: 'Wards & Admissions',
+    billing: 'Billing',
+    cheques: 'Cheques',
+    mpesa: 'M-Pesa',
+    messaging: 'Internal Messaging',
+    referrals: 'Referrals',
+    settings: 'Hospital Settings',
+    branding: 'Branding',
+    notifications: 'Notifications',
+    support: 'MediFleet Support',
+    analytics: 'Analytics',
+    patient_portal: 'Patient Portal',
+    privacy: 'Privacy (KDPA)',
+    accounting: 'Managerial Accounting',
+};
+
+// Order categories follow the module catalogue in the backend so the editor
+// reads top-to-bottom in the same shape the superadmin sees in tenant modules.
+const CATEGORY_ORDER = [
+    'users', 'roles', 'departments',
+    'dashboard',
+    'patients', 'appointments',
+    'clinical', 'history',
+    'pharmacy', 'inventory',
+    'laboratory', 'radiology',
+    'wards',
+    'billing', 'cheques', 'mpesa',
+    'messaging', 'referrals',
+    'settings', 'branding', 'notifications',
+    'support',
+    'analytics', 'patient_portal', 'privacy',
+    'accounting',
+];
+
+const categoryLabel = (prefix) =>
+    CATEGORY_LABELS[prefix] ||
+    prefix.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
 export default function RolesManager() {
     const [roles, setRoles] = useState([]);
     const [permissions, setPermissions] = useState([]);
@@ -100,6 +154,16 @@ export default function RolesManager() {
         (acc[cat] ||= []).push(p);
         return acc;
     }, {});
+    // Show categories in module-catalogue order so M-Pesa, Inventory etc.
+    // appear grouped by hospital workflow rather than alphabetical noise.
+    const orderedCategories = Object.keys(groupedPerms).sort((a, b) => {
+        const ai = CATEGORY_ORDER.indexOf(a);
+        const bi = CATEGORY_ORDER.indexOf(b);
+        if (ai === -1 && bi === -1) return a.localeCompare(b);
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+    });
 
     return (
         <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
@@ -201,11 +265,11 @@ export default function RolesManager() {
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
-                                    {Object.entries(groupedPerms).map(([cat, perms]) => (
+                                    {orderedCategories.map((cat) => (
                                         <div key={cat}>
-                                            <h4 className="text-2xs font-bold uppercase tracking-wider text-slate-500 mb-2">{cat}</h4>
+                                            <h4 className="text-2xs font-bold uppercase tracking-wider text-slate-500 mb-2">{categoryLabel(cat)}</h4>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                {perms.map((p) => {
+                                                {groupedPerms[cat].map((p) => {
                                                     const checked = draftPerms.has(p.codename);
                                                     const locked = activeRole.name === 'Admin';
                                                     return (
@@ -347,31 +411,53 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
                     {isNew && (
                         <div>
                             <label className="block text-xs font-bold text-slate-700 mb-2">Initial Permissions</label>
-                            <div className="max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 rounded-lg p-3 space-y-1">
-                                {permissions.map((p) => {
-                                    const checked = picked.has(p.codename);
-                                    return (
-                                        <label
-                                            key={p.codename}
-                                            className={`flex items-start gap-3 p-2 rounded cursor-pointer ${
-                                                checked ? 'bg-brand-50' : 'hover:bg-slate-50'
-                                            }`}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={checked}
-                                                onChange={() => togglePerm(p.codename)}
-                                                className="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                                            />
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-slate-800 font-mono">{p.codename}</p>
-                                                {p.description && (
-                                                    <p className="text-2xs text-slate-500 mt-0.5">{p.description}</p>
-                                                )}
-                                            </div>
-                                        </label>
-                                    );
-                                })}
+                            <div className="max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 rounded-lg p-3 space-y-3">
+                                {(() => {
+                                    const grouped = permissions.reduce((acc, p) => {
+                                        const cat = p.codename.split(':')[0];
+                                        (acc[cat] ||= []).push(p);
+                                        return acc;
+                                    }, {});
+                                    const cats = Object.keys(grouped).sort((a, b) => {
+                                        const ai = CATEGORY_ORDER.indexOf(a);
+                                        const bi = CATEGORY_ORDER.indexOf(b);
+                                        if (ai === -1 && bi === -1) return a.localeCompare(b);
+                                        if (ai === -1) return 1;
+                                        if (bi === -1) return -1;
+                                        return ai - bi;
+                                    });
+                                    return cats.map((cat) => (
+                                        <div key={cat}>
+                                            <h5 className="text-2xs font-bold uppercase tracking-wider text-slate-500 mb-1 px-1">
+                                                {categoryLabel(cat)}
+                                            </h5>
+                                            {grouped[cat].map((p) => {
+                                                const checked = picked.has(p.codename);
+                                                return (
+                                                    <label
+                                                        key={p.codename}
+                                                        className={`flex items-start gap-3 p-2 rounded cursor-pointer ${
+                                                            checked ? 'bg-brand-50' : 'hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={() => togglePerm(p.codename)}
+                                                            className="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs font-bold text-slate-800 font-mono">{p.codename}</p>
+                                                            {p.description && (
+                                                                <p className="text-2xs text-slate-500 mt-0.5">{p.description}</p>
+                                                            )}
+                                                        </div>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    ));
+                                })()}
                             </div>
                         </div>
                     )}

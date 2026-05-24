@@ -15,10 +15,17 @@
 #
 # Required environment variables (set as secrets in the Render dashboard):
 #   DATABASE_URL              — managed Postgres connection string
-#   SECRET_KEY                — JWT signing key
-#   SEED_SUPERADMIN_EMAIL     — optional, defaults to superadmin@hms.co.ke
-#   SEED_SUPERADMIN_PASSWORD  — optional, defaults to SuperAdmin@2026
-#                               (override at least once for production!)
+#   SECRET_KEY                — JWT signing key (>=32 bytes high entropy)
+#   ENCRYPTION_KEY            — Fernet key for at-rest secrets (44-char b64)
+#   PUBLIC_BASE_URL           — https://hms-2-3o0p.onrender.com (callback URL)
+#   PAYHERO_USERNAME / PAYHERO_PASSWORD / PAYHERO_CHANNEL_ID — aggregator creds
+#   PAYHERO_WEBHOOK_SECRET    — HMAC shared secret for incoming callbacks
+#   PAYHERO_WEBHOOK_CIDRS     — comma-separated allow-list (e.g. 196.201.0.0/16)
+#   PASSWORD_PEPPER           — server-side pepper added before Argon2id hash
+#   SEED_SUPERADMIN_EMAIL     — optional, defaults to superadmin@medifleet.co.ke
+#   SEED_SUPERADMIN_PASSWORD  — REQUIRED, must be >=16 chars and not a known
+#                               placeholder; the seed script refuses to run
+#                               with a missing/weak value (SEC-002).
 
 services:
   - type: web
@@ -48,10 +55,15 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
-      # Lock CORS to the Vercel frontend domain(s). Override in the Render
-      # dashboard when promoting a preview deployment.
+      # Lock CORS to the production SPA hostnames. CORS allow-lists are not
+      # secrets, so hardcoding here keeps the blueprint authoritative and
+      # the migration durable across redeploys. Order: canonical www, apex
+      # (covers the 308 round-trip where some browsers send Origin before
+      # following the redirect), then the legacy vercel.app alias used by
+      # preview deployments. Add preview-specific origins via the dashboard
+      # when needed; dashboard-set values still win against the blueprint.
       - key: CORS_ORIGINS
-        sync: false
+        value: "https://www.medifleet.app,https://medifleet.app,https://hms-2-psi.vercel.app"
       # Optional: Redis URL for WebSocket pub/sub fan-out across workers.
       - key: REDIS_URL
         sync: false

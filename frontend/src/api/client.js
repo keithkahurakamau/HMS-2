@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-// Endpoints served by the platform router that the superadmin Bearer token
-// authenticates against. Any URL matching these prefixes is treated as a
-// "superadmin call" — both for header injection and for token-expiry handling.
+// Endpoints served by the platform router. Used by the 401 response handler
+// to know "don't try the tenant /auth/refresh dance — this is a superadmin
+// path and refresh works differently" (the superadmin cookie has no refresh
+// counterpart; the 20-minute TTL is hard).
 const SUPERADMIN_PATH_PREFIXES = ['/public/superadmin', '/public/hospitals'];
 
 const isSuperAdminPath = (url) => {
@@ -11,7 +12,6 @@ const isSuperAdminPath = (url) => {
 };
 
 const clearSuperAdminLocal = () => {
-    localStorage.removeItem('hms_superadmin_token');
     localStorage.removeItem('hms_superadmin_name');
     localStorage.removeItem('hms_superadmin_expires_at');
 };
@@ -26,27 +26,15 @@ export const apiClient = axios.create({
     }
 });
 
-// Inject Tenant ID into every request, plus the superadmin Bearer token when
-// the operator is signed in to the platform console. The Bearer header is only
-// attached to platform paths so a 401 from a tenant endpoint (e.g. /users/me on
-// app boot) cannot be misread as "superadmin token expired".
+// Inject Tenant ID into every request. The superadmin JWT used to be smuggled
+// in as a Bearer header from localStorage — that's gone, the cookie does the
+// authentication now and Axios's `withCredentials: true` carries it
+// automatically. Anything an XSS could once steal from localStorage now lives
+// in HttpOnly cookie space.
 apiClient.interceptors.request.use((config) => {
     const tenantId = localStorage.getItem('hms_tenant_id');
     if (tenantId) {
         config.headers['X-Tenant-ID'] = tenantId;
-    }
-
-    if (isSuperAdminPath(config.url)) {
-        const superAdminToken = localStorage.getItem('hms_superadmin_token');
-        const expiresAt = parseInt(localStorage.getItem('hms_superadmin_expires_at') || '0', 10);
-        if (superAdminToken) {
-            // Drop tokens we already know are expired to avoid an unnecessary 401.
-            if (expiresAt && Date.now() >= expiresAt) {
-                clearSuperAdminLocal();
-            } else if (!config.headers['Authorization']) {
-                config.headers['Authorization'] = `Bearer ${superAdminToken}`;
-            }
-        }
     }
     return config;
 }, (error) => {
@@ -82,11 +70,38 @@ const isTenantOptionalPath = (pathname) =>
 const isTenantMissingError = (status, detail) =>
     status === 400 && typeof detail === 'string' && /X-Tenant-ID/i.test(detail);
 
+// FastAPI 422s carry `detail` as an array of validation error objects:
+//   [{ type, loc, msg, input }, ...]
+// React components blow up when those land in JSX (e.g. `toast.error(detail)`
+// → "Objects are not valid as a React child"). Flatten to a readable string
+// here so every `err.response.data.detail` callsite behaves the same.
+const normalizeFastApiDetail = (data) => {
+    const detail = data?.detail;
+    if (Array.isArray(detail)) {
+        const summary = detail
+            .map((d) => {
+                if (typeof d === 'string') return d;
+                if (d && typeof d === 'object') {
+                    const field = Array.isArray(d.loc) ? d.loc.filter(p => p !== 'body').join('.') : '';
+                    const msg = d.msg || d.message || JSON.stringify(d);
+                    return field ? `${field}: ${msg}` : msg;
+                }
+                return String(d);
+            })
+            .join('; ');
+        data.detail = summary || 'Validation error';
+    } else if (detail && typeof detail === 'object') {
+        data.detail = detail.msg || detail.message || JSON.stringify(detail);
+    }
+};
+
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
         const original = error.config;
         const status = error.response?.status;
+        // Reshape FastAPI validation errors BEFORE downstream reads them.
+        if (error.response?.data) normalizeFastApiDetail(error.response.data);
         const detail = error.response?.data?.detail;
 
         // ── Tenant guard: redirect to /portal on missing X-Tenant-ID ─────────
@@ -120,14 +135,12 @@ apiClient.interceptors.response.use(
             return Promise.reject(error);
         }
 
-        // Superadmin tokens don't participate in the cookie-based refresh dance.
-        // Only platform-prefixed URLs use the Bearer token — a 401 there means
-        // the bearer expired, so wipe it and let SuperAdminProtectedRoute kick
-        // the user back to /superadmin/login on the next render.
+        // Superadmin sessions don't participate in the cookie-based refresh
+        // dance — a 401 there means the 20-minute platform JWT expired (or
+        // the cookie was cleared). Wipe the local UI markers so the next
+        // SuperAdminProtectedRoute render bounces back to /superadmin/login.
         if (isSuperAdminPath(original.url)) {
-            if (localStorage.getItem('hms_superadmin_token')) {
-                clearSuperAdminLocal();
-            }
+            clearSuperAdminLocal();
             return Promise.reject(error);
         }
 

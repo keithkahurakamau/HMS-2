@@ -28,10 +28,12 @@ import Appointments from './pages/Appointments';
 import PatientPortal from './pages/PatientPortal';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
+import PayHeroSettings from './pages/PayHeroSettings';
 import Cheques from './pages/Cheques';
 import Support from './pages/Support';
 import Landing from './pages/Landing';
 import Branding from './pages/Branding';
+import Accounting from './pages/Accounting';
 
 // Layout Import
 import MainLayout from './components/layouts/MainLayout';
@@ -146,8 +148,10 @@ export default function App() {
             <Route path="billing" element={<ModuleGuard moduleKey="billing"><Billing /></ModuleGuard>} />
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="payhero-settings" element={<ModuleGuard moduleKey="payhero"><PayHeroSettings /></ModuleGuard>} />
             <Route path="branding" element={<ModuleGuard moduleKey="branding"><Branding /></ModuleGuard>} />
             <Route path="cheques" element={<ModuleGuard moduleKey="cheques"><Cheques /></ModuleGuard>} />
+            <Route path="accounting" element={<ModuleGuard moduleKey="accounting"><Accounting /></ModuleGuard>} />
             {/* Support is always-on — never wrap it; that's the escape hatch. */}
             <Route path="support" element={<Support />} />
           </Route>

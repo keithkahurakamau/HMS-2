@@ -145,7 +145,25 @@ def main() -> int:
 
     email = os.environ.get("SEED_SUPERADMIN_EMAIL", "superadmin@medifleet.co.ke")
     full_name = os.environ.get("SEED_SUPERADMIN_NAME", "MediFleet Platform Superadmin")
-    password = os.environ.get("SEED_SUPERADMIN_PASSWORD", "SuperAdmin@2026")
+    password = os.environ.get("SEED_SUPERADMIN_PASSWORD")
+
+    # SEC-002: refuse to seed with a default / weak / placeholder password.
+    # Prior version silently used 'SuperAdmin@2026' if the env var was missing,
+    # which meant a forgotten "delete-the-seed-after-first-deploy" step left
+    # the platform discoverable with publicly-known credentials.
+    KNOWN_DEFAULTS = {"SuperAdmin@2026", "changeme", "password", "admin"}
+    if not password:
+        print(
+            "FATAL: SEED_SUPERADMIN_PASSWORD must be set explicitly (no default allowed).",
+            file=sys.stderr,
+        )
+        return 2
+    if len(password) < 16:
+        print("FATAL: SEED_SUPERADMIN_PASSWORD must be >=16 characters.", file=sys.stderr)
+        return 2
+    if password in KNOWN_DEFAULTS or password.lower() in KNOWN_DEFAULTS:
+        print("FATAL: SEED_SUPERADMIN_PASSWORD looks like a known placeholder.", file=sys.stderr)
+        return 2
 
     print("=" * 60)
     print("  MEDIFLEET — SUPERADMIN BOOTSTRAP")
@@ -174,7 +192,10 @@ def main() -> int:
     print()
     print("Superadmin login:")
     print(f"  Email:    {email}")
-    print(f"  Password: {password}")
+    # SEC-002: never echo the seeded password to stdout — Render captures
+    # this in its log stream and any operator with log-read access can grab
+    # it. The operator who set the env var already has it.
+    print("  Password: <hidden — value provided via SEED_SUPERADMIN_PASSWORD>")
     print("Sign in at /superadmin/login.")
     print("=" * 60)
     return 0

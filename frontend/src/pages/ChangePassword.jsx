@@ -11,7 +11,7 @@ const RULES = [
     { label: 'One special character (!@#$…)',  test: (v) => /[!@#$%^&*(),.?":{}|<>]/.test(v) },
 ];
 
-export default function ChangePassword({ userId, onSuccess }) {
+export default function ChangePassword({ email, currentPassword, onSuccess }) {
     const [newPassword, setNewPassword] = useState('');
     const [confirm, setConfirm] = useState('');
     const [showNew, setShowNew] = useState(false);
@@ -25,10 +25,20 @@ export default function ChangePassword({ userId, onSuccess }) {
         e.preventDefault();
         if (!allRulesMet) return toast.error('Password does not meet all requirements.');
         if (!passwordsMatch) return toast.error('Passwords do not match.');
+        // AUTH-001: the previous payload was {user_id, new_password}, which
+        // the backend trusted with no auth factor. The new contract requires
+        // re-submitting the credentials the operator just proved they hold.
+        if (!email || !currentPassword) {
+            return toast.error('Session expired. Please sign in again.');
+        }
 
         setIsSubmitting(true);
         try {
-            await apiClient.post('/auth/change-password', { user_id: userId, new_password: newPassword });
+            await apiClient.post('/auth/change-password', {
+                email,
+                current_password: currentPassword,
+                new_password: newPassword,
+            });
             toast.success('Password changed! Please log in with your new credentials.');
             onSuccess();
         } catch (err) {

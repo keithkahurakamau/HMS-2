@@ -8,7 +8,13 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [mustChangePassword, setMustChangePassword] = useState(false);
-    const [pendingUserId, setPendingUserId] = useState(null);
+    // AUTH-001: the forced-change flow used to stash a numeric user_id from
+    // the 403 response and POST {user_id, new_password} back — which let
+    // anyone rewrite anyone's password. We now carry the email + the
+    // password the user just typed, and the backend re-verifies that
+    // current_password against the hash before accepting a new one.
+    const [pendingEmail, setPendingEmail] = useState(null);
+    const [pendingPassword, setPendingPassword] = useState(null);
 
     useEffect(() => {
         checkAuthStatus();
@@ -18,10 +24,19 @@ export const AuthProvider = ({ children }) => {
         try {
             const response = await apiClient.get('/users/me');
             const permRes = await apiClient.get('/users/me/permissions').catch(() => ({ data: [] }));
+            // Explicit pick-list instead of `...response.data` spread — the
+            // backend is trusted today, but an attacker who can shape the
+            // response (compromised tenant API, MITM on a downgraded link)
+            // could otherwise inject `isAuthenticated:false` or arbitrary
+            // permission fields into the auth state.
+            const u = response.data || {};
             setUser({
                 isAuthenticated: true,
-                permissions: permRes.data || [],
-                ...response.data
+                permissions: Array.isArray(permRes.data) ? permRes.data : [],
+                user_id: u.user_id,
+                email: u.email,
+                role: u.role,
+                full_name: u.full_name,
             });
         } catch (error) {
             setUser(null);
@@ -39,8 +54,11 @@ export const AuthProvider = ({ children }) => {
         } catch (error) {
             const detail = error.response?.data?.detail;
             if (detail === 'PASSWORD_CHANGE_REQUIRED') {
-                const userId = parseInt(error.response?.headers?.['x-user-id']);
-                setPendingUserId(userId);
+                // Stash the credentials the operator just successfully proved
+                // they hold so ChangePassword can re-submit them as the
+                // current_password knowledge factor (the backend re-verifies).
+                setPendingEmail(email);
+                setPendingPassword(password);
                 setMustChangePassword(true);
                 return { success: false, mustChangePassword: true };
             }
@@ -51,7 +69,8 @@ export const AuthProvider = ({ children }) => {
 
     const clearMustChange = () => {
         setMustChangePassword(false);
-        setPendingUserId(null);
+        setPendingEmail(null);
+        setPendingPassword(null);
     };
 
     const logout = async () => {
@@ -72,7 +91,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading, mustChangePassword, pendingUserId, clearMustChange }}>
+        <AuthContext.Provider value={{ user, login, logout, loading, mustChangePassword, pendingEmail, pendingPassword, clearMustChange }}>
             {children}
         </AuthContext.Provider>
     );

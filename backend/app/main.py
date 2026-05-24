@@ -33,8 +33,8 @@ import app.routes.websockets as websockets_module
 import app.routes.radiology as radiology_module
 import app.routes.medical_history as medical_history_module
 import app.routes.public as public_module
-import app.routes.mpesa_admin as mpesa_admin_module
-import app.routes.mpesa_payment as mpesa_payment_module
+import app.routes.payhero_admin as payhero_admin_module
+import app.routes.payhero_payment as payhero_payment_module
 import app.routes.privacy as privacy_module
 import app.routes.notifications as notifications_module
 import app.routes.patient_portal as patient_portal_module
@@ -44,6 +44,10 @@ import app.routes.settings as settings_module
 import app.routes.cheques as cheques_module
 import app.routes.support as support_module
 import app.routes.branding as branding_module
+import app.routes.accounting as accounting_module
+import app.routes.accounting_config as accounting_config_module
+import app.routes.accounting_debtors as accounting_debtors_module
+import app.routes.accounting_bank as accounting_bank_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -115,8 +119,20 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # RL-002: tightened from wildcard. CONNECT/TRACE never need to traverse
+    # the API; explicit header allow-list also stops a misconfigured preview
+    # domain from sending arbitrary headers under credential cookies.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Tenant-ID",
+        "X-CSRF-Token",
+        "Idempotency-Key",
+        "X-Requested-With",
+    ],
+    expose_headers=["X-Process-Time"],
+    max_age=600,
 )
 
 # 6. Global Middleware: Process Time (Removed Exception Catcher from here)
@@ -128,7 +144,68 @@ async def process_time_middleware(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
+# 6a. Security Headers Middleware
+# Defense-in-depth: CSP locks the execution model, HSTS forces TLS, COOP
+# isolates the window from cross-origin openers, Permissions-Policy denies
+# powerful browser APIs we never use. These also cover any direct browser
+# visits to the API surface (e.g. someone opening /api/dashboard in a tab);
+# the SPA itself receives a mirrored set from Vercel/nginx.
+# FE-002: connect-src is the only directive the API surface itself can be
+# reached on by a browser; pin to the same origin (the API talks to itself
+# via /api routes only). Style 'unsafe-inline' is retained because the API
+# rarely serves HTML — the SPA's own vercel.json CSP is stricter.
+_CSP_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: https:; "
+    "font-src 'self' data:; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'; "
+    "form-action 'self'; "
+    "base-uri 'none'; "
+    "object-src 'none'; "
+    "media-src 'self'; "
+    "require-trusted-types-for 'script'"
+)
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = _CSP_POLICY
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=(), payment=(), usb=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    # RL-003: COEP+CORP isolate the API surface from cross-origin embedders.
+    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
+
 # 6b. CSRF Protection Middleware
+# Paths excluded from CSRF validation on unsafe methods. Limited to:
+#   - Login endpoints that fire before any safe GET has seeded the cookie
+#     (Login.jsx + SuperAdminLogin.jsx submit POST before doing a GET, so
+#     requiring a token here would brick first-load auth). The other
+#     defences on these routes — bcrypt + rate limiting + per-route locks —
+#     hold the line on credential stuffing while CSRF stays excluded.
+#   - External webhooks (M-Pesa C2B callbacks) that can't possibly carry a
+#     CSRF header because they're called by Pay Hero's servers, not browsers.
+#     Authentication on those paths is HMAC signature based, not session based
+#     (see core/payhero_webhook.verify_payhero).
+# Everything else — including the superadmin /hospitals admin surface, which
+# uses Bearer auth but still benefits from CSRF as defence-in-depth — must
+# present a matching token.
+_CSRF_EXEMPT_PATHS = (
+    "/api/auth/login",
+    "/api/public/superadmin/login",
+    "/api/payments/payhero/callback",
+)
+
+
 @app.middleware("http")
 async def csrf_middleware(request: Request, call_next):
     # Set CSRF cookie for safe methods if missing
@@ -144,26 +221,22 @@ async def csrf_middleware(request: Request, call_next):
                 samesite="none" if is_production else "lax",
             )
         return response
-    
-    # Exclude login and webhooks/public endpoints from CSRF check.
-    # The public router lives under /api/public (the prior /public prefix was a
-    # typo that left the superadmin login unreachable from a fresh tab).
-    if (
-        request.url.path.startswith("/api/auth/login")
-        or request.url.path.startswith("/api/public/")
-    ):
+
+    if any(request.url.path.startswith(p) for p in _CSRF_EXEMPT_PATHS):
         return await call_next(request)
 
-    # Validate Double Submit Cookie for state-changing methods
+    # Validate Double Submit Cookie for state-changing methods. Use
+    # secrets.compare_digest to defeat the (admittedly tiny) timing side
+    # channel from a plain `==` on hex tokens of fixed length.
     csrf_cookie = request.cookies.get("csrf_token")
     csrf_header = request.headers.get("x-csrf-token")
-    
-    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+
+    if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
         return JSONResponse(
-            status_code=403, 
+            status_code=403,
             content={"detail": "CSRF verification failed. Missing or invalid token."}
         )
-        
+
     return await call_next(request)
 
 # 7. Proper Global Exception Handler (Preserves CORS headers)
@@ -194,8 +267,8 @@ app.include_router(websockets_module.router)
 app.include_router(radiology_module.router)
 app.include_router(medical_history_module.router)
 app.include_router(public_module.router)
-app.include_router(mpesa_admin_module.router)
-app.include_router(mpesa_payment_module.router)
+app.include_router(payhero_admin_module.router)  # PAY-001: per-tenant Pay Hero config
+app.include_router(payhero_payment_module.router)  # PAY-001: Pay Hero aggregator
 app.include_router(privacy_module.router)
 app.include_router(notifications_module.router)
 app.include_router(patient_portal_module.router)
@@ -205,6 +278,10 @@ app.include_router(settings_module.router)
 app.include_router(cheques_module.router)
 app.include_router(support_module.tenant_router)
 app.include_router(support_module.admin_router)
+app.include_router(accounting_module.router)
+app.include_router(accounting_config_module.router)
+app.include_router(accounting_debtors_module.router)
+app.include_router(accounting_bank_module.router)
 app.include_router(branding_module.router)
 app.include_router(branding_module.public_router)
 
