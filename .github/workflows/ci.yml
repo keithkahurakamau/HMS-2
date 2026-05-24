@@ -15,6 +15,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default — every job in this workflow only checks out code
+# and runs tests/lint, so contents:read is enough. Override per-job if a
+# future step ever needs to write back to the repo (CodeQL alerts #11, #13).
+permissions:
+  contents: read
+
 jobs:
   # NOTE: the historic tests in backend/tests/test_api.py + siblings are
   # integration tests that need a seeded tenant DB and a running uvicorn

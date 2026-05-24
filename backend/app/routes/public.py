@@ -107,8 +107,11 @@ def get_platform_overview(master_db: Session = Depends(get_master_db)):
                 count = conn.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true")).scalar()
                 total_users += int(count or 0)
         except Exception as exc:  # noqa: BLE001 — surface, don't crash
-            logger.warning("overview: user count failed for %s — %s", t.db_name, exc)
-            user_count_errors.append({"tenant": t.db_name, "error": str(exc)})
+            # Full exception text stays in server logs only; the API surface
+            # gets a sanitized indicator so we don't leak stack-trace or
+            # driver-internal details to the superadmin UI (CodeQL alert #6).
+            logger.warning("overview: user count failed for %s — %s", t.db_name, exc, exc_info=True)
+            user_count_errors.append({"tenant": t.db_name, "error": "fetch_failed"})
 
     open_tickets = master_db.query(SupportTicket).filter(SupportTicket.status == "Open").count()
     in_progress_tickets = master_db.query(SupportTicket).filter(SupportTicket.status == "In Progress").count()
@@ -359,8 +362,11 @@ def list_patients_across_tenants(
             finally:
                 session.close()
         except Exception as exc:
-            logger.warning("Failed to read patients from tenant %s: %s", t.db_name, exc)
-            errors.append({"tenant_id": str(t.tenant_id), "tenant_db": t.db_name, "error": str(exc)})
+            # Full exception text is for operators (server logs); the response
+            # body returns a sanitized marker so we don't surface stack traces
+            # or driver-internal strings to the superadmin UI (CodeQL alert #5).
+            logger.warning("Failed to read patients from tenant %s: %s", t.db_name, exc, exc_info=True)
+            errors.append({"tenant_id": str(t.tenant_id), "tenant_db": t.db_name, "error": "fetch_failed"})
 
     return {
         "patients": aggregated,

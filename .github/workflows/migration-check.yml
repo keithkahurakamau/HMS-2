@@ -29,6 +29,11 @@ on:
   # status check (branch protection currently expects this job to run
   # on every PR into development/beta/main).
   workflow_dispatch:
+# Least-privilege default — the migration-check job only spins up Postgres,
+# runs alembic, and asserts the result. No GitHub-side writes are needed
+# (CodeQL alert #8).
+permissions:
+  contents: read
 
 jobs:
   migrate-all-tenants:

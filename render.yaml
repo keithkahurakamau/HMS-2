@@ -55,10 +55,15 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
-      # Lock CORS to the Vercel frontend domain(s). Override in the Render
-      # dashboard when promoting a preview deployment.
+      # Lock CORS to the production SPA hostnames. CORS allow-lists are not
+      # secrets, so hardcoding here keeps the blueprint authoritative and
+      # the migration durable across redeploys. Order: canonical www, apex
+      # (covers the 308 round-trip where some browsers send Origin before
+      # following the redirect), then the legacy vercel.app alias used by
+      # preview deployments. Add preview-specific origins via the dashboard
+      # when needed; dashboard-set values still win against the blueprint.
       - key: CORS_ORIGINS
-        sync: false
+        value: "https://www.medifleet.app,https://medifleet.app,https://hms-2-psi.vercel.app"
       # Optional: Redis URL for WebSocket pub/sub fan-out across workers.
       - key: REDIS_URL
         sync: false
