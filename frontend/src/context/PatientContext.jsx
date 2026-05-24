@@ -143,7 +143,14 @@ export const PatientProvider = ({ children }) => {
     // from a previous tab session. Fire-and-forget: if the fetch fails
     // (cookie expired, tenant header missing, patient deleted), we clear
     // the stale reference instead of leaving the UI stuck on a phantom.
+    //
+    // Scope: only run inside the authenticated workspace (`/app/*`). On the
+    // public marketing surface (`/`, `/portal`, `/login`, …), a stale ref
+    // from a prior session would fire an API call without the tenant header,
+    // and the response-interceptor in api/client.js would bounce the visitor
+    // to `/portal?next=/` — breaking the "first hit lands on Landing" UX.
     useEffect(() => {
+        if (!location.pathname.startsWith('/app/')) return;
         const stored = loadRefFromSession();
         if (!stored) return;
         let cancelled = false;
@@ -176,6 +183,7 @@ export const PatientProvider = ({ children }) => {
                 if (!cancelled) persistRefToSession(null);
             });
         return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ── Audit trail: log every cross-module navigation while a patient
