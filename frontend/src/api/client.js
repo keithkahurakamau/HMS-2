@@ -62,10 +62,19 @@ const SKIP_REFRESH_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout', '/au
 
 // Pages that should be allowed to render even without a tenant selected.
 // Anything else gets redirected to /portal when the X-Tenant-ID guard trips.
+//
+// Landing (`/`) belongs here even though it's a single-character path: the
+// root-mounted providers (AuthContext, BrandingContext, ModuleContext) all
+// fire their bootstrap fetches on every SPA mount, and a fresh visitor on
+// medifleet.app legitimately has no cookie + no tenant. The 400 response
+// from /users/me must NOT bounce them to the hospital picker — that's the
+// "the first page should be the landing page" regression we saw post-PR-#35.
 const TENANT_OPTIONAL_PATHS = ['/portal', '/login', '/superadmin', '/patient', '/forgot-password', '/reset-password'];
 
-const isTenantOptionalPath = (pathname) =>
-    TENANT_OPTIONAL_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`));
+const isTenantOptionalPath = (pathname) => {
+    if (pathname === '/') return true; // Landing — see comment above.
+    return TENANT_OPTIONAL_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`));
+};
 
 const isTenantMissingError = (status, detail) =>
     status === 400 && typeof detail === 'string' && /X-Tenant-ID/i.test(detail);
