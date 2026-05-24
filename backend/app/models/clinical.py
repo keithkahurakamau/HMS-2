@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index, Float, JSON
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.config.database import Base
 
@@ -11,6 +12,9 @@ class Appointment(Base):
     status = Column(String(50), default="Scheduled", index=True) # Scheduled/Confirmed/Completed/Cancelled/No-Show
     notes = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    patient = relationship("Patient")
+    doctor = relationship("User")
 
 class PatientQueue(Base):
     __tablename__ = "patient_queue"
@@ -23,6 +27,9 @@ class PatientQueue(Base):
     assigned_to = Column(Integer, ForeignKey("users.user_id"), index=True, nullable=True)
     joined_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    patient = relationship("Patient")
+    assigned_user = relationship("User")
 
     __table_args__ = (
         Index('idx_queue_dept_status', 'department', 'status'),
@@ -63,3 +70,6 @@ class MedicalRecord(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    patient = relationship("Patient")
+    doctor = relationship("User")

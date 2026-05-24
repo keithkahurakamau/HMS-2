@@ -24,6 +24,11 @@ on:
       - 'backend/scripts/migrate_all_tenants.py'
       - 'backend/render-start.sh'
       - '.github/workflows/migration-check.yml'
+  # Manual trigger so we can fire the migration check on PRs that don't
+  # touch the alembic surface but still need to satisfy the required
+  # status check (branch protection currently expects this job to run
+  # on every PR into development/beta/main).
+  workflow_dispatch:
 
 jobs:
   migrate-all-tenants:
@@ -46,8 +51,11 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://medifleet:medifleet@localhost:5432/hms_master
-      SECRET_KEY:  ci-secret-key-not-used-in-prod
-      ENCRYPTION_KEY: "00000000000000000000000000000000"
+      # CI-only test values. Settings validators require SECRET_KEY >= 32 bytes
+      # and ENCRYPTION_KEY with > 8 distinct chars. These are never used to
+      # mint real tokens or encrypt real data.
+      SECRET_KEY: ci-test-secret-key-must-be-at-least-32-bytes-not-for-prod-use
+      ENCRYPTION_KEY: "ci-test-fernet-key-32bytes-distinct-AbCdEfGhIjKlMnOpQrSt="
       CORS_ORIGINS: http://localhost:5173
 
     steps:

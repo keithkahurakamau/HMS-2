@@ -5,7 +5,8 @@ import { useModules } from '../../context/ModuleContext';
 import {
     LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
-    ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy
+    ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy,
+    BookOpen, Smartphone,
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -37,11 +38,13 @@ export default function MainLayout() {
         { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={18} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'],                 requiredPermission: 'radiology:manage', moduleKey: 'radiology' },
         { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={18} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'],                  requiredPermission: 'pharmacy:read',    moduleKey: 'pharmacy' },
         { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={18} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'wards:manage',     moduleKey: 'wards' },
-        { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'patients:read',    moduleKey: 'appointments' },
-        { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'pharmacy:read',    moduleKey: 'inventory' },
+        { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'appointments:read',moduleKey: 'appointments' },
+        { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'inventory:read',   moduleKey: 'inventory' },
         { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={18} />,         allowedRoles: ['Admin', 'Receptionist'],                          requiredPermission: 'billing:read',     moduleKey: 'billing' },
         { name: 'Cheque Register',   path: '/app/cheques',         icon: <Banknote size={18} />,        allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'cheques:read',     moduleKey: 'cheques' },
+        { name: 'Accounting',        path: '/app/accounting',      icon: <BookOpen size={18} />,        allowedRoles: ['Admin', 'Accountant'],                            requiredPermission: 'accounting:view',  moduleKey: 'accounting' },
         { name: 'MediFleet Support', path: '/app/support',         icon: <LifeBuoy size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'support:manage',   moduleKey: 'support' },
+        { name: 'Pay Hero Settings', path: '/app/payhero-settings',icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: ['payhero:manage', 'mpesa:manage'], moduleKey: 'payhero' },
         { name: 'Settings',          path: '/app/settings',        icon: <Settings size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'settings:read',    moduleKey: 'settings' },
     ];
 
@@ -59,7 +62,10 @@ export default function MainLayout() {
         //    data yet (older client/server build), fall back to legacy role
         //    list.
         if (userPerms.length > 0 && item.requiredPermission) {
-            return userPerms.includes(item.requiredPermission);
+            const required = Array.isArray(item.requiredPermission)
+                ? item.requiredPermission
+                : [item.requiredPermission];
+            return required.some(p => userPerms.includes(p));
         }
         return item.allowedRoles.includes(userRole);
     });

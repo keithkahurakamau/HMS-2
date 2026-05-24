@@ -155,8 +155,9 @@ export default function Appointments() {
 
             <div className="card p-4 flex flex-wrap gap-4 items-end">
                 <div className="flex flex-col gap-1">
-                    <label className="label flex items-center gap-1"><Filter size={11} /> Status</label>
+                    <label htmlFor="appt-filter-status" className="label flex items-center gap-1"><Filter size={11} /> Status</label>
                     <select
+                        id="appt-filter-status"
                         value={filter.status}
                         onChange={(e) => setFilter({ ...filter, status: e.target.value })}
                         className="input"
@@ -166,12 +167,12 @@ export default function Appointments() {
                     </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="label">From</label>
-                    <input type="date" value={filter.from} onChange={(e) => setFilter({ ...filter, from: e.target.value })} className="input" />
+                    <label htmlFor="appt-filter-from" className="label">From</label>
+                    <input id="appt-filter-from" type="date" value={filter.from} onChange={(e) => setFilter({ ...filter, from: e.target.value })} className="input" />
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="label">To</label>
-                    <input type="date" value={filter.to} onChange={(e) => setFilter({ ...filter, to: e.target.value })} className="input" />
+                    <label htmlFor="appt-filter-to" className="label">To</label>
+                    <input id="appt-filter-to" type="date" value={filter.to} onChange={(e) => setFilter({ ...filter, to: e.target.value })} className="input" />
                 </div>
             </div>
 
@@ -260,8 +261,8 @@ export default function Appointments() {
                         </div>
                         <form onSubmit={handleCreate} className="p-5 space-y-4">
                             <div>
-                                <label className="label">Patient</label>
-                                <select required value={form.patient_id} onChange={(e) => setForm({ ...form, patient_id: e.target.value })} className="input">
+                                <label htmlFor="appt-patient" className="label">Patient</label>
+                                <select id="appt-patient" required value={form.patient_id} onChange={(e) => setForm({ ...form, patient_id: e.target.value })} className="input">
                                     <option value="">Select patient…</option>
                                     {patients.map(p => (
                                         <option key={p.patient_id} value={p.patient_id}>{p.surname}, {p.other_names} ({p.outpatient_no})</option>
@@ -269,8 +270,8 @@ export default function Appointments() {
                                 </select>
                             </div>
                             <div>
-                                <label className="label">Doctor</label>
-                                <select required value={form.doctor_id} onChange={(e) => setForm({ ...form, doctor_id: e.target.value })} className="input">
+                                <label htmlFor="appt-doctor" className="label">Doctor</label>
+                                <select id="appt-doctor" required value={form.doctor_id} onChange={(e) => setForm({ ...form, doctor_id: e.target.value })} className="input">
                                     <option value="">Select doctor…</option>
                                     {doctors.map(d => (
                                         <option key={d.user_id} value={d.user_id}>{d.full_name}{d.specialization ? ` · ${d.specialization}` : ''}</option>
@@ -278,12 +279,12 @@ export default function Appointments() {
                                 </select>
                             </div>
                             <div>
-                                <label className="label">Date &amp; time</label>
-                                <input type="datetime-local" required value={form.appointment_date} onChange={(e) => setForm({ ...form, appointment_date: e.target.value })} className="input" />
+                                <label htmlFor="appt-datetime" className="label">Date &amp; time</label>
+                                <input id="appt-datetime" type="datetime-local" required value={form.appointment_date} onChange={(e) => setForm({ ...form, appointment_date: e.target.value })} className="input" min={new Date().toISOString().slice(0, 16)} />
                             </div>
                             <div>
-                                <label className="label">Notes (optional)</label>
-                                <textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input resize-none" placeholder="Reason for visit, prep instructions…" />
+                                <label htmlFor="appt-notes" className="label">Notes (optional)</label>
+                                <textarea id="appt-notes" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input resize-none" placeholder="Reason for visit, prep instructions…" />
                             </div>
                             <div className="flex justify-end gap-2 pt-2">
                                 <button type="button" onClick={() => setIsFormOpen(false)} className="btn-secondary">Cancel</button>

@@ -9,6 +9,7 @@ from app.models.auth_tokens import RefreshToken, PasswordResetToken
 from app.core.security import (
     verify_password,
     get_password_hash,
+    needs_rehash,
     create_tokens,
     create_access_token,
     create_refresh_token,
@@ -83,7 +84,13 @@ class LoginRequest(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    user_id: int
+    # Audit AUTH-001: prior shape was {user_id, new_password} with no
+    # authentication factor — any caller who knew a user_id could rewrite
+    # that user's password. We now require the email and the current/temp
+    # password as a knowledge factor and look the user up server-side from
+    # the email (never trust a client-supplied user_id).
+    email: EmailStr
+    current_password: str
     new_password: str
 
     @field_validator('new_password')
@@ -176,6 +183,10 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
     # Success reset
     user.failed_login_attempts = 0
     user.locked_until = None
+    # AUTH-001: transparently re-hash legacy bcrypt / outdated-param hashes
+    # under Argon2id now that we have the plaintext password verified.
+    if needs_rehash(user.hashed_password):
+        user.hashed_password = get_password_hash(payload.password)
     db.commit()
 
     # Block login if forced password change is required
@@ -217,7 +228,12 @@ async def refresh(request: Request, response: Response, db: Session = Depends(ge
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token")
 
     try:
-        payload = jwt.decode(raw_refresh, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            raw_refresh,
+            settings.jwt_secret,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_aud": False},  # AUTH-002 rollover; tenant_id is the aud
+        )
     except JWTError:
         _clear_session_cookies(response)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
@@ -292,9 +308,11 @@ async def logout(request: Request, response: Response, db: Session = Depends(get
         try:
             payload = jwt.decode(
                 raw_refresh,
-                settings.SECRET_KEY,
+                settings.jwt_secret,
                 algorithms=[settings.ALGORITHM],
-                options={"verify_exp": False},  # we want to revoke even expired tokens
+                # We want to revoke even expired tokens; ditto don't gate
+                # logout on AUTH-002's aud check during rollover.
+                options={"verify_exp": False, "verify_aud": False},
             )
             jti = payload.get("jti")
             if jti:
@@ -311,19 +329,63 @@ async def logout(request: Request, response: Response, db: Session = Depends(get
 
 
 # =====================================================================
-# Change password (forced first-login flow)
+# Change password (forced first-login flow + future self-service change)
 # =====================================================================
+# Module-level dummy bcrypt hash used solely to equalize timing on the
+# "user not found" branch so the endpoint can't be used as an email
+# enumerator. Computed once at import (≈250 ms cost on cold boot,
+# acceptable). We deliberately keep this in-module so a stale hash in
+# settings can't accidentally be reused as a real password.
+_DUMMY_PW_HASH = get_password_hash("dummy-password-for-constant-time-only-not-a-real-cred")
+
+
 @router.post("/change-password")
 @limiter.limit("5/minute")
 async def change_password(request: Request, payload: ChangePasswordRequest, db: Session = Depends(get_db)):
-    """Allows a user to set a new password when must_change_password is True."""
-    user = db.query(User).filter(User.user_id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    """Knowledge-factor-protected password change.
+
+    Same endpoint serves the forced-first-login flow (where current_password
+    is the temp password issued at provisioning) and any future "change my
+    password from settings" UI. AUTH-001: prior implementation was
+    unauthenticated — taking {user_id, new_password} let anyone rewrite
+    anyone's password by guessing/iterating the integer user_id.
+
+    Failure responses are intentionally generic and time-equalized to block
+    email enumeration.
+    """
+    generic_failure = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid credentials",
+    )
+
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user or not user.is_active:
+        # Equalize timing with the success path — bcrypt comparison dominates
+        # the wall-clock cost of the handler.
+        verify_password(payload.current_password, _DUMMY_PW_HASH)
+        raise generic_failure
+
+    # Honour the same lockout policy as /login so this endpoint can't be used
+    # as an unrate-limited side channel against a locked account.
+    if user.locked_until and user.locked_until > datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account locked. Try again later.",
+        )
+
+    if not verify_password(payload.current_password, user.hashed_password):
+        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+        if user.failed_login_attempts >= 5:
+            user.locked_until = datetime.utcnow() + timedelta(minutes=15)
+        db.commit()
+        raise generic_failure
 
     user.hashed_password = get_password_hash(payload.new_password)
     user.must_change_password = False
-    # Invalidate any existing refresh sessions for this user.
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    # Invalidate any existing refresh sessions for this user — possible
+    # compromise of the prior password.
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user.user_id,
         RefreshToken.revoked == False,  # noqa: E712
@@ -371,7 +433,9 @@ async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: 
 
         # In production, dispatch an email here. Until SMTP is wired, surface
         # the token in non-production environments only.
-        if settings.MPESA_ENV.lower() != "production":
+        # AUTH-005: gate on APP_ENV (single source of truth), not MPESA_ENV —
+        # a prod deploy with sandbox Daraja previously leaked reset tokens.
+        if not settings.is_production:
             response["dev_token"] = raw_token
 
     return response

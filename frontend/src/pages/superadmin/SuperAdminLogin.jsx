@@ -7,15 +7,19 @@ import {
 import toast from 'react-hot-toast';
 import Logo from '../../components/Logo';
 
-const TOKEN_KEY = 'hms_superadmin_token';
+// The JWT itself now lives in an HttpOnly cookie ('superadmin_token') and is
+// not readable from JS — these two markers exist only to drive the UI:
+//  - NAME_KEY: display name in the sidebar.
+//  - EXPIRES_KEY: TTL hint so the route guard can bounce expired sessions
+//    without a round-trip; the server still has the final say (a stale
+//    marker beats only the first navigation, then /superadmin/me 401s and
+//    the interceptor clears everything).
 const NAME_KEY = 'hms_superadmin_name';
 const EXPIRES_KEY = 'hms_superadmin_expires_at';
 
 export const isSuperAdminAuthenticated = () => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return false;
     const expiresAt = parseInt(localStorage.getItem(EXPIRES_KEY) || '0', 10);
-    if (expiresAt && Date.now() >= expiresAt) {
+    if (!expiresAt || Date.now() >= expiresAt) {
         clearSuperAdminSession();
         return false;
     }
@@ -23,7 +27,6 @@ export const isSuperAdminAuthenticated = () => {
 };
 
 export const clearSuperAdminSession = () => {
-    localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(NAME_KEY);
     localStorage.removeItem(EXPIRES_KEY);
 };
@@ -53,10 +56,10 @@ export default function SuperAdminLogin() {
         e.preventDefault();
         setIsSubmitting(true);
         try {
+            // The backend now sets an HttpOnly 'superadmin_token' cookie on
+            // success — the response body only carries display data + TTL.
             const res = await apiClient.post('/public/superadmin/login', { email, password });
-            const { access_token, full_name, expires_in } = res.data || {};
-            if (!access_token) throw new Error('Missing token');
-            localStorage.setItem(TOKEN_KEY, access_token);
+            const { full_name, expires_in } = res.data || {};
             if (full_name) localStorage.setItem(NAME_KEY, full_name);
             const ttlSeconds = typeof expires_in === 'number' ? expires_in : 20 * 60;
             localStorage.setItem(EXPIRES_KEY, String(Date.now() + ttlSeconds * 1000));

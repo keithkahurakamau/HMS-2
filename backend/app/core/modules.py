@@ -64,12 +64,13 @@ MODULES: Tuple[ModuleDef, ...] = (
     ModuleDef("billing",      "Billing",            "Invoicing, statements, payment plans.",    False),
     ModuleDef("cheques",      "Cheques",            "Cheque receipting and reconciliation.",    False),
     ModuleDef("medical_history","Medical History",  "Longitudinal patient history.",            False),
-    ModuleDef("mpesa",        "M-Pesa",             "Mobile-money collections and refunds.",    False),
+    ModuleDef("payhero",      "Pay Hero (M-Pesa)",  "Mobile-money collections via the Pay Hero aggregator.", True),
     ModuleDef("analytics",    "Analytics",          "Aggregated dashboards and reports.",       False),
     ModuleDef("patient_portal","Patient Portal",    "Self-service portal for patients.",        False),
     ModuleDef("branding",     "Branding",           "Logos, colours, document templates.",      False),
     ModuleDef("referrals",    "Referrals",          "Out-bound and in-bound referrals.",        False),
     ModuleDef("privacy",      "Privacy",            "Consent, DSAR, audit logs.",               False),
+    ModuleDef("accounting",   "Managerial Accounting","Chart of accounts, journals, financial statements.", False),
 )
 
 # Convenience lookups.
@@ -83,6 +84,9 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     # always-on routes — listed first for clarity, gate.py short-circuits them.
     ("/api/auth/",                        "auth"),
     ("/api/users/",                       "users"),
+    # NOTE: more specific /api/admin/<module>/ prefixes must appear before
+    # the broad /api/admin/ rule so module gating routes them correctly.
+    ("/api/admin/payhero/",               "payhero"),
     ("/api/admin/",                       "users"),
     ("/api/me/",                          "users"),
     ("/api/support/",                     "support"),
@@ -104,12 +108,13 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/cheques/",                     "cheques"),
     ("/api/medical-history/",             "medical_history"),
     ("/api/medical_history/",             "medical_history"),
-    ("/api/mpesa/",                       "mpesa"),
+    ("/api/payments/payhero/",            "payhero"),
     ("/api/analytics/",                   "analytics"),
     ("/api/patient-portal/",              "patient_portal"),
     ("/api/branding/",                    "branding"),
     ("/api/referrals/",                   "referrals"),
     ("/api/privacy/",                     "privacy"),
+    ("/api/accounting/",                  "accounting"),
 )
 
 
@@ -145,6 +150,12 @@ def resolve_enabled_modules(flags_raw: Optional[str]) -> List[str]:
     − explicit-false (for non-always-on modules).
     """
     flags = _parse_flags(flags_raw)
+    # Legacy alias: the ``mpesa`` module was renamed to ``payhero`` in the
+    # Pay Hero swap. Existing tenants still carry the old key in their
+    # feature_flags column — translate it forward so they don't have to
+    # re-save their entitlement.
+    if "mpesa" in flags and "payhero" not in flags:
+        flags["payhero"] = flags.pop("mpesa")
     enabled: set = set(DEFAULT_ENABLED)
     for key, value in flags.items():
         if key not in BY_KEY:

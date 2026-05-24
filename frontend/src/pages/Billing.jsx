@@ -56,7 +56,7 @@ export default function Billing() {
                 return;
             }
             try {
-                const res = await apiClient.get(`/payments/mpesa/status/${checkoutRequestId}`);
+                const res = await apiClient.get(`/payments/payhero/status/${checkoutRequestId}`);
                 if (res.data.status === 'Success') {
                     clearInterval(interval);
                     setMpesaStatus('success');
@@ -92,20 +92,22 @@ export default function Billing() {
                     setIsProcessing(false);
                     return toast.error("Phone number required for M-Pesa");
                 }
-                const res = await apiClient.post('/payments/mpesa/stk-push', {
+                const res = await apiClient.post('/payments/payhero/stk-push', {
                     phone_number: mpesaPhone,
                     amount: amountDue,
                     invoice_id: activeInvoice.invoice_id,
-                    callback_url: 'https://placeholder.ngrok.app/callback' // Overridden by backend dynamically
                 });
-                
+
                 toast.success("STK Push sent to patient's phone. Waiting for PIN...");
                 setMpesaStatus('waiting');
-                
-                if (res.data.checkout_request_id) {
-                    pollMpesaStatus(res.data.checkout_request_id);
+
+                // Pay Hero returns the aggregator ``reference`` (or our
+                // ``external_reference`` fallback) for status polling.
+                const pollRef = res.data.reference || res.data.external_reference;
+                if (pollRef) {
+                    pollMpesaStatus(pollRef);
                 } else {
-                    toast.error("Invalid response from Safaricom.");
+                    toast.error("Invalid response from Pay Hero.");
                     setIsProcessing(false);
                     setMpesaStatus(null);
                 }
