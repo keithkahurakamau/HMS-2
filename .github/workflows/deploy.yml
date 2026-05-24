@@ -26,6 +26,12 @@ concurrency:
   group: deploy-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
+# Least-privilege default — both deploy jobs shell out to Vercel/Render
+# APIs using repo secrets and never write back to the GitHub repo. Only
+# checkout (contents:read) is required (CodeQL alerts #10, #12).
+permissions:
+  contents: read
+
 jobs:
   vercel:
     name: vercel (${{ github.event.workflow_run.head_branch }})

@@ -15,6 +15,14 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from argon2 import PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
+# Dependabot alert: python-ecdsa 0.19.x carries a documented Minerva-style
+# side-channel on the P-256 curve (upstream considers side channels out of
+# scope; no patched release exists). python-jose pulls ecdsa transitively
+# but only invokes it when signing/verifying with ES256/ES384/ES512. We
+# pin settings.ALGORITHM to HS256 (HMAC-SHA256) below, so the vulnerable
+# code path is never executed. Do NOT change ALGORITHM to an ES* curve
+# without first migrating off python-jose (PyJWT 2.x has no ecdsa
+# dependency) or upgrading ecdsa to a side-channel-hardened release.
 from jose import jwt
 
 from app.config.settings import settings

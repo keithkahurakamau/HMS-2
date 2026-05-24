@@ -17,6 +17,7 @@ registry honest. PostgreSQL CREATE DATABASE itself cannot run inside a
 transaction, so steps 2–4 are best-effort with explicit cleanup on failure.
 """
 import logging
+import re
 import secrets
 import string
 from typing import Optional, Tuple
@@ -252,8 +253,28 @@ def _generate_temp_password(length: int = 14) -> str:
     return "".join(seed)
 
 
+# PostgreSQL identifier whitelist applied at the lowest possible layer,
+# right before the f-string interpolation that CREATE/DROP DATABASE demands
+# (parameterized queries cannot bind identifiers — only values). The pattern
+# enforces:
+#   - starts with a lowercase letter or underscore
+#   - 1..63 chars total (Postgres NAMEDATALEN limit)
+#   - only [a-z0-9_]
+# Callers already screen db_name upstream, but we re-assert here so static
+# analyzers (CodeQL alerts #2, #3 — py/sql-injection) can see the guard
+# inline with the interpolation and so future callers can't accidentally
+# bypass it.
+_DB_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+
+
+def _assert_safe_db_identifier(db_name: str) -> None:
+    if not isinstance(db_name, str) or not _DB_NAME_RE.match(db_name):
+        raise ValueError(f"refusing unsafe Postgres identifier: {db_name!r}")
+
+
 def _create_database_if_missing(db_name: str) -> None:
     """CREATE DATABASE has to live outside a transaction; use AUTOCOMMIT."""
+    _assert_safe_db_identifier(db_name)
     base_url = DATABASE_URL.rsplit('/', 1)[0]
     admin_engine = create_engine(f"{base_url}/postgres", isolation_level="AUTOCOMMIT")
     try:
@@ -263,8 +284,6 @@ def _create_database_if_missing(db_name: str) -> None:
                 {"n": db_name},
             ).fetchone()
             if not exists:
-                # Identifier interpolation is unavoidable for CREATE DATABASE; we've
-                # validated db_name in the calling layer so it's safe.
                 conn.execute(text(f'CREATE DATABASE "{db_name}"'))
                 logger.info("Provisioned new database '%s'", db_name)
     finally:
@@ -273,6 +292,7 @@ def _create_database_if_missing(db_name: str) -> None:
 
 def _drop_database_silently(db_name: str) -> None:
     """Best-effort cleanup when post-CREATE steps fail."""
+    _assert_safe_db_identifier(db_name)
     base_url = DATABASE_URL.rsplit('/', 1)[0]
     admin_engine = create_engine(f"{base_url}/postgres", isolation_level="AUTOCOMMIT")
     try:
