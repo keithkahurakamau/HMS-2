@@ -90,32 +90,122 @@
   }
 
   /* Buttons */
+  /*
+   * ─── Liquid-glass buttons (Apple iOS 18 material) ───────────────────
+   *
+   * Every variant inherits the same glass substrate from .btn:
+   *   - backdrop-filter blur + saturate (the frosted "behind" look)
+   *   - layered inset shadows for the specular ring — a bright hairline
+   *     at the top + subtle hairline at the bottom + 1px outer ring
+   *     that catches ambient light
+   *   - soft outer drop shadow for elevation
+   *   - hover lifts +1px and brightens the rings
+   *   - active scales to 0.97 with a 90ms snap-back, so a tap feels
+   *     like pressing actual glass
+   *
+   * Colour variants (primary, danger, success) stack a soft white
+   * "top gloss" gradient over a saturated colour fill, so the glass
+   * still reads as glass even with a brand colour underneath.
+   * Secondary is the canonical clear-glass card.
+   * Ghost is transparent until hover, when it materialises into the
+   * glass family for visual continuity.
+   */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
-           transition-all duration-150 select-none
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-semibold
+           transition-all duration-200 select-none cursor-pointer
            focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500
            disabled:opacity-50 disabled:cursor-not-allowed;
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+      0 1px 1px rgba(15, 23, 42, 0.04),
+      0 6px 14px -2px rgba(15, 23, 42, 0.10);
   }
+  .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.10),
+      0 2px 4px rgba(15, 23, 42, 0.06),
+      0 12px 28px -6px rgba(15, 23, 42, 0.20);
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(0) scale(0.97);
+    transition-duration: 90ms;
+  }
+
   .btn-primary {
-    @apply btn text-white shadow-soft
-           bg-gradient-to-b from-brand-500 to-brand-600
-           hover:from-brand-500 hover:to-brand-700
-           active:from-brand-600 active:to-brand-700;
+    @apply btn text-white;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 50%),
+      linear-gradient(180deg, rgb(8, 145, 178) 0%, rgb(13, 148, 136) 100%);
   }
+  .btn-primary:hover:not(:disabled) {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
+      linear-gradient(180deg, rgb(6, 165, 196) 0%, rgb(15, 165, 152) 100%);
+  }
+
   .btn-secondary {
-    @apply btn bg-white text-ink-700 border border-ink-200
-           hover:bg-ink-50 hover:border-ink-300
-           active:bg-ink-100;
+    @apply btn text-ink-800;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
+      rgba(255, 255, 255, 0.55);
   }
+  .btn-secondary:hover:not(:disabled) {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 50%),
+      rgba(255, 255, 255, 0.70);
+  }
+
   .btn-ghost {
-    @apply btn text-ink-600 hover:bg-ink-100 hover:text-ink-900;
+    @apply btn text-ink-600;
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
   }
+  .btn-ghost:hover:not(:disabled) {
+    @apply text-ink-900;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
+      rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.10),
+      0 2px 4px rgba(15, 23, 42, 0.06),
+      0 12px 28px -6px rgba(15, 23, 42, 0.20);
+  }
+
   .btn-danger {
-    @apply btn text-white bg-red-600 hover:bg-red-700 shadow-soft;
+    @apply btn text-white;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0) 50%),
+      linear-gradient(180deg, rgb(220, 38, 38) 0%, rgb(185, 28, 28) 100%);
   }
+  .btn-danger:hover:not(:disabled) {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 50%),
+      linear-gradient(180deg, rgb(239, 68, 68) 0%, rgb(220, 38, 38) 100%);
+  }
+
   .btn-success {
-    @apply btn text-white bg-gradient-to-b from-accent-500 to-accent-600
-           hover:from-accent-500 hover:to-accent-700 shadow-soft;
+    @apply btn text-white;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 50%),
+      linear-gradient(180deg, rgb(16, 185, 129) 0%, rgb(5, 150, 105) 100%);
+  }
+  .btn-success:hover:not(:disabled) {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
+      linear-gradient(180deg, rgb(34, 197, 144) 0%, rgb(8, 168, 119) 100%);
   }
 
   /* Inputs */
