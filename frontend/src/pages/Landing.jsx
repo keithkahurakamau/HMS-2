@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     ArrowRight, ShieldCheck, Stethoscope, HeartPulse, Lock, Activity,
@@ -10,12 +10,20 @@ import {
     Palette, LifeBuoy, KeyRound, UserCog, FileSearch,
 } from 'lucide-react';
 import Logo from '../components/Logo';
+import CountUp from '../components/CountUp';
+import ContactStrip from '../components/ContactStrip';
+import Reveal from '../components/Reveal';
 
 export default function Landing() {
     const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen bg-ink-50 text-ink-900 font-sans">
+        <div className="relative min-h-screen bg-ink-50 text-ink-900 font-sans">
+            {/* Animated mesh background — sits behind everything, drifts slowly */}
+            <div
+                aria-hidden="true"
+                className="fixed inset-0 -z-10 bg-mesh-anim animate-mesh-shift pointer-events-none"
+            />
             {/* ============== Floating navbar ============== */}
             <header className="fixed top-4 inset-x-4 z-50">
                 <div className="max-w-7xl mx-auto bg-white/85 backdrop-blur-xl border border-ink-200/70 rounded-2xl shadow-soft px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -44,8 +52,8 @@ export default function Landing() {
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute inset-0 bg-aurora" />
                     <div className="absolute inset-0 bg-grid-faint bg-grid-faint opacity-50" />
-                    <div className="absolute -top-32 -right-24 w-[40rem] h-[40rem] bg-brand-300/20 rounded-full blur-[120px]" />
-                    <div className="absolute -bottom-40 -left-24 w-[36rem] h-[36rem] bg-accent-300/20 rounded-full blur-[120px]" />
+                    <div className="absolute -top-32 -right-24 w-[40rem] h-[40rem] bg-brand-300/20 rounded-full blur-[120px] animate-blob-breathe" />
+                    <div className="absolute -bottom-40 -left-24 w-[36rem] h-[36rem] bg-accent-300/20 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
                 </div>
 
                 <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-10 items-center">
@@ -102,7 +110,7 @@ export default function Landing() {
 
             {/* ============== Features ============== */}
             <section id="features" className="py-24">
-                <div className="max-w-7xl mx-auto px-6">
+                <Reveal className="max-w-7xl mx-auto px-6">
                     <SectionHeader
                         eyebrow="What you get"
                         title="A clinical workspace that respects every role"
@@ -140,7 +148,7 @@ export default function Landing() {
                             body="Real-time WebSocket fan-out across departments — escalate, ping, and resolve without leaving the app."
                         />
                     </div>
-                </div>
+                </Reveal>
             </section>
 
             {/* ============== Modules showcase (interactive) ============== */}
@@ -149,14 +157,14 @@ export default function Landing() {
                 <div className="absolute -top-24 -left-32 w-[28rem] h-[28rem] bg-brand-300/10 rounded-full blur-[120px] pointer-events-none" />
                 <div className="absolute -bottom-32 -right-32 w-[26rem] h-[26rem] bg-accent-300/10 rounded-full blur-[120px] pointer-events-none" />
 
-                <div className="relative max-w-7xl mx-auto px-6">
+                <Reveal className="relative max-w-7xl mx-auto px-6">
                     <SectionHeader
                         eyebrow="Modules"
                         title="Twenty-five modules, one ledger of truth"
                         subtitle="Every module is gated by per-role permissions, audit-logged, and tenant-isolated. Switch them on à-la-carte — the 9 always-on modules below are bundled in the base subscription."
                     />
                     <ModuleShowcase navigate={navigate} />
-                </div>
+                </Reveal>
             </section>
 
             {/* ============== How it works ============== */}
@@ -235,6 +243,9 @@ export default function Landing() {
                     </div>
                 </div>
             </section>
+
+            {/* ============== Contact strip ============== */}
+            <ContactStrip heading="Talk to a human" />
 
             {/* ============== Footer ============== */}
             <footer className="border-t border-ink-200/70 bg-white/60 backdrop-blur-md">
@@ -712,42 +723,4 @@ function ModuleCard({ module: m, delayMs, navigate }) {
     );
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
-   CountUp — animated integer that ticks from 0 → `to` once it scrolls
-   into view. Uses IntersectionObserver so we don't run animations on
-   off-screen counters and don't fire requestAnimationFrame loops that
-   the user will never see. Respects prefers-reduced-motion.
-   ────────────────────────────────────────────────────────────────────── */
-function CountUp({ to, suffix = '', durationMs = 1100 }) {
-    const [value, setValue] = useState(0);
-    const ref = useRef(null);
-    const startedRef = useRef(false);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (reduce) { setValue(to); return; }
-
-        const el = ref.current;
-        if (!el) return;
-        const io = new IntersectionObserver((entries) => {
-            entries.forEach((e) => {
-                if (!e.isIntersecting || startedRef.current) return;
-                startedRef.current = true;
-                const start = performance.now();
-                const tick = (now) => {
-                    const t = Math.min(1, (now - start) / durationMs);
-                    // Cubic ease-out for a satisfying decel
-                    const eased = 1 - Math.pow(1 - t, 3);
-                    setValue(Math.round(eased * to));
-                    if (t < 1) requestAnimationFrame(tick);
-                };
-                requestAnimationFrame(tick);
-            });
-        }, { threshold: 0.4 });
-        io.observe(el);
-        return () => io.disconnect();
-    }, [to, durationMs]);
-
-    return <span ref={ref} className="tabular-nums">{value}{suffix}</span>;
-}
+/* CountUp lives in ../components/CountUp.jsx — reused by Portal as well. */

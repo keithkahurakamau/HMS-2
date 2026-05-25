@@ -12,6 +12,9 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Smooth anchor-link scrolling on Landing/Portal (Features → Modules etc.).
+       Overridden to `auto` under prefers-reduced-motion further down. */
+    scroll-behavior: smooth;
   }
   body {
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
@@ -202,6 +205,46 @@
    Utilities — scrollbars, focus, accessibility
    --------------------------------------------------------------------- */
 @layer utilities {
+  /* ── Liquid-glass surface treatment ──────────────────────────────────
+     Frosted glass card: high-blur backdrop, semi-translucent fill with a
+     subtle inner ring that catches light. Use on surfaces sitting over
+     the animated mesh background so the gradient bleeds through gently
+     instead of being walled off. Provides a clear glass aesthetic that
+     still meets the 4.5:1 contrast minimum for body text in light mode
+     (the white/70 fill on top of the mesh stays in the high-90s % range
+     of brightness). */
+  .glass-card {
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(18px) saturate(135%);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.6) inset,
+      0 1px 3px 0 rgba(15, 23, 42, 0.04),
+      0 20px 40px -20px rgba(15, 23, 42, 0.12);
+  }
+  .glass-card-dark {
+    background-color: rgba(15, 23, 42, 0.78);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* ── Animated mesh background ────────────────────────────────────────
+     A multi-stop radial-gradient stack that slowly slides via the
+     `mesh-shift` keyframe in the Tailwind config. Sized to 200% so the
+     stops actually have room to move when background-position animates.
+     Used as a fixed full-viewport layer behind Landing + Portal so the
+     whole page feels like it's gently breathing. */
+  .bg-mesh-anim {
+    background-image:
+      radial-gradient(at 18% 8%, rgba(34, 211, 238, 0.18) 0px, transparent 50%),
+      radial-gradient(at 82% 92%, rgba(45, 212, 191, 0.16) 0px, transparent 50%),
+      radial-gradient(at 50% 50%, rgba(110, 231, 183, 0.10) 0px, transparent 60%);
+    background-size: 200% 200%, 200% 200%, 220% 220%;
+    background-position: 0% 0%, 100% 100%, 50% 50%;
+  }
+
   /* Refined scrollbar (was referenced across pages but never styled). */
   .custom-scrollbar {
     scrollbar-width: thin;
