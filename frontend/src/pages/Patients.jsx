@@ -424,6 +424,7 @@ export default function Patients() {
                 tone="brand"
                 actions={
                     <button
+                        data-tour="register-patient"
                         type="button"
                         onClick={() => setIsModalOpen(true)}
                         className="btn-primary cursor-pointer"
@@ -443,7 +444,7 @@ export default function Patients() {
             </div>
 
             {/* ── Toolbar: search + filter ───────────────────────────────── */}
-            <div className="card p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div data-tour="patient-search" className="card p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="relative flex-1 min-w-0">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
                     <label htmlFor="patient-search" className="sr-only">Search patients</label>

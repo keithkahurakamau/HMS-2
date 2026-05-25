@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useModules } from '../../context/ModuleContext';
+import { useJourney } from '../../context/JourneyContext';
 import {
     LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
@@ -20,6 +21,39 @@ export default function MainLayout() {
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { branding } = useBranding();
+    const { startJourney, activeKey } = useJourney();
+
+    // Route → module-key map for the on-first-visit tour. The path prefix
+    // match handles deep links like /app/patients/123 → 'patients'.
+    useEffect(() => {
+        const map = [
+            ['/app/admin',           'admin'],
+            ['/app/patients',        'patients'],
+            ['/app/clinical',        'clinical'],
+            ['/app/laboratory',      'laboratory'],
+            ['/app/radiology',       'radiology'],
+            ['/app/pharmacy',        'pharmacy'],
+            ['/app/inventory',       'inventory'],
+            ['/app/wards',           'wards'],
+            ['/app/billing',         'billing'],
+            ['/app/cheques',         'cheques'],
+            ['/app/medical-history', 'medical_history'],
+            ['/app/appointments',    'appointments'],
+            ['/app/messages',        'messages'],
+            ['/app/settings',        'settings'],
+            ['/app/branding',        'branding'],
+            ['/app/accounting',      'accounting'],
+            ['/app/support',         'support'],
+            ['/app/payhero-settings','payhero'],
+            ['/app/dashboard',       'dashboard'],
+            ['/app',                 'dashboard'],   // role-redirect fallback
+        ];
+        const key = map.find(([prefix]) => location.pathname.startsWith(prefix))?.[1];
+        if (!key || activeKey) return;
+        // Defer so the page DOM has time to mount its data-tour anchors.
+        const id = setTimeout(() => startJourney(key), 750);
+        return () => clearTimeout(id);
+    }, [location.pathname, startJourney, activeKey]);
 
     // Get the dynamic hospital name from the portal selection
     const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
@@ -111,7 +145,7 @@ export default function MainLayout() {
                 </div>
 
                 {/* Nav */}
-                <nav className="flex-1 overflow-y-auto py-5 px-3 custom-scrollbar">
+                <nav data-tour="sidebar-nav" className="flex-1 overflow-y-auto py-5 px-3 custom-scrollbar">
                     <div className="text-[10px] font-semibold tracking-[0.2em] uppercase text-ink-500 mb-3 px-3">
                         Modules
                     </div>
@@ -198,7 +232,7 @@ export default function MainLayout() {
                     {/* Active-patient bar — pinned at the top of the main outlet so
                         every workspace page renders the patient context above its
                         own header. Bar self-hides when no patient is active. */}
-                    <ActivePatientBar />
+                    <div data-tour="active-patient-bar"><ActivePatientBar /></div>
                     <div className="animate-fade-in">
                         <Outlet />
                     </div>
