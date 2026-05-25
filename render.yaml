@@ -1,17 +1,11 @@
 # Render Blueprint — HMS backend
 #
-# How the seed runs once on deploy:
-#   The start command (render-start.sh) checks for seed_superadmin.py before
-#   each uvicorn boot. The seed itself is idempotent — it skips inserting the
-#   superadmin row when one already exists — so leaving the file in place
-#   across normal redeploys is harmless.
-#
-#   To "remove the seed after first deploy" as planned:
-#     1. Push this branch — Render runs the seed automatically on first boot.
-#     2. Sign in at /superadmin/login with the seed credentials.
-#     3. Delete backend/seed_superadmin.py from the repo and push again.
-#     4. Render redeploys; render-start.sh sees the file is gone and skips
-#        straight to uvicorn.
+# Superadmin bootstrap is COMPLETE for production. The original
+# backend/seed_superadmin.py has been removed from the repo; render-start.sh
+# now skips the seed step entirely (its `if -f` guard sees no file).
+# Resetting the platform to a fresh state in the future means restoring
+# seed_superadmin.py from git history AND running scripts/reset_production_db.py
+# under the gated RESET_PRODUCTION_DB env flag.
 #
 # Required environment variables (set as secrets in the Render dashboard):
 #   DATABASE_URL              — managed Postgres connection string
@@ -22,10 +16,6 @@
 #   PAYHERO_WEBHOOK_SECRET    — HMAC shared secret for incoming callbacks
 #   PAYHERO_WEBHOOK_CIDRS     — comma-separated allow-list (e.g. 196.201.0.0/16)
 #   PASSWORD_PEPPER           — server-side pepper added before Argon2id hash
-#   SEED_SUPERADMIN_EMAIL     — optional, defaults to superadmin@medifleet.co.ke
-#   SEED_SUPERADMIN_PASSWORD  — REQUIRED, must be >=16 chars and not a known
-#                               placeholder; the seed script refuses to run
-#                               with a missing/weak value (SEC-002).
 
 services:
   - type: web

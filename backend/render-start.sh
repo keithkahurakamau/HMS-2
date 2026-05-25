@@ -2,18 +2,22 @@
 # Render start command for the MediFleet backend.
 #
 # Boot sequence:
-#   1. Run seed_superadmin.py *if it still exists*. The seed is idempotent
-#      (skips when the superadmin row is already there), so it is safe to
-#      execute on every restart of the service.
-#   2. Apply pending Alembic migrations to every active tenant database via
+#   1. Optionally wipe everything (gated by RESET_PRODUCTION_DB env var).
+#   2. Run seed_superadmin.py *if the file is present in the repo*. The file
+#      has been removed post-launch (commit history preserves it), so this
+#      branch is normally a clean skip — keep the `if -f` guard so a future
+#      reset workflow that re-adds the seed file doesn't need to touch this
+#      script.
+#   3. Apply pending Alembic migrations to every active tenant database via
 #      scripts/migrate_all_tenants.py. The script discovers tenants from the
 #      master registry and is safe to re-run — it only applies pending work.
 #      Legacy tenants (provisioned before Alembic was wired in) are
-#      auto-bootstrapped on first contact.
-#   3. Exec uvicorn so it inherits PID 1 and Render can deliver SIGTERM
+#      auto-bootstrapped on first contact, and the safety-net passes in the
+#      script also backfill any missing tables/columns from model drift.
+#   4. Exec uvicorn so it inherits PID 1 and Render can deliver SIGTERM
 #      cleanly on rollouts.
 #
-# Skipping migrations: set MIGRATE_ON_BOOT=0 to short-circuit step 2 (e.g.
+# Skipping migrations: set MIGRATE_ON_BOOT=0 to short-circuit step 3 (e.g.
 # during incident response when you need the API up before chasing a
 # migration regression).
 #
