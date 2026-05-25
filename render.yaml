@@ -55,6 +55,37 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
+      # Fernet key for at-rest secret encryption (per-tenant Pay Hero
+      # credentials, future encrypted fields). 44-byte URL-safe base64.
+      # MUST be declared here as sync:false — otherwise a blueprint resync
+      # silently drops the dashboard value and the next deploy crashes at
+      # `Settings()` construction (settings.py refuses to boot without it).
+      # NEVER use generateValue:true here — rotating this key makes every
+      # previously-encrypted row permanently unreadable.
+      - key: ENCRYPTION_KEY
+        sync: false
+      # Server-side pepper HMACed into passwords before Argon2id. Same
+      # warning applies: regenerating invalidates every existing login.
+      - key: PASSWORD_PEPPER
+        sync: false
+      # Callback URL Pay Hero hits for STK push results. Production value:
+      # https://hms-2-3o0p.onrender.com (the canonical Render host).
+      - key: PUBLIC_BASE_URL
+        sync: false
+      # Pay Hero aggregator credentials. All four required for the live
+      # PAYHERO_ENV=production path; empty values force sandbox behaviour.
+      - key: PAYHERO_ENV
+        sync: false
+      - key: PAYHERO_USERNAME
+        sync: false
+      - key: PAYHERO_PASSWORD
+        sync: false
+      - key: PAYHERO_CHANNEL_ID
+        sync: false
+      - key: PAYHERO_WEBHOOK_SECRET
+        sync: false
+      - key: PAYHERO_WEBHOOK_CIDRS
+        sync: false
       # Lock CORS to the production SPA hostnames. CORS allow-lists are not
       # secrets, so hardcoding here keeps the blueprint authoritative and
       # the migration durable across redeploys. Order: canonical www, apex
