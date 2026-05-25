@@ -356,6 +356,102 @@ _HOSPITAL_SETTING_DEFAULTS: list[tuple] = [
 ]
 
 
+# Idempotent column patches that mirror the ADD COLUMN IF NOT EXISTS
+# statements from alembic migrations. Each entry is (table_name, ddl). The
+# table-existence guard in _apply_tenant_column_patches skips tables that
+# don't live in this tenant (e.g. mpesa_configs was dropped after the
+# Pay Hero swap). Sourced from migrations:
+#   f3d8e91a64b2_lab_flexibility_revamp
+#   c8e21f47a309_pharmacy_payment_link
+#   a91c3d27e845_radiology_revamp
+#   c7a2e94d318f_tenant_flexibility_fields (master only)
+#   c9d4ea7b1f02_tenant_branding_columns (master only)
+#   e7c63a82d51f_mpesa_per_tenant_tills (legacy, table may not exist post-swap)
+# Re-running on a converged tenant is a no-op (every statement uses
+# `ADD COLUMN IF NOT EXISTS`).
+TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
+    # f3d8e91a64b2 — lab flexibility + reusable inventory
+    ("inventory_items",
+        "ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS is_reusable BOOLEAN NOT NULL DEFAULT FALSE;"),
+    ("inventory_usage_logs",
+        "ALTER TABLE inventory_usage_logs ADD COLUMN IF NOT EXISTS is_reusable_use BOOLEAN NOT NULL DEFAULT FALSE;"),
+    ("lab_test_catalog",
+        "ALTER TABLE lab_test_catalog ADD COLUMN IF NOT EXISTS requires_barcode BOOLEAN NOT NULL DEFAULT FALSE;"),
+    # c8e21f47a309 — pharmacy/billing linkage
+    ("pharmacy_invoices",
+        "ALTER TABLE pharmacy_invoices ADD COLUMN IF NOT EXISTS dispense_id INTEGER REFERENCES dispense_logs(dispense_id) ON DELETE SET NULL;"),
+    # a91c3d27e845 — radiology revamp
+    ("radiology_exams",
+        "ALTER TABLE radiology_exams ADD COLUMN IF NOT EXISTS catalog_id INTEGER REFERENCES radiology_exam_catalog(catalog_id) ON DELETE SET NULL;"),
+    ("radiology_exams",
+        "ALTER TABLE radiology_exams ADD COLUMN IF NOT EXISTS priority VARCHAR(20) NOT NULL DEFAULT 'Routine';"),
+    ("radiology_exams",
+        "ALTER TABLE radiology_exams ADD COLUMN IF NOT EXISTS billed_price NUMERIC(10, 2);"),
+    ("radiology_exams",
+        "ALTER TABLE radiology_exams ADD COLUMN IF NOT EXISTS contrast_used VARCHAR(120);"),
+    # e7c63a82d51f — mpesa per-tenant tills (skipped automatically if the
+    # table doesn't exist; safe to keep in the list for tenants that still
+    # have legacy mpesa_configs from before the Pay Hero swap)
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS environment VARCHAR(20) NOT NULL DEFAULT 'sandbox';"),
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS shortcode_type VARCHAR(20) NOT NULL DEFAULT 'paybill';"),
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS c2b_short_code VARCHAR(20);"),
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS c2b_response_type VARCHAR(20) NOT NULL DEFAULT 'Completed';"),
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS c2b_registered_at TIMESTAMPTZ;"),
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS last_test_at TIMESTAMPTZ;"),
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS last_test_status VARCHAR(40);"),
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS last_test_message TEXT;"),
+]
+
+
+def _apply_tenant_column_patches(tenant_url: str) -> None:
+    """Apply idempotent ALTER TABLE ADD COLUMN IF NOT EXISTS statements.
+
+    Each patch is skipped when the target table doesn't exist on this tenant
+    (e.g. mpesa_configs was dropped during the Pay Hero swap). When a patch
+    actually adds a column, we log a WARNING so the operator sees the drift
+    in deploy logs.
+    """
+    if not TENANT_COLUMN_PATCHES:
+        return
+    engine = create_engine(tenant_url)
+    label = tenant_url.rsplit("@", 1)[-1]
+    try:
+        with engine.connect() as conn:
+            existing_tables = set(inspect(conn).get_table_names())
+            applied = 0
+            with conn.begin():
+                for table, ddl in TENANT_COLUMN_PATCHES:
+                    if table not in existing_tables:
+                        continue
+                    # Snapshot column set before applying so we can detect
+                    # whether the patch actually changed anything (the DDL
+                    # itself is silent on IF NOT EXISTS no-ops).
+                    cols_before = {c["name"] for c in inspect(conn).get_columns(table)}
+                    conn.execute(text(ddl))
+                    cols_after = {c["name"] for c in inspect(conn).get_columns(table)}
+                    if cols_after - cols_before:
+                        added_cols = ", ".join(sorted(cols_after - cols_before))
+                        LOG.warning(
+                            "[%s] added column(s) to %s: %s",
+                            label, table, added_cols,
+                        )
+                        applied += 1
+            if applied == 0:
+                LOG.debug("[%s] column patches: no drift", label)
+    except Exception as exc:  # noqa: BLE001
+        LOG.error("[%s] column patch pass failed: %s", label, exc)
+    finally:
+        engine.dispose()
+
+
 def _ensure_tenant_metadata(tenant_url: str) -> None:
     """Create any tables in Base.metadata that are missing on this tenant.
 
@@ -446,6 +542,11 @@ def migrate_one(tenant_db_name: str, default_url: str) -> None:
     # WHERE NOT EXISTS.
     _ensure_tenant_metadata(tenant_url)
     _seed_hospital_settings_defaults(tenant_url)
+    # Safety net (TENANT-DRIFT-002): create_all only adds missing tables —
+    # never columns to existing tables. Apply the same set of idempotent
+    # ADD COLUMN IF NOT EXISTS statements the relevant migrations carry so
+    # legacy-stamped tenants pick up columns added since their bootstrap.
+    _apply_tenant_column_patches(tenant_url)
 
 
 def main() -> int:
