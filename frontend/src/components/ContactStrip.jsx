@@ -74,7 +74,7 @@ function ContactCard({ href, icon, tone, label, value, hint, external }) {
         <a
             href={href}
             {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-            className="group relative bg-white rounded-2xl p-5 ring-1 ring-ink-200/70 hover:ring-brand-300 shadow-soft hover:shadow-elevated transition-all cursor-pointer overflow-hidden"
+            className="group relative glass-card rounded-2xl p-5 hover:ring-brand-300 transition-all cursor-pointer overflow-hidden"
         >
             {/* Subtle gradient reveal on hover */}
             <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-brand-500/0 via-brand-500/[0.04] to-teal-500/[0.06]" />

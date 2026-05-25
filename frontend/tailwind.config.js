@@ -113,6 +113,29 @@ export default {
         'pulse-soft':     { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.55 } },
         'float':          { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-6px)' } },
         'shimmer':        { '0%': { backgroundPosition: '-200% 0' }, '100%': { backgroundPosition: '200% 0' } },
+        // New: slow drift on aurora orbs in the hero — barely perceptible
+        // but adds ambient life. Pause via prefers-reduced-motion in CSS.
+        'aurora-drift':   {
+            '0%, 100%': { transform: 'translate3d(0, 0, 0) scale(1)' },
+            '50%':      { transform: 'translate3d(20px, -10px, 0) scale(1.04)' },
+        },
+        // Slow background-position drift on a multi-stop mesh gradient — used
+        // for the animated mesh layer behind Landing + Portal. The gradient
+        // itself stays still on disk; we just slide where the eye reads.
+        'mesh-shift':     {
+            '0%, 100%': { backgroundPosition: '0% 0%, 100% 100%, 50% 50%' },
+            '50%':      { backgroundPosition: '100% 50%, 0% 50%, 50% 100%' },
+        },
+        // Soft scale+blur breath on hero blobs for a "liquid" feel.
+        'blob-breathe':   {
+            '0%, 100%': { transform: 'scale(1)', filter: 'blur(120px)' },
+            '50%':      { transform: 'scale(1.08)', filter: 'blur(140px)' },
+        },
+        // Reveal-on-scroll — used by the Reveal component
+        'reveal-up':      {
+            '0%':   { opacity: 0, transform: 'translateY(20px)' },
+            '100%': { opacity: 1, transform: 'translateY(0)' },
+        },
       },
       animation: {
         'fade-in':        'fade-in 200ms ease-out',
@@ -121,6 +144,11 @@ export default {
         'pulse-soft':     'pulse-soft 2.4s ease-in-out infinite',
         'float':          'float 6s ease-in-out infinite',
         'shimmer':        'shimmer 3s linear infinite',
+        'aurora-drift':   'aurora-drift 18s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite',
+        'mesh-shift':     'mesh-shift 24s ease-in-out infinite',
+        'blob-breathe':   'blob-breathe 14s ease-in-out infinite',
+        // Slightly longer reveal-up so content arrives with intention, not haste
+        'reveal-up':      'reveal-up 600ms cubic-bezier(0.22, 1, 0.36, 1) both',
       },
     },
   },

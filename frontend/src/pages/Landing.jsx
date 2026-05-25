@@ -12,12 +12,18 @@ import {
 import Logo from '../components/Logo';
 import CountUp from '../components/CountUp';
 import ContactStrip from '../components/ContactStrip';
+import Reveal from '../components/Reveal';
 
 export default function Landing() {
     const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen bg-ink-50 text-ink-900 font-sans">
+        <div className="relative min-h-screen bg-ink-50 text-ink-900 font-sans">
+            {/* Animated mesh background — sits behind everything, drifts slowly */}
+            <div
+                aria-hidden="true"
+                className="fixed inset-0 -z-10 bg-mesh-anim animate-mesh-shift pointer-events-none"
+            />
             {/* ============== Floating navbar ============== */}
             <header className="fixed top-4 inset-x-4 z-50">
                 <div className="max-w-7xl mx-auto bg-white/85 backdrop-blur-xl border border-ink-200/70 rounded-2xl shadow-soft px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -46,8 +52,8 @@ export default function Landing() {
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute inset-0 bg-aurora" />
                     <div className="absolute inset-0 bg-grid-faint bg-grid-faint opacity-50" />
-                    <div className="absolute -top-32 -right-24 w-[40rem] h-[40rem] bg-brand-300/20 rounded-full blur-[120px]" />
-                    <div className="absolute -bottom-40 -left-24 w-[36rem] h-[36rem] bg-accent-300/20 rounded-full blur-[120px]" />
+                    <div className="absolute -top-32 -right-24 w-[40rem] h-[40rem] bg-brand-300/20 rounded-full blur-[120px] animate-blob-breathe" />
+                    <div className="absolute -bottom-40 -left-24 w-[36rem] h-[36rem] bg-accent-300/20 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
                 </div>
 
                 <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-10 items-center">
@@ -104,7 +110,7 @@ export default function Landing() {
 
             {/* ============== Features ============== */}
             <section id="features" className="py-24">
-                <div className="max-w-7xl mx-auto px-6">
+                <Reveal className="max-w-7xl mx-auto px-6">
                     <SectionHeader
                         eyebrow="What you get"
                         title="A clinical workspace that respects every role"
@@ -142,7 +148,7 @@ export default function Landing() {
                             body="Real-time WebSocket fan-out across departments — escalate, ping, and resolve without leaving the app."
                         />
                     </div>
-                </div>
+                </Reveal>
             </section>
 
             {/* ============== Modules showcase (interactive) ============== */}
@@ -151,14 +157,14 @@ export default function Landing() {
                 <div className="absolute -top-24 -left-32 w-[28rem] h-[28rem] bg-brand-300/10 rounded-full blur-[120px] pointer-events-none" />
                 <div className="absolute -bottom-32 -right-32 w-[26rem] h-[26rem] bg-accent-300/10 rounded-full blur-[120px] pointer-events-none" />
 
-                <div className="relative max-w-7xl mx-auto px-6">
+                <Reveal className="relative max-w-7xl mx-auto px-6">
                     <SectionHeader
                         eyebrow="Modules"
                         title="Twenty-five modules, one ledger of truth"
                         subtitle="Every module is gated by per-role permissions, audit-logged, and tenant-isolated. Switch them on à-la-carte — the 9 always-on modules below are bundled in the base subscription."
                     />
                     <ModuleShowcase navigate={navigate} />
-                </div>
+                </Reveal>
             </section>
 
             {/* ============== How it works ============== */}

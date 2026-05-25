@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import Logo from '../components/Logo';
 import CountUp from '../components/CountUp';
 import ContactStrip from '../components/ContactStrip';
+import Reveal from '../components/Reveal';
 
 /**
  * Portal — hospital workspace selector.
@@ -102,7 +103,12 @@ export default function Portal() {
     };
 
     return (
-        <div className="min-h-screen bg-ink-50 text-ink-900 font-sans">
+        <div className="relative min-h-screen bg-ink-50 text-ink-900 font-sans">
+            {/* Animated mesh background — sits behind everything, drifts slowly */}
+            <div
+                aria-hidden="true"
+                className="fixed inset-0 -z-10 bg-mesh-anim animate-mesh-shift pointer-events-none"
+            />
             {/* ============== Floating navbar ============== */}
             <header className="fixed top-4 inset-x-4 z-50">
                 <div className="max-w-7xl mx-auto bg-white/85 backdrop-blur-xl border border-ink-200/70 rounded-2xl shadow-soft px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -129,8 +135,8 @@ export default function Portal() {
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute inset-0 bg-aurora" />
                     <div className="absolute inset-0 bg-grid-faint bg-grid-faint opacity-50" />
-                    <div className="absolute -top-24 -right-24 w-[36rem] h-[36rem] bg-brand-300/20 rounded-full blur-[120px]" />
-                    <div className="absolute -bottom-32 -left-24 w-[32rem] h-[32rem] bg-accent-300/20 rounded-full blur-[120px]" />
+                    <div className="absolute -top-24 -right-24 w-[36rem] h-[36rem] bg-brand-300/20 rounded-full blur-[120px] animate-blob-breathe" />
+                    <div className="absolute -bottom-32 -left-24 w-[32rem] h-[32rem] bg-accent-300/20 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
                 </div>
 
                 <div className="relative max-w-5xl mx-auto px-6 text-center animate-slide-up">
@@ -261,38 +267,20 @@ export default function Portal() {
                             ))}
                         </div>
                     ) : filteredHospitals.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {filteredHospitals.map((tenant) => {
+                        <div
+                            key={sortKey + ':' + searchQuery}
+                            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                        >
+                            {filteredHospitals.map((tenant, idx) => {
                                 const chip = TENANT_CHIP[tenant.theme_color] || TENANT_CHIP.cyan;
                                 return (
-                                    <button
+                                    <HospitalCard
                                         key={tenant.id}
-                                        onClick={() => handleSelectTenant(tenant)}
-                                        className="group text-left bg-white border border-ink-200/70 hover:border-brand-300 rounded-2xl p-5 shadow-soft hover:shadow-elevated transition-all duration-200 flex flex-col justify-between min-h-[12rem] cursor-pointer focus-visible:ring-4 focus-visible:ring-brand-500/20 focus-visible:border-brand-500"
-                                    >
-                                        <div>
-                                            <div className="flex items-start justify-between mb-4">
-                                                <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ring-inset ${chip.ring}`}>
-                                                    <Building2 size={18} />
-                                                </div>
-                                                {tenant.is_premium && (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-accent-50 ring-1 ring-inset ring-accent-100 text-accent-700 text-2xs font-semibold uppercase tracking-wider">
-                                                        <Sparkles size={10} /> Premium
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <h3 className="text-base font-semibold text-ink-900 group-hover:text-brand-700 transition-colors tracking-tight">
-                                                {tenant.name}
-                                            </h3>
-                                            <p className="text-xs text-ink-500 mt-1 truncate font-mono">{tenant.domain}</p>
-                                        </div>
-                                        <div className="mt-5 flex items-center justify-between text-xs font-semibold text-ink-500 group-hover:text-brand-700 transition-colors">
-                                            <span className="inline-flex items-center gap-1.5">
-                                                <CheckCircle2 size={12} className="text-accent-500" /> Active instance
-                                            </span>
-                                            <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
-                                        </div>
-                                    </button>
+                                        tenant={tenant}
+                                        chip={chip}
+                                        delayMs={idx * 40}
+                                        onSelect={handleSelectTenant}
+                                    />
                                 );
                             })}
                         </div>
@@ -411,12 +399,66 @@ function PathCard({ to, icon, title, body, cta, tone }) {
    ────────────────────────────────────────────────────────────────────── */
 function StatTile({ icon, label, value, hint }) {
     return (
-        <div className="group bg-white rounded-2xl p-4 ring-1 ring-ink-200/70 hover:ring-brand-300 shadow-soft hover:shadow-elevated transition-all">
+        <div className="group glass-card rounded-2xl p-4 transition-all hover:translate-y-[-2px]">
             <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
                 <span className="text-brand-600">{icon}</span>{label}
             </div>
             <p className="mt-1.5 text-2xl font-semibold tracking-tight text-ink-900 tabular-nums">{value}</p>
             <p className="mt-0.5 text-xs text-ink-500">{hint}</p>
         </div>
+    );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   HospitalCard — single hospital tile with a cursor-following radial
+   gradient on hover. The gradient is driven by two CSS custom properties
+   (--mx / --my) updated on every onMouseMove, scoped to the card so it
+   doesn't trigger re-renders of the surrounding grid.
+
+   Cards stagger their entrance via animation-delay so a freshly-sorted
+   list cascades in instead of popping; the parent re-keys on sort/search
+   so the cascade re-runs when the user changes the order.
+   ────────────────────────────────────────────────────────────────────── */
+function HospitalCard({ tenant, chip, delayMs, onSelect }) {
+    const handleMove = (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        e.currentTarget.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+        e.currentTarget.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+    };
+    return (
+        <button
+            type="button"
+            onClick={() => onSelect(tenant)}
+            onMouseMove={handleMove}
+            style={{
+                animationDelay: `${delayMs}ms`,
+                animationFillMode: 'both',
+                background: `radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgba(8, 145, 178, 0.06), transparent 40%), white`,
+            }}
+            className="group relative text-left rounded-2xl p-5 ring-1 ring-ink-200/70 hover:ring-brand-300 shadow-soft hover:shadow-elevated transition-all duration-300 flex flex-col justify-between min-h-[12rem] cursor-pointer focus-visible:ring-4 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 animate-reveal-up overflow-hidden"
+        >
+            <div>
+                <div className="flex items-start justify-between mb-4">
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ring-inset transition-transform duration-300 group-hover:scale-105 ${chip.ring}`}>
+                        <Building2 size={18} />
+                    </div>
+                    {tenant.is_premium && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-accent-50 ring-1 ring-inset ring-accent-100 text-accent-700 text-2xs font-semibold uppercase tracking-wider">
+                            <Sparkles size={10} /> Premium
+                        </span>
+                    )}
+                </div>
+                <h3 className="text-base font-semibold text-ink-900 group-hover:text-brand-700 transition-colors tracking-tight">
+                    {tenant.name}
+                </h3>
+                <p className="text-xs text-ink-500 mt-1 truncate font-mono">{tenant.domain}</p>
+            </div>
+            <div className="mt-5 flex items-center justify-between text-xs font-semibold text-ink-500 group-hover:text-brand-700 transition-colors">
+                <span className="inline-flex items-center gap-1.5">
+                    <CheckCircle2 size={12} className="text-accent-500" /> Active instance
+                </span>
+                <ArrowRight size={14} className="transition-transform duration-300 group-hover:translate-x-1.5" />
+            </div>
+        </button>
     );
 }
