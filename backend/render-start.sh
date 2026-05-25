@@ -24,6 +24,27 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# ── Optional destructive reset (gated by two env vars, see script header) ──
+# When the operator wants to wipe production back to a clean slate, they set:
+#   RESET_PRODUCTION_DB=YES_DESTROY_EVERYTHING
+#   CONFIRM_DB_WIPE=i-understand-this-is-irreversible
+# Both are required; the script has additional internal gates and exits
+# non-zero if any is missing — that's NOT an error here, we just continue.
+# After a successful reset the operator MUST unset both vars in the Render
+# dashboard or every redeploy will repeat the wipe.
+if [[ "${RESET_PRODUCTION_DB:-}" == "YES_DESTROY_EVERYTHING" ]]; then
+    echo ">> RESET_PRODUCTION_DB flag set — invoking destructive wipe"
+    if python scripts/reset_production_db.py --confirm; then
+        echo ">> reset_production_db.py completed — proceeding to seed + migrate"
+    else
+        echo "!! reset_production_db.py exited non-zero — investigate before unsetting flags" >&2
+        # Don't abort the deploy. The reset script refuses-by-default, so a
+        # non-zero exit typically means "another gate wasn't open" rather
+        # than "I half-wiped the platform." Boot continues with whatever
+        # state the DBs are in.
+    fi
+fi
+
 if [[ -f "seed_superadmin.py" ]]; then
     echo ">> seed_superadmin.py present — running platform bootstrap"
     # Don't take the API down if the seed itself fails (e.g. transient DB
