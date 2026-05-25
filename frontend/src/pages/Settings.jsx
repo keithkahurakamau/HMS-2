@@ -3,9 +3,11 @@ import { apiClient } from '../api/client';
 import {
     Settings as SettingsIcon, Building2, Clock, Wallet, TestTube, Radio,
     Bell, Shield, Save, RefreshCcw, Activity, Plus, X, Palette, ArrowRight,
+    Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useJourney } from '../context/JourneyContext';
 import PageHeader from '../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -27,6 +29,7 @@ const CATEGORY_META = {
 };
 
 export default function Settings() {
+    const { restartAll } = useJourney();
     const [categories, setCategories] = useState([]);
     const [drafts, setDrafts] = useState({});       // {setting_id: new value}
     const [saving, setSaving] = useState(false);
@@ -136,6 +139,15 @@ export default function Settings() {
                 subtitle="Branding, working hours, billing, lab/radiology defaults, notifications & compliance."
                 actions={
                     <>
+                        <button
+                            data-tour="restart-tours"
+                            type="button"
+                            onClick={() => { restartAll(); toast.success('All product tours will replay on next visit.'); }}
+                            className="btn-secondary cursor-pointer"
+                            title="Reset every module's intro tour so they replay next time you visit"
+                        >
+                            <Sparkles size={15} /> Replay tours
+                        </button>
                         <button onClick={fetchSettings} className="btn-secondary cursor-pointer"><RefreshCcw size={15} /> Refresh</button>
                         <button onClick={() => setShowCustomForm(true)} className="btn-secondary cursor-pointer"><Plus size={15} /> Custom setting</button>
                         <button onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50 cursor-pointer">

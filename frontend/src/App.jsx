@@ -6,6 +6,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { BrandingProvider } from './context/BrandingContext';
 import { ModuleProvider } from './context/ModuleContext';
 import { PatientProvider } from './context/PatientContext';
+import { JourneyProvider } from './context/JourneyContext';
+import JourneyOverlay from './components/JourneyOverlay';
 import ModuleGuard from './components/ModuleGuard';
 import { Activity } from 'lucide-react';
 
@@ -108,8 +110,13 @@ export default function App() {
         <BrandingProvider>
         <BrowserRouter>
         <PatientProvider>
+        <JourneyProvider>
           <Toaster position="top-right" />
           <a href="#main-content" className="skip-link">Skip to main content</a>
+          {/* User-journey overlay — renders the spotlight + tooltip when a
+              module page calls useModuleJourney(). Mounted once at the
+              app root so portal target (document.body) is always available. */}
+          <JourneyOverlay />
           <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/portal" element={<Portal />} />
@@ -161,6 +168,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
           </Routes>
+        </JourneyProvider>
         </PatientProvider>
         </BrowserRouter>
         </BrandingProvider>
