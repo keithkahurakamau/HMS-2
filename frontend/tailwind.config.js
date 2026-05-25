@@ -131,6 +131,29 @@ export default {
             '0%, 100%': { transform: 'scale(1)', filter: 'blur(120px)' },
             '50%':      { transform: 'scale(1.08)', filter: 'blur(140px)' },
         },
+        // Elliptical orbit for floating particles. Each particle uses
+        // this same keyframe with a different duration / delay /
+        // direction so the field reads as organic, never lockstep.
+        'particle-orbit': {
+            '0%':   { transform: 'translate3d(0, 0, 0)' },
+            '25%':  { transform: 'translate3d(60px, -40px, 0)' },
+            '50%':  { transform: 'translate3d(20px, -90px, 0)' },
+            '75%':  { transform: 'translate3d(-40px, -30px, 0)' },
+            '100%': { transform: 'translate3d(0, 0, 0)' },
+        },
+        // Slow rotation for the conic-gradient halo overlay. 90s for a
+        // full loop so it never reads as "spinning" — just a quietly
+        // shifting halo of colour around the page.
+        'halo-spin': {
+            '0%':   { transform: 'rotate(0deg)' },
+            '100%': { transform: 'rotate(360deg)' },
+        },
+        // Twinkle on small particles — opacity pulse so the field
+        // doesn't read as flat dots even when they're orbiting slowly.
+        'twinkle': {
+            '0%, 100%': { opacity: 0.45 },
+            '50%':      { opacity: 1 },
+        },
         // Reveal-on-scroll — used by the Reveal component
         'reveal-up':      {
             '0%':   { opacity: 0, transform: 'translateY(20px)' },
@@ -147,6 +170,9 @@ export default {
         'aurora-drift':   'aurora-drift 18s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite',
         'mesh-shift':     'mesh-shift 24s ease-in-out infinite',
         'blob-breathe':   'blob-breathe 14s ease-in-out infinite',
+        // Note: particle-orbit / halo-spin / twinkle are applied
+        // inline (with per-particle duration + delay) so they're not
+        // registered as named animations here.
         // Slightly longer reveal-up so content arrives with intention, not haste
         'reveal-up':      'reveal-up 600ms cubic-bezier(0.22, 1, 0.36, 1) both',
       },
