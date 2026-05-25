@@ -4,32 +4,51 @@ import toast from 'react-hot-toast';
 import {
     Wallet, Search, Plus, X, Save, Activity, CheckCircle2, AlertCircle,
     Filter, Banknote, TrendingUp, Calendar, Building2, RefreshCw,
-    ArrowDownCircle, XCircle, Eye,
+    ArrowDownCircle, ArrowUpCircle, XCircle, Eye, Send, Ban,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Cheque Register                                                           */
+/*  Cheque Register — incoming + outgoing                                     */
 /*                                                                            */
-/*  Lifecycle: Received → Deposited → Cleared (posts Payment) | Bounced       */
-/*             Cancelled (any non-terminal state)                              */
+/*  Incoming lifecycle: Received → Deposited → Cleared (posts Payment) |     */
+/*                                            Bounced | Cancelled            */
+/*  Outgoing lifecycle: Issued → Dispatched → Cleared | Returned | Stopped | */
+/*                                            Cancelled                       */
 /* ────────────────────────────────────────────────────────────────────────── */
 
 const STATUS_META = {
-    Received:  { label: 'Received',  badge: 'badge-info',    accent: 'bg-blue-500/10 ring-blue-500/20 text-blue-600',     icon: Wallet },
-    Deposited: { label: 'Deposited', badge: 'badge-warn',    accent: 'bg-amber-500/10 ring-amber-500/20 text-amber-600',  icon: ArrowDownCircle },
-    Cleared:   { label: 'Cleared',   badge: 'badge-success', accent: 'bg-emerald-500/10 ring-emerald-500/20 text-emerald-600', icon: CheckCircle2 },
-    Bounced:   { label: 'Bounced',   badge: 'badge-danger',  accent: 'bg-rose-500/10 ring-rose-500/20 text-rose-600',     icon: AlertCircle },
-    Cancelled: { label: 'Cancelled', badge: 'badge-neutral', accent: 'bg-ink-200 text-ink-600',                            icon: XCircle },
+    Received:   { label: 'Received',   badge: 'badge-info',    icon: Wallet },
+    Deposited:  { label: 'Deposited',  badge: 'badge-warn',    icon: ArrowDownCircle },
+    Issued:     { label: 'Issued',     badge: 'badge-info',    icon: Wallet },
+    Dispatched: { label: 'Dispatched', badge: 'badge-warn',    icon: ArrowUpCircle },
+    Cleared:    { label: 'Cleared',    badge: 'badge-success', icon: CheckCircle2 },
+    Bounced:    { label: 'Bounced',    badge: 'badge-danger',  icon: AlertCircle },
+    Returned:   { label: 'Returned',   badge: 'badge-danger',  icon: AlertCircle },
+    Stopped:    { label: 'Stopped',    badge: 'badge-warn',    icon: Ban },
+    Cancelled:  { label: 'Cancelled',  badge: 'badge-neutral', icon: XCircle },
 };
 
 const DRAWER_TYPES = ['Insurance', 'Employer', 'Patient', 'Government', 'Other'];
+const PAYEE_TYPES  = ['Supplier', 'Staff', 'Refund', 'Government', 'Other'];
 
-const EMPTY_CHEQUE = {
+// Direction-aware form defaults — populated when the user picks
+// Incoming or Outgoing on the create modal. Keeps the form fields
+// strictly mutually exclusive so the backend's validation never
+// trips on an accidental mixed-payload.
+const EMPTY_INCOMING = {
+    direction: 'incoming',
     cheque_number: '', drawer_name: '', drawer_type: 'Insurance',
     bank_name: '', bank_branch: '', amount: '', currency: 'KES',
     date_on_cheque: '', invoice_id: '', patient_id: '', notes: '',
 };
+const EMPTY_OUTGOING = {
+    direction: 'outgoing',
+    cheque_number: '', payee_name: '', payee_type: 'Supplier',
+    bank_name: '', bank_branch: '', amount: '', currency: 'KES',
+    date_on_cheque: '', date_issued: '', notes: '',
+};
+const EMPTY_CHEQUE = EMPTY_INCOMING;  // legacy default for the existing form code
 
 export default function Cheques() {
     const [cheques, setCheques] = useState([]);
@@ -38,15 +57,18 @@ export default function Cheques() {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [drawerFilter, setDrawerFilter] = useState('');
+    // Direction tab — 'incoming' | 'outgoing'. Drives both the list filter
+    // and the create-modal default. Switching the tab refetches.
+    const [direction, setDirection] = useState('incoming');
 
     // Modal state
     const [isNewOpen, setIsNewOpen] = useState(false);
-    const [newDraft, setNewDraft] = useState(EMPTY_CHEQUE);
+    const [newDraft, setNewDraft] = useState(EMPTY_INCOMING);
     const [submitting, setSubmitting] = useState(false);
 
     // Detail drawer
     const [active, setActive] = useState(null);
-    const [actionPanel, setActionPanel] = useState(null); // 'deposit' | 'clear' | 'bounce' | 'cancel'
+    const [actionPanel, setActionPanel] = useState(null);
     const [actionDraft, setActionDraft] = useState({});
 
     useEffect(() => { fetchAll(); }, []);
@@ -54,18 +76,20 @@ export default function Cheques() {
         const t = setTimeout(fetchAll, 300);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, statusFilter, drawerFilter]);
+    }, [search, statusFilter, drawerFilter, direction]);
 
     const fetchAll = async () => {
         setIsLoading(true);
         try {
             const params = new URLSearchParams();
+            params.set('direction', direction);
             if (search) params.set('search', search);
             if (statusFilter) params.set('status', statusFilter);
-            if (drawerFilter) params.set('drawer_type', drawerFilter);
+            if (drawerFilter && direction === 'incoming') params.set('drawer_type', drawerFilter);
+            if (drawerFilter && direction === 'outgoing') params.set('payee_type', drawerFilter);
             const [listRes, sumRes] = await Promise.all([
                 apiClient.get(`/cheques/?${params.toString()}`),
-                apiClient.get('/cheques/summary'),
+                apiClient.get(`/cheques/summary?direction=${direction}`),
             ]);
             setCheques(listRes.data || []);
             setSummary(sumRes.data || {});
@@ -76,23 +100,57 @@ export default function Cheques() {
         }
     };
 
+    const switchDirection = (next) => {
+        if (next === direction) return;
+        setDirection(next);
+        setStatusFilter('');
+        setDrawerFilter('');
+        setNewDraft(next === 'incoming' ? EMPTY_INCOMING : EMPTY_OUTGOING);
+    };
+
+    const openNewModal = () => {
+        setNewDraft(direction === 'incoming' ? EMPTY_INCOMING : EMPTY_OUTGOING);
+        setIsNewOpen(true);
+    };
+
     /* ─── Create ─── */
 
     const submitNew = async (e) => {
         e.preventDefault();
         setSubmitting(true);
         try {
+            // Build payload from the draft, coercing numerics and clearing
+            // string defaults that should be null on the wire. Direction
+            // determines which counterparty block we keep.
+            const isIncoming = newDraft.direction === 'incoming';
             const body = {
-                ...newDraft,
+                direction: newDraft.direction,
+                cheque_number: newDraft.cheque_number,
+                bank_name: newDraft.bank_name,
+                bank_branch: newDraft.bank_branch || null,
                 amount: parseFloat(newDraft.amount) || 0,
+                currency: newDraft.currency || 'KES',
                 date_on_cheque: newDraft.date_on_cheque || null,
-                invoice_id: newDraft.invoice_id ? parseInt(newDraft.invoice_id) : null,
-                patient_id: newDraft.patient_id ? parseInt(newDraft.patient_id) : null,
+                notes: newDraft.notes || null,
+                ...(isIncoming
+                    ? {
+                        drawer_name: newDraft.drawer_name,
+                        drawer_type: newDraft.drawer_type,
+                        invoice_id: newDraft.invoice_id ? parseInt(newDraft.invoice_id) : null,
+                        patient_id: newDraft.patient_id ? parseInt(newDraft.patient_id) : null,
+                      }
+                    : {
+                        payee_name: newDraft.payee_name,
+                        payee_type: newDraft.payee_type,
+                        date_issued: newDraft.date_issued
+                            ? new Date(newDraft.date_issued).toISOString()
+                            : new Date().toISOString(),
+                      }),
             };
             await apiClient.post('/cheques/', body);
-            toast.success('Cheque recorded.');
+            toast.success(isIncoming ? 'Incoming cheque recorded.' : 'Outgoing cheque issued.');
             setIsNewOpen(false);
-            setNewDraft(EMPTY_CHEQUE);
+            setNewDraft(isIncoming ? EMPTY_INCOMING : EMPTY_OUTGOING);
             fetchAll();
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Could not record cheque.');
@@ -106,13 +164,17 @@ export default function Cheques() {
     const openAction = (cheque, action) => {
         setActive(cheque);
         setActionPanel(action);
-        setActionDraft(
-            action === 'deposit'
-                ? { deposit_account: '', deposit_date: new Date().toISOString().slice(0, 10) }
-                : action === 'clear'
-                    ? { clearance_date: new Date().toISOString().slice(0, 10) }
-                    : { reason: '' }
-        );
+        const today = new Date().toISOString().slice(0, 10);
+        const defaults = {
+            deposit:  { deposit_account: '', deposit_date: today },
+            dispatch: { dispatch_date: today, deposit_account: '' },
+            clear:    { clearance_date: today },
+            bounce:   { reason: '' },
+            return:   { reason: '' },
+            stop:     { reason: '' },
+            cancel:   { reason: '' },
+        };
+        setActionDraft(defaults[action] || {});
     };
 
     const submitAction = async () => {
@@ -125,15 +187,23 @@ export default function Cheques() {
                     deposit_account: actionDraft.deposit_account,
                     deposit_date: actionDraft.deposit_date ? new Date(actionDraft.deposit_date).toISOString() : null,
                 };
+            } else if (actionPanel === 'dispatch') {
+                payload = {
+                    dispatch_date: actionDraft.dispatch_date ? new Date(actionDraft.dispatch_date).toISOString() : null,
+                    deposit_account: actionDraft.deposit_account || null,
+                };
             } else if (actionPanel === 'clear') {
                 payload = { clearance_date: actionDraft.clearance_date ? new Date(actionDraft.clearance_date).toISOString() : null };
-            } else if (actionPanel === 'bounce' || actionPanel === 'cancel') {
+            } else if (['bounce', 'return', 'stop', 'cancel'].includes(actionPanel)) {
                 if (!actionDraft.reason?.trim()) return toast.error('A reason is required.');
                 payload = { reason: actionDraft.reason };
             }
 
             const res = await apiClient.post(`/cheques/${active.cheque_id}/${actionPanel}`, payload);
-            toast.success(`Cheque ${actionPanel}ed.`);
+            const verb = { deposit: 'deposited', dispatch: 'dispatched', clear: 'cleared',
+                           bounce: 'marked as bounced', return: 'marked as returned',
+                           stop: 'stopped', cancel: 'cancelled' }[actionPanel] || actionPanel;
+            toast.success(`Cheque ${verb}.`);
             setActive(res.data);
             setActionPanel(null);
             fetchAll();
@@ -144,12 +214,23 @@ export default function Cheques() {
 
     /* ─── Derived ─── */
 
-    const kpiTiles = useMemo(() => ([
-        { key: 'Received',  label: 'Received',  icon: Wallet,         accent: 'blue'    },
-        { key: 'Deposited', label: 'In transit',icon: ArrowDownCircle, accent: 'amber'   },
-        { key: 'Cleared',   label: 'Cleared',   icon: CheckCircle2,    accent: 'emerald' },
-        { key: 'Bounced',   label: 'Bounced',   icon: AlertCircle,     accent: 'rose'    },
-    ]), []);
+    // Direction-aware KPI strip — incoming shows received/in-transit/cleared/
+    // bounced; outgoing shows issued/in-transit/cleared/returned.
+    const kpiTiles = useMemo(() => (
+        direction === 'incoming'
+            ? [
+                { key: 'Received',   label: 'Received',   icon: Wallet,          accent: 'blue'    },
+                { key: 'Deposited',  label: 'In transit', icon: ArrowDownCircle, accent: 'amber'   },
+                { key: 'Cleared',    label: 'Cleared',    icon: CheckCircle2,    accent: 'emerald' },
+                { key: 'Bounced',    label: 'Bounced',    icon: AlertCircle,     accent: 'rose'    },
+            ]
+            : [
+                { key: 'Issued',     label: 'Issued',     icon: Wallet,          accent: 'blue'    },
+                { key: 'Dispatched', label: 'In transit', icon: ArrowUpCircle,   accent: 'amber'   },
+                { key: 'Cleared',    label: 'Cleared',    icon: CheckCircle2,    accent: 'emerald' },
+                { key: 'Returned',   label: 'Returned',   icon: AlertCircle,     accent: 'rose'    },
+            ]
+    ), [direction]);
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -161,10 +242,40 @@ export default function Cheques() {
                 actions={
                     <>
                         <button onClick={fetchAll} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
-                        <button onClick={() => setIsNewOpen(true)} className="btn-primary cursor-pointer"><Plus size={15} /> Record cheque</button>
+                        <button onClick={openNewModal} className="btn-primary cursor-pointer">
+                            <Plus size={15} /> {direction === 'incoming' ? 'Record cheque' : 'Issue cheque'}
+                        </button>
                     </>
                 }
             />
+
+            {/* Direction tabs — incoming (received) vs outgoing (issued).
+                Sticky inside the page so the user can scan a long table
+                without losing the tab strip. */}
+            <div className="inline-flex p-1 rounded-2xl bg-ink-100/70 ring-1 ring-ink-200/60 shadow-soft">
+                <button
+                    type="button"
+                    onClick={() => switchDirection('incoming')}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
+                        direction === 'incoming'
+                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
+                            : 'text-ink-600 hover:text-ink-900 hover:bg-white/60'
+                    }`}
+                >
+                    <ArrowDownCircle size={15} /> Incoming
+                </button>
+                <button
+                    type="button"
+                    onClick={() => switchDirection('outgoing')}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
+                        direction === 'outgoing'
+                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
+                            : 'text-ink-600 hover:text-ink-900 hover:bg-white/60'
+                    }`}
+                >
+                    <ArrowUpCircle size={15} /> Outgoing
+                </button>
+            </div>
 
             {/* KPIs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -196,7 +307,8 @@ export default function Cheques() {
             <div className="card p-3 flex flex-wrap gap-3 items-center">
                 <div className="relative flex-1 min-w-[16rem]">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-                    <input type="text" placeholder="Cheque #, drawer, bank…"
+                    <input type="text"
+                           placeholder={direction === 'incoming' ? 'Cheque #, drawer, bank…' : 'Cheque #, payee, bank…'}
                            value={search} onChange={e => setSearch(e.target.value)}
                            className="input pl-9" />
                 </div>
@@ -204,14 +316,17 @@ export default function Cheques() {
                     <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                     <select className="input pl-9 pr-8" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                         <option value="">All statuses</option>
-                        {Object.keys(STATUS_META).map(s => <option key={s}>{s}</option>)}
+                        {(direction === 'incoming'
+                            ? ['Received', 'Deposited', 'Cleared', 'Bounced', 'Cancelled']
+                            : ['Issued', 'Dispatched', 'Cleared', 'Returned', 'Stopped', 'Cancelled']
+                         ).map(s => <option key={s}>{s}</option>)}
                     </select>
                 </div>
                 <div className="relative">
                     <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                     <select className="input pl-9 pr-8" value={drawerFilter} onChange={e => setDrawerFilter(e.target.value)}>
-                        <option value="">All drawers</option>
-                        {DRAWER_TYPES.map(d => <option key={d}>{d}</option>)}
+                        <option value="">{direction === 'incoming' ? 'All drawers' : 'All payees'}</option>
+                        {(direction === 'incoming' ? DRAWER_TYPES : PAYEE_TYPES).map(d => <option key={d}>{d}</option>)}
                     </select>
                 </div>
                 <span className="ml-auto text-xs text-ink-500">{cheques.length} cheque{cheques.length === 1 ? '' : 's'}</span>
@@ -224,10 +339,10 @@ export default function Cheques() {
                         <thead>
                             <tr>
                                 <th>Cheque #</th>
-                                <th>Drawer</th>
+                                <th>{direction === 'incoming' ? 'Drawer' : 'Payee'}</th>
                                 <th>Bank</th>
                                 <th>Amount</th>
-                                <th>Date received</th>
+                                <th>{direction === 'incoming' ? 'Date received' : 'Date issued'}</th>
                                 <th>Status</th>
                                 <th className="text-right">Actions</th>
                             </tr>
@@ -241,12 +356,15 @@ export default function Cheques() {
                                 <tr><td colSpan="7" className="text-center py-10 text-ink-500">No cheques match the current filters.</td></tr>
                             ) : cheques.map(c => {
                                 const meta = STATUS_META[c.status] || {};
+                                const counterparty = c.direction === 'incoming' ? c.drawer_name : c.payee_name;
+                                const counterpartyType = c.direction === 'incoming' ? c.drawer_type : c.payee_type;
+                                const counterpartyDate = c.direction === 'incoming' ? c.date_received : (c.date_issued || c.created_at);
                                 return (
                                     <tr key={c.cheque_id} className="hover:bg-ink-50/40">
                                         <td className="font-mono text-xs font-semibold text-brand-700">{c.cheque_number}</td>
                                         <td>
-                                            <div className="font-medium text-ink-900">{c.drawer_name}</div>
-                                            <div className="text-2xs text-ink-500">{c.drawer_type}</div>
+                                            <div className="font-medium text-ink-900">{counterparty || '—'}</div>
+                                            <div className="text-2xs text-ink-500">{counterpartyType}</div>
                                         </td>
                                         <td>
                                             <div className="text-sm text-ink-700">{c.bank_name}</div>
@@ -255,19 +373,20 @@ export default function Cheques() {
                                         <td className="font-mono text-sm">{c.currency} {Number(c.amount).toLocaleString()}</td>
                                         <td className="text-xs text-ink-500">
                                             <Calendar size={11} className="inline mr-1 text-ink-400" />
-                                            {c.date_received ? new Date(c.date_received).toLocaleDateString() : '—'}
+                                            {counterpartyDate ? new Date(counterpartyDate).toLocaleDateString() : '—'}
                                         </td>
                                         <td><span className={meta.badge}>{c.status}</span></td>
                                         <td className="text-right">
                                             <button onClick={() => setActive(c)} className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded" aria-label="View">
                                                 <Eye size={15} />
                                             </button>
-                                            {c.status === 'Received' && (
+                                            {/* Incoming actions */}
+                                            {c.direction === 'incoming' && c.status === 'Received' && (
                                                 <button onClick={() => openAction(c, 'deposit')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100">
                                                     Deposit
                                                 </button>
                                             )}
-                                            {c.status === 'Deposited' && (
+                                            {c.direction === 'incoming' && c.status === 'Deposited' && (
                                                 <>
                                                     <button onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100">
                                                         Clear
@@ -277,7 +396,33 @@ export default function Cheques() {
                                                     </button>
                                                 </>
                                             )}
-                                            {(c.status === 'Received' || c.status === 'Deposited') && (
+                                            {/* Outgoing actions */}
+                                            {c.direction === 'outgoing' && c.status === 'Issued' && (
+                                                <>
+                                                    <button onClick={() => openAction(c, 'dispatch')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100">
+                                                        Dispatch
+                                                    </button>
+                                                    <button onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100">
+                                                        Stop
+                                                    </button>
+                                                </>
+                                            )}
+                                            {c.direction === 'outgoing' && c.status === 'Dispatched' && (
+                                                <>
+                                                    <button onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100">
+                                                        Clear
+                                                    </button>
+                                                    <button onClick={() => openAction(c, 'return')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-rose-700 bg-rose-50 hover:bg-rose-100">
+                                                        Return
+                                                    </button>
+                                                    <button onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100">
+                                                        Stop
+                                                    </button>
+                                                </>
+                                            )}
+                                            {/* Cancel available in any non-terminal state */}
+                                            {(c.direction === 'incoming' && ['Received', 'Deposited'].includes(c.status)
+                                              || c.direction === 'outgoing' && ['Issued', 'Dispatched'].includes(c.status)) && (
                                                 <button onClick={() => openAction(c, 'cancel')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-ink-600 bg-ink-100 hover:bg-ink-200">
                                                     Cancel
                                                 </button>
@@ -299,13 +444,41 @@ export default function Cheques() {
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
                             <div>
                                 <span className="section-eyebrow">Finance</span>
-                                <h2 className="text-xl font-semibold mt-1 flex items-center gap-2"><Banknote size={20} className="text-brand-600" /> Record cheque</h2>
+                                <h2 className="text-xl font-semibold mt-1 flex items-center gap-2">
+                                    <Banknote size={20} className="text-brand-600" />
+                                    {newDraft.direction === 'incoming' ? 'Record received cheque' : 'Issue new cheque'}
+                                </h2>
                             </div>
                             <button onClick={() => setIsNewOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
                         <form onSubmit={submitNew} className="flex-1 overflow-y-auto p-5 bg-ink-50/60 space-y-4">
+                            {/* Direction toggle inside the modal so the receptionist can flip
+                                even after opening the form. Persists the active tab choice. */}
+                            <div className="inline-flex p-1 rounded-xl bg-white ring-1 ring-ink-200">
+                                <button type="button"
+                                    onClick={() => setNewDraft(EMPTY_INCOMING)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                        newDraft.direction === 'incoming'
+                                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white'
+                                            : 'text-ink-600 hover:text-ink-900'
+                                    }`}
+                                >
+                                    <ArrowDownCircle size={13} /> Incoming
+                                </button>
+                                <button type="button"
+                                    onClick={() => setNewDraft(EMPTY_OUTGOING)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                        newDraft.direction === 'outgoing'
+                                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white'
+                                            : 'text-ink-600 hover:text-ink-900'
+                                    }`}
+                                >
+                                    <ArrowUpCircle size={13} /> Outgoing
+                                </button>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="label">Cheque number *</label>
@@ -317,19 +490,42 @@ export default function Cheques() {
                                     <input type="date" className="input" value={newDraft.date_on_cheque}
                                            onChange={e => setNewDraft({ ...newDraft, date_on_cheque: e.target.value })} />
                                 </div>
-                                <div className="col-span-2">
-                                    <label className="label">Drawer name *</label>
-                                    <input required className="input" value={newDraft.drawer_name}
-                                           onChange={e => setNewDraft({ ...newDraft, drawer_name: e.target.value })}
-                                           placeholder="e.g. Jubilee Insurance Ltd" />
-                                </div>
-                                <div>
-                                    <label className="label">Drawer type *</label>
-                                    <select className="input" value={newDraft.drawer_type}
-                                            onChange={e => setNewDraft({ ...newDraft, drawer_type: e.target.value })}>
-                                        {DRAWER_TYPES.map(d => <option key={d}>{d}</option>)}
-                                    </select>
-                                </div>
+
+                                {/* Counterparty block — drawer for incoming, payee for outgoing */}
+                                {newDraft.direction === 'incoming' ? (
+                                    <>
+                                        <div className="col-span-2">
+                                            <label className="label">Drawer name *</label>
+                                            <input required className="input" value={newDraft.drawer_name}
+                                                   onChange={e => setNewDraft({ ...newDraft, drawer_name: e.target.value })}
+                                                   placeholder="e.g. Jubilee Insurance Ltd" />
+                                        </div>
+                                        <div>
+                                            <label className="label">Drawer type *</label>
+                                            <select className="input" value={newDraft.drawer_type}
+                                                    onChange={e => setNewDraft({ ...newDraft, drawer_type: e.target.value })}>
+                                                {DRAWER_TYPES.map(d => <option key={d}>{d}</option>)}
+                                            </select>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="col-span-2">
+                                            <label className="label">Payee name *</label>
+                                            <input required className="input" value={newDraft.payee_name}
+                                                   onChange={e => setNewDraft({ ...newDraft, payee_name: e.target.value })}
+                                                   placeholder="e.g. Acme Medical Supplies Ltd" />
+                                        </div>
+                                        <div>
+                                            <label className="label">Payee type *</label>
+                                            <select className="input" value={newDraft.payee_type}
+                                                    onChange={e => setNewDraft({ ...newDraft, payee_type: e.target.value })}>
+                                                {PAYEE_TYPES.map(d => <option key={d}>{d}</option>)}
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+
                                 <div>
                                     <label className="label">Amount *</label>
                                     <input required type="number" min="0.01" step="0.01" className="input" value={newDraft.amount}
@@ -338,7 +534,8 @@ export default function Cheques() {
                                 <div>
                                     <label className="label">Bank name *</label>
                                     <input required className="input" value={newDraft.bank_name}
-                                           onChange={e => setNewDraft({ ...newDraft, bank_name: e.target.value })} />
+                                           onChange={e => setNewDraft({ ...newDraft, bank_name: e.target.value })}
+                                           placeholder={newDraft.direction === 'incoming' ? "Drawer's bank" : 'Our bank (drawn-on)'} />
                                 </div>
                                 <div>
                                     <label className="label">Branch</label>
@@ -350,16 +547,31 @@ export default function Cheques() {
                                     <input className="input uppercase" maxLength="3" value={newDraft.currency}
                                            onChange={e => setNewDraft({ ...newDraft, currency: e.target.value.toUpperCase() })} />
                                 </div>
-                                <div>
-                                    <label className="label">Linked invoice ID (optional)</label>
-                                    <input type="number" className="input" value={newDraft.invoice_id}
-                                           onChange={e => setNewDraft({ ...newDraft, invoice_id: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="label">Linked patient ID (optional)</label>
-                                    <input type="number" className="input" value={newDraft.patient_id}
-                                           onChange={e => setNewDraft({ ...newDraft, patient_id: e.target.value })} />
-                                </div>
+
+                                {/* Incoming-only optional links */}
+                                {newDraft.direction === 'incoming' && (
+                                    <>
+                                        <div>
+                                            <label className="label">Linked invoice ID (optional)</label>
+                                            <input type="number" className="input" value={newDraft.invoice_id}
+                                                   onChange={e => setNewDraft({ ...newDraft, invoice_id: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label className="label">Linked patient ID (optional)</label>
+                                            <input type="number" className="input" value={newDraft.patient_id}
+                                                   onChange={e => setNewDraft({ ...newDraft, patient_id: e.target.value })} />
+                                        </div>
+                                    </>
+                                )}
+                                {/* Outgoing-only: date issued */}
+                                {newDraft.direction === 'outgoing' && (
+                                    <div className="col-span-2">
+                                        <label className="label">Date issued (defaults to today)</label>
+                                        <input type="date" className="input" value={newDraft.date_issued}
+                                               onChange={e => setNewDraft({ ...newDraft, date_issued: e.target.value })} />
+                                    </div>
+                                )}
+
                                 <div className="col-span-2">
                                     <label className="label">Notes</label>
                                     <textarea rows="3" className="input resize-none" value={newDraft.notes}
@@ -369,7 +581,8 @@ export default function Cheques() {
                             <div className="flex justify-end gap-2 pt-3 border-t border-ink-100">
                                 <button type="button" onClick={() => setIsNewOpen(false)} className="btn-secondary">Cancel</button>
                                 <button type="submit" disabled={submitting} className="btn-primary">
-                                    {submitting ? <Activity size={15} className="animate-spin" /> : <Save size={15} />} Record cheque
+                                    {submitting ? <Activity size={15} className="animate-spin" /> : <Save size={15} />}
+                                    {newDraft.direction === 'incoming' ? ' Record cheque' : ' Issue cheque'}
                                 </button>
                             </div>
                         </form>
