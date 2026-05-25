@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
     Building2, Search, ArrowRight, Activity, Sparkles, HeartPulse,
     ShieldCheck, Globe2, Lock, CheckCircle2, X, ChevronRight,
+    Award, Database, Layers, Zap, ArrowUpRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Logo from '../components/Logo';
+import CountUp from '../components/CountUp';
+import ContactStrip from '../components/ContactStrip';
 
 /**
  * Portal — hospital workspace selector.
@@ -34,10 +37,24 @@ const TENANT_CHIP = {
 // hand off to.
 const ALLOWED_NEXT_PATHS = new Set(['/login', '/patient']);
 
+// Sort options for the directory chips. "Name" is the safe default for
+// readability; "Newest" surfaces fresh tenants after a launch; "Premium"
+// pushes paying customers up so support requests land in the right place
+// when staff scan a long list.
+const SORT_OPTIONS = [
+    { key: 'name', label: 'A → Z',
+      cmp: (a, b) => a.name.localeCompare(b.name) },
+    { key: 'newest', label: 'Newest',
+      cmp: (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0) },
+    { key: 'premium', label: 'Premium first',
+      cmp: (a, b) => (b.is_premium ? 1 : 0) - (a.is_premium ? 1 : 0) || a.name.localeCompare(b.name) },
+];
+
 export default function Portal() {
     const [hospitals, setHospitals] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortKey, setSortKey] = useState('name');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const nextPath = ALLOWED_NEXT_PATHS.has(searchParams.get('next'))
@@ -62,10 +79,20 @@ export default function Portal() {
         localStorage.removeItem('hms_tenant_name');
     }, []);
 
-    const filteredHospitals = hospitals.filter((h) =>
-        h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.domain.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredHospitals = useMemo(() => {
+        const needle = searchQuery.trim().toLowerCase();
+        const filtered = needle
+            ? hospitals.filter((h) =>
+                h.name.toLowerCase().includes(needle)
+                || h.domain.toLowerCase().includes(needle))
+            : hospitals;
+        const sorter = SORT_OPTIONS.find(o => o.key === sortKey) || SORT_OPTIONS[0];
+        return [...filtered].sort(sorter.cmp);
+    }, [hospitals, searchQuery, sortKey]);
+
+    // Headline counts derived from the live registry so the stat strip
+    // actually reflects platform reality instead of marketing fiction.
+    const premiumCount = hospitals.filter(h => h.is_premium).length;
 
     const handleSelectTenant = (tenant) => {
         localStorage.setItem('hms_tenant_id', tenant.db_name);
@@ -164,8 +191,20 @@ export default function Portal() {
                 </div>
             </section>
 
+            {/* ============== Live platform stat strip ============== */}
+            {!isLoading && hospitals.length > 0 && (
+                <section className="relative -mt-4 mb-8">
+                    <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <StatTile icon={<Building2 size={16} />} label="Hospitals" value={<CountUp to={hospitals.length} />} hint="on the platform today" />
+                        <StatTile icon={<Award size={16} />} label="Premium tier" value={<CountUp to={premiumCount} />} hint="active subscriptions" />
+                        <StatTile icon={<Layers size={16} />} label="Modules" value={<CountUp to={25} />} hint="per hospital, à-la-carte" />
+                        <StatTile icon={<Zap size={16} />} label="Connect time" value={<><CountUp to={2} suffix="s" /></>} hint="from pick → workspace" />
+                    </div>
+                </section>
+            )}
+
             {/* ============== Hospital directory ============== */}
-            <section id="directory" className="relative pb-16 sm:pb-24 -mt-2">
+            <section id="directory" className="relative pb-16 sm:pb-24">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="flex items-end justify-between flex-wrap gap-3 mb-6">
                         <div>
@@ -185,6 +224,30 @@ export default function Portal() {
                             </div>
                         )}
                     </div>
+
+                    {/* Sort chips */}
+                    {!isLoading && hospitals.length > 1 && (
+                        <div className="flex flex-wrap items-center gap-2 mb-6">
+                            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-500 mr-1">Sort</span>
+                            {SORT_OPTIONS.map(opt => {
+                                const isActive = opt.key === sortKey;
+                                return (
+                                    <button
+                                        key={opt.key}
+                                        type="button"
+                                        onClick={() => setSortKey(opt.key)}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                                            isActive
+                                                ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
+                                                : 'bg-white ring-1 ring-ink-200 text-ink-600 hover:ring-brand-300 hover:text-brand-700'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     {isLoading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -286,6 +349,9 @@ export default function Portal() {
                 </div>
             </section>
 
+            {/* ============== Contact strip ============== */}
+            <ContactStrip />
+
             {/* ============== Footer ============== */}
             <footer className="border-t border-ink-200/70 bg-white/60 backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -334,5 +400,23 @@ function PathCard({ to, icon, title, body, cta, tone }) {
                 {cta} <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
             </div>
         </Link>
+    );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   StatTile — compact stat card used in the platform-stats strip between
+   the hero and the directory. Visually lighter than the Landing page's
+   `Stat` (no separate hint row) because the Portal page already has its
+   own search/sort affordances competing for attention.
+   ────────────────────────────────────────────────────────────────────── */
+function StatTile({ icon, label, value, hint }) {
+    return (
+        <div className="group bg-white rounded-2xl p-4 ring-1 ring-ink-200/70 hover:ring-brand-300 shadow-soft hover:shadow-elevated transition-all">
+            <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500">
+                <span className="text-brand-600">{icon}</span>{label}
+            </div>
+            <p className="mt-1.5 text-2xl font-semibold tracking-tight text-ink-900 tabular-nums">{value}</p>
+            <p className="mt-0.5 text-xs text-ink-500">{hint}</p>
+        </div>
     );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     ArrowRight, ShieldCheck, Stethoscope, HeartPulse, Lock, Activity,
@@ -10,6 +10,8 @@ import {
     Palette, LifeBuoy, KeyRound, UserCog, FileSearch,
 } from 'lucide-react';
 import Logo from '../components/Logo';
+import CountUp from '../components/CountUp';
+import ContactStrip from '../components/ContactStrip';
 
 export default function Landing() {
     const navigate = useNavigate();
@@ -235,6 +237,9 @@ export default function Landing() {
                     </div>
                 </div>
             </section>
+
+            {/* ============== Contact strip ============== */}
+            <ContactStrip heading="Talk to a human" />
 
             {/* ============== Footer ============== */}
             <footer className="border-t border-ink-200/70 bg-white/60 backdrop-blur-md">
@@ -712,42 +717,4 @@ function ModuleCard({ module: m, delayMs, navigate }) {
     );
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
-   CountUp — animated integer that ticks from 0 → `to` once it scrolls
-   into view. Uses IntersectionObserver so we don't run animations on
-   off-screen counters and don't fire requestAnimationFrame loops that
-   the user will never see. Respects prefers-reduced-motion.
-   ────────────────────────────────────────────────────────────────────── */
-function CountUp({ to, suffix = '', durationMs = 1100 }) {
-    const [value, setValue] = useState(0);
-    const ref = useRef(null);
-    const startedRef = useRef(false);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (reduce) { setValue(to); return; }
-
-        const el = ref.current;
-        if (!el) return;
-        const io = new IntersectionObserver((entries) => {
-            entries.forEach((e) => {
-                if (!e.isIntersecting || startedRef.current) return;
-                startedRef.current = true;
-                const start = performance.now();
-                const tick = (now) => {
-                    const t = Math.min(1, (now - start) / durationMs);
-                    // Cubic ease-out for a satisfying decel
-                    const eased = 1 - Math.pow(1 - t, 3);
-                    setValue(Math.round(eased * to));
-                    if (t < 1) requestAnimationFrame(tick);
-                };
-                requestAnimationFrame(tick);
-            });
-        }, { threshold: 0.4 });
-        io.observe(el);
-        return () => io.disconnect();
-    }, [to, durationMs]);
-
-    return <span ref={ref} className="tabular-nums">{value}{suffix}</span>;
-}
+/* CountUp lives in ../components/CountUp.jsx — reused by Portal as well. */
