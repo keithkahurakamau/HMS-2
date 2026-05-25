@@ -13,17 +13,17 @@ import Logo from '../components/Logo';
 import CountUp from '../components/CountUp';
 import ContactStrip from '../components/ContactStrip';
 import Reveal from '../components/Reveal';
+import PremiumBackground from '../components/PremiumBackground';
 
 export default function Landing() {
     const navigate = useNavigate();
 
     return (
         <div className="relative min-h-screen bg-ink-50 text-ink-900 font-sans">
-            {/* Animated mesh background — sits behind everything, drifts slowly */}
-            <div
-                aria-hidden="true"
-                className="fixed inset-0 -z-10 bg-mesh-anim animate-mesh-shift pointer-events-none"
-            />
+            {/* Premium reactive background — parallax gradient blobs that
+                follow the cursor + a spotlight disc that tracks 1:1. See
+                PremiumBackground.jsx for the rAF lerp mechanics. */}
+            <PremiumBackground />
             {/* ============== Floating navbar ============== */}
             <header className="fixed top-4 inset-x-4 z-50">
                 <div className="max-w-7xl mx-auto bg-white/85 backdrop-blur-xl border border-ink-200/70 rounded-2xl shadow-soft px-4 sm:px-6 py-3 flex items-center justify-between">
