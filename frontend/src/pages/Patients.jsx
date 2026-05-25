@@ -144,6 +144,18 @@ export default function Patients() {
     };
     const [formData, setFormData] = useState(defaultFormState);
 
+    // KDPA Section 30 — Treatment consent must exist before any clinical
+    // write. We capture it inline at registration so the patient is
+    // consent-active by the time anyone tries to record vitals / notes /
+    // prescriptions. Persisted separately from the patient row via a
+    // follow-up POST to /medical-history/consent — the Patient schema
+    // doesn't carry these fields. Default checked + Verbal because that's
+    // how walk-in registrations work in practice; the clinician can
+    // uncheck and capture written consent later if the patient hasn't
+    // agreed yet.
+    const defaultConsentState = { given: true, method: 'Verbal' };
+    const [consentForm, setConsentForm] = useState(defaultConsentState);
+
     useEffect(() => {
         const delayDebounce = setTimeout(() => fetchPatients(), 500);
         return () => clearTimeout(delayDebounce);
@@ -236,10 +248,35 @@ export default function Patients() {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            await apiClient.post('/patients/', formData);
+            const created = await apiClient.post('/patients/', formData);
+            const newPatientId = created?.data?.patient_id ?? created?.data?.id;
             toast.success("Patient registered successfully & OP Number generated.");
+
+            // KDPA Section 30 follow-up: if the receptionist captured a
+            // Treatment consent on the form, record it now so the next
+            // clinical write doesn't 403. Failure here is non-fatal —
+            // the patient row already exists; clinicians can record
+            // consent later via the Medical History page.
+            if (newPatientId && consentForm.given) {
+                try {
+                    await apiClient.post('/medical-history/consent', {
+                        patient_id: newPatientId,
+                        consent_type: 'Treatment',
+                        consent_given: true,
+                        consent_method: consentForm.method || 'Verbal',
+                        notes: 'Captured at patient registration.',
+                    });
+                } catch (consentErr) {
+                    toast.error(
+                        'Patient saved, but treatment consent failed to record. '
+                        + 'Record it from Medical History before adding clinical notes.'
+                    );
+                }
+            }
+
             setIsModalOpen(false);
             setFormData(defaultFormState);
+            setConsentForm(defaultConsentState);
             fetchPatients();
         } catch (error) {
             toast.error(error.response?.data?.detail || "Registration failed");
@@ -884,6 +921,41 @@ export default function Patients() {
                                         <div className="md:col-span-3">
                                             <label htmlFor="reg-notes" className="label">Front Desk Notes</label>
                                             <textarea id="reg-notes" name="notes" value={formData.notes} onChange={handleInputChange} rows="2" className="input" placeholder="Any additional registration remarks..." />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* SECTION 4: KDPA Section 30 — Treatment consent */}
+                                <div className="p-5 rounded-xl border border-amber-200 bg-amber-50/40">
+                                    <div className="flex items-start gap-3">
+                                        <input
+                                            id="reg-consent"
+                                            type="checkbox"
+                                            checked={consentForm.given}
+                                            onChange={(e) => setConsentForm(c => ({ ...c, given: e.target.checked }))}
+                                            className="mt-1"
+                                        />
+                                        <div className="flex-1">
+                                            <label htmlFor="reg-consent" className="font-medium text-ink-900 cursor-pointer">
+                                                Patient has consented to treatment (KDPA Section 30)
+                                            </label>
+                                            <p className="text-xs text-ink-600 mt-1">
+                                                Required before clinicians can record any clinical entry. Uncheck only if the patient hasn't agreed yet — you can capture written consent later from the Medical History page.
+                                            </p>
+                                            <div className="mt-3 flex items-center gap-2">
+                                                <label htmlFor="reg-consent-method" className="text-xs text-ink-600">Method:</label>
+                                                <select
+                                                    id="reg-consent-method"
+                                                    value={consentForm.method}
+                                                    onChange={(e) => setConsentForm(c => ({ ...c, method: e.target.value }))}
+                                                    disabled={!consentForm.given}
+                                                    className="input py-1.5 text-xs max-w-[10rem]"
+                                                >
+                                                    <option value="Verbal">Verbal</option>
+                                                    <option value="Written">Written</option>
+                                                    <option value="Electronic">Electronic</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
