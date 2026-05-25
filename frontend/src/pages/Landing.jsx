@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     ArrowRight, ShieldCheck, Stethoscope, HeartPulse, Lock, Activity,
     Users, Building2, Sparkles, CheckCircle2, ChevronRight, BarChart3,
     Pill, TestTube, Bed, Receipt, MessageSquare, Globe2, Workflow,
+    // module-grid additions
+    Calendar, ClipboardList, ScanLine, Package, BookOpen, BadgeCheck,
+    Smartphone, Bell, Share2, LayoutDashboard, Settings as SettingsIcon,
+    Palette, LifeBuoy, KeyRound, UserCog, FileSearch,
 } from 'lucide-react';
 import Logo from '../components/Logo';
 
@@ -86,12 +90,12 @@ export default function Landing() {
                 </div>
             </section>
 
-            {/* ============== Stat strip ============== */}
+            {/* ============== Stat strip (animated on scroll into view) ============== */}
             <section className="relative">
                 <div className="max-w-7xl mx-auto px-6 -mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <Stat label="Modules" value="14+" hint="Clinical, ops & finance" />
-                    <Stat label="Tenant isolation" value="100%" hint="Per-DB separation" />
-                    <Stat label="Auth lockout" value="5 / 15m" hint="Brute-force aware" />
+                    <Stat label="Modules" value={<CountUp to={25} suffix="" />} hint="Clinical, ops & finance" />
+                    <Stat label="Tenant isolation" value={<CountUp to={100} suffix="%" />} hint="Per-DB separation" />
+                    <Stat label="Permission codes" value={<CountUp to={40} suffix="+" />} hint="Fine-grained RBAC" />
                     <Stat label="Audit retention" value="∞" hint="Append-only by design" />
                 </div>
             </section>
@@ -139,39 +143,19 @@ export default function Landing() {
                 </div>
             </section>
 
-            {/* ============== Modules grid ============== */}
-            <section id="modules" className="py-24 bg-gradient-to-b from-white to-brand-50/40">
-                <div className="max-w-7xl mx-auto px-6">
+            {/* ============== Modules showcase (interactive) ============== */}
+            <section id="modules" className="py-24 bg-gradient-to-b from-white via-brand-50/30 to-white relative overflow-hidden">
+                {/* Decorative blurred orbs */}
+                <div className="absolute -top-24 -left-32 w-[28rem] h-[28rem] bg-brand-300/10 rounded-full blur-[120px] pointer-events-none" />
+                <div className="absolute -bottom-32 -right-32 w-[26rem] h-[26rem] bg-accent-300/10 rounded-full blur-[120px] pointer-events-none" />
+
+                <div className="relative max-w-7xl mx-auto px-6">
                     <SectionHeader
                         eyebrow="Modules"
-                        title="One workspace, every department"
-                        subtitle="Pick the modules each role needs and lock them down with permission-driven access."
+                        title="Twenty-five modules, one ledger of truth"
+                        subtitle="Every module is gated by per-role permissions, audit-logged, and tenant-isolated. Switch them on à-la-carte — the 9 always-on modules below are bundled in the base subscription."
                     />
-                    <div className="mt-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                        {[
-                            ['Patient registry', Users, 'brand'],
-                            ['Medical history', Activity, 'teal'],
-                            ['Clinical desk', Stethoscope, 'accent'],
-                            ['Laboratory', TestTube, 'brand'],
-                            ['Radiology', Workflow, 'teal'],
-                            ['Pharmacy', Pill, 'accent'],
-                            ['Wards', Bed, 'brand'],
-                            ['Appointments', BarChart3, 'teal'],
-                            ['Billing', Receipt, 'accent'],
-                            ['Messages', MessageSquare, 'brand'],
-                        ].map(([name, Icon, tone]) => (
-                            <div key={name} className="group bg-white border border-ink-200/70 rounded-2xl px-4 py-5 shadow-soft hover:shadow-elevated hover:border-brand-200 transition-all cursor-pointer">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${
-                                    tone === 'brand' ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-100'
-                                  : tone === 'teal'  ? 'bg-teal-50 text-teal-700 ring-1 ring-teal-100'
-                                                     : 'bg-accent-50 text-accent-700 ring-1 ring-accent-100'
-                                }`}>
-                                    <Icon size={18} />
-                                </div>
-                                <p className="text-sm font-semibold text-ink-900 group-hover:text-brand-700 transition-colors">{name}</p>
-                            </div>
-                        ))}
-                    </div>
+                    <ModuleShowcase navigate={navigate} />
                 </div>
             </section>
 
@@ -462,4 +446,308 @@ function ComplianceCard() {
             </div>
         </div>
     );
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ModuleShowcase — interactive tabbed browser for all 25 platform modules.
+
+   Groups the modules by clinical workflow so a visitor scanning the page
+   can map "department" → "what does it actually do." Each card has a
+   hover-reveal that exposes the three headline features for that module.
+
+   Always-on modules carry a green "Included" badge; à-la-carte modules
+   carry an amber "Add-on" badge — same visual taxonomy as the superadmin
+   Modules dashboard, so what visitors see here matches what they'll buy.
+   ────────────────────────────────────────────────────────────────────── */
+
+const MODULE_GROUPS = [
+    {
+        key: 'clinical',
+        label: 'Clinical Workflow',
+        tagline: 'Front-desk to follow-up — one continuous chart.',
+        modules: [
+            { name: 'Patient Registry', icon: Users, alwaysOn: true,
+              desc: 'KDPA-compliant patient onboarding with auto-generated outpatient numbers and treatment-consent capture at first contact.',
+              bullets: ['Single search across name, OP#, ID, phone', 'Consent capture inline at registration', 'Soft-delete + audit trail'] },
+            { name: 'Appointments', icon: Calendar, alwaysOn: true,
+              desc: 'Doctor schedules, slot availability, and automated reminders that respect each provider\'s working hours.',
+              bullets: ['Per-doctor calendar', 'Slot-availability lookup', 'SMS/email reminders'] },
+            { name: 'Clinical Desk', icon: Stethoscope, alwaysOn: false,
+              desc: 'Encounters, vitals, diagnoses, and prescriptions captured in one continuous flow with a consent gate on every write.',
+              bullets: ['Queue-driven workflow', 'Vitals history with sparkline trends', 'Prescription return + reprint'] },
+            { name: 'Medical History', icon: ClipboardList, alwaysOn: false,
+              desc: 'Longitudinal chart across nine entry types — surgical, family, social, immunizations, allergies, mental health, more.',
+              bullets: ['Nine structured entry types', 'KDPA Section 26 access log', 'Sensitive-field redaction by role'] },
+            { name: 'Privacy & KDPA', icon: ShieldCheck, alwaysOn: false,
+              desc: 'Consent records, data-subject access requests, Section 40 erasure, and Section 43 breach notification with 72-hour countdown.',
+              bullets: ['DSAR export endpoint', 'Right-to-erasure with audit', 'Breach register with countdown'] },
+        ],
+    },
+    {
+        key: 'diagnostics',
+        label: 'Diagnostics',
+        tagline: 'Order, collect, result, report — with full sample lifecycle.',
+        modules: [
+            { name: 'Laboratory', icon: TestTube, alwaysOn: false,
+              desc: 'Lab catalogue with per-test parameter definitions, barcoded specimen IDs, and result entry with critical-value alerts.',
+              bullets: ['Per-test parameter schema', 'Barcoded sample tracking', 'Critical-value notifications'] },
+            { name: 'Radiology', icon: ScanLine, alwaysOn: false,
+              desc: 'Imaging orders with priority routing, radiologist sign-off requirements, and contrast usage tracking.',
+              bullets: ['Routine / Urgent / STAT triage', 'Radiologist sign-off gate', 'Contrast & modality tracking'] },
+        ],
+    },
+    {
+        key: 'pharmacy',
+        label: 'Pharmacy & Wards',
+        tagline: 'Stock-aware dispensing and bed orchestration.',
+        modules: [
+            { name: 'Pharmacy', icon: Pill, alwaysOn: false,
+              desc: 'Post-dispense and OTC payment flows, receipt generation, transaction ledger, and stock-aware dispensing with batch + expiry.',
+              bullets: ['SELECT FOR UPDATE on batch decrements', 'Cash / Card / M-Pesa receipts', 'Returned-prescription handling'] },
+            { name: 'Inventory', icon: Package, alwaysOn: false,
+              desc: 'Stores, suppliers, batches, reusable-asset tracking, low-stock alerts that ping the right team automatically.',
+              bullets: ['Per-location stock visibility', 'Reusable asset usage logs', 'Auto-escalating low-stock alerts'] },
+            { name: 'Wards & Admissions', icon: Bed, alwaysOn: false,
+              desc: 'Real-time bed map, admission/discharge orchestration, per-shift consumption logging, and bed-cleaning hand-off.',
+              bullets: ['Locked-row admission to defeat double-book', 'Ward-level consumables ledger', 'Discharge → cleaning workflow'] },
+        ],
+    },
+    {
+        key: 'finance',
+        label: 'Finance & Payments',
+        tagline: 'Encounter-grained billing through full-bench accounting.',
+        modules: [
+            { name: 'Billing', icon: Receipt, alwaysOn: false,
+              desc: 'Encounter-grained invoicing with eager-loaded billing queue, partial-payment support, and consultation-fee shortcuts.',
+              bullets: ['Eager-loaded billing queue (no N+1)', 'Idempotency-keyed payments', 'Partial-payment ledger'] },
+            { name: 'Managerial Accounting', icon: BookOpen, alwaysOn: false,
+              desc: 'Chart of accounts, journals, fiscal periods, debtor lifecycle, bank reconciliation, and IFRS-shaped financial statements.',
+              bullets: ['Auto-posting from Billing/Pharmacy/Cheques', 'Phase-6 bank reconciliation', 'Balance-sheet, P&L, cash-flow'] },
+            { name: 'Cheques', icon: BadgeCheck, alwaysOn: false,
+              desc: 'Cheque receipting with full lifecycle — deposit, clear, bounce, cancel — and automatic GL journals at each transition.',
+              bullets: ['4-state lifecycle with audit', 'Auto-post to GL on clear', 'Bounce reversal entries'] },
+            { name: 'Pay Hero (M-Pesa)', icon: Smartphone, alwaysOn: false,
+              desc: 'Mobile-money collections via the Pay Hero aggregator — STK push, webhook-validated callbacks, per-tenant credentials.',
+              bullets: ['HMAC + CIDR webhook auth', 'Per-tenant encrypted creds', 'Receipt-number unique index'] },
+        ],
+    },
+    {
+        key: 'communication',
+        label: 'Communication',
+        tagline: 'Real-time signal, patient-facing channels, escalation.',
+        modules: [
+            { name: 'Internal Messaging', icon: MessageSquare, alwaysOn: true,
+              desc: 'Direct, group, and department conversations with Redis pub/sub fan-out across workers so escalations are real-time.',
+              bullets: ['1:1, group, department threads', 'WebSocket + Redis pub/sub', 'Unread badge across tabs'] },
+            { name: 'Notifications', icon: Bell, alwaysOn: true,
+              desc: 'System + clinical notifications with read-state, deep-links into the originating chart, and bulk read-all.',
+              bullets: ['Per-user inbox', 'Deep-link to source record', 'Mark-all-read shortcut'] },
+            { name: 'Patient Portal', icon: Globe2, alwaysOn: false,
+              desc: 'Self-service portal so patients can see their appointments, billing, and history — with a separate cookie scope from staff.',
+              bullets: ['Token-cookie scope (not staff JWT)', 'Read-only history surface', 'Outpatient self-lookup'] },
+            { name: 'Referrals', icon: Share2, alwaysOn: false,
+              desc: 'Out-bound referrals to specialists with status tracking and inbound queue for receiving facilities.',
+              bullets: ['Status state-machine', 'Inbound + outbound queues', 'Specialist directory'] },
+            { name: 'Support', icon: LifeBuoy, alwaysOn: true,
+              desc: 'In-app helpdesk routed to the MediFleet platform team with priority, status, and SLA-aware response.',
+              bullets: ['Ticket lifecycle with audit', 'Platform-team triage UI', 'In-app + email replies'] },
+        ],
+    },
+    {
+        key: 'platform',
+        label: 'Platform & Admin',
+        tagline: 'Identity, branding, role-based access, configuration.',
+        modules: [
+            { name: 'Dashboard', icon: LayoutDashboard, alwaysOn: true,
+              desc: 'Role-based home page that lands every staff member on the page that matches their actual job that hour.',
+              bullets: ['Per-role landing pages', 'Worker-agenda for shift handoff', 'Sticky last-section recall'] },
+            { name: 'Authentication', icon: KeyRound, alwaysOn: true,
+              desc: 'Argon2id with HMAC pepper, JWT HS256 with tenant audience binding, secure cookie sessions, CSRF double-submit.',
+              bullets: ['Argon2id + server-side pepper', 'Tenant-audience-bound JWT', 'CSRF + Secure cookies'] },
+            { name: 'User Management', icon: UserCog, alwaysOn: true,
+              desc: 'Staff directory, roles, permissions catalogue, per-user permission overrides, license-number capture.',
+              bullets: ['Role-based + per-user overrides', '40+ permission codenames', 'Licence-number tracking'] },
+            { name: 'Settings', icon: SettingsIcon, alwaysOn: true,
+              desc: 'Per-tenant key/value configuration store — branding, working hours, billing, lab, radiology, notifications, privacy.',
+              bullets: ['Eight setting categories', 'Per-key edit history', 'Sensitive-flag masking'] },
+            { name: 'Branding', icon: Palette, alwaysOn: false,
+              desc: 'Per-tenant logo, brand colours, background imagery, and printed-document templates — applied across the SPA.',
+              bullets: ['Hosted-logo upload', 'Hex-validated colour pairs', 'Custom print templates'] },
+        ],
+    },
+    {
+        key: 'insights',
+        label: 'Insights',
+        tagline: 'Aggregated telemetry and ad-hoc reporting.',
+        modules: [
+            { name: 'Analytics', icon: BarChart3, alwaysOn: false,
+              desc: 'Aggregated dashboards across encounters, pharmacy turnover, lab throughput, and billing performance.',
+              bullets: ['Cross-module roll-ups', 'Per-doctor productivity', 'Exportable to CSV'] },
+            { name: 'Audit & Access Logs', icon: FileSearch, alwaysOn: true,
+              desc: 'Append-only audit trail of every state change, paired with KDPA Section 26 access logs for chart visibility.',
+              bullets: ['Append-only by design', 'Section 26 access log per view', 'IP + user + before/after'] },
+        ],
+    },
+];
+
+function ModuleShowcase({ navigate }) {
+    const [activeKey, setActiveKey] = useState(MODULE_GROUPS[0].key);
+    const active = MODULE_GROUPS.find(g => g.key === activeKey) ?? MODULE_GROUPS[0];
+
+    return (
+        <div className="mt-12">
+            {/* Pill-style tab nav (horizontally scrollable on mobile) */}
+            <div className="overflow-x-auto -mx-6 px-6 pb-2">
+                <div role="tablist" aria-label="Module categories" className="inline-flex gap-2 p-1.5 rounded-2xl bg-white/80 backdrop-blur ring-1 ring-ink-200/70 shadow-soft">
+                    {MODULE_GROUPS.map(g => {
+                        const isActive = g.key === activeKey;
+                        return (
+                            <button
+                                key={g.key}
+                                role="tab"
+                                aria-selected={isActive}
+                                aria-controls={`mod-panel-${g.key}`}
+                                onClick={() => setActiveKey(g.key)}
+                                className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                                    isActive
+                                        ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
+                                        : 'text-ink-600 hover:text-ink-900 hover:bg-ink-50'
+                                }`}
+                            >
+                                {g.label}
+                                <span className={`ml-1.5 text-2xs font-bold ${isActive ? 'text-white/80' : 'text-ink-400'}`}>
+                                    {g.modules.length}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Active group tagline */}
+            <p
+                key={active.key + '-tag'}
+                className="mt-5 text-sm text-ink-600 max-w-2xl animate-fade-in"
+            >
+                <span className="text-ink-900 font-semibold">{active.label}.</span>{' '}{active.tagline}
+            </p>
+
+            {/* Cards grid — keyed by activeKey so cards remount + re-animate on tab switch */}
+            <div
+                key={active.key}
+                id={`mod-panel-${active.key}`}
+                role="tabpanel"
+                className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+                {active.modules.map((m, idx) => (
+                    <ModuleCard key={m.name} module={m} delayMs={idx * 60} navigate={navigate} />
+                ))}
+            </div>
+
+            {/* Footer CTA strip */}
+            <div className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-br from-ink-900 via-brand-900 to-teal-900 text-white p-6">
+                <div>
+                    <p className="text-sm font-semibold">Don't see what you need? Tell us — we ship modules every sprint.</p>
+                    <p className="text-xs text-ink-200 mt-1">Or jump in: the always-on modules are live the moment your hospital is provisioned.</p>
+                </div>
+                <button
+                    onClick={() => navigate('/portal')}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-brand-700 font-semibold text-sm hover:bg-ink-50 transition-colors shadow-soft cursor-pointer"
+                >
+                    Get started <ArrowRight size={14} />
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function ModuleCard({ module: m, delayMs, navigate }) {
+    const Icon = m.icon;
+    const [hover, setHover] = useState(false);
+    return (
+        <div
+            onMouseEnter={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+            onClick={() => navigate('/portal')}
+            className="group relative bg-white rounded-2xl p-5 ring-1 ring-ink-200/70 hover:ring-brand-300 shadow-soft hover:shadow-elevated cursor-pointer transition-all animate-slide-up"
+            style={{ animationDelay: `${delayMs}ms`, animationFillMode: 'both' }}
+        >
+            {/* Gradient border reveal on hover */}
+            <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-brand-500/0 via-brand-500/[0.04] to-teal-500/[0.06]" />
+
+            <div className="relative flex items-start justify-between gap-3">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-brand-50 to-teal-50 ring-1 ring-brand-100 text-brand-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Icon size={20} />
+                </div>
+                <span className={`text-2xs font-semibold uppercase tracking-[0.12em] px-2 py-1 rounded-md ${
+                    m.alwaysOn
+                        ? 'bg-accent-50 text-accent-700 ring-1 ring-accent-100'
+                        : 'bg-amber-50 text-amber-700 ring-1 ring-amber-100'
+                }`}>
+                    {m.alwaysOn ? 'Included' : 'Add-on'}
+                </span>
+            </div>
+
+            <h3 className="relative mt-4 text-base font-semibold text-ink-900 group-hover:text-brand-700 transition-colors">
+                {m.name}
+            </h3>
+            <p className="relative mt-1.5 text-sm text-ink-600 leading-relaxed">{m.desc}</p>
+
+            {/* Hover-reveal feature bullets */}
+            <ul
+                aria-hidden={!hover}
+                className={`relative mt-3 space-y-1.5 transition-all duration-300 overflow-hidden ${
+                    hover ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
+                }`}
+            >
+                {m.bullets.map(b => (
+                    <li key={b} className="flex items-start gap-2 text-xs text-ink-700">
+                        <CheckCircle2 size={13} className="text-accent-600 shrink-0 mt-0.5" />
+                        <span>{b}</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   CountUp — animated integer that ticks from 0 → `to` once it scrolls
+   into view. Uses IntersectionObserver so we don't run animations on
+   off-screen counters and don't fire requestAnimationFrame loops that
+   the user will never see. Respects prefers-reduced-motion.
+   ────────────────────────────────────────────────────────────────────── */
+function CountUp({ to, suffix = '', durationMs = 1100 }) {
+    const [value, setValue] = useState(0);
+    const ref = useRef(null);
+    const startedRef = useRef(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { setValue(to); return; }
+
+        const el = ref.current;
+        if (!el) return;
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((e) => {
+                if (!e.isIntersecting || startedRef.current) return;
+                startedRef.current = true;
+                const start = performance.now();
+                const tick = (now) => {
+                    const t = Math.min(1, (now - start) / durationMs);
+                    // Cubic ease-out for a satisfying decel
+                    const eased = 1 - Math.pow(1 - t, 3);
+                    setValue(Math.round(eased * to));
+                    if (t < 1) requestAnimationFrame(tick);
+                };
+                requestAnimationFrame(tick);
+            });
+        }, { threshold: 0.4 });
+        io.observe(el);
+        return () => io.disconnect();
+    }, [to, durationMs]);
+
+    return <span ref={ref} className="tabular-nums">{value}{suffix}</span>;
 }
