@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
@@ -310,6 +310,13 @@ export default function MedicalHistory() {
                             </div>
                         </div>
 
+                        {/* Consents on file (KDPA Section 30) */}
+                        <ConsentCard
+                            patientId={chart.patient_id}
+                            consents={chart.consents || []}
+                            onRecorded={() => fetchChart(chart.patient_id)}
+                        />
+
                         {/* History Sections */}
                         {ENTRY_TYPES.map(type => {
                             const entries = getEntriesForType(type.key);
@@ -477,6 +484,160 @@ export default function MedicalHistory() {
                         </div>
                     </div>
                 </div>
+            )}
+        </div>
+    );
+}
+
+
+// Valid consent_type values mirror VALID_CONSENT_TYPES in
+// backend/app/schemas/medical_history.py. Treatment is the only one the
+// Section 30 gate currently checks; the rest are surfaced for completeness
+// (the Privacy Officer may need them on file for KDPA audits even though
+// they don't block writes).
+const CONSENT_TYPES = ['Treatment', 'Data Sharing', 'Research', 'Telehealth', 'Photography'];
+const CONSENT_METHODS = ['Verbal', 'Written', 'Electronic'];
+
+/**
+ * ConsentCard — view + record patient consents (KDPA Section 30).
+ *
+ *  Lists every consent_record currently on file for the patient and
+ *  surfaces an inline form so the clinician can capture a new one without
+ *  leaving the chart. POSTs /api/medical-history/consent then triggers a
+ *  chart refetch so the new row appears in the list (and downstream
+ *  clinical writes pass the consent gate).
+ */
+function ConsentCard({ patientId, consents, onRecorded }) {
+    const [open, setOpen] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [form, setForm] = useState({
+        consent_type: 'Treatment',
+        consent_method: 'Verbal',
+        notes: '',
+        consent_expires_at: '',
+    });
+
+    // Active Treatment consent is the one that gates clinical writes.
+    const activeTreatment = useMemo(() => {
+        const now = Date.now();
+        return (consents || [])
+            .filter(c => c.consent_type === 'Treatment' && c.consent_given)
+            .filter(c => !c.consent_expires_at || new Date(c.consent_expires_at).getTime() > now)
+            .sort((a, b) => new Date(b.consented_at) - new Date(a.consented_at))[0] || null;
+    }, [consents]);
+
+    const submit = async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+            const payload = {
+                patient_id: patientId,
+                consent_type: form.consent_type,
+                consent_given: true,
+                consent_method: form.consent_method,
+            };
+            if (form.notes.trim()) payload.notes = form.notes.trim();
+            if (form.consent_expires_at) {
+                // Schema expects ISO; <input type="date"> gives YYYY-MM-DD,
+                // append end-of-day UTC so a same-day expiry isn't already
+                // stale by the time the request lands.
+                payload.consent_expires_at = `${form.consent_expires_at}T23:59:59Z`;
+            }
+            await apiClient.post('/medical-history/consent', payload);
+            toast.success(`${form.consent_type} consent recorded.`);
+            setForm(f => ({ ...f, notes: '', consent_expires_at: '' }));
+            setOpen(false);
+            await onRecorded();
+        } catch (err) {
+            toast.error(err.response?.data?.detail || 'Failed to record consent');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handle = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+    return (
+        <div className="card overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-ink-100">
+                <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-emerald-50 text-emerald-700 border-emerald-200">
+                        <ShieldCheck size={14} /> Consents (KDPA Section 30)
+                    </span>
+                    <span className="badge-neutral">{(consents || []).length}</span>
+                    {activeTreatment ? (
+                        <span className="text-xs text-emerald-700">Treatment consent active</span>
+                    ) : (
+                        <span className="text-xs text-rose-700 font-medium">No active Treatment consent — clinical writes will be blocked</span>
+                    )}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setOpen(o => !o)}
+                    className="btn-primary text-xs py-1.5 px-3"
+                >
+                    <Plus size={13} /> Record consent
+                </button>
+            </div>
+
+            {/* Existing consents */}
+            {(consents || []).length > 0 && (
+                <ul className="divide-y divide-ink-100">
+                    {consents.map((c) => (
+                        <li key={c.consent_id} className="px-4 py-3 flex items-center justify-between text-sm">
+                            <div>
+                                <div className="font-medium text-ink-900">
+                                    {c.consent_type}
+                                    <span className="ml-2 text-xs text-ink-500">({c.consent_method})</span>
+                                    {c.consent_given ? (
+                                        <span className="ml-2 inline-flex items-center gap-1 text-emerald-700 text-xs"><ShieldCheck size={11} /> Granted</span>
+                                    ) : (
+                                        <span className="ml-2 inline-flex items-center gap-1 text-rose-700 text-xs"><X size={11} /> Withheld</span>
+                                    )}
+                                </div>
+                                <div className="text-xs text-ink-500 mt-0.5">
+                                    Recorded {new Date(c.consented_at).toLocaleString()}
+                                    {c.consent_expires_at && ` · expires ${new Date(c.consent_expires_at).toLocaleDateString()}`}
+                                </div>
+                                {c.notes && <div className="text-xs text-ink-600 mt-1 italic">"{c.notes}"</div>}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {/* Inline record form */}
+            {open && (
+                <form onSubmit={submit} className="p-4 border-t border-ink-100 bg-ink-50/40 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label className="label">Consent type</label>
+                            <select name="consent_type" value={form.consent_type} onChange={handle} className="input">
+                                {CONSENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label">Method</label>
+                            <select name="consent_method" value={form.consent_method} onChange={handle} className="input">
+                                {CONSENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label">Expires (optional)</label>
+                            <input type="date" name="consent_expires_at" value={form.consent_expires_at} onChange={handle} className="input" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="label">Notes (optional)</label>
+                        <textarea name="notes" value={form.notes} onChange={handle} rows="2" className="input" placeholder="e.g., Patient consented verbally during admission" />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                        <button type="button" onClick={() => setOpen(false)} className="btn-secondary text-xs">Cancel</button>
+                        <button type="submit" disabled={busy} className="btn-primary text-xs">
+                            {busy ? (<><Activity className="animate-spin" size={13} /> Recording…</>) : (<><Save size={13} /> Record consent</>)}
+                        </button>
+                    </div>
+                </form>
             )}
         </div>
     );

@@ -7,8 +7,8 @@ import {
     Search, UserPlus, X, Activity, Clock, ShieldCheck, Users,
     MapPin, Phone, Briefcase, HeartPulse,
     MoreVertical, Stethoscope, TestTube, UserMinus,
-    Pill, Bed, CreditCard, Printer, Download, Trash, Eye,
-    AlertTriangle, Droplet, Send, Image, ChevronDown,
+    Pill, Bed, CreditCard, Printer, Download, Trash, Eye, Edit,
+    AlertTriangle, Droplet, Send, Image, ChevronDown, Save,
 } from 'lucide-react';
 import { printPatientCard } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
@@ -292,6 +292,19 @@ export default function Patients() {
     // confirms (or skips, in which case the row lands in the unassigned
     // pool so any qualified clinician can claim it).
     const [routeRequest, setRouteRequest] = useState(null); // { patient, target } | null
+    // Edit modal state. Holds the patient object being edited — null means
+    // closed. The modal owns its own form state so the parent doesn't have
+    // to track every keystroke, and a successful PUT triggers fetchPatients().
+    const [editingPatient, setEditingPatient] = useState(null);
+    const openEditModal = (patient) => {
+        closeDropdown();
+        setEditingPatient(patient);
+    };
+    const closeEditModal = () => setEditingPatient(null);
+    const handlePatientUpdated = async () => {
+        await fetchPatients();
+        closeEditModal();
+    };
 
     const openRoutePicker = (patient, target) => {
         setRouteRequest({ patient, target });
@@ -1008,6 +1021,7 @@ export default function Patients() {
                         anchorEl={activeDropdown.anchorEl}
                         onClose={closeDropdown}
                         onView={viewHistory}
+                        onEdit={openEditModal}
                         onPrint={(p) => { printPatientCard(p); closeDropdown(); }}
                         onExport={exportPatientData}
                         onDeactivate={deactivatePatient}
@@ -1015,6 +1029,14 @@ export default function Patients() {
                     />
                 );
             })()}
+
+            {editingPatient && (
+                <EditPatientModal
+                    patient={editingPatient}
+                    onClose={closeEditModal}
+                    onSaved={handlePatientUpdated}
+                />
+            )}
         </div>
     );
 }
@@ -1286,7 +1308,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
 const MENU_WIDTH = 232;
 const MENU_MARGIN = 8;
 
-function RowMenu({ patient, anchorEl, onClose, onView, onPrint, onExport, onDeactivate, onErase }) {
+function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport, onDeactivate, onErase }) {
     const menuRef = useRef(null);
     const [pos, setPos] = useState({ top: 0, left: 0, ready: false });
 
@@ -1361,6 +1383,9 @@ function RowMenu({ patient, anchorEl, onClose, onView, onPrint, onExport, onDeac
             <button type="button" role="menuitem" onClick={() => onView(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
                 <Eye size={15} className="text-ink-500" aria-hidden="true" /> View history
             </button>
+            <button type="button" role="menuitem" onClick={() => onEdit(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
+                <Edit size={15} className="text-ink-500" aria-hidden="true" /> Edit details
+            </button>
             <button type="button" role="menuitem" onClick={() => onPrint(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
                 <Printer size={15} className="text-ink-500" aria-hidden="true" /> Print card
             </button>
@@ -1376,5 +1401,159 @@ function RowMenu({ patient, anchorEl, onClose, onView, onPrint, onExport, onDeac
             </button>
         </div>,
         document.body
+    );
+}
+
+/**
+ * EditPatientModal — focused editor for the fields most commonly corrected
+ * after registration (typos in name, missing phone, updated next-of-kin,
+ * blood group / allergies / chronic conditions discovered at the first
+ * encounter).
+ *
+ * Only fields in PatientUpdate are PUT — schema strict-mode would reject
+ * unknown keys. Sensitive identifiers (id_number, dob) are intentionally
+ * kept here because front-desk frequently mis-keys them at registration
+ * and the audit trail captures every change anyway.
+ */
+function EditPatientModal({ patient, onClose, onSaved }) {
+    const [form, setForm] = useState({
+        surname:           patient.surname           ?? '',
+        other_names:       patient.other_names       ?? '',
+        sex:               patient.sex               ?? 'Male',
+        date_of_birth:     patient.date_of_birth     ?? '',
+        marital_status:    patient.marital_status    ?? 'Single',
+        blood_group:       patient.blood_group       ?? 'Unknown',
+        allergies:         patient.allergies         ?? '',
+        chronic_conditions: patient.chronic_conditions ?? '',
+        id_type:           patient.id_type           ?? 'National ID',
+        id_number:         patient.id_number         ?? '',
+        nationality:       patient.nationality       ?? 'Kenyan',
+        telephone_1:       patient.telephone_1       ?? '',
+        telephone_2:       patient.telephone_2       ?? '',
+        email:             patient.email             ?? '',
+        residence:         patient.residence         ?? '',
+        town:              patient.town              ?? '',
+        occupation:        patient.occupation        ?? '',
+        nok_name:          patient.nok_name          ?? '',
+        nok_relationship:  patient.nok_relationship  ?? '',
+        nok_contact:       patient.nok_contact       ?? '',
+        notes:             patient.notes             ?? '',
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const handle = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+    const submit = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        try {
+            // Strip empty optional fields so we don't overwrite existing
+            // values with "" on a save the user didn't intend to clear.
+            // Required-equivalent fields (surname/other_names/sex/dob)
+            // stay even if technically empty so backend validation catches
+            // accidental wipes loudly.
+            const KEEP_EMPTY = new Set(['surname', 'other_names', 'sex', 'date_of_birth']);
+            const payload = Object.fromEntries(
+                Object.entries(form).filter(([k, v]) =>
+                    KEEP_EMPTY.has(k) || (v !== '' && v !== null && v !== undefined)
+                )
+            );
+            await apiClient.put(`/patients/${patient.patient_id}`, payload);
+            toast.success('Patient updated.');
+            await onSaved();
+        } catch (err) {
+            toast.error(err.response?.data?.detail || 'Update failed');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-elevated w-full max-w-3xl max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
+                    <div>
+                        <h3 className="text-lg font-semibold text-ink-900">Edit patient</h3>
+                        <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
+                    </div>
+                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full transition-colors">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <form id="editPatientForm" onSubmit={submit} className="p-5 space-y-5 overflow-y-auto">
+                    {/* Demographics */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div><label className="label">Surname</label><input name="surname" value={form.surname} onChange={handle} className="input" required /></div>
+                        <div><label className="label">Other names</label><input name="other_names" value={form.other_names} onChange={handle} className="input" required /></div>
+                        <div><label className="label">Sex</label>
+                            <select name="sex" value={form.sex} onChange={handle} className="input">
+                                <option>Male</option><option>Female</option><option>Other</option>
+                            </select>
+                        </div>
+                        <div><label className="label">Date of birth</label><input type="date" name="date_of_birth" value={form.date_of_birth} onChange={handle} className="input" /></div>
+                        <div><label className="label">Marital status</label>
+                            <select name="marital_status" value={form.marital_status} onChange={handle} className="input">
+                                <option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option><option>Other</option>
+                            </select>
+                        </div>
+                        <div><label className="label">Nationality</label><input name="nationality" value={form.nationality} onChange={handle} className="input" /></div>
+                    </div>
+
+                    {/* Clinical */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label className="label">Blood group</label>
+                            <select name="blood_group" value={form.blood_group} onChange={handle} className="input">
+                                {['Unknown','A+','A-','B+','B-','AB+','AB-','O+','O-'].map(g => <option key={g}>{g}</option>)}
+                            </select>
+                        </div>
+                        <div className="md:col-span-2"><label className="label">Allergies</label><input name="allergies" value={form.allergies} onChange={handle} className="input" placeholder="e.g., Penicillin, Peanuts" /></div>
+                        <div className="md:col-span-3"><label className="label">Chronic conditions</label><input name="chronic_conditions" value={form.chronic_conditions} onChange={handle} className="input" placeholder="e.g., Hypertension, Type 2 Diabetes" /></div>
+                    </div>
+
+                    {/* ID */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label className="label">ID type</label>
+                            <select name="id_type" value={form.id_type} onChange={handle} className="input">
+                                <option>National ID</option><option>Passport</option><option>Alien ID</option><option>Birth Certificate</option><option>Other</option>
+                            </select>
+                        </div>
+                        <div className="md:col-span-2"><label className="label">ID number</label><input name="id_number" value={form.id_number} onChange={handle} className="input" /></div>
+                    </div>
+
+                    {/* Contact */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div><label className="label">Phone 1</label><input name="telephone_1" value={form.telephone_1} onChange={handle} className="input" /></div>
+                        <div><label className="label">Phone 2</label><input name="telephone_2" value={form.telephone_2} onChange={handle} className="input" /></div>
+                        <div className="md:col-span-2"><label className="label">Email</label><input type="email" name="email" value={form.email} onChange={handle} className="input" /></div>
+                        <div><label className="label">Residence</label><input name="residence" value={form.residence} onChange={handle} className="input" /></div>
+                        <div><label className="label">Town</label><input name="town" value={form.town} onChange={handle} className="input" /></div>
+                    </div>
+
+                    {/* Employment & NOK */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="md:col-span-3"><label className="label">Occupation</label><input name="occupation" value={form.occupation} onChange={handle} className="input" /></div>
+                        <div><label className="label">Next of kin</label><input name="nok_name" value={form.nok_name} onChange={handle} className="input" /></div>
+                        <div><label className="label">Relationship</label><input name="nok_relationship" value={form.nok_relationship} onChange={handle} className="input" /></div>
+                        <div><label className="label">NoK contact</label><input name="nok_contact" value={form.nok_contact} onChange={handle} className="input" /></div>
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                        <label className="label">Front desk notes</label>
+                        <textarea name="notes" value={form.notes} onChange={handle} rows="2" className="input" />
+                    </div>
+                </form>
+
+                <div className="p-5 border-t border-ink-100 bg-white flex gap-3 shrink-0">
+                    <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+                    <button type="submit" form="editPatientForm" disabled={isSubmitting} className="btn-primary flex-1 py-3">
+                        {isSubmitting ? (<><Activity className="animate-spin" size={16} /> Saving…</>) : (<><Save size={16} /> Save changes</>)}
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }
