@@ -13,12 +13,18 @@ production. See `docs/DEPLOYMENT.md` for the production-ready PgBouncer recipe.
 """
 from collections import OrderedDict
 from threading import Lock
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from fastapi import Request
 
 from app.config.settings import settings
+
+# Cheap, side-effect-free probe used by get_db() to surface "database does
+# not exist" before the request handler runs a real query (avoids 500s on
+# stale tenant headers — see TENANT-DRIFT-003).
+_TENANT_PROBE = text("SELECT 1")
 
 
 def _normalize_db_url(raw: str) -> str:
@@ -148,6 +154,28 @@ def get_db(request: Request = None):
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = SessionLocal()
     try:
+        # Touch the connection once so a "database does not exist" failure
+        # (e.g. stale localStorage hms_tenant_id pointing at a tenant we
+        # dropped) surfaces as a clean 410 Gone rather than a 500 from the
+        # middleware stack. The frontend interceptor maps 410 → clear the
+        # stored tenant + bounce to /portal.
+        try:
+            db.execute(_TENANT_PROBE)
+        except OperationalError as exc:
+            db.close()
+            # Evict the dead engine from the cache so the next request after
+            # a re-provisioning doesn't get a stuck pool.
+            with _tenant_engines_lock:
+                cached = tenant_engines.pop(tenant_db_name, None)
+            if cached is not None:
+                cached.dispose()
+            detail_text = str(exc)
+            if "does not exist" in detail_text:
+                raise HTTPException(
+                    status_code=status.HTTP_410_GONE,
+                    detail="tenant_not_found",
+                )
+            raise
         yield db
     finally:
         db.close()

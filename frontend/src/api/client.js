@@ -118,7 +118,20 @@ apiClient.interceptors.response.use(
         // deployments where a fresh tab opens before the user picks a hospital.
         // Redirecting once is much cleaner than every page firing its own
         // error UI.
-        if (isTenantMissingError(status, detail)
+        // Stale-tenant guard (TENANT-DRIFT-003): when localStorage still
+        // holds an `hms_tenant_id` for a hospital whose DB was dropped (a
+        // post-wipe browser, or a tenant deleted via the superadmin UI),
+        // the backend's get_db() probes the connection and returns
+        // 410 Gone with detail "tenant_not_found". Clear the dead pointer
+        // so the visitor doesn't keep poking a deleted DB on every navigation.
+        if (status === 410 && detail === 'tenant_not_found'
+            && typeof window !== 'undefined'
+        ) {
+            localStorage.removeItem('hms_tenant_id');
+        }
+
+        if ((isTenantMissingError(status, detail)
+                || (status === 410 && detail === 'tenant_not_found'))
             && !tenantRedirectFired
             && typeof window !== 'undefined'
             && !isTenantOptionalPath(window.location.pathname)
