@@ -322,6 +322,106 @@ def _run_alembic(*args: str, database_url: str) -> None:
         raise RuntimeError(f"alembic {' '.join(args)} failed (exit {result.returncode})")
 
 
+# Default rows for hospital_settings — mirrored from alembic revision
+# b27f4e91d563. Kept here in lockstep so the safety net can re-seed an empty
+# table on tenants that lost the rows (or never had them). Each tuple:
+# (category, key, label, description, data_type, value, is_sensitive, sort_order).
+# Re-running this seed on a converged tenant is a no-op (WHERE NOT EXISTS).
+_HOSPITAL_SETTING_DEFAULTS: list[tuple] = [
+    ("branding", "hospital_name", "Hospital name", "Displayed on every print-out and dashboard.", "string", "", False, 1),
+    ("branding", "tagline", "Tagline", "Short subtitle below the hospital name on letterheads.", "string", "", False, 2),
+    ("branding", "primary_color", "Primary brand color", "Hex code used for UI accents.", "string", "#2563eb", False, 3),
+    ("branding", "logo_url", "Logo URL", "Public URL of the hospital logo (PNG/SVG).", "string", "", False, 4),
+    ("working_hours", "weekday_open", "Weekday opening", "Front-desk opens (24-hour, HH:MM).", "string", "08:00", False, 1),
+    ("working_hours", "weekday_close", "Weekday closing", "Front-desk closes (24-hour, HH:MM).", "string", "17:00", False, 2),
+    ("working_hours", "saturday_open", "Saturday opening", "", "string", "09:00", False, 3),
+    ("working_hours", "saturday_close", "Saturday closing", "", "string", "13:00", False, 4),
+    ("working_hours", "sunday_open", "Sunday opening", "Leave blank if closed.", "string", "", False, 5),
+    ("working_hours", "sunday_close", "Sunday closing", "Leave blank if closed.", "string", "", False, 6),
+    ("working_hours", "appointment_slot_minutes", "Appointment slot (min)", "", "number", "30", False, 7),
+    ("billing", "currency", "Currency code", "ISO 4217 (KES, USD…).", "string", "KES", False, 1),
+    ("billing", "tax_rate_pct", "VAT / tax rate (%)", "Applied on taxable invoices.", "number", "16", False, 2),
+    ("billing", "invoice_prefix", "Invoice prefix", "Goes on every printed invoice number.", "string", "INV-", False, 3),
+    ("billing", "lock_pricing_on_order", "Lock pricing on order", "Once a lab/imaging order is placed, the price won't change.", "boolean", "true", False, 4),
+    ("laboratory", "default_turnaround_hours", "Default turnaround (h)", "Used when a catalog entry doesn't specify its own.", "number", "24", False, 1),
+    ("laboratory", "barcode_default", "Barcode by default", "Default value for the catalog 'Requires barcode' checkbox.", "boolean", "false", False, 2),
+    ("laboratory", "critical_value_notify", "Notify critical values", "Auto-DM the ordering doctor for out-of-range flags.", "boolean", "true", False, 3),
+    ("radiology", "default_modality", "Default modality", "Pre-selects this modality in new exam dialogs.", "string", "X-Ray", False, 1),
+    ("radiology", "report_signing_required", "Require radiologist sign-off", "", "boolean", "true", False, 2),
+    ("notifications", "email_from", "Outbound email From:", "RFC-5321 address used by transactional mail.", "string", "no-reply@hospital.local", False, 1),
+    ("notifications", "sms_sender_id", "SMS sender ID", "Letterhead the SMS gateway shows on the patient's phone.", "string", "HMS", False, 2),
+    ("notifications", "remind_before_hours", "Appointment reminder (h)", "Hours before the appointment to send a reminder.", "number", "24", False, 3),
+    ("privacy", "kdpa_dpo_email", "Data protection officer email", "Used in subject access response letters.", "string", "", False, 1),
+    ("privacy", "breach_notify_minutes", "Breach window (minutes)", "KDPA Section 43 default is 72 hours = 4320.", "number", "4320", False, 2),
+]
+
+
+def _ensure_tenant_metadata(tenant_url: str) -> None:
+    """Create any tables in Base.metadata that are missing on this tenant.
+
+    Pure safety net. create_all is idempotent — only creates tables that
+    don't already exist — so calling it after `alembic upgrade head` adds
+    nothing on a converged tenant but recovers a tenant that's stamped at
+    head yet missing a table (e.g. hospital_settings on BriAfya).
+    """
+    engine = create_engine(tenant_url)
+    try:
+        before = set(inspect(engine).get_table_names())
+        Base.metadata.create_all(bind=engine)
+        after = set(inspect(engine).get_table_names())
+        added = sorted(after - before)
+        if added:
+            LOG.warning(
+                "[%s] create_all backfilled %d missing table(s): %s",
+                tenant_url.rsplit("@", 1)[-1], len(added), ", ".join(added),
+            )
+    finally:
+        engine.dispose()
+
+
+def _seed_hospital_settings_defaults(tenant_url: str) -> None:
+    """Re-seed the hospital_settings defaults, idempotently.
+
+    Required for tenants whose hospital_settings table was freshly created
+    by the safety net above — `create_all` only creates the schema, never
+    rows. The alembic migration's INSERT … WHERE NOT EXISTS pattern is
+    repeated here so re-running on a converged tenant is a no-op.
+    """
+    engine = create_engine(tenant_url)
+    try:
+        with engine.begin() as conn:
+            # Skip cleanly if the table somehow still isn't there (shouldn't
+            # happen after _ensure_tenant_metadata, but defensive).
+            if not inspect(conn).has_table("hospital_settings"):
+                LOG.error(
+                    "[%s] hospital_settings still missing after create_all — skipping seed",
+                    tenant_url.rsplit("@", 1)[-1],
+                )
+                return
+            inserted = 0
+            for (category, key, label, description, data_type, value, is_sensitive, sort_order) in _HOSPITAL_SETTING_DEFAULTS:
+                result = conn.execute(
+                    text(
+                        "INSERT INTO hospital_settings "
+                        "(category, key, label, description, data_type, value, is_sensitive, sort_order) "
+                        "SELECT :c, :k, :l, :d, :t, :v, :s, :o "
+                        "WHERE NOT EXISTS (SELECT 1 FROM hospital_settings WHERE category = :c AND key = :k)"
+                    ),
+                    {
+                        "c": category, "k": key, "l": label, "d": description,
+                        "t": data_type, "v": value, "s": is_sensitive, "o": sort_order,
+                    },
+                )
+                inserted += result.rowcount or 0
+            if inserted:
+                LOG.warning(
+                    "[%s] seeded %d hospital_settings default row(s)",
+                    tenant_url.rsplit("@", 1)[-1], inserted,
+                )
+    finally:
+        engine.dispose()
+
+
 def migrate_one(tenant_db_name: str, default_url: str) -> None:
     tenant_url = _tenant_db_url(default_url, tenant_db_name)
     safe_label = tenant_url.rsplit("@", 1)[-1]  # hide creds in logs
@@ -329,10 +429,23 @@ def migrate_one(tenant_db_name: str, default_url: str) -> None:
     if _is_legacy_tenant(tenant_url):
         LOG.info("[%s] no alembic_version — running legacy bootstrap", safe_label)
         _bootstrap_legacy_tenant(tenant_url)
-        return
+        # Even the legacy bootstrap path benefits from the safety net below —
+        # in practice we've seen tenants stamped at head with a stale model
+        # registry that was missing the hospital_settings table. Fall through.
+    else:
+        LOG.info("[%s] alembic upgrade head", safe_label)
+        _run_alembic("upgrade", "head", database_url=tenant_url)
 
-    LOG.info("[%s] alembic upgrade head", safe_label)
-    _run_alembic("upgrade", "head", database_url=tenant_url)
+    # Safety net (TENANT-DRIFT-001): re-run create_all + idempotent seeds so
+    # any table that an older migrate_all_tenants run missed gets backfilled.
+    # Concrete incident: BriAfya_db lost hospital_settings because the model
+    # was added to app/models/ AFTER its legacy bootstrap had already stamped
+    # alembic head — every subsequent `alembic upgrade head` was a no-op
+    # because alembic believed the schema was current. create_all is
+    # idempotent (only creates missing tables); the seed inserts are guarded
+    # WHERE NOT EXISTS.
+    _ensure_tenant_metadata(tenant_url)
+    _seed_hospital_settings_defaults(tenant_url)
 
 
 def main() -> int:
