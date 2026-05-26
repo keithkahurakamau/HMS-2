@@ -538,9 +538,9 @@ const MODULE_GROUPS = [
             { name: 'Cheques', icon: BadgeCheck, alwaysOn: false,
               desc: 'Cheque receipting with full lifecycle — deposit, clear, bounce, cancel — and automatic GL journals at each transition.',
               bullets: ['4-state lifecycle with audit', 'Auto-post to GL on clear', 'Bounce reversal entries'] },
-            { name: 'Pay Hero (M-Pesa)', icon: Smartphone, alwaysOn: false,
-              desc: 'Mobile-money collections via the Pay Hero aggregator — STK push, webhook-validated callbacks, per-tenant credentials.',
-              bullets: ['HMAC + CIDR webhook auth', 'Per-tenant encrypted creds', 'Receipt-number unique index'] },
+            { name: 'M-Pesa Payments', icon: Smartphone, alwaysOn: false,
+              desc: 'Mobile-money collections at the till and pharmacy — STK push to the customer, webhook-validated receipts, settled to your bank.',
+              bullets: ['HMAC + CIDR webhook auth', 'Encrypted at rest', 'Receipt-number unique index'] },
         ],
     },
     {

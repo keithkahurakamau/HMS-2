@@ -43,7 +43,7 @@ export default function MainLayout() {
         ['/app/branding',        'branding'],
         ['/app/accounting',      'accounting'],
         ['/app/support',         'support'],
-        ['/app/payhero-settings','payhero'],
+        ['/app/mpesa-settings',  'payhero'],
         ['/app/dashboard',       'dashboard'],
         ['/app',                 'dashboard'],   // role-redirect fallback
     ];
@@ -80,7 +80,7 @@ export default function MainLayout() {
         { name: 'Cheque Register',   path: '/app/cheques',         icon: <Banknote size={18} />,        allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'cheques:read',     moduleKey: 'cheques' },
         { name: 'Accounting',        path: '/app/accounting',      icon: <BookOpen size={18} />,        allowedRoles: ['Admin', 'Accountant'],                            requiredPermission: 'accounting:view',  moduleKey: 'accounting' },
         { name: 'MediFleet Support', path: '/app/support',         icon: <LifeBuoy size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'support:manage',   moduleKey: 'support' },
-        { name: 'Pay Hero Settings', path: '/app/payhero-settings',icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: ['payhero:manage', 'mpesa:manage'], moduleKey: 'payhero' },
+        { name: 'M-Pesa Payments',   path: '/app/mpesa-settings',  icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: ['payhero:manage', 'mpesa:manage'], moduleKey: 'payhero' },
         { name: 'Settings',          path: '/app/settings',        icon: <Settings size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'settings:read',    moduleKey: 'settings' },
     ];
 

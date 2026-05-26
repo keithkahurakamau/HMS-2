@@ -64,7 +64,7 @@ MODULES: Tuple[ModuleDef, ...] = (
     ModuleDef("billing",      "Billing",            "Invoicing, statements, payment plans.",    False),
     ModuleDef("cheques",      "Cheques",            "Cheque receipting and reconciliation.",    False),
     ModuleDef("medical_history","Medical History",  "Longitudinal patient history.",            False),
-    ModuleDef("payhero",      "Pay Hero (M-Pesa)",  "Mobile-money collections via the Pay Hero aggregator.", True),
+    ModuleDef("payhero",      "M-Pesa Payments",    "Mobile-money collections at the till and pharmacy.", True),
     ModuleDef("analytics",    "Analytics",          "Aggregated dashboards and reports.",       False),
     ModuleDef("patient_portal","Patient Portal",    "Self-service portal for patients.",        False),
     ModuleDef("branding",     "Branding",           "Logos, colours, document templates.",      False),
