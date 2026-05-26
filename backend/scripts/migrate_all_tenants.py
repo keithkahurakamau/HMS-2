@@ -408,6 +408,28 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
         "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS last_test_status VARCHAR(40);"),
     ("mpesa_configs",
         "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS last_test_message TEXT;"),
+    # c4e62d8a1f37 — bidirectional cheque register
+    ("cheques",
+        "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS direction VARCHAR(20) NOT NULL DEFAULT 'incoming';"),
+    ("cheques",
+        "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS payee_name VARCHAR(255);"),
+    ("cheques",
+        "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS payee_type VARCHAR(40);"),
+    ("cheques",
+        "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS date_issued TIMESTAMPTZ;"),
+    ("cheques",
+        "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS dispatch_date TIMESTAMPTZ;"),
+    ("cheques",
+        "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS return_reason VARCHAR(255);"),
+    ("cheques",
+        "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS stop_reason VARCHAR(255);"),
+    # drawer_* must be nullable for outgoing rows (the hospital is the
+    # implicit drawer for those). Idempotent — DROP NOT NULL on a column
+    # that's already nullable is a no-op.
+    ("cheques",
+        "ALTER TABLE cheques ALTER COLUMN drawer_name DROP NOT NULL;"),
+    ("cheques",
+        "ALTER TABLE cheques ALTER COLUMN drawer_type DROP NOT NULL;"),
 ]
 
 
