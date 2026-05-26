@@ -28,6 +28,12 @@ import { useJourney } from '../context/JourneyContext';
  * opening cards and any step whose target may not exist for a given
  * role.
  */
+const ARROW_GLYPHS = { up: ArrowUp, down: ArrowDown, left: ArrowLeft, right: ArrowRight };
+function ArrowGlyph({ dir }) {
+    const Icon = ARROW_GLYPHS[dir] || ArrowUp;
+    return <Icon size={16} className="text-brand-600" strokeWidth={2.5} />;
+}
+
 export default function JourneyOverlay() {
     const { activeKey, activeSteps, completeCurrent, skipCurrent, skipAll } = useJourney();
     const [stepIdx, setStepIdx] = useState(0);
@@ -118,12 +124,6 @@ export default function JourneyOverlay() {
         w: target.width + HOLE_PAD * 2,
         h: target.height + HOLE_PAD * 2,
     } : null;
-
-    const ArrowGlyph = ({ dir }) => {
-        const map = { up: ArrowUp, down: ArrowDown, left: ArrowLeft, right: ArrowRight };
-        const Icon = map[dir] || ArrowUp;
-        return <Icon size={16} className="text-brand-600" strokeWidth={2.5} />;
-    };
 
     return createPortal(
         <div className="fixed inset-0 z-[1000] pointer-events-none" aria-live="polite">
