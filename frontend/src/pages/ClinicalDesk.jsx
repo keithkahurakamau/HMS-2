@@ -5,7 +5,7 @@ import {
     Search, User, Activity, FileText, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable,
-    X, Image as ImageIcon, Plus, Minus,
+    X, Image as ImageIcon, Plus, Minus, ShieldCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
@@ -35,6 +35,19 @@ export default function ClinicalDesk() {
     // the doctor sees confirmation in-line and the button updates from
     // "Select date…" to the scheduled date/time.
     const [pendingFollowUp, setPendingFollowUp] = useState(null);
+
+    // --- KDPA TREATMENT CONSENT MODAL ---
+    // Doctors can record consent without leaving the desk, so the clinical
+    // submit never trips the S.30 gate mid-encounter. Modal is local rather
+    // than reused from Medical History because the flow here is one-shot
+    // (Treatment type, current patient) and we want zero context switching.
+    const [isConsentOpen, setIsConsentOpen] = useState(false);
+    const [consentDraft, setConsentDraft] = useState({
+        consent_method: 'Verbal',
+        notes: '',
+    });
+    const [consentSubmitting, setConsentSubmitting] = useState(false);
+    const [hasRecordedConsent, setHasRecordedConsent] = useState(false);
 
     // Cross-page active patient context (also drives the bar at the top of
     // every workspace page). We mirror the local `activePatient` state into
@@ -81,7 +94,14 @@ export default function ClinicalDesk() {
         setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
         setClinicalNotes({ cc: '', hpi: '', objective: '', diagnosis: '', plan: '', internal_notes: '' });
         setIcdSearch('');
-        setChargeConsultation(false);
+        // Default to ON — a consultation that ends at "Send to billing" with
+        // no fee posts no invoice and the patient never surfaces in the
+        // cashier's queue, which is the most common bug report from
+        // receptionists. Doctors who need to waive the fee can uncheck.
+        setChargeConsultation(true);
+        setPendingFollowUp(null);
+        setHasRecordedConsent(false);
+        setConsentDraft({ consent_method: 'Verbal', notes: '' });
     };
 
     // --- ACTION HANDLERS ---
@@ -89,8 +109,51 @@ export default function ClinicalDesk() {
         toast(`The ${moduleName} module is currently under development.`, { icon: '🚧' });
     };
 
+    // Per-target validation. Returns an error message or null. We branch on
+    // targetStatus so a doctor doesn't accidentally:
+    //   - finalize an empty encounter (no diagnosis / no chief complaint)
+    //   - forward a blank prescription to Pharmacy
+    //   - send a patient to Billing with no charges and no consultation fee,
+    //     which would leave them invisible in the cashier's queue
+    const validateForSubmit = (targetStatus) => {
+        if (!activePatient) return 'Select a patient from the queue first.';
+        if (targetStatus === 'Draft') return null;                    // drafts are intentionally permissive
+        const hasDx = (clinicalNotes.diagnosis || icdSearch || '').trim().length > 0;
+        const hasCc = (clinicalNotes.cc || '').trim().length > 0;
+        if (targetStatus === 'Pharmacy') {
+            if (!(clinicalNotes.plan || '').trim()) {
+                return 'Add a prescription in the Medications field before forwarding to Pharmacy.';
+            }
+            if (!hasDx && !hasCc) {
+                return 'Record at least a chief complaint or diagnosis before forwarding to Pharmacy.';
+            }
+        }
+        if (targetStatus === 'Billed') {
+            // Billing queue is populated by Pending invoices. With no
+            // consultation fee and no other line items, the patient would
+            // never surface there. Require either the fee or an explicit
+            // ack the doctor knows another bill already exists.
+            if (!chargeConsultation) {
+                return 'Re-enable the consultation fee, or charge a service from Billing — otherwise the cashier won\'t see this patient.';
+            }
+            if (!hasDx && !hasCc) {
+                return 'Record at least a chief complaint or diagnosis before billing.';
+            }
+        }
+        if (targetStatus === 'Completed') {
+            if (!hasDx && !hasCc) {
+                return 'Finalising requires at least a chief complaint or diagnosis.';
+            }
+        }
+        return null;
+    };
+
     const handleClinicalSubmit = async (targetStatus) => {
-        if (!activePatient) return;
+        const validationError = validateForSubmit(targetStatus);
+        if (validationError) {
+            toast.error(validationError);
+            return;
+        }
         setIsSubmitting(true);
 
         // Build the payload matching the backend Pydantic schema
@@ -98,7 +161,7 @@ export default function ClinicalDesk() {
             patient_id: activePatient.patient_id,
             queue_id: activePatient.queue_id,
             record_status: targetStatus, // "Draft", "Pharmacy", "Billed", or "Completed"
-            
+
             // Vitals (Convert strings to numbers where appropriate, or leave null)
             blood_pressure: vitals.bp || null,
             heart_rate: vitals.hr ? parseInt(vitals.hr) : null,
@@ -107,7 +170,7 @@ export default function ClinicalDesk() {
             spo2: vitals.spo2 ? parseInt(vitals.spo2) : null,
             weight_kg: vitals.weight ? parseFloat(vitals.weight) : null,
             height_cm: vitals.height ? parseFloat(vitals.height) : null,
-            
+
             // Clinical Notes
             chief_complaint: clinicalNotes.cc,
             history_of_present_illness: clinicalNotes.hpi,
@@ -120,19 +183,23 @@ export default function ClinicalDesk() {
 
         try {
             await apiClient.post('/clinical/submit', payload);
-            
-            // Generate Consultation Fee if checked
+
+            // Consultation fee posts on Billed/Pharmacy/Completed only — never
+            // on Draft. For Pharmacy + Completed the checkbox still gates it
+            // (a follow-up encounter might not warrant a new fee). For Billed
+            // the validator already forced the checkbox on, so this branch
+            // posts unconditionally for that path.
             if (chargeConsultation && targetStatus !== 'Draft') {
                 await apiClient.post('/billing/consultation-fee', {
                     patient_id: activePatient.patient_id,
                     amount: 1000.0
                 });
             }
-            
-            if (targetStatus === 'Pharmacy') toast.success("Record saved and routed to Pharmacy!");
-            else if (targetStatus === 'Billed') toast.success("Record saved and sent to Billing!");
-            else if (targetStatus === 'Draft') toast.success("Draft saved successfully.");
-            else toast.success("Consultation finalized and closed.");
+
+            if (targetStatus === 'Pharmacy') toast.success('Record saved and routed to Pharmacy.');
+            else if (targetStatus === 'Billed') toast.success('Record saved — patient is now in the Billing queue.');
+            else if (targetStatus === 'Draft') toast.success('Draft saved.');
+            else toast.success('Consultation finalised and signed.');
 
             // If not a draft, clear the workspace and refresh the queue
             if (targetStatus !== 'Draft') {
@@ -141,9 +208,37 @@ export default function ClinicalDesk() {
                 fetchQueue();
             }
         } catch (error) {
-            toast.error(error.response?.data?.detail || "Failed to save clinical record.");
+            const detail = error.response?.data?.detail || 'Failed to save clinical record.';
+            // Friendlier message when the KDPA S.30 gate fires server-side
+            // (means no active Treatment consent on file for the patient).
+            if (typeof detail === 'string' && /consent/i.test(detail)) {
+                toast.error('No active Treatment consent on file — click "Record consent" first.');
+            } else {
+                toast.error(detail);
+            }
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleConsentSubmit = async () => {
+        if (!activePatient) return;
+        setConsentSubmitting(true);
+        try {
+            await apiClient.post('/medical-history/consent', {
+                patient_id: activePatient.patient_id,
+                consent_type: 'Treatment',
+                consent_given: true,
+                consent_method: consentDraft.consent_method,
+                notes: consentDraft.notes || null,
+            });
+            toast.success('Treatment consent recorded.');
+            setHasRecordedConsent(true);
+            setIsConsentOpen(false);
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Failed to record consent.');
+        } finally {
+            setConsentSubmitting(false);
         }
     };
 
@@ -157,7 +252,7 @@ export default function ClinicalDesk() {
             />
 
             {/* TOP PANEL: Collapsible Queue */}
-            <div className="card shrink-0 flex flex-col z-20">
+            <div data-tour="clinical-queue" className="card shrink-0 flex flex-col z-20">
                 <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
                     <div className="flex items-center gap-3">
                         <Users className="text-brand-600" size={18} />
@@ -215,15 +310,37 @@ export default function ClinicalDesk() {
                                         <p className="text-xs font-medium text-ink-500">{activePatient.outpatient_no} &middot; {activePatient.age} yrs &middot; {activePatient.gender}</p>
                                     </div>
                                 </div>
-                                {activePatient.allergies && activePatient.allergies.toLowerCase() !== 'none' && (
-                                    <div className="bg-rose-50 ring-1 ring-rose-100 px-3 py-2 rounded-xl flex items-center gap-2">
-                                        <AlertCircle size={16} className="text-rose-600" />
-                                        <div>
-                                            <p className="text-2xs font-semibold text-rose-700 uppercase tracking-[0.14em]">Allergies</p>
-                                            <p className="text-xs font-semibold text-rose-700">{activePatient.allergies}</p>
+                                <div className="flex items-center gap-2">
+                                    {activePatient.allergies && activePatient.allergies.toLowerCase() !== 'none' && (
+                                        <div className="bg-rose-50 ring-1 ring-rose-100 px-3 py-2 rounded-xl flex items-center gap-2">
+                                            <AlertCircle size={16} className="text-rose-600" />
+                                            <div>
+                                                <p className="text-2xs font-semibold text-rose-700 uppercase tracking-[0.14em]">Allergies</p>
+                                                <p className="text-xs font-semibold text-rose-700">{activePatient.allergies}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                    {/* KDPA S.30 consent capture — visible at all times so the
+                                        doctor can record verbal/written consent without leaving
+                                        the desk. Turns into a confirmed pill once recorded for
+                                        the active encounter. */}
+                                    <button
+                                        type="button"
+                                        data-tour="clinical-consent"
+                                        onClick={() => setIsConsentOpen(true)}
+                                        title={hasRecordedConsent
+                                            ? 'Consent recorded for this encounter — click to re-record'
+                                            : 'Record KDPA Section 30 treatment consent'}
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ring-1 ${
+                                            hasRecordedConsent
+                                                ? 'bg-emerald-50 ring-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                                : 'bg-brand-50 ring-brand-200 text-brand-700 hover:bg-brand-100'
+                                        }`}
+                                    >
+                                        <ShieldCheck size={14} />
+                                        {hasRecordedConsent ? 'Consent recorded' : 'Record consent'}
+                                    </button>
+                                </div>
                             </div>
 
                             {/* History toolbar — each button deep-links to the
@@ -257,7 +374,7 @@ export default function ClinicalDesk() {
                         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 custom-scrollbar">
 
                             {/* Vitals Entry */}
-                            <div className="card-flush p-5 border-l-4 border-l-brand-500">
+                            <div data-tour="clinical-vitals" className="card-flush p-5 border-l-4 border-l-brand-500">
                                 <div className="flex justify-between items-center mb-4 border-b border-ink-100 pb-3">
                                     <h3 className="section-eyebrow flex items-center gap-2"><Activity size={16} className="text-brand-500" /> Vital signs</h3>
                                     <button onClick={() => handleNotImplemented('Vitals Trends')} className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"><Activity size={13} /> View trends</button>
@@ -283,7 +400,7 @@ export default function ClinicalDesk() {
                             </div>
 
                             {/* Orders & Prescriptions */}
-                            <div className="card-flush p-5 border-l-4 border-l-accent-500 space-y-4">
+                            <div data-tour="clinical-diagnoses" className="card-flush p-5 border-l-4 border-l-accent-500 space-y-4">
                                 <h3 className="section-eyebrow border-b border-ink-100 pb-3 flex items-center gap-2"><Pill size={16} className="text-accent-600" /> Diagnosis &amp; orders</h3>
 
                                 <div className="relative">
@@ -316,7 +433,7 @@ export default function ClinicalDesk() {
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="rounded-xl border border-accent-200 bg-accent-50/40 p-4">
+                                    <div data-tour="clinical-prescriptions" className="rounded-xl border border-accent-200 bg-accent-50/40 p-4">
                                         <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-700 mb-3 flex items-center gap-2"><Pill size={13} /> Medications (routed to Pharmacy)</h4>
                                         <textarea rows="2" value={clinicalNotes.plan} onChange={(e) => setClinicalNotes({...clinicalNotes, plan: e.target.value})} className="input resize-none" placeholder="Enter prescription instructions to send to Pharmacy…"></textarea>
                                     </div>
@@ -373,20 +490,20 @@ export default function ClinicalDesk() {
                         </div>
 
                         {/* Footer actions */}
-                        <div className="p-4 border-t border-ink-100 bg-white flex flex-wrap justify-between items-center gap-3 shrink-0 z-10">
+                        <div data-tour="clinical-submit" className="p-4 border-t border-ink-100 bg-white flex flex-wrap justify-between items-center gap-3 shrink-0 z-10">
                             <div className="flex gap-2">
-                                <button onClick={() => handleClinicalSubmit('Draft')} disabled={isSubmitting} className="btn-secondary"><Save size={15} /> Save draft</button>
+                                <button data-tour="clinical-save-draft" onClick={() => handleClinicalSubmit('Draft')} disabled={isSubmitting} className="btn-secondary"><Save size={15} /> Save draft</button>
                                 <button onClick={() => handleNotImplemented('External Referrals')} className="btn-ghost"><ArrowRightLeft size={15} /> Refer patient</button>
                             </div>
 
                             <div className="flex gap-2">
-                                <button onClick={() => handleClinicalSubmit('Billed')} disabled={isSubmitting} className="btn-secondary text-brand-700 border-brand-200 hover:bg-brand-50">
+                                <button data-tour="clinical-send-billing" onClick={() => handleClinicalSubmit('Billed')} disabled={isSubmitting} className="btn-secondary text-brand-700 border-brand-200 hover:bg-brand-50">
                                     <Receipt size={15} /> Send to billing
                                 </button>
-                                <button onClick={() => handleClinicalSubmit('Pharmacy')} disabled={isSubmitting} className="btn-success">
+                                <button data-tour="clinical-forward-pharmacy" onClick={() => handleClinicalSubmit('Pharmacy')} disabled={isSubmitting} className="btn-success">
                                     <Pill size={15} /> Forward to pharmacy
                                 </button>
-                                <button onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 text-white hover:bg-ink-900 shadow-soft">
+                                <button data-tour="clinical-finalize" onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 text-white hover:bg-ink-900 shadow-soft">
                                     <FileSignature size={15} /> Finalize &amp; sign
                                 </button>
                             </div>
@@ -417,6 +534,99 @@ export default function ClinicalDesk() {
                     onBooked={(appt) => { setPendingFollowUp(appt); setIsFollowUpOpen(false); }}
                 />
             )}
+
+            {activePatient && isConsentOpen && (
+                <ConsentModal
+                    patient={activePatient}
+                    draft={consentDraft}
+                    setDraft={setConsentDraft}
+                    submitting={consentSubmitting}
+                    onClose={() => setIsConsentOpen(false)}
+                    onSubmit={handleConsentSubmit}
+                />
+            )}
+        </div>
+    );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Consent modal — KDPA Section 30 Treatment consent.                        */
+/*                                                                            */
+/*  Local to ClinicalDesk so the doctor can record consent without leaving    */
+/*  the encounter. POSTs /medical-history/consent with consent_type=          */
+/*  'Treatment'. The server backs that with an audit-log entry, so the chain  */
+/*  of custody is intact even when the consent is recorded mid-consultation.  */
+/* ────────────────────────────────────────────────────────────────────────── */
+const CONSENT_METHODS = ['Verbal', 'Written', 'Guardian/Next of Kin', 'Implied (Emergency)'];
+
+function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
+            <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-elevated w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                            <ShieldCheck size={17} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-semibold text-ink-900 tracking-tight">Record treatment consent</h3>
+                            <p className="text-xs text-ink-500">KDPA Section 30 · {patient.patient_name}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="p-5 space-y-4 overflow-y-auto">
+                    <p className="text-sm text-ink-700 leading-relaxed">
+                        The patient agrees to assessment, diagnosis, and treatment for this encounter.
+                        Recording consent lets you save SOAP notes and forward to Pharmacy / Billing.
+                    </p>
+
+                    <div>
+                        <label className="label">Consent method</label>
+                        <select
+                            className="input"
+                            value={draft.consent_method}
+                            onChange={(e) => setDraft({ ...draft, consent_method: e.target.value })}
+                        >
+                            {CONSENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        <p className="text-2xs text-ink-500 mt-1">
+                            Use <strong>Verbal</strong> for in-person consent, <strong>Written</strong> when a signed
+                            form is on file, <strong>Implied</strong> only in emergencies where the patient can't
+                            communicate.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="label">Notes (optional)</label>
+                        <textarea
+                            rows="3"
+                            className="input resize-none"
+                            placeholder="e.g. Witnessed by Nurse Atieno; patient confirmed understanding of treatment plan."
+                            value={draft.notes}
+                            onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+                        />
+                    </div>
+                </div>
+
+                <div className="p-4 border-t border-ink-100 flex justify-end gap-2 bg-ink-50/40">
+                    <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
+                    <button
+                        type="button"
+                        onClick={onSubmit}
+                        disabled={submitting}
+                        className="btn-primary cursor-pointer"
+                    >
+                        {submitting
+                            ? <><Activity size={14} className="animate-spin" /> Recording…</>
+                            : <><ShieldCheck size={14} /> Record consent</>}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
