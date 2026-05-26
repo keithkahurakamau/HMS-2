@@ -17,8 +17,11 @@ import { useEffect, useRef } from 'react';
  * check keep one hospital from ever seeing another's feed.
  * ────────────────────────────────────────────────────────────────────────── */
 export default function usePaymentSocket(enabled, onEvent) {
+    // Keep the latest callback in a ref so the socket effect doesn't need to
+    // reconnect every render. Updated in an effect (not during render) per the
+    // rules of hooks.
     const cbRef = useRef(onEvent);
-    cbRef.current = onEvent;
+    useEffect(() => { cbRef.current = onEvent; });
 
     useEffect(() => {
         if (!enabled) return undefined;
