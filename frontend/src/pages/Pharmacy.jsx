@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
+import MpesaStkProgress from '../components/MpesaStkProgress';
 
 export default function Pharmacy() {
     // --- APP STATE ---
@@ -158,7 +159,8 @@ export default function Pharmacy() {
                     patientName: 'Walk-in',
                     pendingMpesa: { external_reference: res.data?.external_reference,
                                     payhero_reference: res.data?.payhero_reference,
-                                    transaction_id: res.data?.transaction_id },
+                                    transaction_id: res.data?.transaction_id,
+                                    phone: phoneNumber },
                 });
             } else {
                 toast.success(`${method === 'card' ? 'Card' : 'Cash'} payment recorded.`);
@@ -789,7 +791,7 @@ function Field({ label, children }) {
 /* ─── Payment modal ───────────────────────────────────────────────────────── */
 
 const POLL_MS = 3000;
-const POLL_TIMEOUT_MS = 90_000;
+const STK_TIMEOUT = 60;   // seconds the customer has to enter their PIN
 
 function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMpesa, onClose, onSettled }) {
     const [method, setMethod] = useState('cash');     // 'cash' | 'mpesa'
@@ -797,36 +799,55 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
     const [phone, setPhone] = useState('');
     const [reference, setReference] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [pollingTxnId, setPollingTxnId] = useState(pendingMpesa?.transaction_id ?? null);
-    const [pollStatus, setPollStatus] = useState(null);
+    // M-Pesa wait state: null = form, else 'waiting' | 'success' | 'failed'.
+    const [mpesaStatus, setMpesaStatus] = useState(pendingMpesa?.transaction_id ? 'waiting' : null);
+    const [secondsLeft, setSecondsLeft] = useState(STK_TIMEOUT);
+    const [mpesaError, setMpesaError] = useState(null);
+    const [mpesaReceipt, setMpesaReceipt] = useState(null);
 
-    // Poll the dispense's payment status while M-Pesa is pending.
+    // Poll our own DB row (settled by the verified Pay Hero webhook) while a
+    // push is pending, and run a visible countdown alongside it.
     useEffect(() => {
-        if (!pollingTxnId) return undefined;
-        const startedAt = Date.now();
-        const interval = setInterval(async () => {
+        if (mpesaStatus !== 'waiting') return undefined;
+        setSecondsLeft(STK_TIMEOUT);
+
+        const tick = setInterval(() => {
+            setSecondsLeft((s) => {
+                if (s <= 1) {
+                    setMpesaStatus('failed');
+                    setMpesaError('No PIN was entered before the prompt expired.');
+                    return 0;
+                }
+                return s - 1;
+            });
+        }, 1000);
+
+        const poll = setInterval(async () => {
             try {
                 const r = await apiClient.get(`/pharmacy/dispense/${dispenseId}/payment-status`);
-                setPollStatus(r.data);
                 if (r.data?.invoice_status === 'Paid' || r.data?.mpesa_status === 'Success') {
-                    clearInterval(interval);
+                    setMpesaReceipt(r.data?.mpesa_receipt_number);
+                    setMpesaStatus('success');
                     toast.success(`M-Pesa receipt ${r.data?.mpesa_receipt_number || ''} confirmed.`);
-                    onSettled();
+                    setTimeout(onSettled, 1800);
                 } else if (r.data?.mpesa_status === 'Failed') {
-                    clearInterval(interval);
-                    toast.error(r.data?.mpesa_result_desc || 'M-Pesa payment failed.');
-                    setPollingTxnId(null);
-                } else if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
-                    clearInterval(interval);
-                    toast.error('M-Pesa did not confirm in time. Check Cashier > M-Pesa transactions.');
-                    setPollingTxnId(null);
+                    setMpesaStatus('failed');
+                    setMpesaError(r.data?.mpesa_result_desc || 'Cancelled by the customer.');
                 }
             } catch {
-                // Transient — keep polling until timeout.
+                // Transient — keep polling until the countdown ends.
             }
         }, POLL_MS);
-        return () => clearInterval(interval);
-    }, [pollingTxnId, dispenseId, onSettled]);
+
+        return () => { clearInterval(tick); clearInterval(poll); };
+    }, [mpesaStatus, dispenseId, onSettled]);
+
+    const retry = () => {
+        setMpesaStatus(null);
+        setMpesaError(null);
+        setMpesaReceipt(null);
+        setSecondsLeft(STK_TIMEOUT);
+    };
 
     const submit = async () => {
         const amt = Number(amount);
@@ -848,7 +869,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                 onSettled();
             } else if (method === 'mpesa') {
                 toast.success('STK push sent. Customer to confirm on their phone.');
-                setPollingTxnId(res.data?.transaction_id);
+                setMpesaStatus('waiting');
             }
         } catch (err) {
             toast.error(err?.response?.data?.detail || 'Payment failed.');
@@ -873,15 +894,16 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                 </div>
 
                 <div className="p-5 space-y-4">
-                    {pollingTxnId ? (
-                        <div className="text-center py-6">
-                            <Smartphone size={32} className="mx-auto text-brand-700 mb-2" />
-                            <p className="text-sm text-ink-700 font-medium">Waiting for M-Pesa confirmation…</p>
-                            <p className="text-xs text-ink-500 mt-1">Customer should accept the STK push on their phone.</p>
-                            {pollStatus?.mpesa_status && (
-                                <p className="text-xs mt-3 font-mono">status: {pollStatus.mpesa_status}</p>
-                            )}
-                        </div>
+                    {mpesaStatus ? (
+                        <MpesaStkProgress
+                            status={mpesaStatus}
+                            phone={phone || pendingMpesa?.phone}
+                            secondsLeft={secondsLeft}
+                            total={STK_TIMEOUT}
+                            receipt={mpesaReceipt}
+                            errorDesc={mpesaError}
+                            onRetry={retry}
+                        />
                     ) : (
                         <>
                             <div className="flex gap-2 border-b border-ink-100">

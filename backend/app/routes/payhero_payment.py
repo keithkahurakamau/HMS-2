@@ -70,6 +70,37 @@ def get_payment_status(reference: str, db: Session = Depends(get_db)):
     return check_payment_status(db, reference=reference)
 
 
+@router.get(
+    "/invoice-status/{invoice_id}",
+    dependencies=[Depends(RequirePermission("billing:read", "billing:manage"))],
+)
+def invoice_payment_status(invoice_id: int, db: Session = Depends(get_db)):
+    """DB-backed status the cashier screen polls while an STK push is pending.
+
+    Reads our own transaction row (updated by the verified webhook) rather
+    than Pay Hero's live API, so a confirmed-then-settled payment is reflected
+    the instant the callback commits — mirrors the pharmacy dispense poll.
+    """
+    invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    latest = (
+        db.query(PayHeroTransaction)
+        .filter(PayHeroTransaction.invoice_id == invoice_id)
+        .order_by(PayHeroTransaction.id.desc())
+        .first()
+    )
+    return {
+        "invoice_id": invoice.invoice_id,
+        "invoice_status": invoice.status,
+        "amount_paid": float(invoice.amount_paid or 0),
+        "total_amount": float(invoice.total_amount or 0),
+        "mpesa_status": latest.status if latest else None,
+        "mpesa_receipt_number": latest.receipt_number if latest else None,
+        "mpesa_result_desc": latest.result_desc if latest else None,
+    }
+
+
 # ─── Webhook callback ──────────────────────────────────────────────────────
 
 

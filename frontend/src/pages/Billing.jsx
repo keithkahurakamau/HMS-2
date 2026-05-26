@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api/client';
 import {
     Receipt, Search, Filter, CreditCard, Banknote, Smartphone, CheckCircle2,
@@ -7,6 +7,10 @@ import {
 import toast from 'react-hot-toast';
 import { printInvoice } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
+import MpesaStkProgress from '../components/MpesaStkProgress';
+
+const STK_TIMEOUT = 60;   // seconds the customer has to enter their PIN
+const POLL_MS = 3000;     // how often we re-check our own DB for the receipt
 
 export default function Billing() {
     const [queue, setQueue] = useState([]);
@@ -17,11 +21,29 @@ export default function Billing() {
     const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [mpesaPhone, setMpesaPhone] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [mpesaStatus, setMpesaStatus] = useState(null); // 'waiting', 'success', 'failed'
-    
+    const [mpesaStatus, setMpesaStatus] = useState(null); // 'waiting' | 'success' | 'failed'
+    const [secondsLeft, setSecondsLeft] = useState(STK_TIMEOUT);
+    const [mpesaError, setMpesaError] = useState(null);
+    const [mpesaReceipt, setMpesaReceipt] = useState(null);
+
+    // Interval handles for the STK countdown + DB-status poll, so we can
+    // tear both down from one place regardless of how the wait ends.
+    const pollRef = useRef(null);
+    const countdownRef = useRef(null);
+
     // Ledger Modal State
     const [isLedgerOpen, setIsLedgerOpen] = useState(false);
     const [mpesaLogs, setMpesaLogs] = useState([]);
+
+    const stopMpesa = () => {
+        clearInterval(pollRef.current);
+        clearInterval(countdownRef.current);
+        pollRef.current = null;
+        countdownRef.current = null;
+    };
+
+    // Tear down timers if the cashier navigates away mid-wait.
+    useEffect(() => stopMpesa, []);
 
     const fetchQueue = async () => {
         setIsLoading(true);
@@ -44,39 +66,60 @@ export default function Billing() {
         inv.patient_opd.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const pollMpesaStatus = async (checkoutRequestId) => {
-        let attempts = 0;
-        const interval = setInterval(async () => {
-            attempts++;
-            if (attempts > 20) { // 60 seconds timeout
-                clearInterval(interval);
-                setMpesaStatus(null);
-                setIsProcessing(false);
-                toast.error("M-Pesa request timed out. Patient did not enter PIN.");
-                return;
-            }
-            try {
-                const res = await apiClient.get(`/payments/payhero/status/${checkoutRequestId}`);
-                if (res.data.status === 'Success') {
-                    clearInterval(interval);
-                    setMpesaStatus('success');
-                    toast.success("M-Pesa payment received successfully!");
-                    setIsProcessing(false);
-                    setMpesaStatus(null);
-                    setActiveInvoice(null);
-                    fetchQueue();
-                } else if (res.data.status === 'Failed') {
-                    clearInterval(interval);
+    // Poll our OWN DB (updated by the verified Pay Hero webhook) for the
+    // receipt — not Pay Hero's live API. The callback settles the invoice and
+    // flips the transaction row to Success/Failed; we just watch for that.
+    const startMpesaPolling = (invoiceId) => {
+        stopMpesa();
+        setMpesaStatus('waiting');
+        setMpesaError(null);
+        setMpesaReceipt(null);
+        setSecondsLeft(STK_TIMEOUT);
+
+        countdownRef.current = setInterval(() => {
+            setSecondsLeft((s) => {
+                if (s <= 1) {
+                    stopMpesa();
                     setMpesaStatus('failed');
-                    toast.error(`M-Pesa payment failed: ${res.data.result_desc || 'Cancelled by user'}`);
+                    setMpesaError('No PIN was entered before the prompt expired.');
                     setIsProcessing(false);
-                    setMpesaStatus(null);
+                    return 0;
                 }
-                // If status is still Pending, continue polling
+                return s - 1;
+            });
+        }, 1000);
+
+        pollRef.current = setInterval(async () => {
+            try {
+                const res = await apiClient.get(`/payments/payhero/invoice-status/${invoiceId}`);
+                const { invoice_status, mpesa_status, mpesa_receipt_number, mpesa_result_desc } = res.data;
+                if (invoice_status === 'Paid' || mpesa_status === 'Success') {
+                    stopMpesa();
+                    setMpesaReceipt(mpesa_receipt_number);
+                    setMpesaStatus('success');
+                    setIsProcessing(false);
+                    toast.success('M-Pesa payment received successfully!');
+                    // Hold the success tick briefly, then return to the queue.
+                    setTimeout(() => { setActiveInvoice(null); resetMpesa(); fetchQueue(); }, 1800);
+                } else if (mpesa_status === 'Failed') {
+                    stopMpesa();
+                    setMpesaStatus('failed');
+                    setMpesaError(mpesa_result_desc || 'Cancelled by the customer.');
+                    setIsProcessing(false);
+                }
             } catch (error) {
-                // Ignore errors during polling and keep trying
+                // Transient network error — keep polling until the countdown ends.
             }
-        }, 3000);
+        }, POLL_MS);
+    };
+
+    const resetMpesa = () => {
+        stopMpesa();
+        setMpesaStatus(null);
+        setMpesaError(null);
+        setMpesaReceipt(null);
+        setSecondsLeft(STK_TIMEOUT);
+        setIsProcessing(false);
     };
 
     const handleProcessPayment = async (e) => {
@@ -92,25 +135,15 @@ export default function Billing() {
                     setIsProcessing(false);
                     return toast.error("Phone number required for M-Pesa");
                 }
-                const res = await apiClient.post('/payments/payhero/stk-push', {
+                await apiClient.post('/payments/payhero/stk-push', {
                     phone_number: mpesaPhone,
                     amount: amountDue,
                     invoice_id: activeInvoice.invoice_id,
                 });
 
                 toast.success("STK Push sent to patient's phone. Waiting for PIN...");
-                setMpesaStatus('waiting');
-
-                // Pay Hero returns the aggregator ``reference`` (or our
-                // ``external_reference`` fallback) for status polling.
-                const pollRef = res.data.reference || res.data.external_reference;
-                if (pollRef) {
-                    pollMpesaStatus(pollRef);
-                } else {
-                    toast.error("Invalid response from Pay Hero.");
-                    setIsProcessing(false);
-                    setMpesaStatus(null);
-                }
+                // Watch our own DB row (settled by the webhook) for this invoice.
+                startMpesaPolling(activeInvoice.invoice_id);
             } else {
                 await apiClient.post('/billing/process-payment', {
                     idempotency_key: idempotencyKey,
@@ -187,7 +220,7 @@ export default function Billing() {
                             {filteredQueue.map(inv => {
                                 const active = activeInvoice?.invoice_id === inv.invoice_id;
                                 return (
-                                    <button key={inv.invoice_id} type="button" onClick={() => setActiveInvoice(inv)}
+                                    <button key={inv.invoice_id} type="button" onClick={() => { resetMpesa(); setActiveInvoice(inv); }}
                                         className={`w-full text-left card p-4 transition-all duration-150 ${active ? 'border-brand-400 ring-2 ring-brand-500/15 shadow-elevated' : 'hover:-translate-y-0.5 hover:shadow-elevated'}`}>
                                         <div className="flex justify-between items-start mb-2">
                                             <span className={inv.status === 'Pending M-Pesa' ? 'badge-success' : 'badge-warn'}>{inv.status}</span>
@@ -264,6 +297,19 @@ export default function Billing() {
 
                                 <div>
                                     <h3 className="section-eyebrow mb-3 border-b border-ink-100 pb-2">Receive payment</h3>
+                                    {mpesaStatus ? (
+                                        <div className="card p-5 sm:p-6">
+                                            <MpesaStkProgress
+                                                status={mpesaStatus}
+                                                phone={mpesaPhone}
+                                                secondsLeft={secondsLeft}
+                                                total={STK_TIMEOUT}
+                                                receipt={mpesaReceipt}
+                                                errorDesc={mpesaError}
+                                                onRetry={resetMpesa}
+                                            />
+                                        </div>
+                                    ) : (
                                     <form onSubmit={handleProcessPayment} className="card p-5 sm:p-6">
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
                                             {[
@@ -305,16 +351,16 @@ export default function Billing() {
                                             type="submit"
                                             disabled={isProcessing}
                                             className={`w-full py-3.5 rounded-xl font-semibold text-white text-base flex items-center justify-center gap-2 transition-all shadow-soft ${
-                                                mpesaStatus === 'waiting' ? 'bg-amber-500 hover:bg-amber-600 animate-pulse-soft' :
                                                 paymentMethod === 'M-Pesa' ? 'bg-gradient-to-b from-accent-500 to-accent-600 hover:from-accent-500 hover:to-accent-700' :
                                                 paymentMethod === 'Card'   ? 'bg-gradient-to-b from-purple-500 to-purple-600 hover:from-purple-500 hover:to-purple-700' :
                                                                               'bg-gradient-to-b from-brand-500 to-brand-600 hover:from-brand-500 hover:to-brand-700'
                                             } disabled:opacity-80 disabled:cursor-not-allowed`}
                                         >
-                                            {mpesaStatus === 'waiting' ? <Smartphone className="animate-pulse" size={20} /> : isProcessing ? <Activity className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
-                                            {mpesaStatus === 'waiting' ? 'Awaiting PIN from patient…' : paymentMethod === 'M-Pesa' ? 'Trigger M-Pesa STK Push' : 'Confirm payment & close bill'}
+                                            {isProcessing ? <Activity className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
+                                            {paymentMethod === 'M-Pesa' ? 'Trigger M-Pesa STK Push' : 'Confirm payment & close bill'}
                                         </button>
                                     </form>
+                                    )}
                                 </div>
                             </div>
                         </div>

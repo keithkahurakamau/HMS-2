@@ -19,7 +19,6 @@ import PageHeader from '../components/PageHeader';
 const empty = {
     shortcode: '',
     shortcode_type: 'paybill',
-    payhero_channel_id: '',
     payhero_username: '',
     payhero_password: '',
     settlement_bank_code: '',
@@ -52,7 +51,6 @@ export default function PayHeroSettings() {
                     ...f,
                     shortcode: cfg.data.shortcode || '',
                     shortcode_type: cfg.data.shortcode_type || 'paybill',
-                    payhero_channel_id: cfg.data.payhero_channel_id || '',
                     settlement_bank_code: cfg.data.settlement_bank_code || '',
                     settlement_account_number: cfg.data.settlement_account_number || '',
                     settlement_account_name: cfg.data.settlement_account_name || '',
@@ -130,12 +128,12 @@ export default function PayHeroSettings() {
                                 <option value="till">Buy Goods / Till (no account #)</option>
                             </select>
                         </Field>
-                        <Field label="Pay Hero channel id">
-                            <input className="input" value={form.payhero_channel_id}
-                                   onChange={e => setForm({ ...form, payhero_channel_id: e.target.value })}
-                                   placeholder="copied from the Pay Hero dashboard" />
-                        </Field>
                     </div>
+                    <p className="text-xs text-ink-500 -mt-2 inline-flex items-start gap-1.5">
+                        <ShieldCheck size={13} className="mt-0.5 text-brand-600 shrink-0" />
+                        MediFleet links your till to Pay Hero and provisions the channel for
+                        you — you don't need a Pay Hero channel id here.
+                    </p>
 
                     <SectionHead icon={Building2} title="Settlement bank" />
                     <p className="text-xs text-ink-500 -mt-3">
@@ -214,10 +212,15 @@ export default function PayHeroSettings() {
                         <input className="input" value={testPhone}
                                onChange={e => setTestPhone(e.target.value)}
                                placeholder="07XXXXXXXX or 2547XXXXXXXX" />
-                        <button onClick={testStk} disabled={testing || !config?.configured}
+                        <button onClick={testStk} disabled={testing || !config?.configured || !config?.payhero_channel_id}
                                 className="w-full px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                             {testing ? 'Sending…' : 'Send test'}
                         </button>
+                        {config?.configured && !config?.payhero_channel_id && (
+                            <p className="text-xs text-amber-700">
+                                The test push unlocks once MediFleet links your Pay Hero channel.
+                            </p>
+                        )}
                         {config?.last_test_at && (
                             <div className="text-xs text-ink-600 pt-2 border-t border-ink-100">
                                 <div>Last: <span className="font-mono">{new Date(config.last_test_at).toLocaleString()}</span></div>
@@ -243,9 +246,9 @@ function PayHeroChecklist() {
             </h3>
             <ol className="list-decimal pl-5 text-sm text-amber-900 space-y-1">
                 <li>You must already have a Safaricom <strong>PayBill or Buy Goods Till</strong>. Tills are issued via Safaricom Business support and require business registration + KRA PIN.</li>
-                <li>Onboard with <strong>Pay Hero</strong> (<code className="bg-amber-100 px-1">payhero.co.ke</code>) and link the till above to a Pay Hero channel. Paste the channel id here.</li>
-                <li>Select the bank account where Pay Hero should settle proceeds. The schedule (daily / weekly) is configured inside the Pay Hero dashboard.</li>
-                <li>After saving, send a test KES&nbsp;1 STK push to your own number to verify the link end-to-end.</li>
+                <li>Enter that shortcode and your settlement bank below, then save. <strong>MediFleet</strong> links your till to Pay Hero and provisions the channel on its end — there's nothing for you to copy from the Pay Hero dashboard.</li>
+                <li>The settlement schedule (daily / weekly) is agreed during onboarding and managed by MediFleet.</li>
+                <li>Once MediFleet confirms your channel is linked, send a test KES&nbsp;1 STK push to your own number to verify end-to-end.</li>
             </ol>
         </div>
     );
@@ -271,14 +274,21 @@ function StatusCard({ config, loading }) {
             </div>
             <div className="text-ink-700">
                 <div><span className="text-ink-500">Shortcode:</span> <span className="font-mono">{config.shortcode}</span> ({config.shortcode_type})</div>
-                {config.payhero_channel_id && (
-                    <div><span className="text-ink-500">Pay Hero channel:</span> <span className="font-mono">{config.payhero_channel_id}</span></div>
-                )}
                 <div><span className="text-ink-500">Settles to:</span> <span className="font-mono">{config.settlement_bank_name} · {config.settlement_account_number}</span></div>
                 {config.uses_per_tenant_creds && (
                     <div className="text-xs text-emerald-700">Using per-tenant Pay Hero credentials.</div>
                 )}
             </div>
+            {config.payhero_channel_id ? (
+                <div className="text-xs inline-flex items-center gap-1.5 text-emerald-700 pt-2 border-t border-ink-100 w-full">
+                    <CheckCircle2 size={14} /> Pay Hero channel linked by MediFleet — M-Pesa is live.
+                </div>
+            ) : (
+                <div className="text-xs inline-flex items-start gap-1.5 text-amber-700 pt-2 border-t border-ink-100 w-full">
+                    <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                    Awaiting MediFleet to link your Pay Hero channel. M-Pesa stays disabled until then.
+                </div>
+            )}
         </div>
     );
 }

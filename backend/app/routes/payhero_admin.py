@@ -123,7 +123,12 @@ def update_payhero_config(
 
     config.shortcode = payload.shortcode.strip()
     config.shortcode_type = payload.shortcode_type
-    config.payhero_channel_id = (payload.payhero_channel_id or "").strip() or None
+    # The Pay Hero channel id is provisioned by the platform operator (MediFleet),
+    # not the hospital — Pay Hero assigns it during till onboarding. Only
+    # overwrite it when a value is explicitly supplied (operator/API call) so a
+    # hospital saving its shortcode + bank can never clear an operator-wired id.
+    if payload.payhero_channel_id:
+        config.payhero_channel_id = payload.payhero_channel_id.strip()
     config.settlement_bank_code = payload.settlement_bank_code
     config.settlement_bank_name = name_for(payload.settlement_bank_code) or payload.settlement_bank_code
     config.settlement_account_number = payload.settlement_account_number.strip()
