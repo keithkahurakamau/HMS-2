@@ -7,7 +7,7 @@ import {
     LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
     ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy,
-    BookOpen, Smartphone,
+    BookOpen, Smartphone, HelpCircle,
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -21,39 +21,41 @@ export default function MainLayout() {
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { branding } = useBranding();
-    const { startJourney, activeKey } = useJourney();
+    const { startJourney, forceStartJourney, activeKey } = useJourney();
 
     // Route → module-key map for the on-first-visit tour. The path prefix
     // match handles deep links like /app/patients/123 → 'patients'.
+    const ROUTE_TO_JOURNEY = [
+        ['/app/admin',           'admin'],
+        ['/app/patients',        'patients'],
+        ['/app/clinical',        'clinical'],
+        ['/app/laboratory',      'laboratory'],
+        ['/app/radiology',       'radiology'],
+        ['/app/pharmacy',        'pharmacy'],
+        ['/app/inventory',       'inventory'],
+        ['/app/wards',           'wards'],
+        ['/app/billing',         'billing'],
+        ['/app/cheques',         'cheques'],
+        ['/app/medical-history', 'medical_history'],
+        ['/app/appointments',    'appointments'],
+        ['/app/messages',        'messages'],
+        ['/app/settings',        'settings'],
+        ['/app/branding',        'branding'],
+        ['/app/accounting',      'accounting'],
+        ['/app/support',         'support'],
+        ['/app/payhero-settings','payhero'],
+        ['/app/dashboard',       'dashboard'],
+        ['/app',                 'dashboard'],   // role-redirect fallback
+    ];
+    const currentJourneyKey = ROUTE_TO_JOURNEY.find(
+        ([prefix]) => location.pathname.startsWith(prefix)
+    )?.[1] || null;
+
     useEffect(() => {
-        const map = [
-            ['/app/admin',           'admin'],
-            ['/app/patients',        'patients'],
-            ['/app/clinical',        'clinical'],
-            ['/app/laboratory',      'laboratory'],
-            ['/app/radiology',       'radiology'],
-            ['/app/pharmacy',        'pharmacy'],
-            ['/app/inventory',       'inventory'],
-            ['/app/wards',           'wards'],
-            ['/app/billing',         'billing'],
-            ['/app/cheques',         'cheques'],
-            ['/app/medical-history', 'medical_history'],
-            ['/app/appointments',    'appointments'],
-            ['/app/messages',        'messages'],
-            ['/app/settings',        'settings'],
-            ['/app/branding',        'branding'],
-            ['/app/accounting',      'accounting'],
-            ['/app/support',         'support'],
-            ['/app/payhero-settings','payhero'],
-            ['/app/dashboard',       'dashboard'],
-            ['/app',                 'dashboard'],   // role-redirect fallback
-        ];
-        const key = map.find(([prefix]) => location.pathname.startsWith(prefix))?.[1];
-        if (!key || activeKey) return;
-        // Defer so the page DOM has time to mount its data-tour anchors.
-        const id = setTimeout(() => startJourney(key), 750);
+        if (!currentJourneyKey || activeKey) return;
+        const id = setTimeout(() => startJourney(currentJourneyKey), 750);
         return () => clearTimeout(id);
-    }, [location.pathname, startJourney, activeKey]);
+    }, [currentJourneyKey, startJourney, activeKey]);
 
     // Get the dynamic hospital name from the portal selection
     const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
@@ -210,10 +212,23 @@ export default function MainLayout() {
                             </span>
                             <span className="text-2xs font-semibold text-accent-700 dark:text-accent-400 uppercase tracking-wider">System Online</span>
                         </div>
-                        <NotificationBell />
+                        {currentJourneyKey && (
+                            <button
+                                type="button"
+                                data-tour="topbar-help"
+                                onClick={() => forceStartJourney(currentJourneyKey)}
+                                aria-label="Replay the tour for this page"
+                                title="Replay tour for this page"
+                                className="hidden sm:inline-flex p-2 rounded-lg text-ink-500 hover:text-brand-700 hover:bg-brand-50 dark:text-ink-400 dark:hover:text-brand-300 dark:hover:bg-brand-900/20 transition-colors"
+                            >
+                                <HelpCircle size={18} />
+                            </button>
+                        )}
+                        <div data-tour="topbar-notifications"><NotificationBell /></div>
                         <ThemeToggle compact />
                         <div className="hidden sm:block w-px h-6 bg-ink-200 dark:bg-ink-800" />
                         <button
+                            data-tour="topbar-signout"
                             onClick={logout}
                             aria-label="Sign out"
                             className="flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-red-600 dark:text-ink-400 dark:hover:text-red-400 transition-colors px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"

@@ -435,7 +435,7 @@ export default function Patients() {
             />
 
             {/* ── Stat strip ──────────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div data-tour="patients-stats" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 <DirectoryStat label="Active patients"      value={stats.total}          icon={Users}        accent="brand" />
                 <DirectoryStat label="Registered today"     value={stats.today}          icon={UserPlus}     accent="accent" />
                 <DirectoryStat label="Female"               value={stats.female}         icon={Users}        accent="rose" />
@@ -457,7 +457,7 @@ export default function Patients() {
                         className="input pl-10"
                     />
                 </div>
-                <div className="flex items-center gap-2" role="tablist" aria-label="Filter by sex">
+                <div data-tour="patients-filter-chips" className="flex items-center gap-2" role="tablist" aria-label="Filter by sex">
                     {['', 'Male', 'Female'].map(s => (
                         <button
                             key={s || 'all'}
@@ -566,7 +566,7 @@ export default function Patients() {
 
                                             {/* Route to queue */}
                                             <td className="px-5 py-3 align-top">
-                                                <div className="flex flex-wrap gap-1">
+                                                <div data-tour="patient-row-route-chips" className="flex flex-wrap gap-1">
                                                     {ROUTE_TARGETS.map(t => {
                                                         const Icon = t.icon;
                                                         const busy = routingId === `${patient.patient_id}:${t.department}`;
@@ -594,6 +594,7 @@ export default function Patients() {
                                             <td className="px-5 py-3 text-right align-top">
                                                 <button
                                                     type="button"
+                                                    data-tour="patient-row-more"
                                                     onClick={(e) => toggleDropdown(patient.patient_id, e)}
                                                     aria-label={`More actions for ${patient.surname}, ${patient.other_names}`}
                                                     aria-haspopup="menu"
