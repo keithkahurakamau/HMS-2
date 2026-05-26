@@ -242,7 +242,7 @@ export default function Cheques() {
                 actions={
                     <>
                         <button onClick={fetchAll} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
-                        <button onClick={openNewModal} className="btn-primary cursor-pointer">
+                        <button onClick={openNewModal} data-tour="cheque-new" className="btn-primary cursor-pointer">
                             <Plus size={15} /> {direction === 'incoming' ? 'Record cheque' : 'Issue cheque'}
                         </button>
                     </>
@@ -252,7 +252,7 @@ export default function Cheques() {
             {/* Direction tabs — incoming (received) vs outgoing (issued).
                 Sticky inside the page so the user can scan a long table
                 without losing the tab strip. */}
-            <div className="inline-flex p-1 rounded-2xl bg-ink-100/70 ring-1 ring-ink-200/60 shadow-soft">
+            <div data-tour="cheque-direction-tabs" className="inline-flex p-1 rounded-2xl bg-ink-100/70 ring-1 ring-ink-200/60 shadow-soft">
                 <button
                     type="button"
                     onClick={() => switchDirection('incoming')}
@@ -278,7 +278,7 @@ export default function Cheques() {
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div data-tour="cheque-kpis" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {kpiTiles.map((tile) => {
                     const s = summary[tile.key] || { count: 0, total: 0 };
                     const ring = {
@@ -305,7 +305,7 @@ export default function Cheques() {
 
             {/* Filters */}
             <div className="card p-3 flex flex-wrap gap-3 items-center">
-                <div className="relative flex-1 min-w-[16rem]">
+                <div data-tour="cheque-search" className="relative flex-1 min-w-[16rem]">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                     <input type="text"
                            placeholder={direction === 'incoming' ? 'Cheque #, drawer, bank…' : 'Cheque #, payee, bank…'}
@@ -376,7 +376,7 @@ export default function Cheques() {
                                             {counterpartyDate ? new Date(counterpartyDate).toLocaleDateString() : '—'}
                                         </td>
                                         <td><span className={meta.badge}>{c.status}</span></td>
-                                        <td className="text-right">
+                                        <td data-tour="cheque-row-actions" className="text-right">
                                             <button onClick={() => setActive(c)} className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded" aria-label="View">
                                                 <Eye size={15} />
                                             </button>
