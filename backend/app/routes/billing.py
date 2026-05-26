@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.config.database import get_db
-from app.models.billing import Invoice, Payment
+from app.models.billing import Invoice, InvoiceItem, Payment
 from app.core.idempotency import idempotent_guard
 from app.schemas.billing import PaymentRequest, InvoiceResponse
 from app.core.dependencies import get_current_user, RequirePermission
