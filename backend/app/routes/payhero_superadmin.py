@@ -184,6 +184,13 @@ def test_tenant_stk(
 ):
     """Send a real KES 1 STK push using the tenant's saved wiring to verify it
     end-to-end. Records the outcome on the tenant's config."""
+    tenant = (
+        master_db.query(Tenant)
+        .filter(Tenant.tenant_id == tenant_id, Tenant.is_active == True)  # noqa: E712
+        .first()
+    )
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found or inactive.")
     with _tenant_session(tenant_id, master_db) as db:
         config = db.query(PayHeroConfig).first()
         if not config:
@@ -196,6 +203,7 @@ def test_tenant_stk(
                 invoice_id=None,
                 account_reference="TEST",
                 transaction_desc="MediFleet Pay Hero test",
+                callback_tenant=tenant.db_name,
             )
             config.last_test_at = datetime.utcnow()
             config.last_test_status = "STK Push Sent"

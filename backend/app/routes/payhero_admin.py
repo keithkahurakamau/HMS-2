@@ -168,6 +168,7 @@ def test_stk(
             invoice_id=None,
             account_reference="TEST",
             transaction_desc="MediFleet Pay Hero test",
+            callback_tenant=request.headers.get("X-Tenant-ID"),
         )
         config.last_test_at = datetime.utcnow()
         config.last_test_status = "STK Push Sent"

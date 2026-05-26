@@ -62,6 +62,7 @@ def trigger_stk_push(
         phone_number=payload.phone_number,
         amount=payload.amount,
         invoice_id=payload.invoice_id,
+        callback_tenant=request.headers.get("X-Tenant-ID"),
     )
 
 
@@ -105,11 +106,18 @@ def invoice_payment_status(invoice_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/callback")
+@router.post("/callback/{tenant_db}")
 async def payhero_callback(
     request: Request,
     background_tasks: BackgroundTasks,
+    tenant_db: str = "",
 ):
     """Receive a Pay Hero callback, verify it, and queue it for processing.
+
+    The tenant is taken from the URL path (``/callback/{tenant_db}``) — that
+    segment was baked into the callback URL at STK-push time, because Pay Hero
+    echoes the URL back but cannot send our ``X-Tenant-ID`` header. We fall
+    back to the header for any legacy push that used the bare ``/callback``.
 
     The HTTP response is fast (verify + 200) so Pay Hero never times out and
     retries. State mutations happen in a background task that takes an
@@ -123,19 +131,51 @@ async def payhero_callback(
         logger.error("Pay Hero webhook had non-JSON body after signature check passed")
         return {"status": "ignored", "reason": "non-json"}
 
-    logger.info("Pay Hero callback verified: %s", safe_repr(payload))
+    logger.info("Pay Hero callback verified (tenant=%s): %s", tenant_db or "?", safe_repr(payload))
 
-    tenant_db = request.headers.get("X-Tenant-ID", "")
-    background_tasks.add_task(_apply_callback_async, payload, tenant_db)
+    resolved = _resolve_tenant_db(tenant_db or request.headers.get("X-Tenant-ID", ""))
+    if not resolved:
+        # No recognised tenant means we have nowhere to apply the receipt.
+        # ACK 200 so Pay Hero doesn't hammer retries, but surface it loudly —
+        # an operator needs to reconcile it manually.
+        logger.error(
+            "Pay Hero callback could not be routed to a tenant (path/header gave %r). "
+            "Receipt will not auto-settle.", tenant_db,
+        )
+        return {"status": "ignored", "reason": "unknown-tenant"}
+
+    background_tasks.add_task(_apply_callback_async, payload, resolved)
     return {"status": "queued"}
+
+
+def _resolve_tenant_db(candidate: str) -> str | None:
+    """Validate a tenant db_name against the master registry before we open an
+    engine against it — defends against connecting to an arbitrary database
+    name and confirms the tenant is real + active."""
+    candidate = (candidate or "").strip()
+    if not candidate:
+        return None
+    from app.config.database import MasterSessionLocal
+    from app.models.master import Tenant
+
+    master = MasterSessionLocal()
+    try:
+        t = (
+            master.query(Tenant)
+            .filter(Tenant.db_name == candidate, Tenant.is_active == True)  # noqa: E712
+            .first()
+        )
+        return candidate if t else None
+    except Exception:  # noqa: BLE001 — master lookup must never crash the webhook
+        logger.exception("Pay Hero callback tenant lookup failed for %r", candidate)
+        return None
+    finally:
+        master.close()
 
 
 def _open_tenant_session(tenant_db: str) -> Session:
     from sqlalchemy.orm import sessionmaker
-    from app.config.database import DefaultSessionLocal
 
-    if not tenant_db:
-        return DefaultSessionLocal()
     engine = get_tenant_engine(tenant_db)
     return sessionmaker(autocommit=False, autoflush=False, bind=engine)()
 
