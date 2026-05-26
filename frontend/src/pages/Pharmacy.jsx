@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
 import MpesaStkProgress from '../components/MpesaStkProgress';
+import usePaymentSocket from '../hooks/usePaymentSocket';
 
 export default function Pharmacy() {
     // --- APP STATE ---
@@ -841,6 +842,21 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
 
         return () => { clearInterval(tick); clearInterval(poll); };
     }, [mpesaStatus, dispenseId, onSettled]);
+
+    // Live push — flips the modal the instant the webhook settles, ahead of
+    // the next poll. Polling above stays as the fallback.
+    usePaymentSocket(mpesaStatus === 'waiting', (data) => {
+        if (mpesaStatus !== 'waiting' || data.dispense_id !== dispenseId) return;
+        if (data.status === 'Success') {
+            setMpesaReceipt(data.receipt_number);
+            setMpesaStatus('success');
+            toast.success(`M-Pesa receipt ${data.receipt_number || ''} confirmed.`);
+            setTimeout(onSettled, 1800);
+        } else if (data.status === 'Failed') {
+            setMpesaStatus('failed');
+            setMpesaError(data.result_desc || 'Cancelled by the customer.');
+        }
+    });
 
     const retry = () => {
         setMpesaStatus(null);

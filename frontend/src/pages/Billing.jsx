@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { printInvoice } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
 import MpesaStkProgress from '../components/MpesaStkProgress';
+import usePaymentSocket from '../hooks/usePaymentSocket';
 
 const STK_TIMEOUT = 60;   // seconds the customer has to enter their PIN
 const POLL_MS = 3000;     // how often we re-check our own DB for the receipt
@@ -94,18 +95,9 @@ export default function Billing() {
                 const res = await apiClient.get(`/payments/payhero/invoice-status/${invoiceId}`);
                 const { invoice_status, mpesa_status, mpesa_receipt_number, mpesa_result_desc } = res.data;
                 if (invoice_status === 'Paid' || mpesa_status === 'Success') {
-                    stopMpesa();
-                    setMpesaReceipt(mpesa_receipt_number);
-                    setMpesaStatus('success');
-                    setIsProcessing(false);
-                    toast.success('M-Pesa payment received successfully!');
-                    // Hold the success tick briefly, then return to the queue.
-                    setTimeout(() => { setActiveInvoice(null); resetMpesa(); fetchQueue(); }, 1800);
+                    markMpesaSuccess(mpesa_receipt_number);
                 } else if (mpesa_status === 'Failed') {
-                    stopMpesa();
-                    setMpesaStatus('failed');
-                    setMpesaError(mpesa_result_desc || 'Cancelled by the customer.');
-                    setIsProcessing(false);
+                    markMpesaFailed(mpesa_result_desc);
                 }
             } catch (error) {
                 // Transient network error — keep polling until the countdown ends.
@@ -121,6 +113,34 @@ export default function Billing() {
         setSecondsLeft(STK_TIMEOUT);
         setIsProcessing(false);
     };
+
+    // Terminal handlers, shared by the DB poll and the live WebSocket so both
+    // paths resolve the checkout identically (whichever fires first wins; the
+    // second is a no-op because the timers are already stopped).
+    const markMpesaSuccess = (receipt) => {
+        stopMpesa();
+        setMpesaReceipt(receipt || null);
+        setMpesaStatus('success');
+        setIsProcessing(false);
+        toast.success('M-Pesa payment received successfully!');
+        setTimeout(() => { setActiveInvoice(null); resetMpesa(); fetchQueue(); }, 1800);
+    };
+
+    const markMpesaFailed = (desc) => {
+        stopMpesa();
+        setMpesaStatus('failed');
+        setMpesaError(desc || 'Cancelled by the customer.');
+        setIsProcessing(false);
+    };
+
+    // Live push — flips the screen the instant the webhook settles, instead of
+    // waiting up to POLL_MS. Polling above stays as the fallback.
+    usePaymentSocket(mpesaStatus === 'waiting', (data) => {
+        if (mpesaStatus !== 'waiting' || !activeInvoice) return;
+        if (data.invoice_id !== activeInvoice.invoice_id) return;
+        if (data.status === 'Success') markMpesaSuccess(data.receipt_number);
+        else if (data.status === 'Failed') markMpesaFailed(data.result_desc);
+    });
 
     const handleProcessPayment = async (e) => {
         e.preventDefault();
@@ -297,19 +317,6 @@ export default function Billing() {
 
                                 <div>
                                     <h3 className="section-eyebrow mb-3 border-b border-ink-100 pb-2">Receive payment</h3>
-                                    {mpesaStatus ? (
-                                        <div className="card p-5 sm:p-6">
-                                            <MpesaStkProgress
-                                                status={mpesaStatus}
-                                                phone={mpesaPhone}
-                                                secondsLeft={secondsLeft}
-                                                total={STK_TIMEOUT}
-                                                receipt={mpesaReceipt}
-                                                errorDesc={mpesaError}
-                                                onRetry={resetMpesa}
-                                            />
-                                        </div>
-                                    ) : (
                                     <form onSubmit={handleProcessPayment} className="card p-5 sm:p-6">
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
                                             {[
@@ -360,7 +367,6 @@ export default function Billing() {
                                             {paymentMethod === 'M-Pesa' ? 'Trigger M-Pesa STK Push' : 'Confirm payment & close bill'}
                                         </button>
                                     </form>
-                                    )}
                                 </div>
                             </div>
                         </div>
@@ -373,6 +379,40 @@ export default function Billing() {
                     )}
                 </div>
             </div>
+
+            {/* --- M-PESA PROCESSING OVERLAY (full-screen, matches pharmacy) --- */}
+            {mpesaStatus && (
+                <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-elevated w-full max-w-md">
+                        <div className="flex items-center justify-between p-4 border-b border-ink-100">
+                            <div>
+                                <h3 className="text-sm font-semibold text-ink-900">M-Pesa payment</h3>
+                                {activeInvoice && (
+                                    <p className="text-xs text-ink-500">
+                                        {activeInvoice.patient_name} · Invoice #{activeInvoice.invoice_id}
+                                    </p>
+                                )}
+                            </div>
+                            {mpesaStatus !== 'waiting' && (
+                                <button onClick={resetMpesa} className="text-ink-400 hover:text-ink-700" aria-label="Close">
+                                    <X size={18} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="p-2">
+                            <MpesaStkProgress
+                                status={mpesaStatus}
+                                phone={mpesaPhone}
+                                secondsLeft={secondsLeft}
+                                total={STK_TIMEOUT}
+                                receipt={mpesaReceipt}
+                                errorDesc={mpesaError}
+                                onRetry={resetMpesa}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* --- M-PESA LEDGER MODAL --- */}
             {isLedgerOpen && (

@@ -201,7 +201,7 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
 
         if not receipt_no and result_code not in (0, "0"):
             logger.info("Pay Hero callback failure or no-receipt: %s", safe_repr(resp))
-            _mark_failed(db, external_ref, result_desc)
+            _mark_failed(db, external_ref, result_desc, tenant_db)
             return
 
         lock_id = int(hashlib.sha1((receipt_no or external_ref).encode()).hexdigest()[:15], 16)
@@ -271,10 +271,14 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
                     txn=txn,
                     match_basis="external_reference",
                 )
+        snapshot = _txn_snapshot(txn)
         try:
             db.commit()
         except IntegrityError:
             db.rollback()
+            snapshot = None
+        if snapshot:
+            _notify_payment(tenant_db, snapshot)
     except Exception:  # noqa: BLE001 — never propagate from the background task
         db.rollback()
         logger.exception("Pay Hero callback worker raised")
@@ -282,7 +286,7 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
         db.close()
 
 
-def _mark_failed(db: Session, external_ref: str, desc: str) -> None:
+def _mark_failed(db: Session, external_ref: str, desc: str, tenant_db: str = "") -> None:
     if not external_ref:
         return
     txn = (
@@ -299,4 +303,33 @@ def _mark_failed(db: Session, external_ref: str, desc: str) -> None:
     if txn:
         txn.status = "Failed"
         txn.result_desc = (desc or "Failed")[:255]
+        snapshot = _txn_snapshot(txn)
         db.commit()
+        _notify_payment(tenant_db, snapshot)
+
+
+def _txn_snapshot(txn: PayHeroTransaction) -> dict[str, Any]:
+    """Plain-value snapshot taken before commit (avoids a post-commit reload)
+    so we can broadcast the outcome after the session closes."""
+    return {
+        "type": "payment_update",
+        "invoice_id": txn.invoice_id,
+        "dispense_id": txn.dispense_id,
+        "external_reference": txn.external_reference,
+        "status": txn.status,
+        "receipt_number": txn.receipt_number,
+        "result_desc": txn.result_desc,
+        "amount": float(txn.amount or 0),
+    }
+
+
+def _notify_payment(tenant_db: str, snapshot: dict[str, Any] | None) -> None:
+    """Push a live payment update to the tenant's checkout screens. Best-effort:
+    a failure here must never affect settlement (polling is the fallback)."""
+    if not tenant_db or not snapshot:
+        return
+    try:
+        from app.core.websocket import manager
+        manager.publish_topic_threadsafe(f"payment:{tenant_db}", {**snapshot, "tenant": tenant_db})
+    except Exception:  # noqa: BLE001
+        logger.exception("Payment WS notify failed for tenant=%s", tenant_db)

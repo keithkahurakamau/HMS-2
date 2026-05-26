@@ -83,6 +83,7 @@ def _auto_migrate_on_boot() -> None:
 async def lifespan(app: FastAPI):
     # Boot: optionally bring schemas up to head, then warm up WebSocket pubsub.
     _auto_migrate_on_boot()
+    ws_manager.bind_loop()
     await ws_manager.init_redis()
     if not settings.REDIS_URL:
         logger.warning("REDIS_URL not configured. WebSocket broadcasts will not span workers.")
