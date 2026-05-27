@@ -8,20 +8,18 @@ import {
 import PageHeader from '../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Pay Hero settings — per-tenant admin.                                    */
-/*  Each tenant pastes the Safaricom shortcode (their existing PayBill or    */
-/*  Buy-Goods till), the Pay Hero channel id assigned to that shortcode,    */
-/*  and picks the settlement bank + account number where Pay Hero deposits  */
-/*  proceeds. Optional per-tenant Pay Hero API creds override the platform  */
-/*  default.                                                                 */
+/*  M-Pesa payment settings — hospital-facing.                                */
+/*                                                                            */
+/*  The hospital enters only its OWN Safaricom till (PayBill / Buy-Goods)     */
+/*  and the bank account where proceeds settle. The payment aggregator that   */
+/*  MediFleet uses behind the scenes is never surfaced here — activation is   */
+/*  handled by the MediFleet team, and this page simply reflects whether      */
+/*  M-Pesa is live for the hospital.                                          */
 /* ────────────────────────────────────────────────────────────────────────── */
 
 const empty = {
     shortcode: '',
     shortcode_type: 'paybill',
-    payhero_channel_id: '',
-    payhero_username: '',
-    payhero_password: '',
     settlement_bank_code: '',
     settlement_account_number: '',
     settlement_account_name: '',
@@ -29,9 +27,9 @@ const empty = {
     transaction_desc: 'Hospital Bill Payment',
 };
 
-export default function PayHeroSettings() {
+export default function MpesaSettings() {
     const [config, setConfig] = useState(null); // server-side public view
-    const [form, setForm] = useState(empty);    // editor state (with secrets)
+    const [form, setForm] = useState(empty);     // editor state
     const [banks, setBanks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -52,7 +50,6 @@ export default function PayHeroSettings() {
                     ...f,
                     shortcode: cfg.data.shortcode || '',
                     shortcode_type: cfg.data.shortcode_type || 'paybill',
-                    payhero_channel_id: cfg.data.payhero_channel_id || '',
                     settlement_bank_code: cfg.data.settlement_bank_code || '',
                     settlement_account_number: cfg.data.settlement_account_number || '',
                     settlement_account_name: cfg.data.settlement_account_name || '',
@@ -61,7 +58,7 @@ export default function PayHeroSettings() {
                 }));
             }
         } catch (err) {
-            toast.error(err?.response?.data?.detail || 'Could not load Pay Hero config.');
+            toast.error(err?.response?.data?.detail || 'Could not load M-Pesa settings.');
         } finally { setLoading(false); }
     };
     useEffect(() => { load(); }, []);
@@ -73,10 +70,7 @@ export default function PayHeroSettings() {
         setSaving(true);
         try {
             await apiClient.post('/admin/payhero/config', form);
-            toast.success('Pay Hero configuration saved.');
-            // Clear creds from the editor — they're encrypted server-side and
-            // we deliberately don't echo them back.
-            setForm(f => ({ ...f, payhero_username: '', payhero_password: '' }));
+            toast.success('M-Pesa settings saved.');
             load();
         } catch (err) {
             toast.error(err?.response?.data?.detail || 'Could not save.');
@@ -84,14 +78,14 @@ export default function PayHeroSettings() {
     };
 
     const testStk = async () => {
-        if (!testPhone) return toast.error('Enter a phone number to send the test STK to.');
+        if (!testPhone) return toast.error('Enter a phone number to send the test prompt to.');
         setTesting(true);
         try {
-            const r = await apiClient.post('/admin/payhero/test-stk', { phone_number: testPhone });
-            toast.success(`STK push sent. reference: ${r.data?.reference || r.data?.external_reference || '—'}`);
+            await apiClient.post('/admin/payhero/test-stk', { phone_number: testPhone });
+            toast.success(`Test M-Pesa prompt sent to ${testPhone}.`);
             load();
         } catch (err) {
-            toast.error(err?.response?.data?.detail || 'Test STK push failed.');
+            toast.error(err?.response?.data?.detail || 'Test prompt failed.');
             load();
         } finally { setTesting(false); }
     };
@@ -101,20 +95,20 @@ export default function PayHeroSettings() {
             <PageHeader
                 eyebrow="Finance"
                 icon={Smartphone}
-                title="Pay Hero Settings"
-                subtitle="Wire this hospital's Safaricom till to MediFleet through the Pay Hero aggregator."
+                title="M-Pesa Payments"
+                subtitle="Connect this hospital's Safaricom till so you can collect M-Pesa at the till and pharmacy."
                 tone="brand"
             />
 
-            <PayHeroChecklist />
+            <MpesaChecklist />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Editor */}
                 <div className="lg:col-span-2 bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5">
                     <SectionHead icon={Hash} title="Your Safaricom shortcode" />
                     <p className="text-xs text-ink-500 -mt-3">
-                        Enter the PayBill or Buy-Goods Till you already own. Pay Hero will
-                        route payments made to this shortcode into MediFleet.
+                        Enter the PayBill or Buy-Goods Till you already own. Payments made
+                        to this shortcode are routed into MediFleet.
                     </p>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -130,17 +124,17 @@ export default function PayHeroSettings() {
                                 <option value="till">Buy Goods / Till (no account #)</option>
                             </select>
                         </Field>
-                        <Field label="Pay Hero channel id">
-                            <input className="input" value={form.payhero_channel_id}
-                                   onChange={e => setForm({ ...form, payhero_channel_id: e.target.value })}
-                                   placeholder="copied from the Pay Hero dashboard" />
-                        </Field>
                     </div>
+                    <p className="text-xs text-ink-500 -mt-2 inline-flex items-start gap-1.5">
+                        <ShieldCheck size={13} className="mt-0.5 text-brand-600 shrink-0" />
+                        MediFleet activates M-Pesa for your till on its end — there's nothing
+                        else for you to set up or copy from anywhere.
+                    </p>
 
                     <SectionHead icon={Building2} title="Settlement bank" />
                     <p className="text-xs text-ink-500 -mt-3">
-                        Pay Hero deposits till proceeds into this bank account on the
-                        settlement schedule you agreed at onboarding.
+                        Proceeds are deposited into this bank account on the settlement
+                        schedule agreed at onboarding.
                     </p>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -176,48 +170,36 @@ export default function PayHeroSettings() {
                         </Field>
                     </div>
 
-                    <SectionHead icon={ShieldCheck} title="Per-tenant Pay Hero credentials (optional)" />
-                    <p className="text-xs text-ink-500 -mt-3">
-                        Leave blank to use MediFleet's platform Pay Hero account. Fill in
-                        only if you have your own Pay Hero merchant credentials — they're
-                        encrypted at rest and never echoed back.
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field label="Pay Hero username">
-                            <input className="input" type="password" value={form.payhero_username}
-                                   onChange={e => setForm({ ...form, payhero_username: e.target.value })} />
-                        </Field>
-                        <Field label="Pay Hero password">
-                            <input className="input" type="password" value={form.payhero_password}
-                                   onChange={e => setForm({ ...form, payhero_password: e.target.value })} />
-                        </Field>
-                    </div>
-
                     <div className="flex justify-end pt-2 border-t border-ink-100">
                         <button onClick={save} disabled={saving}
                                 className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
-                            {saving ? 'Saving…' : 'Save configuration'}
+                            {saving ? 'Saving…' : 'Save settings'}
                         </button>
                     </div>
                 </div>
 
-                {/* Sidebar: test + status */}
+                {/* Sidebar: status + test */}
                 <div className="space-y-4">
                     <StatusCard config={config} loading={loading} />
 
                     <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-5 space-y-3">
-                        <SectionHead icon={Send} title="Send a test STK push" />
+                        <SectionHead icon={Send} title="Send a test M-Pesa prompt" />
                         <p className="text-xs text-ink-500">
-                            Sends a real KES&nbsp;1 prompt to the phone below using the saved
-                            credentials. Doesn't actually charge — the customer can decline.
+                            Sends a real KES&nbsp;1 prompt to the phone below. It doesn't
+                            actually charge — the customer can decline.
                         </p>
                         <input className="input" value={testPhone}
                                onChange={e => setTestPhone(e.target.value)}
                                placeholder="07XXXXXXXX or 2547XXXXXXXX" />
-                        <button onClick={testStk} disabled={testing || !config?.configured}
+                        <button onClick={testStk} disabled={testing || !config?.mpesa_active}
                                 className="w-full px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                             {testing ? 'Sending…' : 'Send test'}
                         </button>
+                        {config?.configured && !config?.mpesa_active && (
+                            <p className="text-xs text-amber-700">
+                                The test prompt unlocks once MediFleet activates M-Pesa for your till.
+                            </p>
+                        )}
                         {config?.last_test_at && (
                             <div className="text-xs text-ink-600 pt-2 border-t border-ink-100">
                                 <div>Last: <span className="font-mono">{new Date(config.last_test_at).toLocaleString()}</span></div>
@@ -235,7 +217,7 @@ export default function PayHeroSettings() {
 }
 
 
-function PayHeroChecklist() {
+function MpesaChecklist() {
     return (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
             <h3 className="text-sm font-semibold text-amber-900 mb-2 inline-flex items-center gap-2">
@@ -243,9 +225,9 @@ function PayHeroChecklist() {
             </h3>
             <ol className="list-decimal pl-5 text-sm text-amber-900 space-y-1">
                 <li>You must already have a Safaricom <strong>PayBill or Buy Goods Till</strong>. Tills are issued via Safaricom Business support and require business registration + KRA PIN.</li>
-                <li>Onboard with <strong>Pay Hero</strong> (<code className="bg-amber-100 px-1">payhero.co.ke</code>) and link the till above to a Pay Hero channel. Paste the channel id here.</li>
-                <li>Select the bank account where Pay Hero should settle proceeds. The schedule (daily / weekly) is configured inside the Pay Hero dashboard.</li>
-                <li>After saving, send a test KES&nbsp;1 STK push to your own number to verify the link end-to-end.</li>
+                <li>Enter that shortcode and your settlement bank below, then save. <strong>MediFleet</strong> takes care of activating M-Pesa for your till on its end.</li>
+                <li>The settlement schedule (daily / weekly) is agreed during onboarding and managed by MediFleet.</li>
+                <li>Once MediFleet confirms M-Pesa is active, send a test KES&nbsp;1 prompt to your own number to verify end-to-end.</li>
             </ol>
         </div>
     );
@@ -259,7 +241,7 @@ function StatusCard({ config, loading }) {
                 <AlertCircle size={16} className="mt-0.5" />
                 <div>
                     <div className="font-semibold">Not configured</div>
-                    <div className="text-xs mt-1">Fill out the form and click Save to enable M-Pesa payments via Pay Hero.</div>
+                    <div className="text-xs mt-1">Fill out the form and click Save to start setting up M-Pesa payments.</div>
                 </div>
             </div>
         );
@@ -267,18 +249,22 @@ function StatusCard({ config, loading }) {
     return (
         <div className="bg-white border border-ink-200/70 rounded-2xl p-5 text-sm space-y-2">
             <div className="flex items-center gap-2 font-semibold text-emerald-700">
-                <CheckCircle2 size={16} /> Configured
+                <CheckCircle2 size={16} /> Saved
             </div>
             <div className="text-ink-700">
                 <div><span className="text-ink-500">Shortcode:</span> <span className="font-mono">{config.shortcode}</span> ({config.shortcode_type})</div>
-                {config.payhero_channel_id && (
-                    <div><span className="text-ink-500">Pay Hero channel:</span> <span className="font-mono">{config.payhero_channel_id}</span></div>
-                )}
                 <div><span className="text-ink-500">Settles to:</span> <span className="font-mono">{config.settlement_bank_name} · {config.settlement_account_number}</span></div>
-                {config.uses_per_tenant_creds && (
-                    <div className="text-xs text-emerald-700">Using per-tenant Pay Hero credentials.</div>
-                )}
             </div>
+            {config.mpesa_active ? (
+                <div className="text-xs inline-flex items-center gap-1.5 text-emerald-700 pt-2 border-t border-ink-100 w-full">
+                    <CheckCircle2 size={14} /> M-Pesa is live — you can collect payments at the till and pharmacy.
+                </div>
+            ) : (
+                <div className="text-xs inline-flex items-start gap-1.5 text-amber-700 pt-2 border-t border-ink-100 w-full">
+                    <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                    Awaiting MediFleet to activate M-Pesa for your till. Collection stays disabled until then.
+                </div>
+            )}
         </div>
     );
 }
