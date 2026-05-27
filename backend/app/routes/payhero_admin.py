@@ -30,7 +30,6 @@ from app.services.payhero_service import (
     initiate_stk_push,
     settle_invoice_match,
 )
-from app.utils.encryption import encrypt_data
 
 router = APIRouter(prefix="/api/admin/payhero", tags=["Payments — Pay Hero Admin"])
 
@@ -39,12 +38,13 @@ router = APIRouter(prefix="/api/admin/payhero", tags=["Payments — Pay Hero Adm
 
 
 class PayHeroConfigSchema(BaseModel):
+    """Hospital-facing M-Pesa settings — their own Safaricom till + settlement
+    bank only. The Pay Hero channel id and aggregator credentials are NOT
+    accepted here; only the platform operator provisions those (via the
+    superadmin route). A hospital admin can never read or set them."""
+
     shortcode: str = Field(min_length=4, max_length=20)
     shortcode_type: str = Field(default="paybill", pattern="^(paybill|till)$")
-    payhero_channel_id: Optional[str] = Field(default=None, max_length=40)
-    # Optional per-tenant Pay Hero API creds; blank = use platform default.
-    payhero_username: Optional[str] = None
-    payhero_password: Optional[str] = None
     # Settlement bank
     settlement_bank_code: str = Field(min_length=2, max_length=20)
     settlement_account_number: str = Field(min_length=4, max_length=40)
@@ -75,13 +75,18 @@ def list_banks(_user: dict = Depends(get_current_user)):
 
 
 def _public_view(config: PayHeroConfig | None) -> dict:
+    """Hospital-facing view. Deliberately exposes no Pay Hero internals — the
+    aggregator channel + credentials are reduced to a single ``mpesa_active``
+    flag so the hospital sees only whether M-Pesa is live, never the wiring."""
     if not config:
-        return {"configured": False}
+        return {"configured": False, "mpesa_active": False}
     return {
         "configured": True,
+        # M-Pesa goes live once the operator has provisioned the Pay Hero
+        # channel for this tenant; the hospital sees the boolean, not the id.
+        "mpesa_active": bool(config.payhero_channel_id),
         "shortcode": config.shortcode,
         "shortcode_type": config.shortcode_type,
-        "payhero_channel_id": config.payhero_channel_id,
         "settlement_bank_code": config.settlement_bank_code,
         "settlement_bank_name": config.settlement_bank_name,
         "settlement_account_number": config.settlement_account_number,
@@ -89,7 +94,6 @@ def _public_view(config: PayHeroConfig | None) -> dict:
         "account_reference": config.account_reference,
         "transaction_desc": config.transaction_desc,
         "is_active": config.is_active,
-        "uses_per_tenant_creds": bool(config.payhero_username_encrypted),
         "last_test_at": config.last_test_at.isoformat() if config.last_test_at else None,
         "last_test_status": config.last_test_status,
         "last_test_message": config.last_test_message,
@@ -121,21 +125,18 @@ def update_payhero_config(
         config = PayHeroConfig()
         db.add(config)
 
+    # Hospital writes only its own till + settlement bank + customisation.
+    # The Pay Hero channel id and aggregator credentials are never touched
+    # here — they are operator-provisioned via the superadmin route and left
+    # intact so a tenant save can neither set nor clear them.
     config.shortcode = payload.shortcode.strip()
     config.shortcode_type = payload.shortcode_type
-    config.payhero_channel_id = (payload.payhero_channel_id or "").strip() or None
     config.settlement_bank_code = payload.settlement_bank_code
     config.settlement_bank_name = name_for(payload.settlement_bank_code) or payload.settlement_bank_code
     config.settlement_account_number = payload.settlement_account_number.strip()
     config.settlement_account_name = (payload.settlement_account_name or "").strip() or None
     config.account_reference = payload.account_reference
     config.transaction_desc = payload.transaction_desc
-    # Only overwrite credential fields when the operator supplied non-blank
-    # values — submitting an empty string preserves what was already saved.
-    if payload.payhero_username:
-        config.payhero_username_encrypted = encrypt_data(payload.payhero_username)
-    if payload.payhero_password:
-        config.payhero_password_encrypted = encrypt_data(payload.payhero_password)
     config.updated_by = user["user_id"]
     config.is_active = True
 
@@ -167,6 +168,7 @@ def test_stk(
             invoice_id=None,
             account_reference="TEST",
             transaction_desc="MediFleet Pay Hero test",
+            callback_tenant=request.headers.get("X-Tenant-ID"),
         )
         config.last_test_at = datetime.utcnow()
         config.last_test_status = "STK Push Sent"

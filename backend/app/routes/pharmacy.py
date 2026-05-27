@@ -308,6 +308,7 @@ def collect_dispense_payment(
             amount=float(amt),
             invoice_id=invoice.invoice_id,
             dispense_id=dispense_id,
+            callback_tenant=request.headers.get("X-Tenant-ID"),
         )
     except HTTPException:
         raise

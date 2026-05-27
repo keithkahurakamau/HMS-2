@@ -26,7 +26,7 @@ const MODULE_LABELS = {
     billing: 'Billing',
     cheques: 'Cheques',
     medical_history: 'Medical History',
-    payhero: 'Pay Hero (M-Pesa)',
+    payhero: 'M-Pesa Payments',
     analytics: 'Analytics',
     patient_portal: 'Patient Portal',
     branding: 'Branding',

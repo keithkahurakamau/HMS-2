@@ -30,7 +30,7 @@ import Appointments from './pages/Appointments';
 import PatientPortal from './pages/PatientPortal';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
-import PayHeroSettings from './pages/PayHeroSettings';
+import MpesaSettings from './pages/MpesaSettings';
 import Cheques from './pages/Cheques';
 import Support from './pages/Support';
 import Landing from './pages/Landing';
@@ -45,6 +45,7 @@ import SuperAdminLayout from './components/layouts/SuperAdminLayout';
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import TenantsManager from './pages/superadmin/TenantsManager';
 import PlatformBilling from './pages/superadmin/PlatformBilling';
+import PaymentsManager from './pages/superadmin/PaymentsManager';
 import PlatformSettings from './pages/superadmin/PlatformSettings';
 import SuperAdminPatients from './pages/superadmin/SuperAdminPatients';
 import SupportInbox from './pages/superadmin/SupportInbox';
@@ -133,6 +134,7 @@ export default function App() {
             <Route path="patients" element={<SuperAdminPatients />} />
             <Route path="support" element={<SupportInbox />} />
             <Route path="billing" element={<PlatformBilling />} />
+            <Route path="payments" element={<PaymentsManager />} />
             <Route path="settings" element={<PlatformSettings />} />
             <Route path="*" element={<SuperAdminDashboard />} />
           </Route>
@@ -155,7 +157,7 @@ export default function App() {
             <Route path="billing" element={<ModuleGuard moduleKey="billing"><Billing /></ModuleGuard>} />
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="payhero-settings" element={<ModuleGuard moduleKey="payhero"><PayHeroSettings /></ModuleGuard>} />
+            <Route path="mpesa-settings" element={<ModuleGuard moduleKey="payhero"><MpesaSettings /></ModuleGuard>} />
             <Route path="branding" element={<ModuleGuard moduleKey="branding"><Branding /></ModuleGuard>} />
             <Route path="cheques" element={<ModuleGuard moduleKey="cheques"><Cheques /></ModuleGuard>} />
             <Route path="accounting" element={<ModuleGuard moduleKey="accounting"><Accounting /></ModuleGuard>} />

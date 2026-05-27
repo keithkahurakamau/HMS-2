@@ -30,3 +30,24 @@ async def websocket_endpoint(
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket, user_id)
+
+
+@router.websocket("/ws/payments/{tenant_db}")
+async def payments_websocket(websocket: WebSocket, tenant_db: str):
+    """Tenant-scoped live payment feed for the cashier / pharmacy checkout.
+
+    Authenticated by the access_token cookie; the token's tenant must match
+    ``tenant_db`` so a hospital only ever receives its own payment events.
+    The webhook publishes ``payment_update`` frames here the instant a receipt
+    settles, turning the checkout spinner into a success/failure state without
+    waiting for the next poll.
+    """
+    is_connected = await manager.connect_payment(websocket, tenant_db)
+    if not is_connected:
+        return
+    topic = f"payment:{tenant_db}"
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect_topic(websocket, topic)
