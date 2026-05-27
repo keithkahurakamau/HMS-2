@@ -20,6 +20,7 @@ import logging
 import secrets
 from decimal import Decimal
 from typing import Optional
+from urllib.parse import quote
 
 import requests
 from fastapi import HTTPException
@@ -83,13 +84,21 @@ def _format_msisdn(phone: str) -> str:
     return p
 
 
-def _callback_url() -> str:
+def _callback_url(tenant_db: Optional[str] = None) -> str:
+    """Per-push callback URL. The tenant's db_name is baked into the path so
+    the webhook can route the callback back to the right tenant database —
+    Pay Hero echoes exactly the URL we set here, and (unlike a header) it
+    survives the round-trip through Pay Hero's servers. Forgery is still
+    blocked by the HMAC signature check in core/payhero_webhook."""
     base = (settings.PUBLIC_BASE_URL or "").rstrip("/")
     if not base:
         raise HTTPException(status_code=500, detail="PUBLIC_BASE_URL is not configured.")
     if settings.is_production and not base.startswith("https://"):
         raise HTTPException(status_code=500, detail="PUBLIC_BASE_URL must be HTTPS in production.")
-    return f"{base}/api/payments/payhero/callback"
+    url = f"{base}/api/payments/payhero/callback"
+    if tenant_db:
+        url += f"/{quote(tenant_db.strip(), safe='')}"
+    return url
 
 
 # ─── STK push ──────────────────────────────────────────────────────────────
@@ -105,8 +114,13 @@ def initiate_stk_push(
     account_reference: Optional[str] = None,
     transaction_desc: Optional[str] = None,
     customer_name: Optional[str] = None,
+    callback_tenant: Optional[str] = None,
 ) -> dict:
-    """Trigger a Pay Hero STK push and persist a pending PayHeroTransaction."""
+    """Trigger a Pay Hero STK push and persist a pending PayHeroTransaction.
+
+    ``callback_tenant`` is the tenant's db_name; it is baked into the callback
+    URL so the asynchronous webhook lands in this tenant's database.
+    """
     config = _tenant_config(db)
     formatted_phone = _format_msisdn(phone_number)
 
@@ -127,7 +141,7 @@ def initiate_stk_push(
         "provider": "m-pesa",
         "external_reference": external_reference,
         "customer_name": customer_name or "HMS Patient",
-        "callback_url": _callback_url(),
+        "callback_url": _callback_url(callback_tenant),
         "account_reference": account_reference or config.account_reference or "HMS-BILLING",
         "transaction_desc": transaction_desc or config.transaction_desc or "Hospital Bill Payment",
     }

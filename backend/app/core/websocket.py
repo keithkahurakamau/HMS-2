@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 USER_CHANNEL_PREFIX = "hms:user:"
 ROLE_CHANNEL_PREFIX = "hms:role:"
+# Generic, arbitrary-keyed topic channel. Used for tenant-scoped payment
+# feeds (topic == "payment:{tenant_db}") so a hospital's payment events only
+# ever reach that hospital's own staff — never broadcast by role across tenants.
+TOPIC_CHANNEL_PREFIX = "hms:topic:"
 
 
 class ConnectionManager:
@@ -40,12 +44,26 @@ class ConnectionManager:
         # user_id -> role lookup, populated on connect, used for role broadcasts.
         self.user_roles: Dict[int, str] = {}
 
+        # Arbitrary-topic registry (e.g. tenant-scoped payment feeds).
+        self.topic_connections: Dict[str, List[WebSocket]] = {}
+
         self._redis = None  # type: ignore[assignment]
         self._pubsub = None
         self._listener_task: Optional[asyncio.Task] = None
         self._subscribed_user_ids: Set[int] = set()
         self._subscribed_roles: Set[str] = set()
+        self._subscribed_topics: Set[str] = set()
         self._lock = asyncio.Lock()
+        # The main event loop, captured at startup so synchronous code (e.g. a
+        # webhook BackgroundTask running in a threadpool) can publish safely.
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def bind_loop(self) -> None:
+        """Capture the running loop at app startup for thread-safe publishing."""
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._loop = None
 
     # ----- lifecycle -------------------------------------------------
     async def init_redis(self) -> None:
@@ -131,6 +149,50 @@ class ConnectionManager:
                 # the last connection closes. Re-subscription is cheap and
                 # avoids race conditions with reconnecting clients.
 
+    # ----- tenant-scoped topic connect ------------------------------
+    async def connect_payment(self, websocket: WebSocket, tenant_db: str) -> bool:
+        """Authenticated subscribe to a tenant's payment feed.
+
+        Verifies the access_token cookie AND that its ``tenant_id`` claim
+        matches the requested tenant — so a user from hospital B can never
+        attach to hospital A's payment channel.
+        """
+        token = websocket.cookies.get("access_token")
+        if not token or not tenant_db:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return False
+        try:
+            payload = jwt.decode(
+                token,
+                settings.jwt_secret,
+                algorithms=[settings.ALGORITHM],
+                options={"verify_aud": False},
+            )
+        except JWTError:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return False
+        if payload.get("tenant_id") != tenant_db:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return False
+
+        await websocket.accept()
+        topic = f"payment:{tenant_db}"
+        self.topic_connections.setdefault(topic, []).append(websocket)
+
+        await self.init_redis()
+        if self._redis is not None:
+            await self._ensure_subscribed_topic(topic)
+        return True
+
+    def disconnect_topic(self, websocket: WebSocket, topic: str) -> None:
+        if topic in self.topic_connections:
+            try:
+                self.topic_connections[topic].remove(websocket)
+            except ValueError:
+                pass
+            if not self.topic_connections[topic]:
+                del self.topic_connections[topic]
+
     # ----- public sender API ----------------------------------------
     async def send_personal_message(self, message: dict, user_id: int) -> None:
         """Deliver to a specific user across all workers."""
@@ -146,6 +208,30 @@ class ConnectionManager:
         else:
             await self._dispatch_local_role(role, message)
 
+    async def publish_topic(self, topic: str, message: dict) -> None:
+        """Deliver to every subscriber of an arbitrary topic across all workers."""
+        if not settings.REDIS_URL:
+            await self._dispatch_local_topic(topic, message)
+            return
+        # Ensure this worker has a Redis client even if no socket has connected
+        # here yet (the publisher may be a different worker than the listener).
+        await self.init_redis()
+        if self._redis is not None:
+            await self._redis.publish(f"{TOPIC_CHANNEL_PREFIX}{topic}", json.dumps(message))
+        else:
+            await self._dispatch_local_topic(topic, message)
+
+    def publish_topic_threadsafe(self, topic: str, message: dict) -> None:
+        """Publish from synchronous code (e.g. a webhook BackgroundTask running
+        in a threadpool) by scheduling the coroutine on the captured loop."""
+        if self._loop is None:
+            logger.warning("publish_topic_threadsafe called before loop bind; dropping %s", topic)
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self.publish_topic(topic, message), self._loop)
+        except Exception:  # noqa: BLE001 — never let a notification break settlement
+            logger.exception("Failed to schedule WS publish for topic %s", topic)
+
     # ----- internal: local dispatch ---------------------------------
     async def _dispatch_local_user(self, user_id: int, message: dict) -> None:
         connections = list(self.active_connections.get(user_id, []))
@@ -159,6 +245,13 @@ class ConnectionManager:
         for uid, user_role in list(self.user_roles.items()):
             if user_role == role:
                 await self._dispatch_local_user(uid, message)
+
+    async def _dispatch_local_topic(self, topic: str, message: dict) -> None:
+        for ws in list(self.topic_connections.get(topic, [])):
+            try:
+                await ws.send_text(json.dumps(message))
+            except Exception:
+                self.disconnect_topic(ws, topic)
 
     # ----- internal: subscription bookkeeping -----------------------
     async def _ensure_subscribed_user(self, user_id: int) -> None:
@@ -174,6 +267,13 @@ class ConnectionManager:
                 return
             await self._pubsub.subscribe(f"{ROLE_CHANNEL_PREFIX}{role}")
             self._subscribed_roles.add(role)
+
+    async def _ensure_subscribed_topic(self, topic: str) -> None:
+        async with self._lock:
+            if topic in self._subscribed_topics or self._pubsub is None:
+                return
+            await self._pubsub.subscribe(f"{TOPIC_CHANNEL_PREFIX}{topic}")
+            self._subscribed_topics.add(topic)
 
     async def _listen_forever(self) -> None:
         """Long-running task that reads pub/sub messages and dispatches locally."""
@@ -199,6 +299,9 @@ class ConnectionManager:
                 elif channel and channel.startswith(ROLE_CHANNEL_PREFIX):
                     role = channel[len(ROLE_CHANNEL_PREFIX):]
                     await self._dispatch_local_role(role, payload)
+                elif channel and channel.startswith(TOPIC_CHANNEL_PREFIX):
+                    topic = channel[len(TOPIC_CHANNEL_PREFIX):]
+                    await self._dispatch_local_topic(topic, payload)
         except asyncio.CancelledError:
             raise
         except Exception as exc:

@@ -62,6 +62,7 @@ def trigger_stk_push(
         phone_number=payload.phone_number,
         amount=payload.amount,
         invoice_id=payload.invoice_id,
+        callback_tenant=request.headers.get("X-Tenant-ID"),
     )
 
 
@@ -70,15 +71,53 @@ def get_payment_status(reference: str, db: Session = Depends(get_db)):
     return check_payment_status(db, reference=reference)
 
 
+@router.get(
+    "/invoice-status/{invoice_id}",
+    dependencies=[Depends(RequirePermission("billing:read", "billing:manage"))],
+)
+def invoice_payment_status(invoice_id: int, db: Session = Depends(get_db)):
+    """DB-backed status the cashier screen polls while an STK push is pending.
+
+    Reads our own transaction row (updated by the verified webhook) rather
+    than Pay Hero's live API, so a confirmed-then-settled payment is reflected
+    the instant the callback commits — mirrors the pharmacy dispense poll.
+    """
+    invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    latest = (
+        db.query(PayHeroTransaction)
+        .filter(PayHeroTransaction.invoice_id == invoice_id)
+        .order_by(PayHeroTransaction.id.desc())
+        .first()
+    )
+    return {
+        "invoice_id": invoice.invoice_id,
+        "invoice_status": invoice.status,
+        "amount_paid": float(invoice.amount_paid or 0),
+        "total_amount": float(invoice.total_amount or 0),
+        "mpesa_status": latest.status if latest else None,
+        "mpesa_receipt_number": latest.receipt_number if latest else None,
+        "mpesa_result_desc": latest.result_desc if latest else None,
+    }
+
+
 # ─── Webhook callback ──────────────────────────────────────────────────────
 
 
 @router.post("/callback")
+@router.post("/callback/{tenant_db}")
 async def payhero_callback(
     request: Request,
     background_tasks: BackgroundTasks,
+    tenant_db: str = "",
 ):
     """Receive a Pay Hero callback, verify it, and queue it for processing.
+
+    The tenant is taken from the URL path (``/callback/{tenant_db}``) — that
+    segment was baked into the callback URL at STK-push time, because Pay Hero
+    echoes the URL back but cannot send our ``X-Tenant-ID`` header. We fall
+    back to the header for any legacy push that used the bare ``/callback``.
 
     The HTTP response is fast (verify + 200) so Pay Hero never times out and
     retries. State mutations happen in a background task that takes an
@@ -92,19 +131,51 @@ async def payhero_callback(
         logger.error("Pay Hero webhook had non-JSON body after signature check passed")
         return {"status": "ignored", "reason": "non-json"}
 
-    logger.info("Pay Hero callback verified: %s", safe_repr(payload))
+    logger.info("Pay Hero callback verified (tenant=%s): %s", tenant_db or "?", safe_repr(payload))
 
-    tenant_db = request.headers.get("X-Tenant-ID", "")
-    background_tasks.add_task(_apply_callback_async, payload, tenant_db)
+    resolved = _resolve_tenant_db(tenant_db or request.headers.get("X-Tenant-ID", ""))
+    if not resolved:
+        # No recognised tenant means we have nowhere to apply the receipt.
+        # ACK 200 so Pay Hero doesn't hammer retries, but surface it loudly —
+        # an operator needs to reconcile it manually.
+        logger.error(
+            "Pay Hero callback could not be routed to a tenant (path/header gave %r). "
+            "Receipt will not auto-settle.", tenant_db,
+        )
+        return {"status": "ignored", "reason": "unknown-tenant"}
+
+    background_tasks.add_task(_apply_callback_async, payload, resolved)
     return {"status": "queued"}
+
+
+def _resolve_tenant_db(candidate: str) -> str | None:
+    """Validate a tenant db_name against the master registry before we open an
+    engine against it — defends against connecting to an arbitrary database
+    name and confirms the tenant is real + active."""
+    candidate = (candidate or "").strip()
+    if not candidate:
+        return None
+    from app.config.database import MasterSessionLocal
+    from app.models.master import Tenant
+
+    master = MasterSessionLocal()
+    try:
+        t = (
+            master.query(Tenant)
+            .filter(Tenant.db_name == candidate, Tenant.is_active == True)  # noqa: E712
+            .first()
+        )
+        return candidate if t else None
+    except Exception:  # noqa: BLE001 — master lookup must never crash the webhook
+        logger.exception("Pay Hero callback tenant lookup failed for %r", candidate)
+        return None
+    finally:
+        master.close()
 
 
 def _open_tenant_session(tenant_db: str) -> Session:
     from sqlalchemy.orm import sessionmaker
-    from app.config.database import DefaultSessionLocal
 
-    if not tenant_db:
-        return DefaultSessionLocal()
     engine = get_tenant_engine(tenant_db)
     return sessionmaker(autocommit=False, autoflush=False, bind=engine)()
 
@@ -130,7 +201,7 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
 
         if not receipt_no and result_code not in (0, "0"):
             logger.info("Pay Hero callback failure or no-receipt: %s", safe_repr(resp))
-            _mark_failed(db, external_ref, result_desc)
+            _mark_failed(db, external_ref, result_desc, tenant_db)
             return
 
         lock_id = int(hashlib.sha1((receipt_no or external_ref).encode()).hexdigest()[:15], 16)
@@ -200,10 +271,14 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
                     txn=txn,
                     match_basis="external_reference",
                 )
+        snapshot = _txn_snapshot(txn)
         try:
             db.commit()
         except IntegrityError:
             db.rollback()
+            snapshot = None
+        if snapshot:
+            _notify_payment(tenant_db, snapshot)
     except Exception:  # noqa: BLE001 — never propagate from the background task
         db.rollback()
         logger.exception("Pay Hero callback worker raised")
@@ -211,7 +286,7 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
         db.close()
 
 
-def _mark_failed(db: Session, external_ref: str, desc: str) -> None:
+def _mark_failed(db: Session, external_ref: str, desc: str, tenant_db: str = "") -> None:
     if not external_ref:
         return
     txn = (
@@ -228,4 +303,33 @@ def _mark_failed(db: Session, external_ref: str, desc: str) -> None:
     if txn:
         txn.status = "Failed"
         txn.result_desc = (desc or "Failed")[:255]
+        snapshot = _txn_snapshot(txn)
         db.commit()
+        _notify_payment(tenant_db, snapshot)
+
+
+def _txn_snapshot(txn: PayHeroTransaction) -> dict[str, Any]:
+    """Plain-value snapshot taken before commit (avoids a post-commit reload)
+    so we can broadcast the outcome after the session closes."""
+    return {
+        "type": "payment_update",
+        "invoice_id": txn.invoice_id,
+        "dispense_id": txn.dispense_id,
+        "external_reference": txn.external_reference,
+        "status": txn.status,
+        "receipt_number": txn.receipt_number,
+        "result_desc": txn.result_desc,
+        "amount": float(txn.amount or 0),
+    }
+
+
+def _notify_payment(tenant_db: str, snapshot: dict[str, Any] | None) -> None:
+    """Push a live payment update to the tenant's checkout screens. Best-effort:
+    a failure here must never affect settlement (polling is the fallback)."""
+    if not tenant_db or not snapshot:
+        return
+    try:
+        from app.core.websocket import manager
+        manager.publish_topic_threadsafe(f"payment:{tenant_db}", {**snapshot, "tenant": tenant_db})
+    except Exception:  # noqa: BLE001
+        logger.exception("Payment WS notify failed for tenant=%s", tenant_db)

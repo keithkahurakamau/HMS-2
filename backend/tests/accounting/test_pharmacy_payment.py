@@ -113,11 +113,15 @@ def _seed_dispense_with_invoice(db, *, patient_id=1, total=Decimal("250")):
 
 
 class _FakeRequest:
-    """Stand-in for the FastAPI Request just enough that log_audit works."""
+    """Stand-in for the FastAPI Request just enough that log_audit + the
+    STK-push tenant lookup work."""
     class _Client:
         host = "127.0.0.1"
     client = _Client()
     base_url = "http://test.local"
+    # The dispense-pay endpoint reads X-Tenant-ID to build the per-tenant
+    # Pay Hero callback URL; a real Request always carries .headers.
+    headers: dict = {}
 
 
 # ─── Cash flow ─────────────────────────────────────────────────────────────

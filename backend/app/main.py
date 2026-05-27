@@ -35,6 +35,7 @@ import app.routes.medical_history as medical_history_module
 import app.routes.public as public_module
 import app.routes.payhero_admin as payhero_admin_module
 import app.routes.payhero_payment as payhero_payment_module
+import app.routes.payhero_superadmin as payhero_superadmin_module
 import app.routes.privacy as privacy_module
 import app.routes.notifications as notifications_module
 import app.routes.patient_portal as patient_portal_module
@@ -82,6 +83,7 @@ def _auto_migrate_on_boot() -> None:
 async def lifespan(app: FastAPI):
     # Boot: optionally bring schemas up to head, then warm up WebSocket pubsub.
     _auto_migrate_on_boot()
+    ws_manager.bind_loop()
     await ws_manager.init_redis()
     if not settings.REDIS_URL:
         logger.warning("REDIS_URL not configured. WebSocket broadcasts will not span workers.")
@@ -269,6 +271,7 @@ app.include_router(medical_history_module.router)
 app.include_router(public_module.router)
 app.include_router(payhero_admin_module.router)  # PAY-001: per-tenant Pay Hero config
 app.include_router(payhero_payment_module.router)  # PAY-001: Pay Hero aggregator
+app.include_router(payhero_superadmin_module.router)  # operator-only Pay Hero provisioning
 app.include_router(privacy_module.router)
 app.include_router(notifications_module.router)
 app.include_router(patient_portal_module.router)
