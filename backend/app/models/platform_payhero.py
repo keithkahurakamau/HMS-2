@@ -43,6 +43,10 @@ class PlatformPayHeroConfig(Base):
     payhero_username_encrypted = Column(String(255), nullable=True)
     payhero_password_encrypted = Column(String(255), nullable=True)
 
+    # The platform account's own webhook signing secret (encrypted). When NULL,
+    # verify_payhero falls back to the global settings.PAYHERO_WEBHOOK_SECRET.
+    payhero_webhook_secret_encrypted = Column(String(255), nullable=True)
+
     # MediFleet's settlement bank — Pay Hero deposits subscription proceeds
     # here on the schedule agreed during onboarding.
     settlement_bank_code = Column(String(20), nullable=False, default="")

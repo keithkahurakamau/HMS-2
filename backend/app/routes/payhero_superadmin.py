@@ -71,6 +71,9 @@ class SuperPayHeroConfigSchema(BaseModel):
     payhero_channel_id: Optional[str] = Field(default=None, max_length=40)
     payhero_username: Optional[str] = None
     payhero_password: Optional[str] = None
+    # Each hospital owns its Pay Hero account and signs callbacks with its own
+    # secret. Stored encrypted; write-only (never returned).
+    payhero_webhook_secret: Optional[str] = None
     # Settlement bank.
     settlement_bank_code: Optional[str] = Field(default=None, max_length=20)
     settlement_account_number: Optional[str] = Field(default=None, max_length=40)
@@ -95,6 +98,7 @@ def _operator_view(config: PayHeroConfig | None) -> dict:
         "shortcode_type": config.shortcode_type,
         "payhero_channel_id": config.payhero_channel_id,
         "uses_per_tenant_creds": bool(config.payhero_username_encrypted),
+        "uses_per_tenant_webhook_secret": bool(config.payhero_webhook_secret_encrypted),
         "settlement_bank_code": config.settlement_bank_code,
         "settlement_bank_name": config.settlement_bank_name,
         "settlement_account_number": config.settlement_account_number,
@@ -221,6 +225,8 @@ def set_tenant_payhero(
             config.payhero_username_encrypted = encrypt_data(payload.payhero_username)
         if payload.payhero_password:
             config.payhero_password_encrypted = encrypt_data(payload.payhero_password)
+        if payload.payhero_webhook_secret:
+            config.payhero_webhook_secret_encrypted = encrypt_data(payload.payhero_webhook_secret)
         config.is_active = True
         # NB: updated_by is a FK to the tenant's users table — leave it untouched
         # here since the actor is a platform superadmin, not a tenant user.
