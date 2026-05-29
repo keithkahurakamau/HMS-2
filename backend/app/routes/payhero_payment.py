@@ -102,6 +102,69 @@ def invoice_payment_status(invoice_id: int, db: Session = Depends(get_db)):
     }
 
 
+# ─── Platform (subscription) callback ──────────────────────────────────────
+# MUST be declared before the /callback/{tenant_db} route below so the literal
+# "platform" segment isn't captured as a tenant db_name. This is the operator's
+# OWN subscription rail — it settles in the master DB, not a tenant DB.
+
+
+@router.post("/callback/platform")
+async def payhero_platform_callback(request: Request, background_tasks: BackgroundTasks):
+    """Receive a Pay Hero callback for a PLAT-<tenant_id>-<nonce> subscription
+    charge, verify it against the platform account's secret, and settle it in
+    the master DB. Fast ACK + background settlement, mirroring the tenant rail.
+    """
+    from app.config.database import MasterSessionLocal
+    from app.services.platform_payhero_service import platform_webhook_secret
+
+    master = MasterSessionLocal()
+    try:
+        expected_secret = platform_webhook_secret(master)
+    except Exception:  # noqa: BLE001 — never let the lookup crash the webhook
+        logger.exception("Platform webhook-secret lookup failed")
+        expected_secret = None
+    finally:
+        master.close()
+
+    raw = await verify_payhero(request, expected_secret=expected_secret)
+    try:
+        payload = json.loads(raw or b"{}")
+    except ValueError:
+        logger.error("Platform Pay Hero webhook had non-JSON body after signature check passed")
+        return {"status": "ignored", "reason": "non-json"}
+
+    logger.info("Platform Pay Hero callback verified: %s", safe_repr(payload))
+    background_tasks.add_task(_apply_platform_callback_async, payload)
+    return {"status": "queued"}
+
+
+def _apply_platform_callback_async(payload: dict[str, Any]) -> None:
+    """Background worker: settle a subscription charge in the master DB."""
+    from app.config.database import MasterSessionLocal
+    from app.services.platform_payhero_service import apply_platform_callback
+
+    db = MasterSessionLocal()
+    snapshot = None
+    try:
+        snapshot = apply_platform_callback(db, payload)
+    except Exception:  # noqa: BLE001 — never propagate from a background task
+        db.rollback()
+        logger.exception("Platform callback worker raised")
+    finally:
+        db.close()
+    if snapshot:
+        _notify_platform_payment(snapshot)
+
+
+def _notify_platform_payment(snapshot: dict[str, Any]) -> None:
+    """Push a live subscription update to the superadmin billing screen."""
+    try:
+        from app.core.websocket import manager
+        manager.publish_topic_threadsafe("payment:platform", snapshot)
+    except Exception:  # noqa: BLE001
+        logger.exception("Platform payment WS notify failed")
+
+
 # ─── Webhook callback ──────────────────────────────────────────────────────
 
 

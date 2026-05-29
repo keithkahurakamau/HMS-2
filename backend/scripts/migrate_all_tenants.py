@@ -162,6 +162,62 @@ MASTER_DB_PATCHES: list[str] = [
     """,
     "CREATE INDEX IF NOT EXISTS ix_support_messages_ticket_id  ON support_messages (ticket_id);",
     "CREATE INDEX IF NOT EXISTS ix_support_messages_created_at ON support_messages (created_at);",
+    # ab3c9e5d27f8 — platform Pay Hero (superadmin subscription billing).
+    # These tables + the tenants billing columns live in the MASTER DB. The
+    # alembic revision only runs against tenant DBs, so without these explicit
+    # master patches the platform billing tables would never be created in
+    # production. Every statement is idempotent.
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS billing_contact_msisdn VARCHAR(20);",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS billing_contact_name VARCHAR(120);",
+    """
+    CREATE TABLE IF NOT EXISTS platform_payhero_configs (
+        id                          SERIAL PRIMARY KEY,
+        shortcode                   VARCHAR(20)  NOT NULL DEFAULT '',
+        shortcode_type              VARCHAR(20)  NOT NULL DEFAULT 'paybill',
+        payhero_channel_id          VARCHAR(40),
+        payhero_username_encrypted  VARCHAR(255),
+        payhero_password_encrypted  VARCHAR(255),
+        payhero_webhook_secret_encrypted VARCHAR(255),
+        settlement_bank_code        VARCHAR(20)  NOT NULL DEFAULT '',
+        settlement_bank_name        VARCHAR(80)  NOT NULL DEFAULT '',
+        settlement_account_number   VARCHAR(40)  NOT NULL DEFAULT '',
+        settlement_account_name     VARCHAR(120),
+        account_reference           VARCHAR(50)  DEFAULT 'MEDIFLEET',
+        transaction_desc            VARCHAR(100) DEFAULT 'MediFleet Subscription',
+        is_active                   BOOLEAN      DEFAULT TRUE,
+        last_test_at                TIMESTAMPTZ,
+        last_test_status            VARCHAR(40),
+        last_test_message           TEXT,
+        created_at                  TIMESTAMPTZ  DEFAULT now(),
+        updated_at                  TIMESTAMPTZ,
+        updated_by                  INTEGER REFERENCES superadmins(admin_id)
+    );
+    """,
+    # The encrypted-secret column post-dates the original CREATE above, so add
+    # it separately for master DBs provisioned before this column existed.
+    "ALTER TABLE platform_payhero_configs ADD COLUMN IF NOT EXISTS payhero_webhook_secret_encrypted VARCHAR(255);",
+    """
+    CREATE TABLE IF NOT EXISTS platform_payhero_transactions (
+        id                  SERIAL PRIMARY KEY,
+        tenant_id           INTEGER NOT NULL REFERENCES tenants(tenant_id),
+        phone_number        VARCHAR(20)  NOT NULL,
+        amount              NUMERIC(10, 2) NOT NULL,
+        payhero_reference   VARCHAR(100),
+        external_reference  VARCHAR(100) NOT NULL UNIQUE,
+        receipt_number      VARCHAR(50)  UNIQUE,
+        status              VARCHAR(50)  DEFAULT 'Pending',
+        result_desc         VARCHAR(255),
+        period_label        VARCHAR(120),
+        initiated_by        INTEGER REFERENCES superadmins(admin_id),
+        initiated_at        TIMESTAMPTZ DEFAULT now(),
+        settled_at          TIMESTAMPTZ
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_plat_payhero_txn_tenant   ON platform_payhero_transactions (tenant_id);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_payhero_txn_extref   ON platform_payhero_transactions (external_reference);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_payhero_txn_receipt  ON platform_payhero_transactions (receipt_number);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_payhero_txn_status   ON platform_payhero_transactions (status);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_payhero_txn_initiated ON platform_payhero_transactions (initiated_at);",
 ]
 
 
