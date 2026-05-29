@@ -27,7 +27,7 @@ from app.core.dependencies import RequirePermission
 from app.core.limiter import limiter
 from app.core.payhero_webhook import verify_payhero
 from app.models.billing import Invoice
-from app.models.payhero import PayHeroTransaction
+from app.models.payhero import PayHeroConfig, PayHeroTransaction
 from app.services.payhero_service import (
     check_payment_status,
     initiate_stk_push as payhero_stk_push,
@@ -102,6 +102,69 @@ def invoice_payment_status(invoice_id: int, db: Session = Depends(get_db)):
     }
 
 
+# ─── Platform (subscription) callback ──────────────────────────────────────
+# MUST be declared before the /callback/{tenant_db} route below so the literal
+# "platform" segment isn't captured as a tenant db_name. This is the operator's
+# OWN subscription rail — it settles in the master DB, not a tenant DB.
+
+
+@router.post("/callback/platform")
+async def payhero_platform_callback(request: Request, background_tasks: BackgroundTasks):
+    """Receive a Pay Hero callback for a PLAT-<tenant_id>-<nonce> subscription
+    charge, verify it against the platform account's secret, and settle it in
+    the master DB. Fast ACK + background settlement, mirroring the tenant rail.
+    """
+    from app.config.database import MasterSessionLocal
+    from app.services.platform_payhero_service import platform_webhook_secret
+
+    master = MasterSessionLocal()
+    try:
+        expected_secret = platform_webhook_secret(master)
+    except Exception:  # noqa: BLE001 — never let the lookup crash the webhook
+        logger.exception("Platform webhook-secret lookup failed")
+        expected_secret = None
+    finally:
+        master.close()
+
+    raw = await verify_payhero(request, expected_secret=expected_secret)
+    try:
+        payload = json.loads(raw or b"{}")
+    except ValueError:
+        logger.error("Platform Pay Hero webhook had non-JSON body after signature check passed")
+        return {"status": "ignored", "reason": "non-json"}
+
+    logger.info("Platform Pay Hero callback verified: %s", safe_repr(payload))
+    background_tasks.add_task(_apply_platform_callback_async, payload)
+    return {"status": "queued"}
+
+
+def _apply_platform_callback_async(payload: dict[str, Any]) -> None:
+    """Background worker: settle a subscription charge in the master DB."""
+    from app.config.database import MasterSessionLocal
+    from app.services.platform_payhero_service import apply_platform_callback
+
+    db = MasterSessionLocal()
+    snapshot = None
+    try:
+        snapshot = apply_platform_callback(db, payload)
+    except Exception:  # noqa: BLE001 — never propagate from a background task
+        db.rollback()
+        logger.exception("Platform callback worker raised")
+    finally:
+        db.close()
+    if snapshot:
+        _notify_platform_payment(snapshot)
+
+
+def _notify_platform_payment(snapshot: dict[str, Any]) -> None:
+    """Push a live subscription update to the superadmin billing screen."""
+    try:
+        from app.core.websocket import manager
+        manager.publish_topic_threadsafe("payment:platform", snapshot)
+    except Exception:  # noqa: BLE001
+        logger.exception("Platform payment WS notify failed")
+
+
 # ─── Webhook callback ──────────────────────────────────────────────────────
 
 
@@ -124,7 +187,15 @@ async def payhero_callback(
     advisory lock on the receipt and is idempotent against the UNIQUE
     receipt_number index.
     """
-    raw = await verify_payhero(request)
+    # Resolve the tenant FIRST (cheap, read-only) so we can pick that
+    # hospital's own webhook secret before verifying the signature. Each
+    # hospital owns its Pay Hero account, so each signs with its own secret;
+    # _tenant_webhook_secret returns None for tenants that set none, and
+    # verify_payhero then falls back to the global operator secret.
+    resolved = _resolve_tenant_db(tenant_db or request.headers.get("X-Tenant-ID", ""))
+    expected_secret = _tenant_webhook_secret(resolved) if resolved else None
+
+    raw = await verify_payhero(request, expected_secret=expected_secret)
     try:
         payload = json.loads(raw or b"{}")
     except ValueError:
@@ -133,7 +204,6 @@ async def payhero_callback(
 
     logger.info("Pay Hero callback verified (tenant=%s): %s", tenant_db or "?", safe_repr(payload))
 
-    resolved = _resolve_tenant_db(tenant_db or request.headers.get("X-Tenant-ID", ""))
     if not resolved:
         # No recognised tenant means we have nowhere to apply the receipt.
         # ACK 200 so Pay Hero doesn't hammer retries, but surface it loudly —
@@ -178,6 +248,36 @@ def _open_tenant_session(tenant_db: str) -> Session:
 
     engine = get_tenant_engine(tenant_db)
     return sessionmaker(autocommit=False, autoflush=False, bind=engine)()
+
+
+def _tenant_webhook_secret(tenant_db: str) -> str | None:
+    """Return the tenant's own Pay Hero webhook secret (decrypted), or None.
+
+    Each hospital owns its Pay Hero account and signs callbacks with its own
+    HMAC secret. None means the tenant configured no secret, so verify_payhero
+    falls back to the global settings.PAYHERO_WEBHOOK_SECRET. Best-effort: a
+    lookup failure returns None (→ global fallback) rather than crashing the
+    webhook — the signature check still gates, fail-closed, in production.
+    """
+    if not tenant_db:
+        return None
+    try:
+        db = _open_tenant_session(tenant_db)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not open tenant session for webhook-secret lookup: %s", tenant_db)
+        return None
+    try:
+        from app.utils.encryption import decrypt_data
+
+        cfg = db.query(PayHeroConfig).first()
+        if cfg and cfg.payhero_webhook_secret_encrypted:
+            return decrypt_data(cfg.payhero_webhook_secret_encrypted)
+        return None
+    except Exception:  # noqa: BLE001
+        logger.exception("Per-tenant webhook-secret lookup failed for %s", tenant_db)
+        return None
+    finally:
+        db.close()
 
 
 def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:

@@ -51,3 +51,22 @@ async def payments_websocket(websocket: WebSocket, tenant_db: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect_topic(websocket, topic)
+
+
+@router.websocket("/ws/payments/platform")
+async def platform_payments_websocket(websocket: WebSocket):
+    """Superadmin-scoped live feed for subscription billing.
+
+    Authenticated by the ``superadmin_token`` cookie. The platform webhook
+    publishes ``platform_payment_update`` frames the instant a subscription
+    charge settles, so the operator watches it complete without polling.
+    """
+    is_connected = await manager.connect_platform_payment(websocket)
+    if not is_connected:
+        return
+    topic = "payment:platform"
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect_topic(websocket, topic)

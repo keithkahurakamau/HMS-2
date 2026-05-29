@@ -44,6 +44,13 @@ class Tenant(Base):
     #   }
     print_templates     = Column(Text, nullable=True)
 
+    # ── Subscription billing contact ────────────────────────────────────────
+    # The MSISDN the superadmin sends the subscription STK push to (the
+    # hospital's billing contact). Stored so the operator doesn't retype it
+    # every cycle. Lives in the master DB alongside the tenant registry.
+    billing_contact_msisdn = Column(String(20), nullable=True)
+    billing_contact_name   = Column(String(120), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
