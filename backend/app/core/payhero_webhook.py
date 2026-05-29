@@ -58,26 +58,32 @@ def _client_ip(request: Request) -> ipaddress._BaseAddress | None:
     return None
 
 
-def _signature_valid(raw_body: bytes, header_value: str | None) -> bool:
+def _signature_valid(raw_body: bytes, header_value: str | None, secret: str) -> bool:
     if not header_value:
         return False
-    secret = settings.payhero_webhook_secret.encode("utf-8")
-    if not secret:
+    secret_bytes = (secret or "").encode("utf-8")
+    if not secret_bytes:
         return False
-    expected = hmac.new(secret, raw_body, hashlib.sha256).hexdigest()
+    expected = hmac.new(secret_bytes, raw_body, hashlib.sha256).hexdigest()
     # Tolerate either hex or "sha256=hex" forms — Pay Hero changed format
     # between docs versions.
     candidate = header_value.split("=", 1)[1] if "=" in header_value else header_value
     return hmac.compare_digest(expected, candidate.strip())
 
 
-async def verify_payhero(request: Request) -> bytes:
+async def verify_payhero(request: Request, expected_secret: str | None = None) -> bytes:
     """Verify a Pay Hero webhook request and return the raw body bytes.
+
+    ``expected_secret`` is the resolved per-tenant webhook secret (each hospital
+    owns its own Pay Hero account, so each signs with its own secret). When it
+    is None — the tenant set no secret, or the callback is for the operator's
+    own account — we fall back to the global settings.PAYHERO_WEBHOOK_SECRET.
 
     Raises HTTPException on any failure.
     """
     raw = await request.body()
     is_prod = settings.is_production
+    secret = expected_secret or settings.payhero_webhook_secret
 
     # IP allow-list
     if _ALLOWED_NETS:
@@ -95,8 +101,8 @@ async def verify_payhero(request: Request) -> bytes:
         request.headers.get("x-payhero-signature")
         or request.headers.get("x-signature")
     )
-    if settings.payhero_webhook_secret:
-        if not _signature_valid(raw, sig_header):
+    if secret:
+        if not _signature_valid(raw, sig_header, secret):
             raise HTTPException(status_code=401, detail="Webhook signature invalid")
     elif is_prod:
         raise HTTPException(status_code=500, detail="Webhook secret not configured")

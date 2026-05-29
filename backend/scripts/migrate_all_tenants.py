@@ -430,6 +430,10 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
         "ALTER TABLE cheques ALTER COLUMN drawer_name DROP NOT NULL;"),
     ("cheques",
         "ALTER TABLE cheques ALTER COLUMN drawer_type DROP NOT NULL;"),
+    # d7a1f9c34b85 — per-tenant Pay Hero webhook secret (each hospital owns
+    # its own Pay Hero account and signs callbacks with its own secret).
+    ("payhero_configs",
+        "ALTER TABLE payhero_configs ADD COLUMN IF NOT EXISTS payhero_webhook_secret_encrypted VARCHAR(255);"),
 ]
 
 

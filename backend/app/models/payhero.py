@@ -48,6 +48,13 @@ class PayHeroConfig(Base):
     payhero_username_encrypted = Column(String(255), nullable=True)
     payhero_password_encrypted = Column(String(255), nullable=True)
 
+    # Per-tenant webhook signing secret. In the operator model each hospital
+    # owns its OWN Pay Hero account, so each account signs callbacks with its
+    # own HMAC secret — a single platform-wide secret cannot verify them all.
+    # Encrypted at rest. When NULL, verify_payhero falls back to the global
+    # settings.PAYHERO_WEBHOOK_SECRET (the operator's own account).
+    payhero_webhook_secret_encrypted = Column(String(255), nullable=True)
+
     # Settlement bank — Pay Hero deposits the till proceeds here on the
     # schedule the tenant selected at onboarding. Stored for receipts and
     # operator reference; Pay Hero is the system of record for the schedule.

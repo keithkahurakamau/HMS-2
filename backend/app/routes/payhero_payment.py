@@ -27,7 +27,7 @@ from app.core.dependencies import RequirePermission
 from app.core.limiter import limiter
 from app.core.payhero_webhook import verify_payhero
 from app.models.billing import Invoice
-from app.models.payhero import PayHeroTransaction
+from app.models.payhero import PayHeroConfig, PayHeroTransaction
 from app.services.payhero_service import (
     check_payment_status,
     initiate_stk_push as payhero_stk_push,
@@ -124,7 +124,15 @@ async def payhero_callback(
     advisory lock on the receipt and is idempotent against the UNIQUE
     receipt_number index.
     """
-    raw = await verify_payhero(request)
+    # Resolve the tenant FIRST (cheap, read-only) so we can pick that
+    # hospital's own webhook secret before verifying the signature. Each
+    # hospital owns its Pay Hero account, so each signs with its own secret;
+    # _tenant_webhook_secret returns None for tenants that set none, and
+    # verify_payhero then falls back to the global operator secret.
+    resolved = _resolve_tenant_db(tenant_db or request.headers.get("X-Tenant-ID", ""))
+    expected_secret = _tenant_webhook_secret(resolved) if resolved else None
+
+    raw = await verify_payhero(request, expected_secret=expected_secret)
     try:
         payload = json.loads(raw or b"{}")
     except ValueError:
@@ -133,7 +141,6 @@ async def payhero_callback(
 
     logger.info("Pay Hero callback verified (tenant=%s): %s", tenant_db or "?", safe_repr(payload))
 
-    resolved = _resolve_tenant_db(tenant_db or request.headers.get("X-Tenant-ID", ""))
     if not resolved:
         # No recognised tenant means we have nowhere to apply the receipt.
         # ACK 200 so Pay Hero doesn't hammer retries, but surface it loudly —
@@ -178,6 +185,36 @@ def _open_tenant_session(tenant_db: str) -> Session:
 
     engine = get_tenant_engine(tenant_db)
     return sessionmaker(autocommit=False, autoflush=False, bind=engine)()
+
+
+def _tenant_webhook_secret(tenant_db: str) -> str | None:
+    """Return the tenant's own Pay Hero webhook secret (decrypted), or None.
+
+    Each hospital owns its Pay Hero account and signs callbacks with its own
+    HMAC secret. None means the tenant configured no secret, so verify_payhero
+    falls back to the global settings.PAYHERO_WEBHOOK_SECRET. Best-effort: a
+    lookup failure returns None (→ global fallback) rather than crashing the
+    webhook — the signature check still gates, fail-closed, in production.
+    """
+    if not tenant_db:
+        return None
+    try:
+        db = _open_tenant_session(tenant_db)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not open tenant session for webhook-secret lookup: %s", tenant_db)
+        return None
+    try:
+        from app.utils.encryption import decrypt_data
+
+        cfg = db.query(PayHeroConfig).first()
+        if cfg and cfg.payhero_webhook_secret_encrypted:
+            return decrypt_data(cfg.payhero_webhook_secret_encrypted)
+        return None
+    except Exception:  # noqa: BLE001
+        logger.exception("Per-tenant webhook-secret lookup failed for %s", tenant_db)
+        return None
+    finally:
+        db.close()
 
 
 def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
