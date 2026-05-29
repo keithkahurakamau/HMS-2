@@ -21,8 +21,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config.database import get_master_db, get_tenant_engine
+from app.config.settings import settings
 from app.core.dependencies import require_superadmin
 from app.core.limiter import limiter
+from app.core.payhero_webhook import allowed_networks
 from app.models.master import Tenant
 from app.models.payhero import PayHeroConfig, PayHeroTransaction
 from app.services.payhero_banks import PAYHERO_BANKS, is_supported, name_for
@@ -114,6 +116,60 @@ def _operator_view(config: PayHeroConfig | None) -> dict:
 def list_banks():
     """Supported settlement banks for the operator dropdown."""
     return {"banks": PAYHERO_BANKS}
+
+
+@router.get("/webhook-health")
+def webhook_health():
+    """Platform-level webhook readiness check — never exposes secret values.
+
+    Reports which of the four callback env vars are wired so the operator can
+    confirm a live deploy at a glance. Mirrors the fail-closed rules in
+    ``core/payhero_webhook.verify_payhero``: in production an empty secret or
+    empty CIDR allow-list makes every callback 500, so those gaps are flagged
+    as blocking. The CIDR list and base URL are not secrets and are returned
+    in full; the HMAC secret is reported as a boolean only.
+    """
+    is_prod = settings.is_production
+    base = (settings.PUBLIC_BASE_URL or "").strip()
+    nets = [str(n) for n in allowed_networks()]
+    secret_set = bool(settings.payhero_webhook_secret)
+
+    base_https = base.startswith("https://")
+    base_ok = bool(base) and (base_https or not is_prod)
+
+    # In production all three webhook prerequisites must be satisfied or the
+    # callback path is dead; in dev they are advisory.
+    blockers: list[str] = []
+    if not base:
+        blockers.append("PUBLIC_BASE_URL is not set — STK push will 500 before any callback.")
+    elif is_prod and not base_https:
+        blockers.append("PUBLIC_BASE_URL must be https:// in production.")
+    if is_prod and not secret_set:
+        blockers.append("PAYHERO_WEBHOOK_SECRET is empty — every callback returns 500 in production.")
+    if is_prod and not nets:
+        blockers.append("PAYHERO_WEBHOOK_CIDRS is empty — every callback returns 500 in production.")
+
+    callback_template = (
+        f"{base.rstrip('/')}/api/payments/payhero/callback/{{tenant_db}}" if base else None
+    )
+
+    return {
+        "environment": "production" if is_prod else "development",
+        "ready": not blockers,
+        "blockers": blockers,
+        "checks": {
+            "public_base_url": {"set": bool(base), "value": base or None, "https": base_https, "ok": base_ok},
+            "webhook_secret": {"set": secret_set},
+            "webhook_cidrs": {"set": bool(nets), "count": len(nets), "networks": nets},
+            "platform_credentials": {
+                "username_set": bool(settings.PAYHERO_USERNAME.get_secret_value()),
+                "password_set": bool(settings.PAYHERO_PASSWORD.get_secret_value()),
+                "channel_id_set": bool(settings.PAYHERO_CHANNEL_ID),
+            },
+            "payhero_env": settings.PAYHERO_ENV,
+        },
+        "callback_url_template": callback_template,
+    }
 
 
 @router.get("/{tenant_id}/config")
