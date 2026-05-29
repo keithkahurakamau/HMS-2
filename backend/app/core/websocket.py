@@ -184,6 +184,40 @@ class ConnectionManager:
             await self._ensure_subscribed_topic(topic)
         return True
 
+    # ----- superadmin platform feed ---------------------------------
+    async def connect_platform_payment(self, websocket: WebSocket) -> bool:
+        """Authenticated subscribe to the platform subscription-billing feed.
+
+        Verifies the ``superadmin_token`` cookie (role must be 'superadmin') so
+        only the platform operator can watch subscription charges settle live.
+        """
+        token = websocket.cookies.get("superadmin_token")
+        if not token:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return False
+        try:
+            payload = jwt.decode(
+                token,
+                settings.jwt_secret,
+                algorithms=[settings.ALGORITHM],
+                options={"verify_aud": False},
+            )
+        except JWTError:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return False
+        if payload.get("role") != "superadmin":
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return False
+
+        await websocket.accept()
+        topic = "payment:platform"
+        self.topic_connections.setdefault(topic, []).append(websocket)
+
+        await self.init_redis()
+        if self._redis is not None:
+            await self._ensure_subscribed_topic(topic)
+        return True
+
     def disconnect_topic(self, websocket: WebSocket, topic: str) -> None:
         if topic in self.topic_connections:
             try:
