@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, CreditCard, Settings,
     ShieldAlert, LogOut, Search, Activity, Users, LifeBuoy,
@@ -7,7 +7,16 @@ import {
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/SuperAdminLogin';
 import { apiClient } from '../../api/client';
+import { useJourney } from '../../context/JourneyContext';
 import Logo from '../Logo';
+
+// Route → tour-journey map for the on-first-visit walkthrough, mirroring the
+// tenant MainLayout convention. Prefix match handles any nested paths. Only
+// routes that have a journey defined in journeys/index.js need an entry.
+const ROUTE_TO_JOURNEY = [
+    ['/superadmin/subscriptions', 'platform_subscriptions'],
+    ['/superadmin/payments',      'payhero_provisioning'],
+];
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Superadmin console shell.                                                 */
@@ -20,8 +29,20 @@ import Logo from '../Logo';
 
 export default function SuperAdminLayout() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const { startJourney, activeKey } = useJourney();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const adminName = localStorage.getItem('hms_superadmin_name');
+
+    // Auto-start the page's tour on first visit (route → journey key).
+    const currentJourneyKey = ROUTE_TO_JOURNEY.find(
+        ([prefix]) => location.pathname.startsWith(prefix)
+    )?.[1] || null;
+    useEffect(() => {
+        if (!currentJourneyKey || activeKey) return;
+        const id = setTimeout(() => startJourney(currentJourneyKey), 750);
+        return () => clearTimeout(id);
+    }, [currentJourneyKey, startJourney, activeKey]);
 
     const handleExit = async () => {
         // Ask the backend to clear the HttpOnly cookie; swallow errors so a
