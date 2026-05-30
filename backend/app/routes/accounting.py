@@ -9,11 +9,12 @@ from __future__ import annotations
 from datetime import date
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
 from app.core.dependencies import RequirePermission, get_current_user
+from app.core.limiter import limiter
 from app.models.accounting import (
     Account,
     AccountingSettings,
@@ -42,10 +43,36 @@ from app.schemas.accounting import (
     IncomeStatementResponse,
     JournalEntryCreate,
     JournalEntryResponse,
+    TransactionLogItem,
+    TransactionLogPage,
     TrialBalanceResponse,
 )
+from app.utils.audit import log_audit
 from app.services import accounting as svc
 from app.services import accounting_reports as reports
+
+# Friendly grouping for the transaction log. Maps the head of a journal
+# entry's source_type (e.g. "billing.payment.mpesa" -> "billing") to a label
+# the finance team recognises. Unknown sources fall back to the raw head;
+# manual entries (no source_type) read as "Manual entry".
+_SOURCE_LABELS = {
+    "billing": "Billing",
+    "insurance": "Insurance",
+    "pharmacy": "Pharmacy",
+    "cheque": "Cheque",
+    "cheques": "Cheque",
+    "payhero": "Pay Hero",
+    "bank": "Bank",
+    "debtor": "Debtors",
+    "debtors": "Debtors",
+}
+
+
+def _source_label(source_type: Optional[str]) -> str:
+    if not source_type:
+        return "Manual entry"
+    head = source_type.split(".", 1)[0]
+    return _SOURCE_LABELS.get(head, head.replace("_", " ").title())
 
 router = APIRouter(prefix="/api/accounting", tags=["Accounting"])
 
@@ -350,6 +377,87 @@ def list_entries(
     if reference:
         q = q.filter(JournalEntry.reference == reference)
     return q.order_by(JournalEntry.entry_date.desc(), JournalEntry.entry_id.desc()).limit(limit).all()
+
+
+@router.get(
+    "/transaction-log",
+    response_model=TransactionLogPage,
+    dependencies=[Depends(RequirePermission("accounting:view"))],
+)
+@limiter.limit("60/minute")
+def transaction_log(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+    source: Optional[str] = Query(
+        None,
+        description="Source group head, e.g. 'billing', 'pharmacy', 'payhero'. "
+                    "Use 'manual' for hand-keyed entries (no source).",
+    ),
+    status: Optional[str] = Query(None, description="draft | posted | reversed"),
+    from_date: Optional[date] = Query(None),
+    to_date: Optional[date] = Query(None),
+    q: Optional[str] = Query(None, max_length=120, description="Search entry no., reference, memo, source"),
+    min_amount: Optional[float] = Query(None, ge=0),
+    max_amount: Optional[float] = Query(None, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """System-wide transaction register (read-only).
+
+    Every monetary event in the system auto-posts a balanced journal entry
+    tagged with a ``source_type`` (billing, pharmacy, Pay Hero, cheques,
+    insurance) — so the journal IS the transaction record. This flattens each
+    entry into one row whose amount is the balanced debit total (base currency).
+
+    Security: rate-limited (60/min), gated by ``accounting:view``, read-only,
+    and every access is written to the audit trail (who viewed which filter).
+    """
+    rows, total = svc.transaction_log(
+        db,
+        source=source, status=status,
+        from_date=from_date, to_date=to_date, q=q,
+        min_amount=min_amount, max_amount=max_amount,
+        limit=limit, offset=offset,
+    )
+
+    items = [
+        TransactionLogItem(
+            entry_id=e.entry_id,
+            entry_number=e.entry_number,
+            entry_date=e.entry_date,
+            source_type=e.source_type,
+            source_label=_source_label(e.source_type),
+            source_id=e.source_id,
+            reference=e.reference,
+            memo=e.memo,
+            status=e.status,
+            currency_code=e.currency_code,
+            amount=amount,
+            created_at=e.created_at,
+            posted_at=e.posted_at,
+        )
+        for (e, amount) in rows
+    ]
+
+    # KDPA-style access trail: record who viewed the transaction log and the
+    # filter they applied. The audit row is committed here since this GET
+    # performs no other write.
+    user_id = current_user.get("user_id") if isinstance(current_user, dict) else getattr(current_user, "user_id", None)
+    log_audit(
+        db, user_id, "VIEW", "TransactionLog", "list",
+        new_value={
+            "source": source, "status": status,
+            "from": str(from_date) if from_date else None,
+            "to": str(to_date) if to_date else None,
+            "q": q, "min_amount": min_amount, "max_amount": max_amount,
+            "limit": limit, "offset": offset, "returned": len(items),
+        },
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
+
+    return TransactionLogPage(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get(
