@@ -11,6 +11,7 @@ hundreds of tenants does not exhaust connection-pool memory. All engines apply
 DB pool sizing from settings, which is intended to sit behind PgBouncer in
 production. See `docs/DEPLOYMENT.md` for the production-ready PgBouncer recipe.
 """
+import re
 from collections import OrderedDict
 from threading import Lock
 from sqlalchemy import create_engine, text
@@ -20,6 +21,14 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from fastapi import Request
 
 from app.config.settings import settings
+
+# SECURITY (C-2): tenant_db_name originates from the client-supplied
+# ``X-Tenant-ID`` header and is interpolated directly into the DB connection
+# URL. Constrain it to a safe Postgres identifier so a crafted header cannot
+# inject an alternate host/params or address an arbitrary database. This is the
+# same charset enforced at provisioning time (tenant_provisioning._DB_NAME_RE),
+# so every legitimately-provisioned tenant matches.
+_VALID_TENANT_DB_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 
 # Cheap, side-effect-free probe used by get_db() to surface "database does
 # not exist" before the request handler runs a real query (avoids 500s on
@@ -104,6 +113,11 @@ def get_tenant_engine(tenant_db_name: str):
     grow without limit on platforms with hundreds of tenants. Eviction calls
     .dispose() on the displaced engine so its pool is released cleanly.
     """
+    # SECURITY (C-2): reject any tenant identifier that is not a safe Postgres
+    # identifier before it ever reaches the connection string. Both the request
+    # path (X-Tenant-ID header) and provisioning route through here.
+    if not tenant_db_name or not _VALID_TENANT_DB_NAME.match(tenant_db_name):
+        raise ValueError(f"refusing unsafe tenant identifier: {tenant_db_name!r}")
     with _tenant_engines_lock:
         if tenant_db_name in tenant_engines:
             tenant_engines.move_to_end(tenant_db_name)
@@ -150,7 +164,15 @@ def get_db(request: Request = None):
             detail="X-Tenant-ID header is required for this endpoint.",
         )
 
-    engine = get_tenant_engine(tenant_db_name)
+    # SECURITY (C-2): a malformed/crafted X-Tenant-ID is a client error, not a
+    # 500 — map the identifier-validation failure to a clean 400.
+    try:
+        engine = get_tenant_engine(tenant_db_name)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid X-Tenant-ID.",
+        )
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = SessionLocal()
     try:
