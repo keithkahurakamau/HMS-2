@@ -7,7 +7,7 @@ import {
     LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
     ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy,
-    BookOpen, Smartphone, HelpCircle,
+    BookOpen, Smartphone, HelpCircle, HeartPulse,
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -28,6 +28,7 @@ export default function MainLayout() {
     const ROUTE_TO_JOURNEY = [
         ['/app/admin',           'admin'],
         ['/app/patients',        'patients'],
+        ['/app/triage',          'triage'],
         ['/app/clinical',        'clinical'],
         ['/app/laboratory',      'laboratory'],
         ['/app/radiology',       'radiology'],
@@ -69,6 +70,7 @@ export default function MainLayout() {
         { name: 'Messages',          path: '/app/messages',        icon: <MessageSquare size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Receptionist'], requiredPermission: 'messaging:read', moduleKey: 'messaging' },
         { name: 'Patient Registry',  path: '/app/patients',        icon: <Users size={18} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'patients:read',    moduleKey: 'patients' },
         { name: 'Medical History',   path: '/app/medical-history', icon: <ClipboardList size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse'],                       requiredPermission: 'history:read',     moduleKey: 'medical_history' },
+        { name: 'Triage',            path: '/app/triage',          icon: <HeartPulse size={18} />,      allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'triage:read',      moduleKey: 'clinical' },
         { name: 'Clinical Desk',     path: '/app/clinical',        icon: <Stethoscope size={18} />,     allowedRoles: ['Admin', 'Doctor'],                                requiredPermission: 'clinical:read',    moduleKey: 'clinical' },
         { name: 'Laboratory',        path: '/app/laboratory',      icon: <TestTube size={18} />,        allowedRoles: ['Admin', 'Lab Technician', 'Doctor'],              requiredPermission: 'laboratory:read',  moduleKey: 'laboratory' },
         { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={18} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'],                 requiredPermission: 'radiology:manage', moduleKey: 'radiology' },

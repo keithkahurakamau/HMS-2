@@ -2,14 +2,118 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="MediFleet — multi-hospital management platform" />
+
+    <!-- Primary meta -->
+    <title>MediFleet — Multi-Hospital Management Platform</title>
+    <meta
+      name="description"
+      content="MediFleet is a multi-tenant hospital management platform that unifies patient registration, clinical desk, pharmacy, lab, radiology, wards, and billing in one secure, audited workspace. Each hospital runs in its own isolated database."
+    />
+    <meta
+      name="keywords"
+      content="hospital management system, HMS, multi-tenant healthcare SaaS, clinical management software, pharmacy management, laboratory information system, radiology, wards, hospital billing, electronic medical records, EMR, Kenya hospital software, M-Pesa hospital payments"
+    />
+    <meta name="author" content="MediFleet" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="theme-color" content="#2563eb" />
-    <title>MediFleet — Hospital Operations</title>
+    <meta name="color-scheme" content="light dark" />
+    <meta name="application-name" content="MediFleet" />
+    <meta name="apple-mobile-web-app-title" content="MediFleet" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Canonical (per-route pages override this via the <Seo> component) -->
+    <link rel="canonical" href="https://www.medifleet.app/" />
+
+    <!-- Icons & manifest -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MediFleet" />
+    <meta property="og:title" content="MediFleet — Multi-Hospital Management Platform" />
+    <meta
+      property="og:description"
+      content="Run an entire fleet of hospitals from one codebase. Registration, clinical desk, pharmacy, lab, radiology, wards & billing — unified, audited, and isolated per tenant."
+    />
+    <meta property="og:url" content="https://www.medifleet.app/" />
+    <meta property="og:image" content="https://www.medifleet.app/og-image.svg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="MediFleet — Multi-Hospital Management Platform" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MediFleet — Multi-Hospital Management Platform" />
+    <meta
+      name="twitter:description"
+      content="Run an entire fleet of hospitals from one codebase. Unified clinical, operations & finance modules — audited and isolated per tenant."
+    />
+    <meta name="twitter:image" content="https://www.medifleet.app/og-image.svg" />
+    <meta name="twitter:image:alt" content="MediFleet — Multi-Hospital Management Platform" />
+
+    <!-- Organisation + product structured data (read from the DOM by crawlers; data block, not executed, so CSP-safe) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://www.medifleet.app/#organization",
+          "name": "MediFleet",
+          "url": "https://www.medifleet.app/",
+          "logo": "https://www.medifleet.app/favicon.svg",
+          "description": "Multi-tenant hospital management platform for running a fleet of hospitals from one codebase, with full per-tenant data isolation."
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://www.medifleet.app/#website",
+          "url": "https://www.medifleet.app/",
+          "name": "MediFleet",
+          "publisher": { "@id": "https://www.medifleet.app/#organization" },
+          "inLanguage": "en"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "MediFleet",
+          "applicationCategory": "BusinessApplication",
+          "applicationSubCategory": "Hospital Management System",
+          "operatingSystem": "Web",
+          "url": "https://www.medifleet.app/",
+          "description": "Multi-tenant hospital management platform unifying patient registration, clinical desk, pharmacy, laboratory, radiology, wards, inventory, and billing with role-based access control and per-tenant database isolation.",
+          "offers": {
+            "@type": "Offer",
+            "category": "SaaS subscription"
+          },
+          "featureList": [
+            "Patient registration & medical history",
+            "Clinical desk & triage",
+            "Pharmacy management",
+            "Laboratory information system",
+            "Radiology",
+            "Wards & bed management",
+            "Inventory",
+            "Billing & accounting",
+            "M-Pesa / Pay Hero payments",
+            "Role-based access control",
+            "Per-tenant database isolation",
+            "Audit logging"
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      MediFleet is a multi-hospital management platform. JavaScript is required to run
+      the application. Visit https://www.medifleet.app to learn more.
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

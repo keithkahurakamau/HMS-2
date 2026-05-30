@@ -209,10 +209,10 @@ export default function Inventory() {
                 subtitle="Manage global procurement and departmental distribution."
                 actions={
                     <>
-                        <button onClick={() => setIsTransferModalOpen(true)} className="btn-secondary cursor-pointer">
+                        <button data-tour="inv-transfer" onClick={() => setIsTransferModalOpen(true)} className="btn-secondary cursor-pointer">
                             <ArrowRightLeft size={15} /> Internal transfer
                         </button>
-                        <button onClick={() => setIsProcurementModalOpen(true)} className="btn-primary cursor-pointer">
+                        <button data-tour="inv-procurement" onClick={() => setIsProcurementModalOpen(true)} className="btn-primary cursor-pointer">
                             <Truck size={15} /> External procurement
                         </button>
                     </>
@@ -220,7 +220,7 @@ export default function Inventory() {
             />
 
             {/* DEPARTMENT TABS (HUB & SPOKE) */}
-            <div className="card p-1.5 flex overflow-x-auto custom-scrollbar gap-1">
+            <div data-tour="inv-locations" className="card p-1.5 flex overflow-x-auto custom-scrollbar gap-1">
                 {locations.map((loc) => {
                     const Icon = loc.icon;
                     const isActive = activeLocation.id === loc.id;
@@ -236,7 +236,7 @@ export default function Inventory() {
             </div>
 
             {/* KPI DASHBOARD */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div data-tour="inv-kpis" className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="stat-tile">
                     <div className="flex justify-between items-start"><div className="stat-icon bg-ink-100 ring-ink-200 text-ink-700"><Package size={20} /></div></div>
                     <div>
@@ -261,8 +261,8 @@ export default function Inventory() {
             </div>
 
             {/* INVENTORY DATA TABLE */}
-            <div className="card overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-ink-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-ink-50/40">
+            <div data-tour="inv-table" className="card overflow-hidden flex flex-col">
+                <div data-tour="inv-search" className="p-4 border-b border-ink-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-ink-50/40">
                     <div className="relative w-full max-w-md">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                         <input type="text" placeholder={`Search ${activeLocation.name} stock…`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="input pl-10" />

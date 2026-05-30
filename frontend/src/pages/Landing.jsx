@@ -14,12 +14,17 @@ import CountUp from '../components/CountUp';
 import ContactStrip from '../components/ContactStrip';
 import Reveal from '../components/Reveal';
 import PremiumBackground from '../components/PremiumBackground';
+import Seo from '../components/Seo';
 
 export default function Landing() {
     const navigate = useNavigate();
 
     return (
         <div className="relative min-h-screen bg-ink-50 text-ink-900 font-sans">
+            <Seo
+                path="/"
+                description="MediFleet unifies registration, clinical desk, pharmacy, lab, radiology, wards, and billing into one secure workspace. Run an entire fleet of hospitals from one codebase, fully isolated per tenant."
+            />
             {/* Premium reactive background — parallax gradient blobs that
                 follow the cursor + a spotlight disc that tracks 1:1. See
                 PremiumBackground.jsx for the rAF lerp mechanics. */}
