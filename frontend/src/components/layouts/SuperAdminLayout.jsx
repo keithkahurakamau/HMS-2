@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, CreditCard, Settings,
     ShieldAlert, LogOut, Search, Activity, Users, LifeBuoy,
-    Menu, X, Smartphone,
+    Menu, X, Smartphone, Wallet,
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/SuperAdminLogin';
 import { apiClient } from '../../api/client';
@@ -36,7 +36,8 @@ export default function SuperAdminLayout() {
         { name: 'Tenants & Hospitals',      path: '/superadmin/tenants',   icon: <Building2 size={18} /> },
         { name: 'Patients (read-only)',     path: '/superadmin/patients',  icon: <Users size={18} /> },
         { name: 'Support Inbox',            path: '/superadmin/support',   icon: <LifeBuoy size={18} /> },
-        { name: 'Billing & Subscriptions',  path: '/superadmin/billing',   icon: <CreditCard size={18} /> },
+        { name: 'Revenue & Tiers',          path: '/superadmin/billing',   icon: <CreditCard size={18} /> },
+        { name: 'Subscription Billing',     path: '/superadmin/subscriptions', icon: <Wallet size={18} /> },
         { name: 'M-Pesa Provisioning',      path: '/superadmin/payments',  icon: <Smartphone size={18} /> },
         { name: 'Platform Settings',        path: '/superadmin/settings',  icon: <Settings size={18} /> },
     ];
