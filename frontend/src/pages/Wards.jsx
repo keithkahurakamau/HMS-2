@@ -156,13 +156,13 @@ export default function Wards() {
                 title="Ward & Bed Management"
                 subtitle="Monitor hospital capacity, manage admissions, and track clinical inventory."
                 actions={
-                    <button onClick={() => setIsAdmitModalOpen(true)} className="btn-primary cursor-pointer">
+                    <button data-tour="ward-admit" onClick={() => setIsAdmitModalOpen(true)} className="btn-primary cursor-pointer">
                         <UserPlus size={16} /> Admit patient
                     </button>
                 }
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div data-tour="ward-kpis" className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="stat-tile">
                     <div className="flex justify-between items-start">
                         <div className="stat-icon bg-blue-50 ring-blue-100 text-blue-600"><Activity size={20} /></div>
@@ -196,7 +196,7 @@ export default function Wards() {
             </div>
 
             {/* BED BOARD GRID */}
-            <div className="space-y-6">
+            <div data-tour="bed-board" className="space-y-6">
                 {isLoading ? (
                     <div className="card text-center py-12 text-ink-400"><Activity className="animate-spin mx-auto mb-2" size={20} /> Resolving allocations…</div>
                 ) : wards.map(ward => (

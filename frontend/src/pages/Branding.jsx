@@ -129,6 +129,7 @@ export default function Branding() {
                 )}
                 actions={
                     <button
+                        data-tour="branding-save"
                         onClick={handleSave}
                         disabled={!isDirty || saving}
                         className="btn-primary cursor-pointer disabled:cursor-not-allowed"
@@ -142,6 +143,7 @@ export default function Branding() {
             <div className="grid grid-cols-12 gap-6">
                 {/* Logo */}
                 <Section
+                    tour="branding-logo"
                     span="md:col-span-6"
                     icon={<ImageIcon size={16} />}
                     title="Hospital logo"
@@ -159,6 +161,7 @@ export default function Branding() {
 
                 {/* Background */}
                 <Section
+                    tour="branding-background"
                     span="md:col-span-6"
                     icon={<ImageIcon size={16} />}
                     title="Sign-in background"
@@ -176,6 +179,7 @@ export default function Branding() {
 
                 {/* Brand colours */}
                 <Section
+                    tour="branding-colors"
                     span="md:col-span-6"
                     icon={<Palette size={16} />}
                     title="Brand colours"
@@ -203,6 +207,7 @@ export default function Branding() {
 
                 {/* Print templates */}
                 <Section
+                    tour="branding-templates"
                     span="md:col-span-6"
                     icon={<Printer size={16} />}
                     title="Print templates"
@@ -268,6 +273,7 @@ export default function Branding() {
 
                 {/* Preview */}
                 <Section
+                    tour="branding-preview"
                     span="md:col-span-12"
                     icon={<Eye size={16} />}
                     title="Preview"
@@ -289,9 +295,9 @@ export default function Branding() {
 /*  Subcomponents                                                              */
 /* ─────────────────────────────────────────────────────────────────────────── */
 
-function Section({ span, icon, title, desc, children }) {
+function Section({ span, icon, title, desc, children, tour }) {
     return (
-        <section className={`col-span-12 ${span} card overflow-hidden`}>
+        <section data-tour={tour} className={`col-span-12 ${span} card overflow-hidden`}>
             <div className="px-5 py-3 border-b border-ink-100 bg-ink-50/40 flex items-center gap-2">
                 <span className="text-brand-600">{icon}</span>
                 <h2 className="text-sm font-semibold text-ink-900 tracking-tight">{title}</h2>

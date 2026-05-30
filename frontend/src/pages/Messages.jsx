@@ -174,7 +174,7 @@ export default function Messages() {
             />
             <div className="flex flex-1 min-h-0 gap-4 flex-col md:flex-row">
             {/* Sidebar — full width on mobile (stacks above thread), fixed-width on tablet+. */}
-            <aside className={`md:w-80 shrink-0 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden ${activeId ? 'hidden md:flex' : 'flex'}`}>
+            <aside data-tour="msg-list" className={`md:w-80 shrink-0 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden ${activeId ? 'hidden md:flex' : 'flex'}`}>
                 <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                     <div>
                         <h2 className="text-sm font-semibold text-ink-900 dark:text-white tracking-tight">Conversations</h2>
@@ -182,6 +182,7 @@ export default function Messages() {
                     </div>
                     <div className="flex gap-1">
                         <button
+                            data-tour="msg-new-direct"
                             onClick={() => setPicker('direct')}
                             title="New direct message"
                             className="p-1.5 rounded-lg text-ink-500 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20"
@@ -189,6 +190,7 @@ export default function Messages() {
                             <UserIcon size={16} />
                         </button>
                         <button
+                            data-tour="msg-new-group"
                             onClick={() => setPicker('group')}
                             title="New group chat"
                             className="p-1.5 rounded-lg text-ink-500 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20"
@@ -254,7 +256,7 @@ export default function Messages() {
             </aside>
 
             {/* Main panel */}
-            <section className={`flex-1 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden ${activeId ? 'flex' : 'hidden md:flex'}`}>
+            <section data-tour="msg-thread" className={`flex-1 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden ${activeId ? 'flex' : 'hidden md:flex'}`}>
                 {!activeConv ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-ink-400 p-8">
                         <MessageSquare size={40} className="mb-3 opacity-40" aria-hidden="true" />

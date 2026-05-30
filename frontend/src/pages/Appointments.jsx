@@ -143,17 +143,17 @@ export default function Appointments() {
                 subtitle="Schedule, confirm, and manage clinic appointments."
                 actions={
                     <>
-                        <button onClick={fetchAppointments} className="btn-secondary cursor-pointer" aria-label="Reload appointments">
+                        <button data-tour="appt-refresh" onClick={fetchAppointments} className="btn-secondary cursor-pointer" aria-label="Reload appointments">
                             <RefreshCw size={15} /> Refresh
                         </button>
-                        <button onClick={() => setIsFormOpen(true)} className="btn-primary cursor-pointer">
+                        <button data-tour="appt-new" onClick={() => setIsFormOpen(true)} className="btn-primary cursor-pointer">
                             <Plus size={15} /> New appointment
                         </button>
                     </>
                 }
             />
 
-            <div className="card p-4 flex flex-wrap gap-4 items-end">
+            <div data-tour="appt-filters" className="card p-4 flex flex-wrap gap-4 items-end">
                 <div className="flex flex-col gap-1">
                     <label htmlFor="appt-filter-status" className="label flex items-center gap-1"><Filter size={11} /> Status</label>
                     <select
@@ -187,7 +187,7 @@ export default function Appointments() {
                     <p className="text-xs mt-1">Adjust your filters or book a new appointment.</p>
                 </div>
             ) : (
-                <div className="space-y-6">
+                <div data-tour="appt-list" className="space-y-6">
                     {grouped.map(([day, list]) => (
                         <section key={day}>
                             <h2 className="section-eyebrow mb-3 sticky top-0 bg-ink-50/95 backdrop-blur-sm py-2 z-[1] flex items-center gap-2">
@@ -222,7 +222,7 @@ export default function Appointments() {
                                             {appt.notes && <p className="text-xs text-ink-600 mt-2 line-clamp-2 leading-relaxed">{appt.notes}</p>}
 
                                             {appt.status !== 'Completed' && appt.status !== 'Cancelled' && (
-                                                <div className="flex flex-wrap gap-1.5 mt-3">
+                                                <div data-tour="appt-actions" className="flex flex-wrap gap-1.5 mt-3">
                                                     {appt.status === 'Scheduled' && (
                                                         <button onClick={() => updateStatus(appt.appointment_id, 'Confirmed')} className="text-xs font-semibold px-2.5 py-1 bg-accent-50 text-accent-700 rounded-lg ring-1 ring-accent-100 hover:bg-accent-100 transition-colors">
                                                             <CheckCircle2 size={12} className="inline mr-1" /> Confirm

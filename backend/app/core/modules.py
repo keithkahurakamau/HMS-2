@@ -98,6 +98,8 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/appointments/",                "appointments"),
     ("/api/queue/",                       "patients"),
     # optional modules.
+    # Triage is part of the clinical workflow — gate it with the Clinical Desk.
+    ("/api/triage/",                      "clinical"),
     ("/api/clinical/",                    "clinical"),
     ("/api/laboratory/",                  "laboratory"),
     ("/api/radiology/",                   "radiology"),

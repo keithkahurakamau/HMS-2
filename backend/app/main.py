@@ -20,6 +20,7 @@ import app.routes.dashboard as dashboard_module
 import app.routes.patients as patients_module
 import app.routes.appointments as appointments_module
 import app.routes.queue as queue_module
+import app.routes.triage as triage_module
 import app.routes.clinical as clinical_module
 import app.routes.laboratory as laboratory_module
 import app.routes.pharmacy as pharmacy_module
@@ -259,6 +260,7 @@ app.include_router(admin_module.router)
 app.include_router(patients_module.router)
 app.include_router(appointments_module.router)
 app.include_router(queue_module.router)
+app.include_router(triage_module.router)
 app.include_router(clinical_module.router)
 app.include_router(laboratory_module.router)
 app.include_router(pharmacy_module.router)

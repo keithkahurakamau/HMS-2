@@ -94,6 +94,9 @@ export default function ClinicalDesk() {
         setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
         setClinicalNotes({ cc: '', hpi: '', objective: '', diagnosis: '', plan: '', internal_notes: '' });
         setIcdSearch('');
+        // Pre-fill from the nurse's triage so the doctor doesn't re-key vitals.
+        // Fire-and-forget — a missing/absent triage just leaves the form blank.
+        prefillFromTriage(patientItem.patient_id);
         // Default to ON — a consultation that ends at "Send to billing" with
         // no fee posts no invoice and the patient never surfaces in the
         // cashier's queue, which is the most common bug report from
@@ -102,6 +105,34 @@ export default function ClinicalDesk() {
         setPendingFollowUp(null);
         setHasRecordedConsent(false);
         setConsentDraft({ consent_method: 'Verbal', notes: '' });
+    };
+
+    // Pulls the most recent nurse triage for this patient and drops the vitals
+    // straight into the encounter form. This is the payoff of the triage
+    // module — the doctor opens the chart and the numbers are already there.
+    const prefillFromTriage = async (patientId) => {
+        if (!patientId) return;
+        try {
+            const res = await apiClient.get(`/triage/patients/${patientId}/latest`);
+            const t = res.data;
+            if (!t) return; // never triaged — leave the form blank
+            setVitals({
+                weight: t.weight_kg ?? '',
+                height: t.height_cm ?? '',
+                bp: t.blood_pressure ?? '',
+                hr: t.heart_rate ?? '',
+                rr: t.respiratory_rate ?? '',
+                temp: t.temperature ?? '',
+                spo2: t.spo2 ?? '',
+            });
+            if (t.chief_complaint) {
+                setClinicalNotes((prev) => ({ ...prev, cc: t.chief_complaint }));
+            }
+            toast.success('Vitals pre-filled from triage.', { icon: '🩺' });
+        } catch (err) {
+            // Triage is a convenience prefill, not a hard dependency — stay quiet
+            // on failure (e.g. doctor's role lacks triage:read on an old tenant).
+        }
     };
 
     // --- ACTION HANDLERS ---

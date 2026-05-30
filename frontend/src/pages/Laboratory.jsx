@@ -275,7 +275,7 @@ export default function Laboratory() {
             />
 
             {/* Tabs */}
-            <div className="card p-2 flex items-center justify-between shrink-0">
+            <div data-tour="lab-tabs" className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" aria-label="Laboratory mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
                     <button role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
                             className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
@@ -291,7 +291,7 @@ export default function Laboratory() {
             {/* ─────────────── Mode 1: Lab Operations ─────────────── */}
             {activeTab === 'queue' && (
                 <>
-                    <div className="card shrink-0 flex flex-col z-20">
+                    <div data-tour="lab-queue" className="card shrink-0 flex flex-col z-20">
                         <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
                             <div className="flex items-center gap-3">
                                 <TestTube className="text-brand-600" size={18} />
@@ -336,7 +336,7 @@ export default function Laboratory() {
                     </div>
 
                     {/* Workbench */}
-                    <div className="flex-1 card overflow-hidden flex flex-col z-10 relative">
+                    <div data-tour="lab-workbench" className="flex-1 card overflow-hidden flex flex-col z-10 relative">
                         {!activeTest ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40">
                                 <FlaskConical size={56} className="mb-4 text-ink-300" strokeWidth={1.5} />
@@ -548,12 +548,12 @@ export default function Laboratory() {
                             </h2>
                             <p className="text-sm text-ink-500 mt-1">Add or revise tests, parameters, reference ranges and pricing.</p>
                         </div>
-                        <button onClick={startCreate} className="btn-primary">
+                        <button data-tour="lab-new-test" onClick={startCreate} className="btn-primary">
                             <Plus size={16} /> New test
                         </button>
                     </div>
 
-                    <div className="flex-1 overflow-auto">
+                    <div data-tour="lab-catalog" className="flex-1 overflow-auto">
                         <table className="table-clean min-w-[700px]">
                             <thead>
                                 <tr>

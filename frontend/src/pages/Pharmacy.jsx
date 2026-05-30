@@ -264,7 +264,7 @@ export default function Pharmacy() {
                 subtitle="Fulfil prescriptions, dispense over-the-counter sales, and track stock movements."
             />
             {/* GLOBAL PHARMACY HEADER & TABS */}
-            <div className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
+            <div data-tour="pharmacy-tabs" className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Pharmacy mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
                     <button role="tab" aria-selected={activeTab === 'rx'} onClick={() => setActiveTab('rx')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'rx' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
                         <Pill size={16} className={activeTab === 'rx' ? 'text-brand-600' : 'text-ink-400'} /> Rx Fulfillment
@@ -286,7 +286,7 @@ export default function Pharmacy() {
             {/* ========================================= */}
             {activeTab === 'rx' && (
                 <>
-                    <div className="card shrink-0 flex flex-col z-20">
+                    <div data-tour="pharmacy-dispense-queue" className="card shrink-0 flex flex-col z-20">
                         <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
                             <div className="flex items-center gap-3">
                                 <Package className="text-brand-600" size={18} />
@@ -379,7 +379,7 @@ export default function Pharmacy() {
                                     ))}
                                 </div>
 
-                                <div className="p-4 border-t border-ink-100 bg-white flex flex-wrap justify-end gap-2 shrink-0 z-10">
+                                <div data-tour="pharmacy-rx-actions" className="p-4 border-t border-ink-100 bg-white flex flex-wrap justify-end gap-2 shrink-0 z-10">
                                     <button
                                         onClick={() => printPrescription({
                                             patient: { full_name: activeOrder.patient, outpatient_no: activeOrder.op_no, allergies: activeOrder.allergies },
@@ -409,7 +409,7 @@ export default function Pharmacy() {
             {activeTab === 'otc' && (
                 <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
                     {/* LEFT PANEL: INVENTORY SEARCH */}
-                    <div className="flex-1 card flex flex-col overflow-hidden">
+                    <div data-tour="pharmacy-otc-search" className="flex-1 card flex flex-col overflow-hidden">
                         <div className="p-4 border-b border-ink-100 bg-ink-50/40">
                             <div className="relative">
                                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
@@ -495,7 +495,7 @@ export default function Pharmacy() {
                             )}
                         </div>
 
-                        <div className="p-4 border-t border-ink-100 bg-white">
+                        <div data-tour="pharmacy-pay" className="p-4 border-t border-ink-100 bg-white">
                             <div className="flex justify-between items-center mb-3">
                                 <span className="section-eyebrow">Subtotal</span>
                                 <span className="text-xl font-semibold text-ink-900 tracking-tight">KES {cartTotal.toLocaleString()}</span>
@@ -515,7 +515,9 @@ export default function Pharmacy() {
             )}
 
             {activeTab === 'transactions' && (
-                <TransactionsTab />
+                <div data-tour="pharmacy-transactions" className="flex-1 flex flex-col overflow-hidden">
+                    <TransactionsTab />
+                </div>
             )}
 
             {payment && (

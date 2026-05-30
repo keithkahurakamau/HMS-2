@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="MediFleet — Multi-Hospital Management Platform">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#111c33"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="80" y1="200" x2="240" y2="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1050" cy="120" r="320" fill="#2563eb" opacity="0.10"/>
+  <circle cx="120" cy="560" r="260" fill="#14b8a6" opacity="0.10"/>
+
+  <!-- Logo mark -->
+  <g transform="translate(80,96)">
+    <rect width="120" height="120" rx="28" fill="url(#mark)"/>
+    <path d="M20 64 H44 L54 40 L70 86 L80 60 L88 64 H104"
+          fill="none" stroke="#ffffff" stroke-width="8"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="224" y="178" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="60" font-weight="700" fill="#ffffff">MediFleet</text>
+
+  <!-- Headline -->
+  <text x="80" y="330" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="74" font-weight="700" fill="#ffffff">Run a fleet of hospitals</text>
+  <text x="80" y="416" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="74" font-weight="700" fill="#7dd3fc">from one secure platform.</text>
+
+  <!-- Subhead -->
+  <text x="80" y="488" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="32" fill="#94a3b8">Clinical · Pharmacy · Lab · Radiology · Wards · Billing — isolated per tenant.</text>
+
+  <!-- Bottom accent bar -->
+  <rect x="80" y="540" width="220" height="8" rx="4" fill="url(#accent)"/>
+  <text x="80" y="588" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" font-weight="600" fill="#cbd5e1">www.medifleet.app</text>
+</svg>
