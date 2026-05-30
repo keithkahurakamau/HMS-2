@@ -6,7 +6,6 @@ import {
     Send, Banknote, Building2, Hash, Wallet,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
-import { useModuleJourney } from '../context/JourneyContext';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  M-Pesa payment settings — hospital-facing.                                */
@@ -36,8 +35,6 @@ export default function MpesaSettings() {
     const [saving, setSaving] = useState(false);
     const [testPhone, setTestPhone] = useState('');
     const [testing, setTesting] = useState(false);
-
-    useModuleJourney('payhero');
 
     const load = async () => {
         setLoading(true);
