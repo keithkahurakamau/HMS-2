@@ -351,8 +351,32 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
             return
 
         txn.receipt_number = receipt_no
-        txn.amount = amount or txn.amount
-        txn.status = "Success" if result_code in (0, "0") else "Failed"
+        is_success = result_code in (0, "0")
+
+        # SECURITY (C-1): the matched pending row carries the amount we minted
+        # at initiate-time — that is the authoritative figure we pushed to the
+        # payer. On the tenant rail the webhook signing secret is tenant-owned,
+        # so a *validly-signed* callback can still be forged. Never let the
+        # callback body's Amount inflate what we settle: a callback claiming
+        # MORE than we initiated is tampering — flag it and refuse to settle.
+        initiated_amount = Decimal(str(txn.amount or 0))
+        if is_success and initiated_amount > 0 and amount > initiated_amount:
+            txn.status = "Amount Mismatch"
+            txn.result_desc = (
+                f"callback amount {amount} exceeds initiated {initiated_amount}"
+            )[:255]
+            logger.warning(
+                "Pay Hero callback amount tampering on %s: initiated=%s callback=%s (refused)",
+                external_ref or receipt_no, initiated_amount, amount,
+            )
+            db.commit()
+            return
+
+        # Keep the authoritative initiated amount; only adopt the callback
+        # figure when we never recorded one (older / unmatched rows).
+        if initiated_amount <= 0:
+            txn.amount = amount or txn.amount
+        txn.status = "Success" if is_success else "Failed"
         txn.result_desc = str(result_desc)[:255]
         if not txn.external_reference:
             txn.external_reference = external_ref or None
@@ -364,7 +388,7 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
                 .with_for_update()
                 .first()
             )
-            if invoice and amount > 0:
+            if invoice and txn.amount and txn.amount > 0:
                 settle_invoice_match(
                     db,
                     invoice=invoice,
