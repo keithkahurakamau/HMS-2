@@ -128,6 +128,8 @@ PERMISSION_CATALOG: tuple[tuple[str, str], ...] = (
     ("appointments:manage",    "Book, reschedule, and cancel appointments"),
 
     # ── Clinical workflow ────────────────────────────────────────────────
+    ("triage:read",            "View the triage queue and recorded vitals"),
+    ("triage:write",           "Record triage vitals and route patients to the doctor"),
     ("clinical:read",          "Review encounters, diagnoses, prescriptions"),
     ("clinical:write",         "Create encounters, diagnoses, prescriptions"),
     ("history:read",           "View longitudinal medical history"),
@@ -201,14 +203,15 @@ _BASE = [*_MESSAGING_BASE, *_SETTINGS_READ, *_HOME_BASE]
 
 ROLE_GRANTS = {
     "Admin": PERMISSIONS,
-    "Doctor": ["clinical:write", "clinical:read", "patients:read", "patients:write",
+    "Doctor": ["clinical:write", "clinical:read", "triage:read", "patients:read", "patients:write",
                "pharmacy:read", "laboratory:read", "laboratory:manage",
                "radiology:read", "history:read", "history:manage",
                "inventory:read", "wards:read",
                "appointments:manage",
                "referrals:read", "referrals:manage",
                "cheques:read", *_BASE],
-    "Nurse": ["clinical:read", "patients:read", "wards:read", "wards:manage",
+    "Nurse": ["triage:write", "triage:read", "clinical:read", "patients:read",
+              "wards:read", "wards:manage",
               "pharmacy:read", "history:read", "inventory:read",
               "appointments:manage",
               "cheques:read", *_BASE],

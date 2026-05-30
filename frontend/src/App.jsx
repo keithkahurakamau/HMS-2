@@ -10,11 +10,13 @@ import { JourneyProvider } from './context/JourneyContext';
 import JourneyOverlay from './components/JourneyOverlay';
 import ModuleGuard from './components/ModuleGuard';
 import { Activity } from 'lucide-react';
+import Seo from './components/Seo';
 
 // Page Imports
 import Login from './pages/Login';
 import Patients from './pages/Patients';
 import ClinicalDesk from './pages/ClinicalDesk';
+import Triage from './pages/Triage';
 import Pharmacy from './pages/Pharmacy';
 import Inventory from './pages/Inventory';
 import Laboratory from './pages/Laboratory';
@@ -81,6 +83,19 @@ const SuperAdminProtectedRoute = ({ children }) => {
   return children;
 };
 
+// Routes that should be indexed by search engines. These pages render their
+// own rich <Seo> (title/description/canonical). Every other route is part of
+// the authenticated app, the patient portal, the platform back-office, or an
+// auth flow — none of which belong in a search index — so RouteMeta stamps
+// them noindex. New private routes are covered automatically.
+const PUBLIC_PATHS = new Set(['/', '/portal']);
+
+const RouteMeta = () => {
+  const { pathname } = useLocation();
+  if (PUBLIC_PATHS.has(pathname)) return null;
+  return <Seo noindex title="Secure workspace" />;
+};
+
 // SMART ROUTER
 const RoleBasedRedirect = () => {
     const { user, loading } = useAuth();
@@ -91,7 +106,7 @@ const RoleBasedRedirect = () => {
     switch (user.role) {
         case 'Admin': return <Navigate to="/app/admin" replace />;
         case 'Doctor': return <Navigate to="/app/clinical" replace />;
-        case 'Nurse': return <Navigate to="/app/wards" replace />;
+        case 'Nurse': return <Navigate to="/app/triage" replace />;
         case 'Pharmacist': return <Navigate to="/app/pharmacy" replace />;
         case 'Lab Technician': return <Navigate to="/app/laboratory" replace />;
         case 'Radiologist': return <Navigate to="/app/radiology" replace />;
@@ -119,6 +134,7 @@ export default function App() {
               module page calls useModuleJourney(). Mounted once at the
               app root so portal target (document.body) is always available. */}
           <JourneyOverlay />
+          <RouteMeta />
           <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/portal" element={<Portal />} />
@@ -147,6 +163,7 @@ export default function App() {
             
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="patients" element={<Patients />} />
+            <Route path="triage" element={<ModuleGuard moduleKey="clinical"><Triage /></ModuleGuard>} />
             <Route path="clinical" element={<ModuleGuard moduleKey="clinical"><ClinicalDesk /></ModuleGuard>} />
             <Route path="laboratory" element={<ModuleGuard moduleKey="laboratory"><Laboratory /></ModuleGuard>} />
             <Route path="radiology" element={<ModuleGuard moduleKey="radiology"><Radiology /></ModuleGuard>} />
