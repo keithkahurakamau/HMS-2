@@ -1,0 +1,20 @@
+{
+  "name": "MediFleet — Multi-Hospital Management Platform",
+  "short_name": "MediFleet",
+  "description": "Multi-tenant hospital management platform unifying clinical, operations, and finance workflows in one secure, audited workspace.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "lang": "en",
+  "categories": ["medical", "business", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

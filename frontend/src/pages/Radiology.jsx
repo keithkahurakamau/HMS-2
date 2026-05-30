@@ -145,7 +145,7 @@ export default function Radiology() {
                 title="Radiology"
                 subtitle="Acquire imaging requests, run studies, and publish reports."
             />
-            <div className="card p-2 flex items-center justify-between shrink-0">
+            <div data-tour="radio-tabs" className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
                     <button role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
                             className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
@@ -161,7 +161,7 @@ export default function Radiology() {
             {activeTab === 'queue' && (
                 <>
                     {/* Queue */}
-                    <div className="card shrink-0 flex flex-col z-20">
+                    <div data-tour="radio-queue" className="card shrink-0 flex flex-col z-20">
                         <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl">
                             <div className="flex items-center gap-3">
                                 <Activity className="text-brand-600" size={18} />
@@ -269,7 +269,7 @@ export default function Radiology() {
 
                                             <div className="flex flex-wrap justify-center gap-3">
                                                 <button onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Cancel</button>
-                                                <button onClick={handleAcknowledge} className="btn-primary">
+                                                <button data-tour="radio-acknowledge" onClick={handleAcknowledge} className="btn-primary">
                                                     <CheckCircle2 size={16} /> Acknowledge & begin exam
                                                 </button>
                                             </div>
@@ -285,7 +285,7 @@ export default function Radiology() {
                                                 </div>
                                             )}
 
-                                            <div className="card-flush p-5 sm:p-6 animate-fade-in">
+                                            <div data-tour="radio-report" className="card-flush p-5 sm:p-6 animate-fade-in">
                                                 <h3 className="section-eyebrow mb-5 border-b border-ink-100 pb-3 flex items-center gap-2">
                                                     <FileText className="text-brand-600" size={16} /> Radiologist report
                                                 </h3>
@@ -320,7 +320,7 @@ export default function Radiology() {
                                 {activeRequest.status === 'In Progress' && (
                                     <div className="p-4 border-t border-ink-100 bg-white flex justify-end gap-2 shrink-0 z-10">
                                         <button onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Close</button>
-                                        <button onClick={handleRelease} className="btn-success">
+                                        <button data-tour="radio-publish" onClick={handleRelease} className="btn-success">
                                             <Send size={16} /> Sign & publish report
                                         </button>
                                     </div>
@@ -341,10 +341,10 @@ export default function Radiology() {
                             </h2>
                             <p className="text-sm text-ink-500 mt-1">Add or revise exams, default templates and pricing.</p>
                         </div>
-                        <button onClick={startCreate} className="btn-primary"><Plus size={16} /> New exam</button>
+                        <button data-tour="radio-new-exam" onClick={startCreate} className="btn-primary"><Plus size={16} /> New exam</button>
                     </div>
 
-                    <div className="flex-1 overflow-auto">
+                    <div data-tour="radio-catalog" className="flex-1 overflow-auto">
                         <table className="table-clean min-w-[700px]">
                             <thead>
                                 <tr>

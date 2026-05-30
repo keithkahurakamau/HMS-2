@@ -206,7 +206,7 @@ export default function Billing() {
                 subtitle="Manage patient invoices, consultation fees, and accept payments."
                 actions={
                     <div className="flex gap-2 flex-wrap items-center">
-                    <div className="relative">
+                    <div data-tour="billing-search" className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" size={16} />
                         <input
                             type="text" placeholder="Search invoices…"
@@ -214,7 +214,7 @@ export default function Billing() {
                             className="input pl-9 w-64"
                         />
                     </div>
-                    <button onClick={openLedger} className="btn-success cursor-pointer">
+                    <button data-tour="billing-mpesa" onClick={openLedger} className="btn-success cursor-pointer">
                         <Smartphone size={15} /> M-Pesa Ledger
                     </button>
                     </div>
@@ -223,7 +223,7 @@ export default function Billing() {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                 {/* Billing Queue List */}
-                <div className="md:col-span-1 space-y-3">
+                <div data-tour="billing-queue" className="md:col-span-1 space-y-3">
                     <h3 className="section-eyebrow flex items-center justify-between">
                         Pending invoices <span className="badge-brand">{queue.length}</span>
                     </h3>
@@ -260,7 +260,7 @@ export default function Billing() {
                 </div>
 
                 {/* Main Cashier Workspace */}
-                <div className="md:col-span-3">
+                <div data-tour="billing-pay" className="md:col-span-3">
                     {activeInvoice ? (
                         <div className="card overflow-hidden flex flex-col min-h-[60vh] md:h-[calc(100vh-160px)]">
                             <div className="p-5 sm:p-6 bg-gradient-to-br from-ink-900 to-ink-950 text-white shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

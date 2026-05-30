@@ -54,7 +54,7 @@ export default function Accounting() {
                 tone="brand"
             />
 
-            <div className="flex flex-wrap gap-2 border-b border-ink-200/70">
+            <div data-tour="acc-tabs" className="flex flex-wrap gap-2 border-b border-ink-200/70">
                 {TABS.map(({ key, label, icon: Icon }) => (
                     <button
                         key={key}
@@ -106,7 +106,7 @@ function ChartOfAccountsTab() {
     useEffect(() => { load(); }, []);
 
     return (
-        <div className="space-y-4">
+        <div data-tour="acc-coa" className="space-y-4">
             <div className="flex justify-end">
                 <button
                     onClick={() => setOpenModal(true)}

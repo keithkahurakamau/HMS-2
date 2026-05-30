@@ -207,7 +207,7 @@ export default function MedicalHistory() {
             />
 
             {/* Patient Search */}
-            <div className="card p-4 shrink-0 overflow-visible relative z-20">
+            <div data-tour="mh-search" className="card p-4 shrink-0 overflow-visible relative z-20">
                 <form onSubmit={handleSearch} className="flex gap-2 relative flex-wrap">
                     <div className="relative flex-1 min-w-[16rem]">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
@@ -239,7 +239,7 @@ export default function MedicalHistory() {
                     </div>
                     <button type="submit" className="btn-primary">Search chart</button>
                     {chart && (
-                        <button type="button" onClick={openAddModal} className="btn-success">
+                        <button type="button" data-tour="mh-add-entry" onClick={openAddModal} className="btn-success">
                             <Plus size={15} /> Add entry
                         </button>
                     )}
@@ -279,6 +279,7 @@ export default function MedicalHistory() {
                                             entries: chart.entries || [],
                                             consents: chart.consents || [],
                                         })}
+                                        data-tour="mh-print"
                                         className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/15 ring-1 ring-white/15 rounded-lg text-xs font-semibold transition-colors"
                                     >
                                         <Printer size={13} /> Print summary
@@ -323,7 +324,7 @@ export default function MedicalHistory() {
                             const isOpen = expandedSections[type.key];
                             const colorClass = colorMap[type.color];
                             return (
-                                <div key={type.key} id={`mh-section-${type.key}`} className="card overflow-hidden scroll-mt-20">
+                                <div key={type.key} id={`mh-section-${type.key}`} data-tour={type.key === ENTRY_TYPES[0].key ? 'mh-entry-section' : undefined} className="card overflow-hidden scroll-mt-20">
                                     <button
                                         onClick={() => toggleSection(type.key)}
                                         className="w-full flex items-center justify-between p-4 hover:bg-ink-50/50 transition-colors"
@@ -558,7 +559,7 @@ function ConsentCard({ patientId, consents, onRecorded }) {
     const handle = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
     return (
-        <div className="card overflow-hidden">
+        <div data-tour="consent-card" className="card overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-ink-100">
                 <div className="flex items-center gap-3">
                     <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-emerald-50 text-emerald-700 border-emerald-200">

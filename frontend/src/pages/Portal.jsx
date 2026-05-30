@@ -12,6 +12,7 @@ import CountUp from '../components/CountUp';
 import ContactStrip from '../components/ContactStrip';
 import Reveal from '../components/Reveal';
 import PremiumBackground from '../components/PremiumBackground';
+import Seo from '../components/Seo';
 
 /**
  * Portal — hospital workspace selector.
@@ -105,6 +106,11 @@ export default function Portal() {
 
     return (
         <div className="relative min-h-screen bg-ink-50 text-ink-900 font-sans">
+            <Seo
+                title="Find your hospital"
+                path="/portal"
+                description="Find and sign in to your hospital's MediFleet workspace. Staff and patients can locate their facility to access the clinical, pharmacy, lab, and billing tools they use every day."
+            />
             {/* Premium reactive background — parallax gradient blobs that
                 follow the cursor + a spotlight disc that tracks 1:1. See
                 PremiumBackground.jsx for the rAF lerp mechanics. */}

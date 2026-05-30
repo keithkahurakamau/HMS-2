@@ -1,0 +1,29 @@
+# MediFleet — robots.txt
+# Public marketing surface is crawlable; the authenticated application,
+# patient data, and the platform back-office are not.
+
+User-agent: *
+Allow: /$
+Allow: /portal
+
+# Authenticated hospital workspace — no public content, may expose PHI
+Disallow: /app
+Disallow: /app/
+
+# Patient portal — private health information
+Disallow: /patient
+Disallow: /patient/
+
+# Auth & account flows — no SEO value, avoid duplicate/thin pages
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# Platform back-office (superadmin) — strictly internal
+Disallow: /superadmin
+Disallow: /superadmin/
+
+# Never crawl the JSON API
+Disallow: /api/
+
+Sitemap: https://www.medifleet.app/sitemap.xml

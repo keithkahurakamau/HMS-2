@@ -147,7 +147,7 @@ export default function AdminDashboard() {
                 subtitle="Hospital operations cockpit — staff, roles, departments, pricing, and audit."
             />
             {/* HEADER & TABS — unified pill row, single accent for active state */}
-            <div className="card p-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between shrink-0 gap-2">
+            <div data-tour="admin-tabs" className="card p-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Admin sections" className="flex flex-wrap bg-ink-100/70 p-1 rounded-xl w-full lg:w-auto lg:flex-1 gap-1">
                     {[
                         { key: 'overview',    label: 'Overview',         icon: LayoutDashboard },
@@ -184,7 +184,7 @@ export default function AdminDashboard() {
             {/* TAB 1: SYSTEM OVERVIEW */}
             {activeTab === 'overview' && (
                 <div className="space-y-6 overflow-y-auto custom-scrollbar pr-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div data-tour="admin-overview" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="stat-tile">
                             <div className="flex justify-between items-start">
                                 <div className="stat-icon bg-blue-50 ring-blue-100 text-blue-600"><Users size={20} /></div>
@@ -239,7 +239,7 @@ export default function AdminDashboard() {
                                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm transition-all" 
                             />
                         </div>
-                        <button onClick={() => setIsStaffModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 shadow-sm transition-colors">
+                        <button data-tour="admin-provision" onClick={() => setIsStaffModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 shadow-sm transition-colors">
                             <UserPlus size={18} /> Provision New Account
                         </button>
                     </div>
@@ -293,6 +293,7 @@ export default function AdminDashboard() {
                                                         <Edit size={12}/> Edit Role
                                                     </button>
                                                     <button
+                                                        data-tour="admin-perms"
                                                         onClick={() => setPermsEditorUser(user)}
                                                         disabled={user.role === 'Admin'}
                                                         title={user.role === 'Admin' ? "Admin permissions can't be overridden" : 'Override individual permissions'}

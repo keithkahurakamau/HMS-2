@@ -192,13 +192,13 @@ export default function Support() {
                 actions={
                     <>
                         <button onClick={fetchTickets} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
-                        <button onClick={() => setIsNewOpen(true)} className="btn-primary cursor-pointer"><Plus size={15} /> New ticket</button>
+                        <button data-tour="support-new" onClick={() => setIsNewOpen(true)} className="btn-primary cursor-pointer"><Plus size={15} /> New ticket</button>
                     </>
                 }
             />
 
             {/* History filter chips — show count per status across the whole inbox */}
-            <div className="card p-2 flex flex-wrap gap-1" role="tablist" aria-label="Filter tickets by status">
+            <div data-tour="support-filters" className="card p-2 flex flex-wrap gap-1" role="tablist" aria-label="Filter tickets by status">
                 <button
                     type="button"
                     onClick={() => setStatusFilter('')}
@@ -235,7 +235,7 @@ export default function Support() {
 
             <div className="grid grid-cols-12 gap-4">
                 {/* List */}
-                <div className="col-span-12 lg:col-span-5 card overflow-hidden flex flex-col" style={{maxHeight: 'calc(100vh - 18rem)'}}>
+                <div data-tour="support-list" className="col-span-12 lg:col-span-5 card overflow-hidden flex flex-col" style={{maxHeight: 'calc(100vh - 18rem)'}}>
                     {isLoading ? (
                         <div className="flex-1 flex items-center justify-center text-ink-400 p-10">
                             <Activity className="animate-spin mr-2 text-brand-500" size={18} /> Loading…
@@ -288,7 +288,7 @@ export default function Support() {
                 </div>
 
                 {/* Thread */}
-                <div className="col-span-12 lg:col-span-7 card overflow-hidden flex flex-col" style={{maxHeight: 'calc(100vh - 18rem)'}}>
+                <div data-tour="support-thread" className="col-span-12 lg:col-span-7 card overflow-hidden flex flex-col" style={{maxHeight: 'calc(100vh - 18rem)'}}>
                     {!activeTicket ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-ink-400 p-10 text-center">
                             <MessageSquare size={36} className="mb-3 text-ink-300" />
@@ -322,6 +322,7 @@ export default function Support() {
                                 {activeTicket.status !== 'Closed' && (
                                     <button
                                         type="button"
+                                        data-tour="support-close"
                                         onClick={closeTicket}
                                         className="text-xs text-rose-600 hover:text-rose-700 hover:underline mt-1 cursor-pointer"
                                     >
@@ -355,7 +356,7 @@ export default function Support() {
                             </div>
 
                             {activeTicket.status !== 'Closed' && (
-                                <div className="p-3 border-t border-ink-100 bg-white flex gap-2">
+                                <div data-tour="support-reply" className="p-3 border-t border-ink-100 bg-white flex gap-2">
                                     <textarea rows="2" className="input flex-1 resize-none" placeholder="Reply to MediFleet support…"
                                               value={reply} onChange={e => setReply(e.target.value)} />
                                     <button onClick={sendReply} disabled={sendingReply || !reply.trim()} className="btn-primary self-end disabled:opacity-50">

@@ -149,8 +149,8 @@ export default function Settings() {
                             <Sparkles size={15} /> Replay tours
                         </button>
                         <button onClick={fetchSettings} className="btn-secondary cursor-pointer"><RefreshCcw size={15} /> Refresh</button>
-                        <button onClick={() => setShowCustomForm(true)} className="btn-secondary cursor-pointer"><Plus size={15} /> Custom setting</button>
-                        <button onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50 cursor-pointer">
+                        <button data-tour="settings-custom" onClick={() => setShowCustomForm(true)} className="btn-secondary cursor-pointer"><Plus size={15} /> Custom setting</button>
+                        <button data-tour="settings-save" onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50 cursor-pointer">
                             {saving ? <Activity size={15} className="animate-spin" /> : <Save size={15} />} Save changes ({dirtyIds.length})
                         </button>
                     </>
@@ -191,7 +191,7 @@ export default function Settings() {
             ) : (
                 <div className="grid grid-cols-12 gap-4">
                     {/* Category nav */}
-                    <nav className="col-span-12 md:col-span-3 card p-2 flex md:flex-col gap-1 overflow-x-auto">
+                    <nav data-tour="settings-categories" className="col-span-12 md:col-span-3 card p-2 flex md:flex-col gap-1 overflow-x-auto">
                         {categories.map(c => {
                             const meta = CATEGORY_META[c.key] || { label: c.key.replace(/_/g, ' '), icon: SettingsIcon };
                             const Icon = meta.icon;
@@ -208,7 +208,7 @@ export default function Settings() {
                     </nav>
 
                     {/* Setting list */}
-                    <div className="col-span-12 md:col-span-9 card overflow-hidden">
+                    <div data-tour="settings-list" className="col-span-12 md:col-span-9 card overflow-hidden">
                         <div className="p-5 border-b border-ink-100 bg-ink-50/40">
                             <h2 className="font-semibold text-ink-900">
                                 {(CATEGORY_META[activeCategory]?.label || activeCategory)}
