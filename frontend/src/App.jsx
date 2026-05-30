@@ -45,6 +45,7 @@ import SuperAdminLayout from './components/layouts/SuperAdminLayout';
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import TenantsManager from './pages/superadmin/TenantsManager';
 import PlatformBilling from './pages/superadmin/PlatformBilling';
+import PlatformSubscriptions from './pages/superadmin/PlatformSubscriptions';
 import PaymentsManager from './pages/superadmin/PaymentsManager';
 import PlatformSettings from './pages/superadmin/PlatformSettings';
 import SuperAdminPatients from './pages/superadmin/SuperAdminPatients';
@@ -134,6 +135,7 @@ export default function App() {
             <Route path="patients" element={<SuperAdminPatients />} />
             <Route path="support" element={<SupportInbox />} />
             <Route path="billing" element={<PlatformBilling />} />
+            <Route path="subscriptions" element={<PlatformSubscriptions />} />
             <Route path="payments" element={<PaymentsManager />} />
             <Route path="settings" element={<PlatformSettings />} />
             <Route path="*" element={<SuperAdminDashboard />} />

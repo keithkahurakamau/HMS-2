@@ -3,9 +3,10 @@ import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import {
     Smartphone, ShieldCheck, AlertCircle, CheckCircle2,
-    Send, Banknote, Building2, Hash,
+    Send, Banknote, Building2, Hash, Wallet,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import { useModuleJourney } from '../context/JourneyContext';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  M-Pesa payment settings — hospital-facing.                                */
@@ -35,6 +36,8 @@ export default function MpesaSettings() {
     const [saving, setSaving] = useState(false);
     const [testPhone, setTestPhone] = useState('');
     const [testing, setTesting] = useState(false);
+
+    useModuleJourney('payhero');
 
     const load = async () => {
         setLoading(true);
@@ -101,10 +104,12 @@ export default function MpesaSettings() {
             />
 
             <MpesaChecklist />
+            <MoneyFlowNote />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Editor */}
-                <div className="lg:col-span-2 bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5">
+                <div data-tour="mpesa-editor" className="lg:col-span-2 bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5">
+                    <div data-tour="mpesa-shortcode">
                     <SectionHead icon={Hash} title="Your Safaricom shortcode" />
                     <p className="text-xs text-ink-500 -mt-3">
                         Enter the PayBill or Buy-Goods Till you already own. Payments made
@@ -130,14 +135,17 @@ export default function MpesaSettings() {
                         MediFleet activates M-Pesa for your till on its end — there's nothing
                         else for you to set up or copy from anywhere.
                     </p>
+                    </div>
 
+                    <div data-tour="mpesa-settlement">
                     <SectionHead icon={Building2} title="Settlement bank" />
                     <p className="text-xs text-ink-500 -mt-3">
-                        Proceeds are deposited into this bank account on the settlement
-                        schedule agreed at onboarding.
+                        Proceeds are deposited into <strong>your hospital's own bank account</strong> on the
+                        settlement schedule agreed at onboarding. MediFleet never holds your money —
+                        it routes the payment and settles straight to you.
                     </p>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 mt-3">
                         <Field label="Bank *">
                             <select className="input" value={form.settlement_bank_code}
                                     onChange={e => setForm({ ...form, settlement_bank_code: e.target.value })}>
@@ -156,6 +164,7 @@ export default function MpesaSettings() {
                                    onChange={e => setForm({ ...form, settlement_account_name: e.target.value })}
                                    placeholder="as it appears on the bank statement" />
                         </Field>
+                    </div>
                     </div>
 
                     <SectionHead icon={Banknote} title="Customisation" />
@@ -180,9 +189,9 @@ export default function MpesaSettings() {
 
                 {/* Sidebar: status + test */}
                 <div className="space-y-4">
-                    <StatusCard config={config} loading={loading} />
+                    <div data-tour="mpesa-status"><StatusCard config={config} loading={loading} /></div>
 
-                    <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-5 space-y-3">
+                    <div data-tour="mpesa-test" className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-5 space-y-3">
                         <SectionHead icon={Send} title="Send a test M-Pesa prompt" />
                         <p className="text-xs text-ink-500">
                             Sends a real KES&nbsp;1 prompt to the phone below. It doesn't
@@ -216,6 +225,23 @@ export default function MpesaSettings() {
     );
 }
 
+
+function MoneyFlowNote() {
+    return (
+        <div data-tour="mpesa-flow" className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-emerald-900 mb-2 inline-flex items-center gap-2">
+                <Wallet size={16} /> How your money flows
+            </h3>
+            <p className="text-sm text-emerald-900 leading-relaxed">
+                When a patient pays by M-Pesa, the money goes through your own Safaricom
+                shortcode and settles directly into <strong>your hospital's bank account</strong> on
+                your settlement schedule. <strong>MediFleet never holds or touches your money</strong> —
+                the platform only triggers the payment prompt and shows you a live status as it
+                completes. The only thing MediFleet bills you for is your subscription.
+            </p>
+        </div>
+    );
+}
 
 function MpesaChecklist() {
     return (
