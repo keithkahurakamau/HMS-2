@@ -6,7 +6,6 @@ import {
     Send, CheckCircle2, AlertCircle, Link2, ShieldCheck, Wallet,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
-import { useModuleJourney } from '../../context/JourneyContext';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Superadmin — M-Pesa / Pay Hero provisioning.                              */
@@ -43,8 +42,6 @@ export default function PaymentsManager() {
     const [saving, setSaving] = useState(false);
     const [testPhone, setTestPhone] = useState('');
     const [testing, setTesting] = useState(false);
-
-    useModuleJourney('payhero_provisioning');
 
     // Load the tenant list + bank catalogue once.
     useEffect(() => {
