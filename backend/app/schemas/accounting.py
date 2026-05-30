@@ -187,6 +187,39 @@ class JournalEntryResponse(BaseModel):
     lines: List[JournalLineResponse]
 
 
+# ─── Transaction log ─────────────────────────────────────────────────────────
+# A read-only, system-wide register over posted/draft journal entries. Every
+# monetary event in the system (billing, pharmacy, Pay Hero, cheques, insurance,
+# manual entries) auto-posts a journal entry tagged with a `source_type`, so the
+# journal IS the transaction record. This view flattens each entry into a single
+# row — the balanced debit total is the transaction amount — and is filterable by
+# source, date, status, and amount. No mutation is exposed.
+
+class TransactionLogItem(BaseModel):
+    """One transaction = one journal entry, summarised."""
+    entry_id: int
+    entry_number: str
+    entry_date: date
+    source_type: Optional[str]          # raw tag, e.g. "billing.payment.mpesa"
+    source_label: str                   # friendly group, e.g. "Billing"
+    source_id: Optional[int]
+    reference: Optional[str]
+    memo: Optional[str]
+    status: EntryStatus
+    currency_code: str
+    amount: Decimal                     # balanced debit total, in base currency
+    created_at: datetime
+    posted_at: Optional[datetime]
+
+
+class TransactionLogPage(BaseModel):
+    """Paginated transaction-log response."""
+    items: List[TransactionLogItem]
+    total: int
+    limit: int
+    offset: int
+
+
 # ─── Settings ────────────────────────────────────────────────────────────────
 
 class AccountingSettingsResponse(BaseModel):

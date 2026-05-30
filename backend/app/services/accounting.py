@@ -20,7 +20,7 @@ from decimal import Decimal
 from typing import Iterable, List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from app.models.accounting import (
@@ -381,3 +381,74 @@ def reverse_entry(db: Session, entry_id: int, user_id: int, reason: Optional[str
     db.flush()
     db.refresh(mirror)
     return mirror
+
+
+# ─── Transaction log ─────────────────────────────────────────────────────────
+
+def transaction_log(
+    db: Session,
+    *,
+    source: Optional[str] = None,
+    status: Optional[str] = None,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    q: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[tuple[JournalEntry, Decimal]], int]:
+    """Read-only, system-wide transaction register over journal entries.
+
+    Every monetary event auto-posts a balanced journal entry tagged with a
+    ``source_type``, so the journal is the transaction record. Each entry is
+    summarised to one row whose amount is the balanced debit total in base
+    currency. Returns ``(rows, total)`` where each row is ``(entry, amount)``.
+
+    ``source`` matches the source_type head (e.g. ``"billing"`` matches
+    ``"billing.payment.mpesa"``); the literal ``"manual"`` selects hand-keyed
+    entries that carry no source.
+    """
+    amount_col = func.coalesce(func.sum(JournalLine.debit_base), 0)
+    base = (
+        db.query(JournalEntry, amount_col.label("amount"))
+        .outerjoin(JournalLine, JournalLine.entry_id == JournalEntry.entry_id)
+        .group_by(JournalEntry.entry_id)
+    )
+
+    if source:
+        key = source.strip().lower()
+        if key == "manual":
+            base = base.filter(JournalEntry.source_type.is_(None))
+        else:
+            base = base.filter(
+                (JournalEntry.source_type == key)
+                | (JournalEntry.source_type.ilike(f"{key}.%"))
+            )
+    if status:
+        base = base.filter(JournalEntry.status == status)
+    if from_date:
+        base = base.filter(JournalEntry.entry_date >= from_date)
+    if to_date:
+        base = base.filter(JournalEntry.entry_date <= to_date)
+    if q:
+        needle = f"%{q.strip()}%"
+        base = base.filter(
+            JournalEntry.entry_number.ilike(needle)
+            | JournalEntry.reference.ilike(needle)
+            | JournalEntry.memo.ilike(needle)
+            | JournalEntry.source_type.ilike(needle)
+        )
+    if min_amount is not None:
+        base = base.having(amount_col >= min_amount)
+    if max_amount is not None:
+        base = base.having(amount_col <= max_amount)
+
+    total = base.count()
+    rows = (
+        base.order_by(JournalEntry.entry_date.desc(), JournalEntry.entry_id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return [(e, amount) for (e, amount) in rows], total

@@ -8,12 +8,14 @@ import {
     BarChart3, Download,
     Users as UsersIcon, Send, FileText, Wallet,
     Landmark, ArrowDownToLine, Check, Slash,
+    Receipt, Search,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 
 const TABS = [
     { key: 'coa',        label: 'Chart of Accounts', icon: BookOpen },
     { key: 'journal',    label: 'Journal Entries',   icon: CalendarRange },
+    { key: 'txlog',      label: 'Transaction Log',   icon: Receipt },
     { key: 'reports',    label: 'Reports',           icon: BarChart3 },
     { key: 'debtors',    label: 'Debtors',           icon: UsersIcon },
     { key: 'bank',       label: 'Bank',              icon: Landmark },
@@ -73,6 +75,7 @@ export default function Accounting() {
 
             {tab === 'coa'        && <ChartOfAccountsTab />}
             {tab === 'journal'    && <JournalEntriesTab />}
+            {tab === 'txlog'      && <TransactionLogTab />}
             {tab === 'reports'    && <ReportsTab />}
             {tab === 'debtors'    && <DebtorsTab />}
             {tab === 'bank'       && <BankTab />}
@@ -1528,6 +1531,202 @@ function DataCard({ loading, empty, emptyMsg, children }) {
             ) : empty ? (
                 <div className="p-6 text-sm text-ink-500">{emptyMsg}</div>
             ) : children}
+        </div>
+    );
+}
+
+
+/* ─── Transaction Log ────────────────────────────────────────────────────── */
+// A read-only, system-wide register over every posted journal entry. Because
+// billing, pharmacy, Pay Hero, cheques and insurance all auto-post journals,
+// this is the single place to see every monetary movement in the system.
+
+const SOURCE_OPTIONS = [
+    { value: '',          label: 'All sources' },
+    { value: 'billing',   label: 'Billing' },
+    { value: 'pharmacy',  label: 'Pharmacy' },
+    { value: 'payhero',   label: 'Pay Hero' },
+    { value: 'insurance', label: 'Insurance' },
+    { value: 'cheque',    label: 'Cheque' },
+    { value: 'debtors',   label: 'Debtors' },
+    { value: 'bank',      label: 'Bank' },
+    { value: 'manual',    label: 'Manual entry' },
+];
+
+const SOURCE_TONE = {
+    Billing:        'bg-sky-50 text-sky-700 ring-sky-200',
+    Pharmacy:       'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    'Pay Hero':     'bg-teal-50 text-teal-700 ring-teal-200',
+    Insurance:      'bg-violet-50 text-violet-700 ring-violet-200',
+    Cheque:         'bg-amber-50 text-amber-700 ring-amber-200',
+    Debtors:        'bg-rose-50 text-rose-700 ring-rose-200',
+    Bank:           'bg-indigo-50 text-indigo-700 ring-indigo-200',
+    'Manual entry': 'bg-ink-100 text-ink-600 ring-ink-200',
+};
+
+const PAGE_SIZE = 50;
+
+function TransactionLogTab() {
+    const [rows, setRows] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [offset, setOffset] = useState(0);
+
+    // Filter inputs. `search` is debounced into the request; the rest apply live.
+    const [source, setSource] = useState('');
+    const [status, setStatus] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [search, setSearch] = useState('');
+
+    const load = async (nextOffset = offset) => {
+        setLoading(true);
+        try {
+            const params = { limit: PAGE_SIZE, offset: nextOffset };
+            if (source) params.source = source;
+            if (status) params.status = status;
+            if (fromDate) params.from_date = fromDate;
+            if (toDate) params.to_date = toDate;
+            if (search.trim()) params.q = search.trim();
+            const res = await apiClient.get('/accounting/transaction-log', { params });
+            setRows(res.data?.items || []);
+            setTotal(res.data?.total || 0);
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not load the transaction log.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Reset to the first page whenever a filter changes; debounce the search box.
+    useEffect(() => {
+        const t = setTimeout(() => { setOffset(0); load(0); }, 350);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [source, status, fromDate, toDate, search]);
+
+    const go = (next) => { setOffset(next); load(next); };
+
+    const exportCsv = () => {
+        if (!rows.length) { toast.error('Nothing to export on this page.'); return; }
+        const head = ['Entry No', 'Date', 'Source', 'Reference', 'Memo', 'Amount', 'Currency', 'Status'];
+        const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+        const lines = rows.map((r) => [
+            r.entry_number, r.entry_date, r.source_label, r.reference || '',
+            r.memo || '', Number(r.amount ?? 0).toFixed(2), r.currency_code, r.status,
+        ].map(esc).join(','));
+        const blob = new Blob([[head.map(esc).join(','), ...lines].join('\n')], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `transaction-log-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const pageStart = total === 0 ? 0 : offset + 1;
+    const pageEnd = Math.min(offset + PAGE_SIZE, total);
+
+    return (
+        <div className="space-y-4">
+            {/* Filter bar */}
+            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-3 flex flex-wrap items-end gap-3">
+                <div className="relative flex-1 min-w-[180px]">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+                    <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search entry no., reference, memo…"
+                        className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-ink-200 focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs text-ink-500 mb-1">Source</label>
+                    <select value={source} onChange={(e) => setSource(e.target.value)}
+                            className="text-sm rounded-lg border border-ink-200 px-2 py-2">
+                        {SOURCE_OPTIONS.map((o) => <option key={o.value || 'all'} value={o.value}>{o.label}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-xs text-ink-500 mb-1">Status</label>
+                    <select value={status} onChange={(e) => setStatus(e.target.value)}
+                            className="text-sm rounded-lg border border-ink-200 px-2 py-2">
+                        <option value="">All</option>
+                        <option value="posted">Posted</option>
+                        <option value="draft">Draft</option>
+                        <option value="reversed">Reversed</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-xs text-ink-500 mb-1">From</label>
+                    <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                           className="text-sm rounded-lg border border-ink-200 px-2 py-2" />
+                </div>
+                <div>
+                    <label className="block text-xs text-ink-500 mb-1">To</label>
+                    <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                           className="text-sm rounded-lg border border-ink-200 px-2 py-2" />
+                </div>
+                <button onClick={exportCsv}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 text-sm font-medium text-ink-700 hover:bg-ink-50">
+                    <Download size={15} /> Export CSV
+                </button>
+            </div>
+
+            {/* Table */}
+            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead className="bg-ink-50/60 text-ink-600">
+                        <tr>
+                            <th className="text-left px-4 py-2 font-medium">Date</th>
+                            <th className="text-left px-4 py-2 font-medium">Entry #</th>
+                            <th className="text-left px-4 py-2 font-medium">Source</th>
+                            <th className="text-left px-4 py-2 font-medium">Reference</th>
+                            <th className="text-left px-4 py-2 font-medium">Memo</th>
+                            <th className="text-right px-4 py-2 font-medium">Amount</th>
+                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                        {loading ? (
+                            <tr><td colSpan={7} className="px-4 py-6 text-ink-500">Loading…</td></tr>
+                        ) : rows.length === 0 ? (
+                            <tr><td colSpan={7} className="px-4 py-6 text-ink-500">No transactions match these filters.</td></tr>
+                        ) : rows.map((r) => (
+                            <tr key={r.entry_id} className="hover:bg-ink-50/40">
+                                <td className="px-4 py-2 whitespace-nowrap">{r.entry_date}</td>
+                                <td className="px-4 py-2 font-mono text-xs">{r.entry_number}</td>
+                                <td className="px-4 py-2">
+                                    <span className={`text-xs px-2 py-0.5 rounded-md ring-1 ${SOURCE_TONE[r.source_label] || 'bg-ink-100 text-ink-600 ring-ink-200'}`}>
+                                        {r.source_label}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-2">{r.reference || '—'}</td>
+                                <td className="px-4 py-2 text-ink-600 max-w-[22rem] truncate" title={r.memo || ''}>{r.memo || '—'}</td>
+                                <td className="px-4 py-2 text-right font-mono whitespace-nowrap">{formatAmount(r.amount)}</td>
+                                <td className="px-4 py-2">
+                                    <span className={`text-xs px-2 py-0.5 rounded-md ${STATUS_BADGE[r.status] || ''}`}>{r.status}</span>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between text-sm text-ink-600">
+                <span>{total === 0 ? 'No records' : `Showing ${pageStart}–${pageEnd} of ${total}`}</span>
+                <div className="flex items-center gap-2">
+                    <button disabled={offset === 0 || loading} onClick={() => go(Math.max(0, offset - PAGE_SIZE))}
+                            className="px-3 py-1.5 rounded-lg border border-ink-200 disabled:opacity-40 hover:bg-ink-50">
+                        Previous
+                    </button>
+                    <button disabled={pageEnd >= total || loading} onClick={() => go(offset + PAGE_SIZE)}
+                            className="px-3 py-1.5 rounded-lg border border-ink-200 disabled:opacity-40 hover:bg-ink-50">
+                        Next
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
