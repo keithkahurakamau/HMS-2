@@ -3,9 +3,10 @@ import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import {
     Smartphone, Building2, Hash, Building, Banknote, KeyRound,
-    Send, CheckCircle2, AlertCircle, Link2,
+    Send, CheckCircle2, AlertCircle, Link2, ShieldCheck, Wallet,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
+import { useModuleJourney } from '../../context/JourneyContext';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Superadmin — M-Pesa / Pay Hero provisioning.                              */
@@ -22,6 +23,7 @@ const blankForm = {
     payhero_channel_id: '',
     payhero_username: '',
     payhero_password: '',
+    payhero_webhook_secret: '',
     settlement_bank_code: '',
     settlement_account_number: '',
     settlement_account_name: '',
@@ -41,6 +43,8 @@ export default function PaymentsManager() {
     const [saving, setSaving] = useState(false);
     const [testPhone, setTestPhone] = useState('');
     const [testing, setTesting] = useState(false);
+
+    useModuleJourney('payhero_provisioning');
 
     // Load the tenant list + bank catalogue once.
     useEffect(() => {
@@ -75,6 +79,7 @@ export default function PaymentsManager() {
                     payhero_channel_id: data.payhero_channel_id || '',
                     payhero_username: '',
                     payhero_password: '',
+                    payhero_webhook_secret: '',
                     settlement_bank_code: data.settlement_bank_code || '',
                     settlement_account_number: data.settlement_account_number || '',
                     settlement_account_name: data.settlement_account_name || '',
@@ -93,7 +98,7 @@ export default function PaymentsManager() {
         try {
             const { data } = await apiClient.post(`/public/superadmin/payhero/${selected}/config`, form);
             setConfig(data);
-            setForm(f => ({ ...f, payhero_username: '', payhero_password: '' }));
+            setForm(f => ({ ...f, payhero_username: '', payhero_password: '', payhero_webhook_secret: '' }));
             toast.success('Pay Hero wiring saved for this hospital.');
         } catch (err) {
             toast.error(err?.response?.data?.detail || 'Could not save.');
@@ -123,7 +128,9 @@ export default function PaymentsManager() {
                 tone="brand"
             />
 
-            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-5">
+            <ProvisioningGuide />
+
+            <div data-tour="prov-hospital" className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-5">
                 <label className="block text-xs font-semibold text-ink-600 mb-1.5 inline-flex items-center gap-1.5">
                     <Building2 size={14} className="text-brand-600" /> Hospital
                 </label>
@@ -166,16 +173,22 @@ export default function PaymentsManager() {
                             </Field>
                         </div>
 
+                        <div data-tour="prov-payhero">
                         <SectionHead icon={Link2} title="Pay Hero wiring (operator-only)" />
+                        <p className="text-xs text-ink-500 mt-2 mb-3">
+                            These come from <strong>this hospital's own Pay Hero account</strong> (each
+                            hospital owns its account so funds settle to their bank, never yours). Paste
+                            the values from their Pay Hero dashboard.
+                        </p>
                         <Field label="Pay Hero channel id">
                             <input className="input" value={form.payhero_channel_id}
                                    onChange={e => setForm({ ...form, payhero_channel_id: e.target.value })}
                                    placeholder="copied from the Pay Hero dashboard" />
                         </Field>
-                        <p className="text-xs text-ink-500 -mt-2">
+                        <p className="text-xs text-ink-500 -mt-2 mt-1">
                             M-Pesa goes live for the hospital the moment a channel id is saved here.
                         </p>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-3 mt-3">
                             <Field label="Pay Hero username">
                                 <input className="input" type="password" autoComplete="new-password"
                                        value={form.payhero_username}
@@ -188,6 +201,18 @@ export default function PaymentsManager() {
                                        onChange={e => setForm({ ...form, payhero_password: e.target.value })}
                                        placeholder={config?.uses_per_tenant_creds ? '•••••• (leave blank to keep)' : 'platform default if blank'} />
                             </Field>
+                        </div>
+                        <Field label="Webhook signing secret">
+                            <input className="input" type="password" autoComplete="new-password"
+                                   value={form.payhero_webhook_secret}
+                                   onChange={e => setForm({ ...form, payhero_webhook_secret: e.target.value })}
+                                   placeholder={config?.uses_per_tenant_webhook_secret ? '•••••• (leave blank to keep)' : "this hospital's own webhook secret"} />
+                        </Field>
+                        <p className="text-xs text-ink-500 -mt-2 mt-1 inline-flex items-start gap-1.5">
+                            <ShieldCheck size={13} className="mt-0.5 text-brand-600 shrink-0" />
+                            Each hospital signs its M-Pesa callbacks with its own secret. Leave blank to
+                            fall back to the platform default secret.
+                        </p>
                         </div>
 
                         <SectionHead icon={Building} title="Settlement bank" />
@@ -233,7 +258,7 @@ export default function PaymentsManager() {
                     <div className="space-y-4">
                         <StatusCard config={config} />
 
-                        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-5 space-y-3">
+                        <div data-tour="prov-test" className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-5 space-y-3">
                             <SectionHead icon={Send} title="Send a test prompt" />
                             <p className="text-xs text-ink-500">
                                 Real KES&nbsp;1 STK push using this hospital's saved wiring.
@@ -263,6 +288,30 @@ export default function PaymentsManager() {
     );
 }
 
+function ProvisioningGuide() {
+    return (
+        <div data-tour="prov-guide" className="bg-brand-50 border border-brand-200 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-brand-900 mb-2 inline-flex items-center gap-2">
+                <Wallet size={16} /> How hospital payments are wired (the operator model)
+            </h3>
+            <p className="text-sm text-brand-900/90 leading-relaxed mb-2">
+                Each hospital owns its <strong>own Pay Hero account</strong>. Patient money flows
+                patient → that hospital's Pay Hero account → that hospital's bank. <strong>MediFleet
+                never holds hospital money</strong> — the platform only triggers the STK push (using
+                the hospital's credentials) and relays the live status back to their screens.
+            </p>
+            <ol className="list-decimal pl-5 text-sm text-brand-900/90 space-y-1">
+                <li>Get the hospital's <strong>Channel ID, API username/password, and webhook secret</strong> from their Pay Hero account.</li>
+                <li>Pick the hospital below, paste those values, set their till + settlement bank, and save.</li>
+                <li>Saving a channel id flips their M-Pesa to live. Send a KES 1 test to confirm end-to-end.</li>
+            </ol>
+            <p className="text-xs text-brand-700 mt-2">
+                Your own MediFleet account (for collecting subscriptions) is configured separately under <strong>Subscription Billing</strong> — that's the only money you receive.
+            </p>
+        </div>
+    );
+}
+
 function StatusCard({ config }) {
     if (!config?.configured) {
         return (
@@ -288,6 +337,9 @@ function StatusCard({ config }) {
                 {config.settlement_bank_name && <div><span className="text-ink-500">Settles to:</span> <span className="font-mono">{config.settlement_bank_name} · {config.settlement_account_number}</span></div>}
                 <div className="text-xs inline-flex items-center gap-1.5 text-ink-500 pt-1">
                     <KeyRound size={12} /> {config.uses_per_tenant_creds ? 'Per-tenant credentials' : 'Platform default credentials'}
+                </div>
+                <div className="text-xs inline-flex items-center gap-1.5 text-ink-500">
+                    <ShieldCheck size={12} /> {config.uses_per_tenant_webhook_secret ? 'Own webhook secret' : 'Platform default webhook secret'}
                 </div>
             </div>
         </div>
