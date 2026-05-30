@@ -6,7 +6,6 @@ import {
     Send, CheckCircle2, AlertCircle, Phone, Building2, Activity, ShieldCheck,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
-import { useModuleJourney } from '../../context/JourneyContext';
 import usePlatformPaymentSocket from '../../hooks/usePlatformPaymentSocket';
 
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -42,8 +41,6 @@ export default function PlatformSubscriptions() {
     const [savingContact, setSavingContact] = useState(false);
 
     const [txns, setTxns] = useState([]);
-
-    useModuleJourney('platform_subscriptions');
 
     const loadHealth = async () => {
         try { const { data } = await apiClient.get('/public/superadmin/platform-payhero/health'); setHealth(data); seedForm(data?.config); }
