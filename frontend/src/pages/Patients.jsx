@@ -27,6 +27,7 @@ import { useActivePatient } from '../context/PatientContext';
 // not applicable. Billing → cashier role; Wards/Pharmacy/Lab/Radiology
 // → their respective clinical role; Clinical → Doctor.
 const ROUTE_TARGETS = [
+    { department: 'Triage',       label: 'Triage',    icon: HeartPulse,  role: 'Nurse',           assignment: 'optional', accent: 'bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200' },
     { department: 'Consultation', label: 'Clinical',  icon: Stethoscope, role: 'Doctor',          assignment: 'optional', accent: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200' },
     { department: 'Laboratory',   label: 'Lab',       icon: TestTube,    role: 'Lab Technician',  assignment: 'optional', accent: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' },
     { department: 'Radiology',    label: 'Radiology', icon: Image,       role: 'Radiologist',     assignment: 'optional', accent: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200' },
