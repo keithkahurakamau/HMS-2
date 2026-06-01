@@ -49,6 +49,7 @@ from app.schemas.accounting import (
 )
 from app.utils.audit import log_audit
 from app.services import accounting as svc
+from app.services import accounting_backfill as backfill
 from app.services import accounting_reports as reports
 
 # Friendly grouping for the transaction log. Maps the head of a journal
@@ -458,6 +459,39 @@ def transaction_log(
     db.commit()
 
     return TransactionLogPage(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.post(
+    "/transaction-log/rebuild",
+    dependencies=[Depends(RequirePermission("accounting:settings.manage"))],
+)
+@limiter.limit("2/minute")
+def rebuild_transaction_log(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Replay every source table into the ledger so the transaction log shows
+    every transaction that ever happened — including pre-go-live history.
+
+    Idempotent: reuses the auto-poster's ``(source_type, source_id)``
+    de-duplication, so re-running never double-posts and never disturbs entries
+    already written live. Safe to run repeatedly.
+
+    Security: gated by ``accounting:settings.manage`` (tenant finance admin),
+    tightly rate-limited (2/min — it's a heavy, rarely-needed operation), and
+    the run + its result summary are written to the audit trail.
+    """
+    user_id = current_user.get("user_id") if isinstance(current_user, dict) else getattr(current_user, "user_id", None)
+    summary = backfill.backfill_all(db, user_id=user_id, commit=False)
+
+    log_audit(
+        db, user_id, "REBUILD", "TransactionLog", "all",
+        new_value=summary,
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
+    return summary
 
 
 @router.get(
