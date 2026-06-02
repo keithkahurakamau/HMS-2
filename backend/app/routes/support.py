@@ -17,14 +17,16 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.config.database import MasterSessionLocal, get_db, get_master_db
+from app.config.settings import settings
 from app.core.dependencies import RequirePermission, get_current_user, require_superadmin
 from app.models.master import Tenant
 from app.models.support import SupportTicket, SupportMessage
+from app.services import support_inbound
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,7 @@ def _serialize_ticket(t: SupportTicket, *, include_messages: bool = False) -> Di
         "category": t.category,
         "priority": t.priority,
         "status": t.status,
+        "origin": getattr(t, "origin", "app"),
         "assigned_to_admin_id": t.assigned_to_admin_id,
         "created_at": t.created_at.isoformat() if t.created_at else None,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
@@ -65,6 +68,7 @@ def _serialize_ticket(t: SupportTicket, *, include_messages: bool = False) -> Di
                 "message_id": m.message_id,
                 "author_kind": m.author_kind,
                 "author_name": m.author_name,
+                "source": getattr(m, "source", "app"),
                 "body": m.body,
                 "created_at": m.created_at.isoformat() if m.created_at else None,
             }
@@ -341,6 +345,7 @@ def admin_detail(ticket_id: int, master_db: Session = Depends(get_master_db)):
 def admin_reply(
     ticket_id: int,
     payload: AdminReply,
+    background_tasks: BackgroundTasks,
     master_db: Session = Depends(get_master_db),
     superadmin: dict = Depends(require_superadmin),
 ):
@@ -350,12 +355,13 @@ def admin_reply(
     if t.status == "Closed":
         raise HTTPException(status_code=400, detail="Ticket is Closed; reopen it to add messages.")
 
+    reply_body = payload.body.strip()
     master_db.add(SupportMessage(
         ticket_id=t.ticket_id,
         author_kind="platform",
         author_name=superadmin["full_name"],
         author_id=superadmin["admin_id"],
-        body=payload.body.strip(),
+        body=reply_body,
     ))
     # First response auto-flips Open → In Progress and records first_response_at.
     if t.status == "Open":
@@ -364,6 +370,21 @@ def admin_reply(
         t.first_response_at = datetime.now()
     master_db.commit()
     master_db.refresh(t)
+
+    # Email the client so they can read + reply from any device. Threading
+    # (subject token + per-ticket Reply-To) routes their reply back here.
+    if settings.EMAIL_ENABLED and t.submitter_email:
+        from app.services.support_emails import send_ticket_reply_email
+        send_ticket_reply_email(
+            background_tasks,
+            ticket_id=t.ticket_id,
+            to=t.submitter_email,
+            ticket_subject=t.subject,
+            reply_body=reply_body,
+            category=t.category,
+            recipient_name=t.submitter_name,
+        )
+
     return _serialize_ticket(t, include_messages=True)
 
 
@@ -400,3 +421,75 @@ def admin_assign(
     master_db.commit()
     master_db.refresh(t)
     return _serialize_ticket(t)
+
+
+# =====================================================================
+# Inbound email webhook (EMAIL-003)
+# =====================================================================
+# The mail provider (Resend Inbound) POSTs each parsed message here. This is a
+# machine-to-machine endpoint — no cookie/CSRF (exempt in main.py), gated by an
+# HMAC signature instead. See app/services/support_inbound.py for the policy.
+inbound_router = APIRouter(prefix="/api/public/support", tags=["Support (inbound)"])
+
+
+def _normalize_inbound(raw: dict) -> dict:
+    """Map a provider payload to the shape support_inbound expects.
+
+    Defensive: providers nest the email under ``data`` (Resend) or send it flat,
+    and ``to`` may be a list of strings or of {address/email} objects.
+    """
+    data = raw.get("data") if isinstance(raw.get("data"), dict) else raw
+
+    def _addrs(v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v]
+        out = []
+        for item in v:
+            if isinstance(item, str):
+                out.append(item)
+            elif isinstance(item, dict):
+                out.append(item.get("address") or item.get("email") or "")
+        return [a for a in out if a]
+
+    frm = data.get("from")
+    if isinstance(frm, dict):
+        frm = frm.get("address") or frm.get("email") or ""
+
+    return {
+        "from": frm or "",
+        "to": _addrs(data.get("to")),
+        "subject": data.get("subject") or "",
+        "text": data.get("text"),
+        "html": data.get("html"),
+        "message_id": data.get("message_id") or data.get("messageId")
+        or (data.get("headers") or {}).get("message-id"),
+        "attachments": data.get("attachments") or [],
+    }
+
+
+@inbound_router.post("/inbound")
+async def inbound_email(request: Request, master_db: Session = Depends(get_master_db)):
+    # Feature off → 404 so we don't advertise an unconfigured endpoint.
+    if not settings.SUPPORT_INBOUND_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    raw = await request.body()
+    signature = (
+        request.headers.get("svix-signature")
+        or request.headers.get("x-webhook-signature")
+        or ""
+    )
+    if not support_inbound.verify_signature(raw, signature, settings.support_inbound_signing_secret):
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    import json
+    try:
+        payload = _normalize_inbound(json.loads(raw))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed payload")
+
+    result = support_inbound.process_inbound(master_db, payload)
+    # Always 200 so the provider stops retrying; the body reports what happened.
+    return {"action": result.action, "ticket_id": result.ticket_id, "reason": result.reason}

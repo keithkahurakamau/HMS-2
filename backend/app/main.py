@@ -209,6 +209,9 @@ _CSRF_EXEMPT_PATHS = (
     "/api/auth/login",
     "/api/public/superadmin/login",
     "/api/payments/payhero/callback",
+    # Inbound support email — called by the mail provider, not a browser.
+    # Gated by HMAC signature instead of CSRF (EMAIL-003).
+    "/api/public/support/inbound",
 )
 
 
@@ -287,6 +290,7 @@ app.include_router(settings_module.router)
 app.include_router(cheques_module.router)
 app.include_router(support_module.tenant_router)
 app.include_router(support_module.admin_router)
+app.include_router(support_module.inbound_router)
 app.include_router(accounting_module.router)
 app.include_router(accounting_config_module.router)
 app.include_router(accounting_debtors_module.router)

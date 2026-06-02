@@ -162,6 +162,17 @@ MASTER_DB_PATCHES: list[str] = [
     """,
     "CREATE INDEX IF NOT EXISTS ix_support_messages_ticket_id  ON support_messages (ticket_id);",
     "CREATE INDEX IF NOT EXISTS ix_support_messages_created_at ON support_messages (created_at);",
+    # EMAIL-003 inbound support email. tenant attribution becomes optional
+    # (inbound from unrecognised-tenant contacts lands in an Unassigned bucket),
+    # plus message-level fields for email threading/dedupe. All idempotent.
+    "ALTER TABLE support_tickets  ALTER COLUMN tenant_id   DROP NOT NULL;",
+    "ALTER TABLE support_tickets  ALTER COLUMN tenant_name DROP NOT NULL;",
+    "ALTER TABLE support_tickets  ADD COLUMN IF NOT EXISTS origin VARCHAR(20) NOT NULL DEFAULT 'app';",
+    "ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'app';",
+    "ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS external_message_id VARCHAR(255);",
+    "ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS from_email VARCHAR(255);",
+    "ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS from_name VARCHAR(255);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_support_messages_external_id ON support_messages (external_message_id);",
     # ab3c9e5d27f8 — platform Pay Hero (superadmin subscription billing).
     # These tables + the tenants billing columns live in the MASTER DB. The
     # alembic revision only runs against tenant DBs, so without these explicit
