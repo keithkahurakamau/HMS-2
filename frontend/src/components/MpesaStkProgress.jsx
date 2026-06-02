@@ -32,7 +32,7 @@ export default function MpesaStkProgress({
     if (status === 'success') {
         return (
             <div className="text-center py-8 px-4">
-                <div className="mx-auto w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
+                <div className="mx-auto size-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
                     <CheckCircle2 className="text-emerald-600" size={34} />
                 </div>
                 <p className="text-base font-semibold text-ink-900">Payment received</p>
@@ -48,7 +48,7 @@ export default function MpesaStkProgress({
     if (status === 'failed') {
         return (
             <div className="text-center py-8 px-4">
-                <div className="mx-auto w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center mb-4">
+                <div className="mx-auto size-16 rounded-full bg-rose-100 flex items-center justify-center mb-4">
                     <XCircle className="text-rose-600" size={34} />
                 </div>
                 <p className="text-base font-semibold text-ink-900">Payment failed. Please try again.</p>
@@ -75,8 +75,8 @@ export default function MpesaStkProgress({
 
     return (
         <div className="text-center py-8 px-4">
-            <div className="relative mx-auto w-24 h-24 mb-4">
-                <svg className="w-24 h-24 -rotate-90" viewBox="0 0 72 72">
+            <div className="relative mx-auto size-24 mb-4">
+                <svg className="size-24 -rotate-90" viewBox="0 0 72 72">
                     <circle cx="36" cy="36" r={R} fill="none" stroke="currentColor"
                             className="text-ink-100" strokeWidth="5" />
                     <circle cx="36" cy="36" r={R} fill="none" stroke="currentColor"

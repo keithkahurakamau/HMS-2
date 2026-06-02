@@ -27,6 +27,20 @@ const ROUTE_TO_JOURNEY = [
 /*  surface that fights the shadcn-aligned design system.                     */
 /* ────────────────────────────────────────────────────────────────────────── */
 
+// Static nav config (literals + module-scope icon imports) — built once at
+// module load instead of every render.
+const NAV = [
+    { name: 'Overview',                 path: '/superadmin/dashboard', icon: <LayoutDashboard size={18} /> },
+    { name: 'Tenants & Hospitals',      path: '/superadmin/tenants',   icon: <Building2 size={18} /> },
+    { name: 'Patients (read-only)',     path: '/superadmin/patients',  icon: <Users size={18} /> },
+    { name: 'Users & Access',           path: '/superadmin/users',     icon: <KeyRound size={18} /> },
+    { name: 'Support Inbox',            path: '/superadmin/support',   icon: <LifeBuoy size={18} /> },
+    { name: 'Revenue & Tiers',          path: '/superadmin/billing',   icon: <CreditCard size={18} /> },
+    { name: 'Subscription Billing',     path: '/superadmin/subscriptions', icon: <Wallet size={18} /> },
+    { name: 'M-Pesa Provisioning',      path: '/superadmin/payments',  icon: <Smartphone size={18} /> },
+    { name: 'Platform Settings',        path: '/superadmin/settings',  icon: <Settings size={18} /> },
+];
+
 export default function SuperAdminLayout() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -51,18 +65,6 @@ export default function SuperAdminLayout() {
         clearSuperAdminSession();
         navigate('/superadmin/login', { replace: true });
     };
-
-    const NAV = [
-        { name: 'Overview',                 path: '/superadmin/dashboard', icon: <LayoutDashboard size={18} /> },
-        { name: 'Tenants & Hospitals',      path: '/superadmin/tenants',   icon: <Building2 size={18} /> },
-        { name: 'Patients (read-only)',     path: '/superadmin/patients',  icon: <Users size={18} /> },
-        { name: 'Users & Access',           path: '/superadmin/users',     icon: <KeyRound size={18} /> },
-        { name: 'Support Inbox',            path: '/superadmin/support',   icon: <LifeBuoy size={18} /> },
-        { name: 'Revenue & Tiers',          path: '/superadmin/billing',   icon: <CreditCard size={18} /> },
-        { name: 'Subscription Billing',     path: '/superadmin/subscriptions', icon: <Wallet size={18} /> },
-        { name: 'M-Pesa Provisioning',      path: '/superadmin/payments',  icon: <Smartphone size={18} /> },
-        { name: 'Platform Settings',        path: '/superadmin/settings',  icon: <Settings size={18} /> },
-    ];
 
     const closeMenu = () => setIsMobileMenuOpen(false);
 
@@ -104,9 +106,9 @@ export default function SuperAdminLayout() {
                 <div className="px-5 py-4 border-b border-white/5">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-1.5">Access level</div>
                     <div className="flex items-center gap-2 text-brand-300 text-xs font-semibold">
-                        <span className="relative flex h-2 w-2" aria-hidden="true">
+                        <span className="relative flex size-2" aria-hidden="true">
                             <span className="animate-pulse-soft absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-70" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-500" />
+                            <span className="relative inline-flex rounded-full size-2 bg-brand-500" />
                         </span>
                         SUPER ADMIN
                     </div>

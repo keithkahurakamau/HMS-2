@@ -168,7 +168,7 @@ export default function PremiumBackground() {
             {/* Parallax blob 1 — cyan, forward parallax */}
             <div
                 ref={blob1Ref}
-                className="absolute top-[8%] left-[10%] w-[42rem] h-[42rem] rounded-full"
+                className="absolute top-[8%] left-[10%] size-[42rem] rounded-full"
                 style={{
                     background: 'radial-gradient(circle, rgba(34, 211, 238, 0.45) 0%, rgba(34, 211, 238, 0.12) 30%, transparent 65%)',
                     willChange: 'transform',
@@ -178,7 +178,7 @@ export default function PremiumBackground() {
             {/* Parallax blob 2 — teal, inverse parallax */}
             <div
                 ref={blob2Ref}
-                className="absolute bottom-[8%] right-[8%] w-[38rem] h-[38rem] rounded-full"
+                className="absolute bottom-[8%] right-[8%] size-[38rem] rounded-full"
                 style={{
                     background: 'radial-gradient(circle, rgba(45, 212, 191, 0.42) 0%, rgba(45, 212, 191, 0.10) 35%, transparent 70%)',
                     willChange: 'transform',
@@ -188,7 +188,7 @@ export default function PremiumBackground() {
             {/* Parallax blob 3 — emerald, slow forward parallax */}
             <div
                 ref={blob3Ref}
-                className="absolute top-[40%] left-[55%] w-[34rem] h-[34rem] rounded-full"
+                className="absolute top-[40%] left-[55%] size-[34rem] rounded-full"
                 style={{
                     background: 'radial-gradient(circle, rgba(110, 231, 183, 0.36) 0%, rgba(110, 231, 183, 0.08) 35%, transparent 70%)',
                     willChange: 'transform',
@@ -221,7 +221,7 @@ export default function PremiumBackground() {
             {/* Cursor-tracking spotlight */}
             <div
                 ref={spotlightRef}
-                className="absolute top-0 left-0 w-[60rem] h-[60rem] rounded-full"
+                className="absolute top-0 left-0 size-[60rem] rounded-full"
                 style={{
                     background: 'radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, rgba(34, 211, 238, 0.08) 25%, transparent 55%)',
                     willChange: 'transform',

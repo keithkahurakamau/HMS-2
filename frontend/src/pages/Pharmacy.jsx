@@ -341,7 +341,7 @@ export default function Pharmacy() {
                                 <div className="shrink-0 flex flex-col">
                                     <div className="p-4 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-between items-center z-10">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 text-white flex items-center justify-center shadow-glow"><FileWarning size={18} /></div>
+                                            <div className="size-11 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 text-white flex items-center justify-center shadow-glow"><FileWarning size={18} /></div>
                                             <div>
                                                 <h1 className="text-lg font-semibold text-ink-900 dark:text-ink-100 tracking-tight">Rx: {activeOrder.id}</h1>
                                                 <p className="text-xs font-medium text-ink-500">{activeOrder.patient} &middot; {activeOrder.op_no} &middot; {activeOrder.doctor}</p>
@@ -372,7 +372,7 @@ export default function Pharmacy() {
                                                     </div>
                                                 </div>
                                                 <label className="flex items-center gap-2 text-xs font-medium text-ink-700 dark:text-ink-300 cursor-pointer p-2.5 border border-ink-200 dark:border-ink-800 rounded-lg hover:bg-ink-50 dark:hover:bg-ink-800/50 shrink-0">
-                                                    <input type="checkbox" className="w-4 h-4 text-brand-600 rounded border-ink-300 focus:ring-brand-500" /> Packed
+                                                    <input type="checkbox" className="size-4 text-brand-600 rounded border-ink-300 focus:ring-brand-500" /> Packed
                                                 </label>
                                             </div>
                                         </div>

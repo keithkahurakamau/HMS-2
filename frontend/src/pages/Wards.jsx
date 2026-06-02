@@ -226,7 +226,7 @@ export default function Wards() {
                                     <button key={bed.id} type="button"
                                         onClick={() => bed.status === 'Occupied' ? setActiveBed({ ...bed, wardName: ward.name }) : null}
                                         className={`relative text-left flex flex-col p-3.5 rounded-xl border transition-all duration-150 ${variantBg}`}>
-                                        <span className={`absolute top-3 right-3 w-2 h-2 rounded-full ${dotBg}`} />
+                                        <span className={`absolute top-3 right-3 size-2 rounded-full ${dotBg}`} />
                                         <div className="flex items-center gap-2 mb-2">
                                             <Bed size={16} className={bed.status === 'Occupied' ? 'text-blue-600' : 'text-ink-400'} />
                                             <span className="font-semibold text-ink-900 text-sm">{bed.number}</span>

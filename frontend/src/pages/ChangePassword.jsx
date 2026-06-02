@@ -53,7 +53,7 @@ export default function ChangePassword({ email, currentPassword, onSuccess }) {
         <div className="min-h-screen bg-ink-50 bg-mesh flex items-center justify-center p-4 sm:p-8">
             <div className="w-full max-w-md animate-slide-up">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500 ring-4 ring-amber-100 shadow-soft">
+                    <div className="inline-flex items-center justify-center size-14 rounded-2xl bg-amber-500 ring-4 ring-amber-100 shadow-soft">
                         <ShieldCheck size={28} className="text-white" />
                     </div>
                     <h1 className="mt-5 text-2xl font-semibold text-ink-900 tracking-tight">Secure your account</h1>
@@ -125,8 +125,8 @@ export default function ChangePassword({ email, currentPassword, onSuccess }) {
                                     const ok = rule.test(newPassword);
                                     return (
                                         <div key={rule.label} className={`flex items-center gap-2 text-xs font-medium transition-colors ${ok ? 'text-accent-700' : 'text-ink-500'}`}>
-                                            <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ring-1 ring-inset ${ok ? 'bg-accent-100 ring-accent-200 text-accent-700' : 'bg-white ring-ink-200 text-ink-400'}`}>
-                                                {ok ? <Check size={10} strokeWidth={3} /> : <span className="w-1 h-1 rounded-full bg-ink-300" />}
+                                            <span className={`size-4 rounded-full flex items-center justify-center shrink-0 ring-1 ring-inset ${ok ? 'bg-accent-100 ring-accent-200 text-accent-700' : 'bg-white ring-ink-200 text-ink-400'}`}>
+                                                {ok ? <Check size={10} strokeWidth={3} /> : <span className="size-1 rounded-full bg-ink-300" />}
                                             </span>
                                             {rule.label}
                                         </div>

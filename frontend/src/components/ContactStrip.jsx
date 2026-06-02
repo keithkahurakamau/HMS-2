@@ -103,7 +103,7 @@ function ContactCard({ href, icon, tone, label, value, hint, external }) {
             {/* Subtle gradient reveal on hover */}
             <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-brand-500/0 via-brand-500/[0.04] to-teal-500/[0.06]" />
             <div className="relative flex items-start gap-3">
-                <div className={`w-11 h-11 rounded-xl ring-1 ring-inset flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${ring}`}>
+                <div className={`size-11 rounded-xl ring-1 ring-inset flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${ring}`}>
                     {icon}
                 </div>
                 <div className="min-w-0">

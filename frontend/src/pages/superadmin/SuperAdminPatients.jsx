@@ -229,7 +229,7 @@ export default function SuperAdminPatients() {
                                                     type="button"
                                                     onClick={() => openDetail(p)}
                                                     aria-label={`View ${p.outpatient_no}`}
-                                                    className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-lg text-ink-500 hover:text-brand-700 hover:bg-ink-100 transition-colors cursor-pointer"
+                                                    className="shrink-0 inline-flex items-center justify-center size-11 rounded-lg text-ink-500 hover:text-brand-700 hover:bg-ink-100 transition-colors cursor-pointer"
                                                 >
                                                     <Eye size={18} aria-hidden="true" />
                                                 </button>

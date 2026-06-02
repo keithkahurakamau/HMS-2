@@ -1,5 +1,25 @@
 import React from 'react';
 
+// Static tone lookups — module scope so they're allocated once, not rebuilt
+// every render. On dark surfaces (superadmin console) the chip backgrounds
+// become translucent overlays that read crisply on ink-950.
+const LIGHT_TONES = {
+    brand:   { chip: 'bg-brand-50 text-brand-700 ring-brand-100',     eyebrow: 'text-brand-700' },
+    teal:    { chip: 'bg-teal-50 text-teal-700 ring-teal-100',        eyebrow: 'text-teal-700' },
+    accent:  { chip: 'bg-accent-50 text-accent-700 ring-accent-100',  eyebrow: 'text-accent-700' },
+    neutral: { chip: 'bg-ink-100 text-ink-700 ring-ink-200',          eyebrow: 'text-ink-500' },
+    warning: { chip: 'bg-amber-50 text-amber-700 ring-amber-100',     eyebrow: 'text-amber-700' },
+    rose:    { chip: 'bg-rose-50 text-rose-700 ring-rose-100',        eyebrow: 'text-rose-700' },
+};
+const DARK_TONES = {
+    brand:   { chip: 'bg-brand-500/10 text-brand-300 ring-brand-500/20', eyebrow: 'text-brand-300' },
+    teal:    { chip: 'bg-teal-500/10 text-teal-300 ring-teal-500/20',    eyebrow: 'text-teal-300' },
+    accent:  { chip: 'bg-accent-500/10 text-accent-300 ring-accent-500/20', eyebrow: 'text-accent-300' },
+    neutral: { chip: 'bg-white/[0.06] text-ink-200 ring-white/10',       eyebrow: 'text-ink-400' },
+    warning: { chip: 'bg-amber-500/10 text-amber-300 ring-amber-500/20', eyebrow: 'text-amber-300' },
+    rose:    { chip: 'bg-rose-500/10 text-rose-300 ring-rose-500/20',    eyebrow: 'text-rose-300' },
+};
+
 /**
  * PageHeader — the uniform header surface every page in the workspace renders.
  *
@@ -37,33 +57,15 @@ export default function PageHeader({
     tone = 'brand',
     surface = 'light',
 }) {
-    const lightTones = {
-        brand:   { chip: 'bg-brand-50 text-brand-700 ring-brand-100',     eyebrow: 'text-brand-700' },
-        teal:    { chip: 'bg-teal-50 text-teal-700 ring-teal-100',        eyebrow: 'text-teal-700' },
-        accent:  { chip: 'bg-accent-50 text-accent-700 ring-accent-100',  eyebrow: 'text-accent-700' },
-        neutral: { chip: 'bg-ink-100 text-ink-700 ring-ink-200',          eyebrow: 'text-ink-500' },
-        warning: { chip: 'bg-amber-50 text-amber-700 ring-amber-100',     eyebrow: 'text-amber-700' },
-        rose:    { chip: 'bg-rose-50 text-rose-700 ring-rose-100',        eyebrow: 'text-rose-700' },
-    };
-    // On dark surfaces (the superadmin console) we keep the same hue family
-    // but pull the chip backgrounds to translucent overlays so they read
-    // crisply on ink-950. Eyebrow lifts to the lighter shade of the same hue.
-    const darkTones = {
-        brand:   { chip: 'bg-brand-500/10 text-brand-300 ring-brand-500/20', eyebrow: 'text-brand-300' },
-        teal:    { chip: 'bg-teal-500/10 text-teal-300 ring-teal-500/20',    eyebrow: 'text-teal-300' },
-        accent:  { chip: 'bg-accent-500/10 text-accent-300 ring-accent-500/20', eyebrow: 'text-accent-300' },
-        neutral: { chip: 'bg-white/[0.06] text-ink-200 ring-white/10',       eyebrow: 'text-ink-400' },
-        warning: { chip: 'bg-amber-500/10 text-amber-300 ring-amber-500/20', eyebrow: 'text-amber-300' },
-        rose:    { chip: 'bg-rose-500/10 text-rose-300 ring-rose-500/20',    eyebrow: 'text-rose-300' },
-    };
     const isDark = surface === 'dark';
-    const t = (isDark ? darkTones : lightTones)[tone] || (isDark ? darkTones : lightTones).brand;
+    const tones = isDark ? DARK_TONES : LIGHT_TONES;
+    const t = tones[tone] || tones.brand;
 
     return (
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-6">
             <div className="flex items-start gap-4 min-w-0">
                 {Icon && (
-                    <div className={`shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center ring-1 ring-inset ${t.chip}`}>
+                    <div className={`shrink-0 size-12 rounded-2xl flex items-center justify-center ring-1 ring-inset ${t.chip}`}>
                         <Icon size={20} />
                     </div>
                 )}

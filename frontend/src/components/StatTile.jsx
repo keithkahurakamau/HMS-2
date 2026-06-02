@@ -1,5 +1,30 @@
 import React from 'react';
 
+// Static tone lookups — declared at module scope so they're allocated once
+// instead of rebuilt on every render (a fresh object each render defeats any
+// memoization downstream). They reference no props/state.
+const LIGHT_TONE = {
+    brand:   'bg-brand-50 text-brand-700 ring-brand-100',
+    teal:    'bg-teal-50 text-teal-700 ring-teal-100',
+    accent:  'bg-accent-50 text-accent-700 ring-accent-100',
+    warning: 'bg-amber-50 text-amber-700 ring-amber-100',
+    rose:    'bg-rose-50 text-rose-700 ring-rose-100',
+    neutral: 'bg-ink-100 text-ink-700 ring-ink-200',
+};
+const DARK_TONE = {
+    brand:   'bg-brand-500/10 text-brand-300 ring-brand-500/20',
+    teal:    'bg-teal-500/10 text-teal-300 ring-teal-500/20',
+    accent:  'bg-accent-500/10 text-accent-300 ring-accent-500/20',
+    warning: 'bg-amber-500/10 text-amber-300 ring-amber-500/20',
+    rose:    'bg-rose-500/10 text-rose-300 ring-rose-500/20',
+    neutral: 'bg-white/[0.06] text-ink-200 ring-white/10',
+};
+const DELTA_COLORS = {
+    accent: 'text-accent-600',
+    rose:   'text-rose-600',
+    ink:    'text-ink-500',
+};
+
 /**
  * StatTile — the canonical KPI / metric card.
  *
@@ -31,30 +56,9 @@ export default function StatTile({
     children,
 }) {
     const isDark = surface === 'dark';
-
-    const lightTone = {
-        brand:   'bg-brand-50 text-brand-700 ring-brand-100',
-        teal:    'bg-teal-50 text-teal-700 ring-teal-100',
-        accent:  'bg-accent-50 text-accent-700 ring-accent-100',
-        warning: 'bg-amber-50 text-amber-700 ring-amber-100',
-        rose:    'bg-rose-50 text-rose-700 ring-rose-100',
-        neutral: 'bg-ink-100 text-ink-700 ring-ink-200',
-    };
-    const darkTone = {
-        brand:   'bg-brand-500/10 text-brand-300 ring-brand-500/20',
-        teal:    'bg-teal-500/10 text-teal-300 ring-teal-500/20',
-        accent:  'bg-accent-500/10 text-accent-300 ring-accent-500/20',
-        warning: 'bg-amber-500/10 text-amber-300 ring-amber-500/20',
-        rose:    'bg-rose-500/10 text-rose-300 ring-rose-500/20',
-        neutral: 'bg-white/[0.06] text-ink-200 ring-white/10',
-    };
-    const iconChip = (isDark ? darkTone : lightTone)[tone] || (isDark ? darkTone : lightTone).brand;
-
-    const deltaColor = {
-        accent: 'text-accent-600',
-        rose:   'text-rose-600',
-        ink:    'text-ink-500',
-    }[deltaTone] || 'text-accent-600';
+    const tones = isDark ? DARK_TONE : LIGHT_TONE;
+    const iconChip = tones[tone] || tones.brand;
+    const deltaColor = DELTA_COLORS[deltaTone] || 'text-accent-600';
 
     const Wrapper = onClick ? 'button' : 'div';
     const wrapperProps = onClick ? { onClick, type: 'button' } : {};
@@ -72,7 +76,7 @@ export default function StatTile({
         >
             <div className="flex items-start justify-between gap-3">
                 {Icon && (
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ring-inset ${iconChip}`}>
+                    <div className={`size-11 rounded-xl flex items-center justify-center ring-1 ring-inset ${iconChip}`}>
                         <Icon size={18} aria-hidden="true" />
                     </div>
                 )}

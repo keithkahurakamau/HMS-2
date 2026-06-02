@@ -300,7 +300,7 @@ export default function SuperAdminDashboard() {
 function StatSkeleton() {
     return (
         <div className="stat-tile">
-            <div className="w-11 h-11 rounded-xl bg-ink-100 animate-pulse" />
+            <div className="size-11 rounded-xl bg-ink-100 animate-pulse" />
             <div className="space-y-2 flex-1">
                 <div className="h-3 w-20 bg-ink-100 rounded animate-pulse" />
                 <div className="h-6 w-28 bg-ink-100 rounded animate-pulse" />
@@ -346,7 +346,7 @@ function DistroBar({ segments }) {
             <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-ink-700">
                 {segments.map((s) => (
                     <li key={s.label} className="flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-sm ${s.className}`} aria-hidden="true" />
+                        <span className={`size-2.5 rounded-sm ${s.className}`} aria-hidden="true" />
                         <span className="font-medium">{s.label}</span>
                         <span className="text-ink-500 tabular-nums">{s.value}</span>
                     </li>

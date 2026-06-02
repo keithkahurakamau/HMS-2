@@ -274,7 +274,7 @@ export default function PlatformSubscriptions() {
                         <Activity size={16} className="text-accent-600" /> Subscription activity
                     </h3>
                     <span className="text-2xs uppercase tracking-wider text-accent-700 inline-flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse-soft" /> live
+                        <span className="size-1.5 rounded-full bg-accent-500 animate-pulse-soft" /> live
                     </span>
                 </div>
                 <TxnTable txns={txns} tenants={tenants} />

@@ -141,8 +141,8 @@ export default function Portal() {
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute inset-0 bg-aurora" />
                     <div className="absolute inset-0 bg-grid-faint bg-grid-faint opacity-50" />
-                    <div className="absolute -top-24 -right-24 w-[36rem] h-[36rem] bg-brand-300/20 rounded-full blur-[120px] animate-blob-breathe" />
-                    <div className="absolute -bottom-32 -left-24 w-[32rem] h-[32rem] bg-accent-300/20 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
+                    <div className="absolute -top-24 -right-24 size-[36rem] bg-brand-300/20 rounded-full blur-[120px] animate-blob-breathe" />
+                    <div className="absolute -bottom-32 -left-24 size-[32rem] bg-accent-300/20 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
                 </div>
 
                 <div className="relative max-w-5xl mx-auto px-6 text-center animate-slide-up">
@@ -265,7 +265,7 @@ export default function Portal() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {Array.from({ length: 6 }).map((_, i) => (
                                 <div key={i} className="bg-white border border-ink-200/70 rounded-2xl p-5 animate-pulse-soft">
-                                    <div className="w-10 h-10 rounded-xl bg-ink-100" />
+                                    <div className="size-10 rounded-xl bg-ink-100" />
                                     <div className="mt-4 h-4 w-2/3 rounded bg-ink-100" />
                                     <div className="mt-2 h-3 w-1/2 rounded bg-ink-100/70" />
                                     <div className="mt-6 h-3 w-1/3 rounded bg-ink-100/60" />
@@ -292,7 +292,7 @@ export default function Portal() {
                         </div>
                     ) : (
                         <div className="bg-white border border-dashed border-ink-300 rounded-2xl p-12 text-center">
-                            <div className="w-14 h-14 rounded-2xl bg-brand-50 ring-1 ring-brand-100 text-brand-600 mx-auto flex items-center justify-center mb-4">
+                            <div className="size-14 rounded-2xl bg-brand-50 ring-1 ring-brand-100 text-brand-600 mx-auto flex items-center justify-center mb-4">
                                 <Building2 size={24} />
                             </div>
                             <h3 className="text-base font-semibold text-ink-900">No matches for &ldquo;{searchQuery}&rdquo;</h3>
@@ -385,7 +385,7 @@ function PathCard({ to, icon, title, body, cta, tone }) {
             to={to}
             className="group bg-white border border-ink-200/70 hover:border-brand-300 rounded-2xl p-5 shadow-soft hover:shadow-elevated transition-all cursor-pointer"
         >
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ring-inset ${ring}`}>
+            <div className={`size-11 rounded-xl flex items-center justify-center ring-1 ring-inset ${ring}`}>
                 {icon}
             </div>
             <h3 className="mt-4 text-base font-semibold tracking-tight text-ink-900">{title}</h3>
@@ -445,7 +445,7 @@ function HospitalCard({ tenant, chip, delayMs, onSelect }) {
         >
             <div>
                 <div className="flex items-start justify-between mb-4">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ring-inset transition-transform duration-300 group-hover:scale-105 ${chip.ring}`}>
+                    <div className={`size-11 rounded-xl flex items-center justify-center ring-1 ring-inset transition-transform duration-300 group-hover:scale-105 ${chip.ring}`}>
                         <Building2 size={18} />
                     </div>
                     {tenant.is_premium && (

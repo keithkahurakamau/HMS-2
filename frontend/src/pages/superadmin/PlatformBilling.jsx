@@ -190,7 +190,7 @@ export default function PlatformBilling() {
                                     </td>
                                     <td className="px-6 py-3">
                                         <span className="inline-flex items-center gap-1.5 text-accent-700 text-xs font-semibold">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse-soft" aria-hidden="true"></span>
+                                            <span className="size-1.5 rounded-full bg-accent-500 animate-pulse-soft" aria-hidden="true"></span>
                                             Active
                                         </span>
                                     </td>

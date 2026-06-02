@@ -101,7 +101,7 @@ export default function PatientPortal() {
             <div className="min-h-screen bg-ink-50 bg-mesh flex flex-col items-center justify-center p-4">
                 <div className="max-w-md w-full animate-slide-up">
                     <div className="text-center mb-6">
-                        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-gradient shadow-glow">
+                        <div className="inline-flex items-center justify-center size-14 rounded-2xl bg-brand-gradient shadow-glow">
                             <HeartPulse size={26} className="text-white" />
                         </div>
                         <h1 className="mt-5 text-2xl font-semibold text-ink-900 tracking-tight">Patient Portal</h1>
@@ -163,7 +163,7 @@ export default function PatientPortal() {
             <header className="bg-white/80 backdrop-blur-md border-b border-ink-200/70 sticky top-0 z-30">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-brand-gradient flex items-center justify-center shrink-0 shadow-glow">
+                        <div className="size-10 rounded-xl bg-brand-gradient flex items-center justify-center shrink-0 shadow-glow">
                             <HeartPulse size={18} className="text-white" />
                         </div>
                         <div>

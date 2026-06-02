@@ -225,7 +225,7 @@ export default function Support() {
                                 isActive ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-ink-700 hover:bg-ink-50'
                             }`}
                         >
-                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT_COLOR[s]}`} aria-hidden="true" />
+                            <span className={`size-1.5 rounded-full ${STATUS_DOT_COLOR[s]}`} aria-hidden="true" />
                             {s}
                             <span className={`text-2xs font-semibold tabular-nums ${isActive ? 'text-brand-700' : 'text-ink-500'}`}>{count}</span>
                         </button>
@@ -262,7 +262,7 @@ export default function Support() {
                                             }`}
                                         >
                                             <span
-                                                className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${STATUS_DOT_COLOR[t.status] || 'bg-ink-400'}`}
+                                                className={`mt-1.5 size-2 rounded-full shrink-0 ${STATUS_DOT_COLOR[t.status] || 'bg-ink-400'}`}
                                                 aria-hidden="true"
                                             />
                                             <div className="min-w-0 flex-1">

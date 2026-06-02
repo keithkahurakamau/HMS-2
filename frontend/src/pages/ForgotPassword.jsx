@@ -30,7 +30,7 @@ export default function ForgotPassword() {
     return (
         <div className="min-h-screen bg-ink-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-mesh">
             <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-gradient shadow-glow">
+                <div className="inline-flex items-center justify-center size-14 rounded-2xl bg-brand-gradient shadow-glow">
                     <ShieldCheck size={28} className="text-white" />
                 </div>
                 <h2 className="mt-6 text-3xl font-semibold text-ink-900 tracking-tight">{tenantName}</h2>
@@ -41,7 +41,7 @@ export default function ForgotPassword() {
                 <div className="card p-8">
                     {submitted ? (
                         <div className="text-center space-y-5">
-                            <div className="w-14 h-14 mx-auto rounded-2xl bg-accent-50 ring-1 ring-accent-100 flex items-center justify-center">
+                            <div className="size-14 mx-auto rounded-2xl bg-accent-50 ring-1 ring-accent-100 flex items-center justify-center">
                                 <ShieldCheck size={26} className="text-accent-600" />
                             </div>
                             <div>

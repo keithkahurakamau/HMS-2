@@ -180,7 +180,7 @@ export default function JourneyOverlay() {
                         top: layout.arrow.y - 14,
                     }}
                 >
-                    <div className="w-7 h-7 rounded-full bg-white shadow-elevated ring-2 ring-brand-300/70 flex items-center justify-center animate-pulse-soft">
+                    <div className="size-7 rounded-full bg-white shadow-elevated ring-2 ring-brand-300/70 flex items-center justify-center animate-pulse-soft">
                         <ArrowGlyph dir={layout.arrow.dir} />
                     </div>
                 </div>
@@ -197,7 +197,7 @@ export default function JourneyOverlay() {
                     <div className="rounded-[14px] glass-card p-5 backdrop-blur-2xl">
                         <div className="flex items-start justify-between gap-3 mb-3">
                             <div className="flex items-center gap-2.5">
-                                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-soft">
+                                <span className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-soft">
                                     <Compass size={17} />
                                 </span>
                                 <div>

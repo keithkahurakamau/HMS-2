@@ -11,6 +11,9 @@ import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
 import { useActivePatient } from '../context/PatientContext';
 
+// Static ICD lookup list — module scope so it isn't rebuilt every render.
+const ICD_DATABASE = ["A09 - Infectious gastroenteritis", "E11.9 - Type 2 diabetes mellitus", "I10 - Essential hypertension", "B50.9 - Severe Malaria", "J03.90 - Acute tonsillitis", "R50.9 - Fever, unspecified"];
+
 export default function ClinicalDesk() {
     const navigate = useNavigate();
     // --- DYNAMIC QUEUE STATE ---
@@ -54,8 +57,7 @@ export default function ClinicalDesk() {
     // it so the rest of the system sees the doctor's current focus.
     const { setActivePatient: setGlobalActivePatient } = useActivePatient();
 
-    const mockIcdDatabase = ["A09 - Infectious gastroenteritis", "E11.9 - Type 2 diabetes mellitus", "I10 - Essential hypertension", "B50.9 - Severe Malaria", "J03.90 - Acute tonsillitis", "R50.9 - Fever, unspecified"];
-    const filteredIcd = mockIcdDatabase.filter(code => code.toLowerCase().includes(icdSearch.toLowerCase()));
+    const filteredIcd = ICD_DATABASE.filter(code => code.toLowerCase().includes(icdSearch.toLowerCase()));
 
     // --- DATA FETCHING ---
     useEffect(() => {
@@ -333,7 +335,7 @@ export default function ClinicalDesk() {
                         <div className="shrink-0 flex flex-col">
                             <div className="p-4 border-b border-ink-100 bg-white flex justify-between items-center z-10">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 text-white flex items-center justify-center font-semibold text-base shadow-glow">
+                                    <div className="size-11 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 text-white flex items-center justify-center font-semibold text-base shadow-glow">
                                         {activePatient.patient_name?.charAt(0) || 'P'}
                                     </div>
                                     <div>
@@ -509,7 +511,7 @@ export default function ClinicalDesk() {
 
                                 <label htmlFor="chargeFee" className="border border-brand-200 bg-brand-50/50 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-brand-50/80 transition-colors">
                                     <div className="flex items-center gap-3">
-                                        <input type="checkbox" id="chargeFee" checked={chargeConsultation} onChange={(e) => setChargeConsultation(e.target.checked)} className="w-5 h-5 text-brand-600 rounded border-brand-300 focus:ring-brand-500" />
+                                        <input type="checkbox" id="chargeFee" checked={chargeConsultation} onChange={(e) => setChargeConsultation(e.target.checked)} className="size-5 text-brand-600 rounded border-brand-300 focus:ring-brand-500" />
                                         <div>
                                             <span className="text-sm font-semibold text-brand-900 block">Authorize consultation fee</span>
                                             <span className="text-xs text-brand-700">Automatically generate a consultation invoice at the cashier.</span>
@@ -597,7 +599,7 @@ function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit 
             <div className="relative bg-white rounded-2xl shadow-elevated w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
                             <ShieldCheck size={17} />
                         </div>
                         <div>
@@ -820,7 +822,7 @@ function LabOrderModal({ patient, onClose }) {
                                             checked={isSelected}
                                             onChange={() => toggle(item.catalog_id)}
                                             aria-label={`Order ${item.test_name}`}
-                                            className="mt-0.5 w-4 h-4 accent-brand-600 cursor-pointer"
+                                            className="mt-0.5 size-4 accent-brand-600 cursor-pointer"
                                         />
                                         <div className="min-w-0 flex-1">
                                             <p className="text-sm font-medium text-ink-900 truncate">{item.test_name}</p>

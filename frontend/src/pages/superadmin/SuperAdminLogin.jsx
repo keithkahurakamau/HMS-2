@@ -77,8 +77,8 @@ export default function SuperAdminLogin() {
     return (
         <div className="min-h-screen w-full bg-ink-950 text-white flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
             <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-                <div className="absolute -top-40 -left-32 w-[36rem] h-[36rem] bg-brand-500/15 rounded-full blur-[120px]" />
-                <div className="absolute -bottom-40 -right-32 w-[36rem] h-[36rem] bg-teal-500/15 rounded-full blur-[120px]" />
+                <div className="absolute -top-40 -left-32 size-[36rem] bg-brand-500/15 rounded-full blur-[120px]" />
+                <div className="absolute -bottom-40 -right-32 size-[36rem] bg-teal-500/15 rounded-full blur-[120px]" />
                 <div className="absolute inset-0 bg-grid opacity-[0.06]" />
             </div>
 
@@ -133,7 +133,7 @@ export default function SuperAdminLogin() {
                                     onClick={() => setShowPassword((s) => !s)}
                                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                                     aria-pressed={showPassword}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-10 h-10 rounded-lg text-ink-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center size-10 rounded-lg text-ink-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
                                 >
                                     {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                                 </button>

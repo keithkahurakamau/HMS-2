@@ -251,7 +251,7 @@ export default function TenantsManager() {
                                     <tr key={tenant.id} className="hover:bg-ink-50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${themeRing}`}>
+                                                <div className={`size-9 rounded-xl flex items-center justify-center border ${themeRing}`}>
                                                     <Building2 size={16} />
                                                 </div>
                                                 <span className="font-semibold text-ink-900 group-hover:text-brand-700 transition-colors">{tenant.name}</span>
@@ -381,7 +381,7 @@ export default function TenantsManager() {
                                     {/* Package header */}
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-start gap-2.5 min-w-0">
-                                            <div className="w-9 h-9 rounded-lg bg-brand-50 ring-1 ring-inset ring-brand-100 flex items-center justify-center shrink-0">
+                                            <div className="size-9 rounded-lg bg-brand-50 ring-1 ring-inset ring-brand-100 flex items-center justify-center shrink-0">
                                                 <Package size={16} className="text-brand-700" aria-hidden="true" />
                                             </div>
                                             <div className="min-w-0">

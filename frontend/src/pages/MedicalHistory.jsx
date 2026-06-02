@@ -468,7 +468,7 @@ export default function MedicalHistory() {
                             </div>
 
                             <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${form.is_sensitive ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
-                                <input type="checkbox" checked={form.is_sensitive} onChange={e => setForm({ ...form, is_sensitive: e.target.checked })} className="mt-0.5 w-4 h-4 text-red-600 rounded border-slate-300" />
+                                <input type="checkbox" checked={form.is_sensitive} onChange={e => setForm({ ...form, is_sensitive: e.target.checked })} className="mt-0.5 size-4 text-red-600 rounded border-slate-300" />
                                 <div>
                                     <p className="text-sm font-bold text-slate-800 flex items-center gap-2"><Lock size={13} className="text-red-600" /> Mark as Sensitive</p>
                                     <p className="text-xs text-slate-500 mt-0.5">KDPA: Restricts access to Doctors and Nurses only. Use for Mental Health, HIV, and Obstetric records.</p>

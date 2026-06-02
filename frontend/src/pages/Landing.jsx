@@ -58,8 +58,8 @@ export default function Landing() {
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute inset-0 bg-aurora" />
                     <div className="absolute inset-0 bg-grid-faint bg-grid-faint opacity-50" />
-                    <div className="absolute -top-32 -right-24 w-[40rem] h-[40rem] bg-brand-300/20 rounded-full blur-[120px] animate-blob-breathe" />
-                    <div className="absolute -bottom-40 -left-24 w-[36rem] h-[36rem] bg-accent-300/20 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
+                    <div className="absolute -top-32 -right-24 size-[40rem] bg-brand-300/20 rounded-full blur-[120px] animate-blob-breathe" />
+                    <div className="absolute -bottom-40 -left-24 size-[36rem] bg-accent-300/20 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
                 </div>
 
                 <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-10 items-center">
@@ -160,8 +160,8 @@ export default function Landing() {
             {/* ============== Modules showcase (interactive) ============== */}
             <section id="modules" className="py-24 bg-gradient-to-b from-white via-brand-50/30 to-white relative overflow-hidden">
                 {/* Decorative blurred orbs */}
-                <div className="absolute -top-24 -left-32 w-[28rem] h-[28rem] bg-brand-300/10 rounded-full blur-[120px] pointer-events-none" />
-                <div className="absolute -bottom-32 -right-32 w-[26rem] h-[26rem] bg-accent-300/10 rounded-full blur-[120px] pointer-events-none" />
+                <div className="absolute -top-24 -left-32 size-[28rem] bg-brand-300/10 rounded-full blur-[120px] pointer-events-none" />
+                <div className="absolute -bottom-32 -right-32 size-[26rem] bg-accent-300/10 rounded-full blur-[120px] pointer-events-none" />
 
                 <Reveal className="relative max-w-7xl mx-auto px-6">
                     <SectionHeader
@@ -227,7 +227,7 @@ export default function Landing() {
                 <div className="max-w-5xl mx-auto px-6">
                     <div className="relative overflow-hidden rounded-3xl bg-brand-gradient p-10 sm:p-16 shadow-elevated">
                         <div className="absolute inset-0 bg-aurora opacity-60 pointer-events-none" />
-                        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+                        <div className="absolute -top-24 -right-24 size-96 rounded-full bg-white/10 blur-3xl pointer-events-none" />
                         <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
                             <div>
                                 <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white max-w-xl">
@@ -328,7 +328,7 @@ function FeatureCard({ tone, icon, title, body }) {
                          : 'bg-accent-50 text-accent-700 ring-accent-100';
     return (
         <div className="group bg-white border border-ink-200/70 rounded-2xl p-6 shadow-soft hover:shadow-elevated hover:border-brand-200 transition-all">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ring-1 ring-inset ${ring}`}>
+            <div className={`size-12 rounded-xl flex items-center justify-center mb-4 ring-1 ring-inset ${ring}`}>
                 {icon}
             </div>
             <h3 className="text-lg font-semibold tracking-tight text-ink-900">{title}</h3>
@@ -343,7 +343,7 @@ function FeatureCard({ tone, icon, title, body }) {
 function Step({ n, title, children }) {
     return (
         <div className="relative bg-white border border-ink-200/70 rounded-2xl p-6 shadow-soft">
-            <div className="w-9 h-9 rounded-xl bg-brand-gradient flex items-center justify-center text-white font-semibold shadow-glow">
+            <div className="size-9 rounded-xl bg-brand-gradient flex items-center justify-center text-white font-semibold shadow-glow">
                 {n}
             </div>
             <h3 className="mt-4 text-lg font-semibold tracking-tight text-ink-900">{title}</h3>
@@ -370,9 +370,9 @@ function HeroComposition() {
                 {/* Mock header */}
                 <div className="px-5 py-3 border-b border-ink-200/70 bg-ink-50/60 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                        <span className="w-2.5 h-2.5 rounded-full bg-accent-400" />
+                        <span className="size-2.5 rounded-full bg-rose-400" />
+                        <span className="size-2.5 rounded-full bg-amber-400" />
+                        <span className="size-2.5 rounded-full bg-accent-400" />
                     </div>
                     <span className="text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em]">Workspace · Clinical</span>
                 </div>
@@ -413,7 +413,7 @@ function HeroComposition() {
             </div>
             {/* Floating badge */}
             <div className="hidden lg:flex absolute -bottom-6 -left-6 bg-white border border-ink-200/70 rounded-2xl px-4 py-3 shadow-elevated items-center gap-3 animate-float">
-                <div className="w-9 h-9 rounded-xl bg-accent-100 text-accent-700 flex items-center justify-center">
+                <div className="size-9 rounded-xl bg-accent-100 text-accent-700 flex items-center justify-center">
                     <ShieldCheck size={18} />
                 </div>
                 <div>
@@ -433,7 +433,7 @@ function Row({ label, right, tone }) {
     return (
         <div className="flex items-center justify-between p-3 rounded-xl bg-ink-50/60 border border-ink-100">
             <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${dot}`} />
+                <span className={`size-2 rounded-full ${dot}`} />
                 <span className="text-sm font-medium text-ink-700">{label}</span>
             </div>
             <span className="text-2xs font-semibold text-ink-500 uppercase tracking-wider">{right}</span>
@@ -447,7 +447,7 @@ function ComplianceCard() {
             <div className="absolute inset-0 bg-aurora opacity-50 pointer-events-none" />
             <div className="relative p-8 space-y-5">
                 <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-brand-gradient flex items-center justify-center shadow-glow">
+                    <div className="size-12 rounded-2xl bg-brand-gradient flex items-center justify-center shadow-glow">
                         <Lock size={20} className="text-white" />
                     </div>
                     <div>
@@ -710,7 +710,7 @@ function ModuleCard({ module: m, delayMs, navigate }) {
             <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-brand-500/0 via-brand-500/[0.04] to-teal-500/[0.06]" />
 
             <div className="relative flex items-start justify-between gap-3">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-brand-50 to-teal-50 ring-1 ring-brand-100 text-brand-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <div className="size-11 rounded-xl bg-gradient-to-br from-brand-50 to-teal-50 ring-1 ring-brand-100 text-brand-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                     <Icon size={20} />
                 </div>
                 <span className={`text-2xs font-semibold uppercase tracking-[0.12em] px-2 py-1 rounded-md ${

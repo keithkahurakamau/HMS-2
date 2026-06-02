@@ -15,6 +15,56 @@ import ActivePatientBar from '../ActivePatientBar';
 import { TenantLogo } from '../Logo';
 import { useBranding } from '../../context/BrandingContext';
 
+// Route → module-key map for the on-first-visit tour. Module scope: static,
+// no local deps, so it's built once rather than every render.
+const ROUTE_TO_JOURNEY = [
+    ['/app/admin',           'admin'],
+    ['/app/patients',        'patients'],
+    ['/app/triage',          'triage'],
+    ['/app/clinical',        'clinical'],
+    ['/app/laboratory',      'laboratory'],
+    ['/app/radiology',       'radiology'],
+    ['/app/pharmacy',        'pharmacy'],
+    ['/app/inventory',       'inventory'],
+    ['/app/wards',           'wards'],
+    ['/app/billing',         'billing'],
+    ['/app/cheques',         'cheques'],
+    ['/app/medical-history', 'medical_history'],
+    ['/app/appointments',    'appointments'],
+    ['/app/messages',        'messages'],
+    ['/app/settings',        'settings'],
+    ['/app/branding',        'branding'],
+    ['/app/accounting',      'accounting'],
+    ['/app/support',         'support'],
+    ['/app/mpesa-settings',  'payhero'],
+    ['/app/dashboard',       'dashboard'],
+    ['/app',                 'dashboard'],   // role-redirect fallback
+];
+
+// Module nav config. Static (literals + module-scope icon imports), so it's
+// allocated once. Each module declares legacy `allowedRoles` + a
+// `requiredPermission`; we prefer permissions and fall back to role names.
+const NAVIGATION = [
+    { name: 'Command Center',    path: '/app/admin',           icon: <LayoutDashboard size={18} />, allowedRoles: ['Admin'],                                          requiredPermission: 'users:manage',     moduleKey: 'dashboard' },
+    { name: 'Messages',          path: '/app/messages',        icon: <MessageSquare size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Receptionist'], requiredPermission: 'messaging:read', moduleKey: 'messaging' },
+    { name: 'Patient Registry',  path: '/app/patients',        icon: <Users size={18} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'patients:read',    moduleKey: 'patients' },
+    { name: 'Medical History',   path: '/app/medical-history', icon: <ClipboardList size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse'],                       requiredPermission: 'history:read',     moduleKey: 'medical_history' },
+    { name: 'Triage',            path: '/app/triage',          icon: <HeartPulse size={18} />,      allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'triage:read',      moduleKey: 'clinical' },
+    { name: 'Clinical Desk',     path: '/app/clinical',        icon: <Stethoscope size={18} />,     allowedRoles: ['Admin', 'Doctor'],                                requiredPermission: 'clinical:read',    moduleKey: 'clinical' },
+    { name: 'Laboratory',        path: '/app/laboratory',      icon: <TestTube size={18} />,        allowedRoles: ['Admin', 'Lab Technician', 'Doctor'],              requiredPermission: 'laboratory:read',  moduleKey: 'laboratory' },
+    { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={18} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'],                 requiredPermission: 'radiology:manage', moduleKey: 'radiology' },
+    { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={18} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'],                  requiredPermission: 'pharmacy:read',    moduleKey: 'pharmacy' },
+    { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={18} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'wards:manage',     moduleKey: 'wards' },
+    { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'appointments:read',moduleKey: 'appointments' },
+    { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'inventory:read',   moduleKey: 'inventory' },
+    { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={18} />,         allowedRoles: ['Admin', 'Receptionist'],                          requiredPermission: 'billing:read',     moduleKey: 'billing' },
+    { name: 'Cheque Register',   path: '/app/cheques',         icon: <Banknote size={18} />,        allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'cheques:read',     moduleKey: 'cheques' },
+    { name: 'Accounting',        path: '/app/accounting',      icon: <BookOpen size={18} />,        allowedRoles: ['Admin', 'Accountant'],                            requiredPermission: 'accounting:view',  moduleKey: 'accounting' },
+    { name: 'MediFleet Support', path: '/app/support',         icon: <LifeBuoy size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'support:manage',   moduleKey: 'support' },
+    { name: 'M-Pesa Payments',   path: '/app/mpesa-settings',  icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: ['payhero:manage', 'mpesa:manage'], moduleKey: 'payhero' },
+    { name: 'Settings',          path: '/app/settings',        icon: <Settings size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'settings:read',    moduleKey: 'settings' },
+];
+
 export default function MainLayout() {
     const { user, logout } = useAuth();
     const { hasModule, loading: modulesLoading } = useModules();
@@ -23,31 +73,6 @@ export default function MainLayout() {
     const { branding } = useBranding();
     const { startJourney, forceStartJourney, activeKey } = useJourney();
 
-    // Route → module-key map for the on-first-visit tour. The path prefix
-    // match handles deep links like /app/patients/123 → 'patients'.
-    const ROUTE_TO_JOURNEY = [
-        ['/app/admin',           'admin'],
-        ['/app/patients',        'patients'],
-        ['/app/triage',          'triage'],
-        ['/app/clinical',        'clinical'],
-        ['/app/laboratory',      'laboratory'],
-        ['/app/radiology',       'radiology'],
-        ['/app/pharmacy',        'pharmacy'],
-        ['/app/inventory',       'inventory'],
-        ['/app/wards',           'wards'],
-        ['/app/billing',         'billing'],
-        ['/app/cheques',         'cheques'],
-        ['/app/medical-history', 'medical_history'],
-        ['/app/appointments',    'appointments'],
-        ['/app/messages',        'messages'],
-        ['/app/settings',        'settings'],
-        ['/app/branding',        'branding'],
-        ['/app/accounting',      'accounting'],
-        ['/app/support',         'support'],
-        ['/app/mpesa-settings',  'payhero'],
-        ['/app/dashboard',       'dashboard'],
-        ['/app',                 'dashboard'],   // role-redirect fallback
-    ];
     const currentJourneyKey = ROUTE_TO_JOURNEY.find(
         ([prefix]) => location.pathname.startsWith(prefix)
     )?.[1] || null;
@@ -60,31 +85,6 @@ export default function MainLayout() {
 
     // Get the dynamic hospital name from the portal selection
     const tenantName = localStorage.getItem('hms_tenant_name') || 'MediFleet';
-
-    // Each module declares both legacy `allowedRoles` and a `requiredPermission`.
-    // We prefer permissions so admin-created custom roles light up modules they
-    // have access to, and fall back to role-name matching for users on builds
-    // where a permission codename hasn't been seeded yet.
-    const NAVIGATION = [
-        { name: 'Command Center',    path: '/app/admin',           icon: <LayoutDashboard size={18} />, allowedRoles: ['Admin'],                                          requiredPermission: 'users:manage',     moduleKey: 'dashboard' },
-        { name: 'Messages',          path: '/app/messages',        icon: <MessageSquare size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Receptionist'], requiredPermission: 'messaging:read', moduleKey: 'messaging' },
-        { name: 'Patient Registry',  path: '/app/patients',        icon: <Users size={18} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'patients:read',    moduleKey: 'patients' },
-        { name: 'Medical History',   path: '/app/medical-history', icon: <ClipboardList size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse'],                       requiredPermission: 'history:read',     moduleKey: 'medical_history' },
-        { name: 'Triage',            path: '/app/triage',          icon: <HeartPulse size={18} />,      allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'triage:read',      moduleKey: 'clinical' },
-        { name: 'Clinical Desk',     path: '/app/clinical',        icon: <Stethoscope size={18} />,     allowedRoles: ['Admin', 'Doctor'],                                requiredPermission: 'clinical:read',    moduleKey: 'clinical' },
-        { name: 'Laboratory',        path: '/app/laboratory',      icon: <TestTube size={18} />,        allowedRoles: ['Admin', 'Lab Technician', 'Doctor'],              requiredPermission: 'laboratory:read',  moduleKey: 'laboratory' },
-        { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={18} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'],                 requiredPermission: 'radiology:manage', moduleKey: 'radiology' },
-        { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={18} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'],                  requiredPermission: 'pharmacy:read',    moduleKey: 'pharmacy' },
-        { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={18} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'wards:manage',     moduleKey: 'wards' },
-        { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'appointments:read',moduleKey: 'appointments' },
-        { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'inventory:read',   moduleKey: 'inventory' },
-        { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={18} />,         allowedRoles: ['Admin', 'Receptionist'],                          requiredPermission: 'billing:read',     moduleKey: 'billing' },
-        { name: 'Cheque Register',   path: '/app/cheques',         icon: <Banknote size={18} />,        allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'cheques:read',     moduleKey: 'cheques' },
-        { name: 'Accounting',        path: '/app/accounting',      icon: <BookOpen size={18} />,        allowedRoles: ['Admin', 'Accountant'],                            requiredPermission: 'accounting:view',  moduleKey: 'accounting' },
-        { name: 'MediFleet Support', path: '/app/support',         icon: <LifeBuoy size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'support:manage',   moduleKey: 'support' },
-        { name: 'M-Pesa Payments',   path: '/app/mpesa-settings',  icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: ['payhero:manage', 'mpesa:manage'], moduleKey: 'payhero' },
-        { name: 'Settings',          path: '/app/settings',        icon: <Settings size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'settings:read',    moduleKey: 'settings' },
-    ];
 
     const userPerms = user?.permissions || [];
     const userRole = user?.role;
@@ -176,7 +176,7 @@ export default function MainLayout() {
                 {/* User card */}
                 <div className="p-4 border-t border-white/5 shrink-0">
                     <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.04] ring-1 ring-white/5">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 flex items-center justify-center text-white font-semibold shadow-glow shrink-0">
+                        <div className="size-10 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 flex items-center justify-center text-white font-semibold shadow-glow shrink-0">
                             {user?.full_name?.charAt(0) || 'U'}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -208,9 +208,9 @@ export default function MainLayout() {
 
                     <div className="flex items-center gap-2 sm:gap-3">
                         <div className="hidden sm:flex items-center gap-2 pl-2.5 pr-3 py-1.5 bg-accent-50 dark:bg-accent-700/15 ring-1 ring-inset ring-accent-100 dark:ring-accent-700/30 rounded-full">
-                            <span className="relative flex h-2 w-2">
+                            <span className="relative flex size-2">
                                 <span className="animate-pulse-soft absolute inline-flex h-full w-full rounded-full bg-accent-500 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-600"></span>
+                                <span className="relative inline-flex rounded-full size-2 bg-accent-600"></span>
                             </span>
                             <span className="text-2xs font-semibold text-accent-700 dark:text-accent-400 uppercase tracking-wider">System Online</span>
                         </div>

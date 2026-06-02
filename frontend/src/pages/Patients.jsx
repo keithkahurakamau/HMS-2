@@ -519,7 +519,7 @@ export default function Patients() {
                                             {/* Patient */}
                                             <td className="px-5 py-3 align-top">
                                                 <div className="flex items-start gap-3">
-                                                    <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${avatarColor(patient.outpatient_no)}`} aria-hidden="true">
+                                                    <div className={`shrink-0 size-10 rounded-full flex items-center justify-center text-sm font-semibold ${avatarColor(patient.outpatient_no)}`} aria-hidden="true">
                                                         {initialsOf(patient)}
                                                     </div>
                                                     <div className="min-w-0">
@@ -632,7 +632,7 @@ export default function Patients() {
                         return (
                             <article key={patient.patient_id} className="card p-4">
                                 <header className="flex items-start gap-3">
-                                    <div className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold ${avatarColor(patient.outpatient_no)}`} aria-hidden="true">
+                                    <div className={`shrink-0 size-11 rounded-full flex items-center justify-center text-sm font-semibold ${avatarColor(patient.outpatient_no)}`} aria-hidden="true">
                                         {initialsOf(patient)}
                                     </div>
                                     <div className="min-w-0 flex-1">
@@ -653,7 +653,7 @@ export default function Patients() {
                                         aria-label={`More actions for ${patient.surname}`}
                                         aria-haspopup="menu"
                                         aria-expanded={activeDropdown?.patientId === patient.patient_id}
-                                        className="shrink-0 w-11 h-11 inline-flex items-center justify-center text-ink-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg cursor-pointer"
+                                        className="shrink-0 size-11 inline-flex items-center justify-center text-ink-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg cursor-pointer"
                                     >
                                         <MoreVertical size={18} aria-hidden="true" />
                                     </button>
@@ -1133,7 +1133,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                 {/* Header */}
                 <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-900/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0 flex items-start gap-3">
-                        <div className={`shrink-0 w-10 h-10 rounded-xl border flex items-center justify-center ${target.accent}`} aria-hidden="true">
+                        <div className={`shrink-0 size-10 rounded-xl border flex items-center justify-center ${target.accent}`} aria-hidden="true">
                             <Icon size={18} />
                         </div>
                         <div className="min-w-0">

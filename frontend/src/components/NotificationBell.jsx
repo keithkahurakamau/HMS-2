@@ -164,7 +164,7 @@ export default function NotificationBell() {
                                                 className="w-full text-left px-4 py-3 hover:bg-ink-50/60 dark:hover:bg-ink-800/50 transition-colors flex gap-3"
                                             >
                                                 <span
-                                                    className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ring-1 ring-inset ${style.ring}`}
+                                                    className={`shrink-0 size-9 rounded-xl flex items-center justify-center ring-1 ring-inset ${style.ring}`}
                                                     aria-hidden="true"
                                                 >
                                                     <Icon size={16} />

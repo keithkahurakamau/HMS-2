@@ -396,7 +396,7 @@ function ColorField({ label, value, placeholder, onChange }) {
     return (
         <div className="flex items-center gap-3">
             <div
-                className="w-10 h-10 rounded-xl border border-ink-200 shadow-soft shrink-0"
+                className="size-10 rounded-xl border border-ink-200 shadow-soft shrink-0"
                 style={{ backgroundColor: isValid && value ? value : '#f1f5f9' }}
             />
             <div className="flex-1">
@@ -415,7 +415,7 @@ function ColorField({ label, value, placeholder, onChange }) {
                 aria-label={`${label} color picker`}
                 value={isValid && value ? (value.length === 7 ? value : '#06b6d4') : '#06b6d4'}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-10 h-10 rounded-xl border border-ink-200 cursor-pointer bg-white"
+                className="size-10 rounded-xl border border-ink-200 cursor-pointer bg-white"
             />
         </div>
     );

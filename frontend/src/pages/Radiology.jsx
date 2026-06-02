@@ -217,7 +217,7 @@ export default function Radiology() {
                             <>
                                 <div className="shrink-0 p-5 border-b border-ink-100 bg-white flex justify-between items-center z-10">
                                     <div className="flex gap-3 items-center flex-1 min-w-0">
-                                        <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100">
+                                        <div className="size-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100">
                                             <Bone size={20} />
                                         </div>
                                         <div className="flex-1 min-w-0">

@@ -201,7 +201,7 @@ export default function RolesManager() {
                                                 isActive ? 'bg-brand-50' : 'hover:bg-slate-50'
                                             }`}
                                         >
-                                            <span className="shrink-0 w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center mt-0.5">
+                                            <span className="shrink-0 size-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center mt-0.5">
                                                 {r.is_system ? <Lock size={14} /> : <ShieldCheck size={14} />}
                                             </span>
                                             <div className="flex-1 min-w-0">

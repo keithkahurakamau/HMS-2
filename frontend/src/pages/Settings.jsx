@@ -165,7 +165,7 @@ export default function Settings() {
                 <div className="absolute inset-0 bg-aurora opacity-60 pointer-events-none" />
                 <div className="relative flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur ring-1 ring-white/20 flex items-center justify-center">
+                        <div className="size-12 rounded-2xl bg-white/15 backdrop-blur ring-1 ring-white/20 flex items-center justify-center">
                             <Palette size={20} />
                         </div>
                         <div>

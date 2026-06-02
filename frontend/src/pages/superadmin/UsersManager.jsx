@@ -319,7 +319,7 @@ export default function UsersManager() {
                     <div className="relative w-full max-w-md bg-white rounded-2xl shadow-elevated border border-ink-200 p-6 animate-slide-up">
                         <div className="flex items-start justify-between gap-3 mb-4">
                             <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-accent-100 text-accent-700"><KeyRound size={18} aria-hidden="true" /></span>
+                                <span className="inline-flex items-center justify-center size-9 rounded-xl bg-accent-100 text-accent-700"><KeyRound size={18} aria-hidden="true" /></span>
                                 <h2 id="temp-pw-title" className="text-base font-semibold text-ink-900">Temporary password</h2>
                             </div>
                             <button type="button" onClick={() => setTempResult(null)} aria-label="Close"

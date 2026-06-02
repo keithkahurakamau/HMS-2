@@ -58,7 +58,7 @@ export default function EmptyState({
             ].join(' ')}
         >
             {Icon && (
-                <div className={`mx-auto w-14 h-14 rounded-2xl flex items-center justify-center ring-1 ring-inset ${chip}`}>
+                <div className={`mx-auto size-14 rounded-2xl flex items-center justify-center ring-1 ring-inset ${chip}`}>
                     <Icon size={22} aria-hidden="true" />
                 </div>
             )}

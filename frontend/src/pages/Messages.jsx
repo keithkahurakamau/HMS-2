@@ -225,7 +225,7 @@ export default function Messages() {
                                                     : 'hover:bg-ink-50 dark:hover:bg-ink-800/50'
                                             }`}
                                         >
-                                            <span className="shrink-0 w-9 h-9 rounded-xl bg-ink-100 dark:bg-ink-800 text-ink-600 dark:text-ink-300 flex items-center justify-center">
+                                            <span className="shrink-0 size-9 rounded-xl bg-ink-100 dark:bg-ink-800 text-ink-600 dark:text-ink-300 flex items-center justify-center">
                                                 <Icon size={16} />
                                             </span>
                                             <div className="flex-1 min-w-0">
@@ -276,7 +276,7 @@ export default function Messages() {
                             {(() => {
                                 const Icon = KIND_ICON[activeConv.kind] || Hash;
                                 return (
-                                    <span className="shrink-0 w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-900/30 text-brand-600 flex items-center justify-center" aria-hidden="true">
+                                    <span className="shrink-0 size-9 rounded-xl bg-brand-50 dark:bg-brand-900/30 text-brand-600 flex items-center justify-center" aria-hidden="true">
                                         <Icon size={18} />
                                     </span>
                                 );
@@ -494,7 +494,7 @@ function NewConversationModal({ kind, onClose, onCreated }) {
                                                     isSelected ? 'bg-brand-50 dark:bg-brand-900/20' : 'hover:bg-ink-50 dark:hover:bg-ink-800/50'
                                                 }`}
                                             >
-                                                <span className="shrink-0 w-8 h-8 rounded-full bg-ink-200 dark:bg-ink-700 text-ink-700 dark:text-ink-200 flex items-center justify-center font-semibold text-xs">
+                                                <span className="shrink-0 size-8 rounded-full bg-ink-200 dark:bg-ink-700 text-ink-700 dark:text-ink-200 flex items-center justify-center font-semibold text-xs">
                                                     {u.full_name.charAt(0)}
                                                 </span>
                                                 <div className="flex-1 min-w-0">

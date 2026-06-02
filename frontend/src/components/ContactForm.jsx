@@ -39,7 +39,7 @@ export default function ContactForm() {
     if (sent) {
         return (
             <div className="glass-card rounded-2xl p-8 text-center">
-                <div className="w-12 h-12 mx-auto rounded-full bg-teal-50 text-teal-600 ring-1 ring-teal-100 flex items-center justify-center">
+                <div className="size-12 mx-auto rounded-full bg-teal-50 text-teal-600 ring-1 ring-teal-100 flex items-center justify-center">
                     <Send size={20} />
                 </div>
                 <h3 className="mt-4 text-lg font-semibold text-ink-900">Message sent</h3>

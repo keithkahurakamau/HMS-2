@@ -76,8 +76,8 @@ export default function Login() {
                 {/* Decorative mesh + grid */}
                 <div className="absolute inset-0 bg-aurora opacity-80 pointer-events-none" />
                 <div className="absolute inset-0 bg-grid opacity-[0.07] pointer-events-none" />
-                <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-accent-400/20 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-40 -left-20 w-[28rem] h-[28rem] rounded-full bg-brand-400/20 blur-3xl pointer-events-none" />
+                <div className="absolute -top-32 -right-32 size-96 rounded-full bg-accent-400/20 blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-40 -left-20 size-[28rem] rounded-full bg-brand-400/20 blur-3xl pointer-events-none" />
 
                 <div className="relative z-10 flex flex-col justify-between w-full p-12 xl:p-16">
                     {/* Logo */}
@@ -92,7 +92,7 @@ export default function Login() {
                     {/* Headline */}
                     <div className="max-w-md">
                         <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 ring-1 ring-white/20 text-2xs font-semibold uppercase tracking-[0.14em] text-white/85">
-                            <span className="w-1.5 h-1.5 rounded-full bg-accent-400 animate-pulse-soft" />
+                            <span className="size-1.5 rounded-full bg-accent-400 animate-pulse-soft" />
                             Clinical-grade workspace
                         </span>
                         <h1 className="mt-6 text-4xl xl:text-5xl font-semibold leading-[1.05] tracking-tight">
@@ -216,7 +216,7 @@ export default function Login() {
 function Feature({ icon, label }) {
     return (
         <div className="flex flex-col items-start gap-2 p-3 rounded-xl bg-white/[0.06] ring-1 ring-white/10 backdrop-blur-sm">
-            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/90">
+            <div className="size-8 rounded-lg bg-white/10 flex items-center justify-center text-white/90">
                 {icon}
             </div>
             <span className="text-xs font-semibold text-white/85">{label}</span>

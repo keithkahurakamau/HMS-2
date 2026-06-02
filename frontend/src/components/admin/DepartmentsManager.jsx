@@ -80,7 +80,7 @@ export default function DepartmentsManager() {
                             <div key={d.department_id} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-soft transition-shadow">
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <span className="shrink-0 w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                                        <span className="shrink-0 size-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
                                             <Building2 size={18} />
                                         </span>
                                         <div className="min-w-0">

@@ -78,7 +78,7 @@ export function UpgradeRequired({ moduleKey, label }) {
     return (
         <div className="min-h-[70vh] flex items-center justify-center p-6">
             <div className="max-w-xl w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-700 rounded-2xl shadow-xl p-8 text-center">
-                <div className="mx-auto w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
+                <div className="mx-auto size-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
                     <Lock className="text-amber-600" size={26} aria-hidden />
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">

@@ -36,14 +36,13 @@ export default function ActivePatientBar() {
         || 'Active patient';
 
     return (
-        <div
-            role="region"
+        <section
             aria-label="Active patient"
             className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 mb-4 px-4 sm:px-6 lg:px-8 py-2.5 bg-brand-50/95 border-b border-brand-200 backdrop-blur-md shadow-soft"
         >
             <div className="flex items-center gap-3 min-w-0">
                 {/* Avatar */}
-                <div className="shrink-0 w-9 h-9 rounded-full bg-white border border-brand-200 flex items-center justify-center text-xs font-semibold text-brand-700" aria-hidden="true">
+                <div className="shrink-0 size-9 rounded-full bg-white border border-brand-200 flex items-center justify-center text-xs font-semibold text-brand-700" aria-hidden="true">
                     {initialsOf(activePatient)}
                 </div>
 
@@ -103,13 +102,13 @@ export default function ActivePatientBar() {
                         type="button"
                         onClick={clearActivePatient}
                         aria-label="Clear active patient"
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-brand-700 hover:bg-brand-100 transition-colors cursor-pointer"
+                        className="inline-flex items-center justify-center size-8 rounded-lg text-brand-700 hover:bg-brand-100 transition-colors cursor-pointer"
                         title="Close active patient"
                     >
                         <X size={16} aria-hidden="true" />
                     </button>
                 </div>
             </div>
-        </div>
+        </section>
     );
 }
