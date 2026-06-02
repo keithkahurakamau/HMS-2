@@ -19,7 +19,7 @@ session.
 from datetime import datetime, date, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response, status
 from jose import jwt, JWTError
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -42,11 +42,17 @@ PORTAL_COOKIE_NAME = "patient_portal_token"
 
 
 # --- token helpers ----------------------------------------------------
-def _issue_portal_token(patient_id: int) -> tuple[str, datetime]:
+def _issue_portal_token(patient_id: int, tenant_db: str) -> tuple[str, datetime]:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=PORTAL_TOKEN_TTL_MINUTES)
     token = jwt.encode(
         {
             "patient_id": patient_id,
+            # SECURITY (ISO-1): bind the portal token to the tenant it was
+            # issued for. Without this, a token earned at hospital A could be
+            # replayed with a different X-Tenant-ID header to read hospital B's
+            # patient with the same sequential patient_id — a cross-tenant PHI
+            # leak. _resolve_portal_patient enforces this matches the request.
+            "tenant": tenant_db,
             "type": "patient_portal",
             "exp": expires_at,
         },
@@ -56,7 +62,7 @@ def _issue_portal_token(patient_id: int) -> tuple[str, datetime]:
     return token, expires_at
 
 
-def _resolve_portal_patient(token: Optional[str], db: Session) -> Patient:
+def _resolve_portal_patient(token: Optional[str], db: Session, tenant_db: Optional[str]) -> Patient:
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Portal session required.")
     try:
@@ -72,6 +78,13 @@ def _resolve_portal_patient(token: Optional[str], db: Session) -> Patient:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Portal session invalid or expired.")
     if payload.get("type") != "patient_portal":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Wrong token type.")
+    # SECURITY (ISO-1): the tenant the token was minted for must match the
+    # tenant DB this request is hitting. Reject mismatches (and legacy tokens
+    # with no tenant claim) — they must re-authenticate. Mirrors the staff
+    # cross-tenant guard in get_current_user.
+    token_tenant = payload.get("tenant")
+    if not token_tenant or token_tenant != tenant_db:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant access strictly forbidden.")
     patient_id = payload.get("patient_id")
     patient = db.query(Patient).filter(Patient.patient_id == patient_id, Patient.is_active.is_(True)).first()
     if not patient:
@@ -130,7 +143,7 @@ async def portal_lookup(
     if not patient.telephone_1 or not patient.telephone_1.endswith(payload.phone_last4):
         raise generic_failure
 
-    token, expires_at = _issue_portal_token(patient.patient_id)
+    token, expires_at = _issue_portal_token(patient.patient_id, request.headers.get("X-Tenant-ID"))
 
     # Audit SEC-004: cookie hardening must follow the authoritative APP_ENV
     # flag, never the M-Pesa environment which legitimately runs sandbox in
@@ -173,8 +186,9 @@ def portal_logout(response: Response):
 def portal_me(
     db: Session = Depends(get_db),
     patient_portal_token: Optional[str] = Cookie(None, alias=PORTAL_COOKIE_NAME),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
 ):
-    patient = _resolve_portal_patient(patient_portal_token, db)
+    patient = _resolve_portal_patient(patient_portal_token, db, x_tenant_id)
     return {
         "outpatient_no": patient.outpatient_no,
         "full_name": f"{patient.surname}, {patient.other_names}",
@@ -191,8 +205,9 @@ def portal_me(
 def portal_appointments(
     db: Session = Depends(get_db),
     patient_portal_token: Optional[str] = Cookie(None, alias=PORTAL_COOKIE_NAME),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
 ):
-    patient = _resolve_portal_patient(patient_portal_token, db)
+    patient = _resolve_portal_patient(patient_portal_token, db, x_tenant_id)
     appts = (
         db.query(Appointment)
         .filter(Appointment.patient_id == patient.patient_id)
@@ -216,8 +231,9 @@ def portal_appointments(
 def portal_billing(
     db: Session = Depends(get_db),
     patient_portal_token: Optional[str] = Cookie(None, alias=PORTAL_COOKIE_NAME),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
 ):
-    patient = _resolve_portal_patient(patient_portal_token, db)
+    patient = _resolve_portal_patient(patient_portal_token, db, x_tenant_id)
     invoices = (
         db.query(Invoice)
         .filter(Invoice.patient_id == patient.patient_id)
@@ -241,13 +257,14 @@ def portal_billing(
 def portal_history(
     db: Session = Depends(get_db),
     patient_portal_token: Optional[str] = Cookie(None, alias=PORTAL_COOKIE_NAME),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
 ):
     """
     KDPA: patients can see their own non-sensitive history. Sensitive entries
     (mental health, obstetric) are filtered out — patients should request
     those through their clinician for proper context.
     """
-    patient = _resolve_portal_patient(patient_portal_token, db)
+    patient = _resolve_portal_patient(patient_portal_token, db, x_tenant_id)
     entries = (
         db.query(MedicalHistoryEntry)
         .filter(

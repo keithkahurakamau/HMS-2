@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -12,47 +12,57 @@ import ModuleGuard from './components/ModuleGuard';
 import { Activity } from 'lucide-react';
 import Seo from './components/Seo';
 
-// Page Imports
-import Login from './pages/Login';
-import Patients from './pages/Patients';
-import ClinicalDesk from './pages/ClinicalDesk';
-import Triage from './pages/Triage';
-import Pharmacy from './pages/Pharmacy';
-import Inventory from './pages/Inventory';
-import Laboratory from './pages/Laboratory';
-import Wards from './pages/Wards';
-import AdminDashboard from './pages/AdminDashboard';
-import Radiology from './pages/Radiology';
-import MedicalHistory from './pages/MedicalHistory';
-import Billing from './pages/Billing';
-import Portal from './pages/Portal';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Appointments from './pages/Appointments';
-import PatientPortal from './pages/PatientPortal';
-import Messages from './pages/Messages';
-import Settings from './pages/Settings';
-import MpesaSettings from './pages/MpesaSettings';
-import Cheques from './pages/Cheques';
-import Support from './pages/Support';
+// Eager imports — public entry points (first paint) + the superadmin guard
+// helper, which is read synchronously by SuperAdminProtectedRoute.
 import Landing from './pages/Landing';
-import Branding from './pages/Branding';
-import Accounting from './pages/Accounting';
-
-// Layout Import
-import MainLayout from './components/layouts/MainLayout';
-
-// Super Admin Imports
-import SuperAdminLayout from './components/layouts/SuperAdminLayout';
-import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
-import TenantsManager from './pages/superadmin/TenantsManager';
-import PlatformBilling from './pages/superadmin/PlatformBilling';
-import PlatformSubscriptions from './pages/superadmin/PlatformSubscriptions';
-import PaymentsManager from './pages/superadmin/PaymentsManager';
-import PlatformSettings from './pages/superadmin/PlatformSettings';
-import SuperAdminPatients from './pages/superadmin/SuperAdminPatients';
-import SupportInbox from './pages/superadmin/SupportInbox';
+import Login from './pages/Login';
 import SuperAdminLogin, { isSuperAdminAuthenticated } from './pages/superadmin/SuperAdminLogin';
+
+// Lazy page imports — each becomes its own chunk, fetched on first visit.
+// Keeps the initial bundle small; authenticated modules load on demand.
+const Patients = lazy(() => import('./pages/Patients'));
+const ClinicalDesk = lazy(() => import('./pages/ClinicalDesk'));
+const Triage = lazy(() => import('./pages/Triage'));
+const Pharmacy = lazy(() => import('./pages/Pharmacy'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const Laboratory = lazy(() => import('./pages/Laboratory'));
+const Wards = lazy(() => import('./pages/Wards'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const Radiology = lazy(() => import('./pages/Radiology'));
+const MedicalHistory = lazy(() => import('./pages/MedicalHistory'));
+const Billing = lazy(() => import('./pages/Billing'));
+const Portal = lazy(() => import('./pages/Portal'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Appointments = lazy(() => import('./pages/Appointments'));
+const PatientPortal = lazy(() => import('./pages/PatientPortal'));
+const Messages = lazy(() => import('./pages/Messages'));
+const Settings = lazy(() => import('./pages/Settings'));
+const MpesaSettings = lazy(() => import('./pages/MpesaSettings'));
+const Cheques = lazy(() => import('./pages/Cheques'));
+const Support = lazy(() => import('./pages/Support'));
+const Branding = lazy(() => import('./pages/Branding'));
+const Accounting = lazy(() => import('./pages/Accounting'));
+
+// Layout + superadmin pages — also lazy (the back-office is rarely the first load).
+const MainLayout = lazy(() => import('./components/layouts/MainLayout'));
+const SuperAdminLayout = lazy(() => import('./components/layouts/SuperAdminLayout'));
+const SuperAdminDashboard = lazy(() => import('./pages/superadmin/SuperAdminDashboard'));
+const TenantsManager = lazy(() => import('./pages/superadmin/TenantsManager'));
+const PlatformBilling = lazy(() => import('./pages/superadmin/PlatformBilling'));
+const PlatformSubscriptions = lazy(() => import('./pages/superadmin/PlatformSubscriptions'));
+const PaymentsManager = lazy(() => import('./pages/superadmin/PaymentsManager'));
+const PlatformSettings = lazy(() => import('./pages/superadmin/PlatformSettings'));
+const SuperAdminPatients = lazy(() => import('./pages/superadmin/SuperAdminPatients'));
+const UsersManager = lazy(() => import('./pages/superadmin/UsersManager'));
+const SupportInbox = lazy(() => import('./pages/superadmin/SupportInbox'));
+
+// Full-screen fallback shown while a lazy route chunk is fetched.
+const PageFallback = () => (
+  <div className="h-screen w-screen flex items-center justify-center bg-ink-50">
+    <Activity className="animate-spin text-brand-600" size={32} aria-label="Loading" />
+  </div>
+);
 
 // Protection Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -135,6 +145,7 @@ export default function App() {
               app root so portal target (document.body) is always available. */}
           <JourneyOverlay />
           <RouteMeta />
+          <Suspense fallback={<PageFallback />}>
           <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/portal" element={<Portal />} />
@@ -149,6 +160,7 @@ export default function App() {
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="tenants" element={<TenantsManager />} />
             <Route path="patients" element={<SuperAdminPatients />} />
+            <Route path="users" element={<UsersManager />} />
             <Route path="support" element={<SupportInbox />} />
             <Route path="billing" element={<PlatformBilling />} />
             <Route path="subscriptions" element={<PlatformSubscriptions />} />
@@ -189,6 +201,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
           </Routes>
+          </Suspense>
         </JourneyProvider>
         </PatientProvider>
         </BrowserRouter>
