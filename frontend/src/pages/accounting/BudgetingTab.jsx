@@ -1,6 +1,6 @@
 /* Budgeting — create budgets, edit per-account/period amounts on a grid,
  * and compare against posted actuals. Backed by /api/accounting/budgets. */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import { Target, BarChart3, Pencil } from 'lucide-react';
