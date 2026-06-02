@@ -94,6 +94,23 @@ const avatarColor = (key) => {
     return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
 };
 
+// Registration form defaults — module scope so they're a stable reference, not
+// rebuilt every render. Read-only (form edits create new objects via setState;
+// reset re-applies these), so a shared reference is safe.
+const DEFAULT_FORM_STATE = {
+    surname: '', other_names: '', sex: 'Male', date_of_birth: '',
+    marital_status: 'Single', religion: '', primary_language: '',
+    blood_group: 'Unknown', allergies: '', chronic_conditions: '',
+    id_type: 'National ID', id_number: '', nationality: 'Kenyan',
+    telephone_1: '', telephone_2: '', email: '',
+    postal_address: '', postal_code: '', residence: '', town: '',
+    occupation: '', employer_name: '', reference_number: '',
+    nok_name: '', nok_relationship: '', nok_contact: '', notes: ''
+};
+// KDPA Section 30 — treatment consent captured inline at registration.
+// Default given + Verbal (how walk-ins work); clinician can adjust.
+const DEFAULT_CONSENT_STATE = { given: true, method: 'Verbal' };
+
 export default function Patients() {
     const [patients, setPatients] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -132,18 +149,8 @@ export default function Patients() {
         );
     };
 
-    // Form State
-    const defaultFormState = {
-        surname: '', other_names: '', sex: 'Male', date_of_birth: '',
-        marital_status: 'Single', religion: '', primary_language: '',
-        blood_group: 'Unknown', allergies: '', chronic_conditions: '',
-        id_type: 'National ID', id_number: '', nationality: 'Kenyan',
-        telephone_1: '', telephone_2: '', email: '',
-        postal_address: '', postal_code: '', residence: '', town: '',
-        occupation: '', employer_name: '', reference_number: '',
-        nok_name: '', nok_relationship: '', nok_contact: '', notes: ''
-    };
-    const [formData, setFormData] = useState(defaultFormState);
+    // Form State (defaults at module scope — see DEFAULT_FORM_STATE)
+    const [formData, setFormData] = useState(DEFAULT_FORM_STATE);
 
     // KDPA Section 30 — Treatment consent must exist before any clinical
     // write. We capture it inline at registration so the patient is
@@ -154,8 +161,7 @@ export default function Patients() {
     // how walk-in registrations work in practice; the clinician can
     // uncheck and capture written consent later if the patient hasn't
     // agreed yet.
-    const defaultConsentState = { given: true, method: 'Verbal' };
-    const [consentForm, setConsentForm] = useState(defaultConsentState);
+    const [consentForm, setConsentForm] = useState(DEFAULT_CONSENT_STATE);
 
     useEffect(() => {
         const delayDebounce = setTimeout(() => fetchPatients(), 500);
@@ -276,8 +282,8 @@ export default function Patients() {
             }
 
             setIsModalOpen(false);
-            setFormData(defaultFormState);
-            setConsentForm(defaultConsentState);
+            setFormData(DEFAULT_FORM_STATE);
+            setConsentForm(DEFAULT_CONSENT_STATE);
             fetchPatients();
         } catch (error) {
             toast.error(error.response?.data?.detail || "Registration failed");

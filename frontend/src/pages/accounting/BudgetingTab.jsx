@@ -204,7 +204,9 @@ function BudgetDetail({ budgetId, onBack }) {
 
 function BudgetGrid({ budget, accounts, periods }) {
     // values keyed `${account_id}:${period_id}` → string amount.
-    const [values, setValues] = useState({});
+    // Lazy initializer: a fresh object once at mount (not rebuilt every render,
+    // and not a shared module-scope singleton that could be mutated across instances).
+    const [values, setValues] = useState(() => ({}));
     const dirty = useRef(new Set());
     const timer = useRef(null);
     const [savedAt, setSavedAt] = useState(null);

@@ -13,6 +13,10 @@ import DepartmentsManager from '../components/admin/DepartmentsManager';
 import RolesManager from '../components/admin/RolesManager';
 import UserPermissionsEditor from '../components/admin/UserPermissionsEditor';
 
+// Built-in role names — static seed so the staff create/edit dropdowns work on
+// a cold render before the API returns custom roles. Module scope: built once.
+const BUILTIN_ROLES = ["Admin", "Doctor", "Nurse", "Pharmacist", "Lab Technician", "Radiologist", "Receptionist"];
+
 export default function AdminDashboard() {
     const { user: currentUser } = useAuth();
     const [activeTab, setActiveTab] = useState('overview'); 
@@ -36,12 +40,9 @@ export default function AdminDashboard() {
     const [roleEditForm, setRoleEditForm] = useState({ role: '' });
     const [pricingForm, setPricingForm] = useState({ catalog_id: null, test_name: '', category: 'Consultation', description: '', base_price: 0 });
 
-    // Built-in roles are available immediately, before /admin/roles loads, so
-    // the staff create + edit-role dropdowns work even on a cold render. As
-    // soon as the admin opens the Directory tab we replace this list with
-    // whatever the API returns (which includes any custom roles).
-    const builtinRoles = ["Admin", "Doctor", "Nurse", "Pharmacist", "Lab Technician", "Radiologist", "Receptionist"];
-    const [allRoleNames, setAllRoleNames] = useState(builtinRoles);
+    // Built-in roles (BUILTIN_ROLES, module scope) seed the dropdowns on a cold
+    // render; replaced by the API list (incl. custom roles) once Directory loads.
+    const [allRoleNames, setAllRoleNames] = useState(BUILTIN_ROLES);
     const roles = allRoleNames;
 
     useEffect(() => {
