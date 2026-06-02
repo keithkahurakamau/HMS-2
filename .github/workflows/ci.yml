@@ -83,6 +83,10 @@ jobs:
         working-directory: backend
         run: pytest tests/email/ -q
 
+      - name: Run support (inbound email) unit tests
+        working-directory: backend
+        run: pytest tests/support/ -q
+
   frontend:
     name: frontend (lint + build)
     runs-on: ubuntu-latest

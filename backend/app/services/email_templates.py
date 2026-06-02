@@ -138,3 +138,37 @@ def render_staff_invite(
         "If you weren't expecting this, ignore this email.\n"
     )
     return subject, html_out, text_out
+
+
+def render_ticket_reply(
+    *, ticket_ref: str, ticket_subject: str, reply_body: str,
+    recipient_name: str | None = None,
+) -> Tuple[str, str, str]:
+    """Email sent to a client when the support team replies to their ticket.
+
+    Subject carries the ``[#MF-000123]`` token so a client reply threads back
+    to the same ticket via the inbound webhook.
+    """
+    greeting = f"Hi {_e(recipient_name)}," if recipient_name else "Hello,"
+    subject = f"[{ticket_ref}] {ticket_subject}".strip()
+    # Preserve the agent's line breaks in HTML.
+    body_html_inner = _e(reply_body).replace("\n", "<br>")
+    body_html = (
+        f'<p style="margin:0 0 12px;font-size:15px;line-height:22px;">{greeting}</p>'
+        f'<p style="margin:0 0 16px;font-size:15px;line-height:22px;">'
+        f"Our support team replied to your request <strong>{_e(ticket_ref)}</strong>:</p>"
+        f'<div style="margin:0 0 16px;padding:14px 16px;background:#f9fafb;border-left:3px solid {_BRAND};'
+        f'font-size:15px;line-height:22px;color:{_INK};">{body_html_inner}</div>'
+        f'<p style="margin:0;font-size:13px;line-height:20px;color:{_MUTED};">'
+        "Just reply to this email to continue the conversation — your response is "
+        "added to the same ticket.</p>"
+    )
+    html_out = _layout(heading="Reply from MediFleet Support", body_html=body_html)
+    text_out = (
+        f"{recipient_name + ',' if recipient_name else 'Hello,'}\n\n"
+        f"Our support team replied to your request {ticket_ref}:\n\n"
+        f"{reply_body}\n\n"
+        "Just reply to this email to continue the conversation — your response is "
+        "added to the same ticket.\n"
+    )
+    return subject, html_out, text_out

@@ -63,9 +63,26 @@ class Settings(BaseSettings):
     # team. Receiving those replies still requires MX/inbound configured on the
     # mail provider for that domain — see docs.
     EMAIL_REPLY_TO: str = ""
+    # Role-based sender identities (EMAIL-002). When set, outbound mail can be
+    # sent "from" the right desk. Empty falls back to EMAIL_FROM.
+    EMAIL_FROM_SUPPORT: str = ""               # support@medifleet.app
+    EMAIL_FROM_FINANCE: str = ""               # finance@medifleet.app
+    EMAIL_FROM_TECHNICAL: str = ""             # technical@medifleet.app
     # Where emailed links (password reset, invites) point. Falls back to the
     # first CORS origin when unset so dev "just works".
     FRONTEND_BASE_URL: str = ""
+
+    # ── Inbound support email (EMAIL-003) ──────────────────────────────
+    # Clients email support@/finance@/technical@<domain>; the mail provider
+    # (Resend Inbound) POSTs the parsed message to /api/public/support/inbound,
+    # which threads it into the platform Support Inbox.
+    SUPPORT_INBOUND_ENABLED: bool = False
+    # HMAC signing secret from the provider's inbound webhook config. Required
+    # when inbound is enabled — the endpoint rejects unsigned/forged posts.
+    SUPPORT_INBOUND_SIGNING_SECRET: SecretStr = SecretStr("")
+    # Domain used to build per-ticket reply addresses (support+ticket-<id>@…)
+    # and to recognise our own inbound recipients.
+    SUPPORT_INBOUND_DOMAIN: str = "medifleet.app"
 
     @field_validator("SECRET_KEY")
     @classmethod
@@ -143,6 +160,20 @@ class Settings(BaseSettings):
     @property
     def smtp_password(self) -> str:
         return self.SMTP_PASSWORD.get_secret_value()
+
+    @property
+    def support_inbound_signing_secret(self) -> str:
+        return self.SUPPORT_INBOUND_SIGNING_SECRET.get_secret_value()
+
+    def email_from_for(self, desk: str | None) -> str:
+        """Resolve the From address for a desk ('support'|'finance'|'technical').
+        Falls back to EMAIL_FROM when the desk-specific address isn't set."""
+        mapping = {
+            "support": self.EMAIL_FROM_SUPPORT,
+            "finance": self.EMAIL_FROM_FINANCE,
+            "technical": self.EMAIL_FROM_TECHNICAL,
+        }
+        return (mapping.get(desk or "") or "").strip() or self.EMAIL_FROM
 
     @property
     def frontend_base_url(self) -> str:
