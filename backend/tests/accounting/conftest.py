@@ -208,6 +208,7 @@ def db(_engine) -> Iterator[Session]:
         "acc_insurance_providers", "acc_suppliers",
         "acc_journal_lines", "acc_journal_entries", "acc_fiscal_periods",
         "acc_fx_rates", "acc_accounts", "acc_settings", "acc_currencies",
+        "cheques",
         "payhero_transactions",
         "payments", "invoice_items", "invoices",
         "dispense_logs", "stock_batches", "inventory_items", "locations",

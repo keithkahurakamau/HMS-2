@@ -58,6 +58,7 @@ def post_from_event(
     memo: Optional[str] = None,
     reference: Optional[str] = None,
     user_id: Optional[int] = None,
+    ignore_go_live: bool = False,
 ) -> Optional[JournalEntry]:
     """Post a 2-line journal entry derived from `source_key`'s mapping.
 
@@ -95,8 +96,10 @@ def post_from_event(
         on = on_date or _date.today()
         settings = get_or_create_settings(db)
 
-        # Go-live gate.
-        if settings.go_live_date and on < settings.go_live_date:
+        # Go-live gate. The historical backfill passes ignore_go_live=True so
+        # transactions dated before the tenant's clean-cutover date are still
+        # posted — that's how "see every transaction that ever happened" works.
+        if settings.go_live_date and on < settings.go_live_date and not ignore_go_live:
             LOG.info("accounting: skip pre-go-live event source_key=%s source_id=%s on=%s go_live=%s",
                      source_key, source_id, on, settings.go_live_date)
             if sp is not None and sp.is_active:
