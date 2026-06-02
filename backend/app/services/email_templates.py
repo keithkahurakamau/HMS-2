@@ -138,3 +138,72 @@ def render_staff_invite(
         "If you weren't expecting this, ignore this email.\n"
     )
     return subject, html_out, text_out
+
+
+def render_ticket_reply(
+    *, ticket_ref: str, ticket_subject: str, reply_body: str,
+    recipient_name: str | None = None,
+) -> Tuple[str, str, str]:
+    """Email sent to a client when the support team replies to their ticket.
+
+    Subject carries the ``[#MF-000123]`` token so a client reply threads back
+    to the same ticket via the inbound webhook.
+    """
+    greeting = f"Hi {_e(recipient_name)}," if recipient_name else "Hello,"
+    subject = f"[{ticket_ref}] {ticket_subject}".strip()
+    # Preserve the agent's line breaks in HTML.
+    body_html_inner = _e(reply_body).replace("\n", "<br>")
+    body_html = (
+        f'<p style="margin:0 0 12px;font-size:15px;line-height:22px;">{greeting}</p>'
+        f'<p style="margin:0 0 16px;font-size:15px;line-height:22px;">'
+        f"Our support team replied to your request <strong>{_e(ticket_ref)}</strong>:</p>"
+        f'<div style="margin:0 0 16px;padding:14px 16px;background:#f9fafb;border-left:3px solid {_BRAND};'
+        f'font-size:15px;line-height:22px;color:{_INK};">{body_html_inner}</div>'
+        f'<p style="margin:0;font-size:13px;line-height:20px;color:{_MUTED};">'
+        "Just reply to this email to continue the conversation — your response is "
+        "added to the same ticket.</p>"
+    )
+    html_out = _layout(heading="Reply from MediFleet Support", body_html=body_html)
+    text_out = (
+        f"{recipient_name + ',' if recipient_name else 'Hello,'}\n\n"
+        f"Our support team replied to your request {ticket_ref}:\n\n"
+        f"{reply_body}\n\n"
+        "Just reply to this email to continue the conversation — your response is "
+        "added to the same ticket.\n"
+    )
+    return subject, html_out, text_out
+
+
+def render_contact_message(
+    *, name: str, email: str, message: str,
+    subject: str | None = None, company: str | None = None,
+) -> Tuple[str, str, str]:
+    """Internal notification email for a website contact-form submission.
+
+    Sent to the support inbox; Reply-To is set to the visitor's address by the
+    caller so the team can reply straight to the prospect.
+    """
+    line = (subject or "New website enquiry").strip()
+    email_subject = f"[Contact] {line} — from {name}".strip()
+    rows = [("Name", name), ("Email", email)]
+    if company:
+        rows.append(("Company", company))
+    if subject:
+        rows.append(("Subject", subject))
+    rows_html = "".join(
+        f'<tr><td style="padding:4px 12px 4px 0;font-size:13px;color:{_MUTED};white-space:nowrap;">{_e(k)}</td>'
+        f'<td style="padding:4px 0;font-size:14px;color:{_INK};">{_e(v)}</td></tr>'
+        for k, v in rows
+    )
+    body_html = (
+        f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">{rows_html}</table>'
+        f'<div style="margin:0;padding:14px 16px;background:#f9fafb;border-left:3px solid {_BRAND};'
+        f'font-size:15px;line-height:22px;color:{_INK};white-space:pre-wrap;">{_e(message)}</div>'
+    )
+    html_out = _layout(heading="New contact enquiry", body_html=body_html)
+    text_out = (
+        "New website contact enquiry\n\n"
+        + "".join(f"{k}: {v}\n" for k, v in rows)
+        + f"\nMessage:\n{message}\n"
+    )
+    return email_subject, html_out, text_out

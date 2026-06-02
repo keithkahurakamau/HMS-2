@@ -109,24 +109,33 @@ class EmailService:
     def __init__(self, backend: EmailBackend | None = None):
         self._backend = backend or _build_backend()
 
-    def send(self, *, to: str, subject: str, html: str, text: str | None = None) -> bool:
+    def send(
+        self, *, to: str, subject: str, html: str, text: str | None = None,
+        from_addr: str | None = None, from_name: str | None = None,
+        reply_to: str | None = None,
+    ) -> bool:
         """Best-effort send. Returns True on success, False on failure.
 
         Never raises — callers run this in a background task and an email
         failure must not surface as a request error or roll anything back.
+
+        ``from_addr`` / ``reply_to`` override the configured defaults — used by
+        the support desk to send "from" finance@/technical@ and to set a
+        per-ticket Reply-To for inbound threading.
         """
-        from_addr = settings.EMAIL_FROM or settings.SMTP_USER
+        from_addr = from_addr or settings.EMAIL_FROM or settings.SMTP_USER
         if not from_addr:
             logger.error("[email] no EMAIL_FROM / SMTP_USER configured — cannot send '%s' to %s", subject, to)
             return False
 
         message = EmailMessage()
-        message["From"] = formataddr((settings.EMAIL_FROM_NAME, from_addr))
+        message["From"] = formataddr((from_name or settings.EMAIL_FROM_NAME, from_addr))
         message["To"] = to
         message["Subject"] = subject
-        # Route client replies to the support inbox when configured.
-        if settings.EMAIL_REPLY_TO:
-            message["Reply-To"] = settings.EMAIL_REPLY_TO
+        # Route client replies: explicit reply_to wins, else the configured inbox.
+        reply_to = reply_to or settings.EMAIL_REPLY_TO
+        if reply_to:
+            message["Reply-To"] = reply_to
         # Plaintext is the required fallback; HTML is the alternative.
         message.set_content(text or _strip_html(html))
         message.add_alternative(html, subtype="html")

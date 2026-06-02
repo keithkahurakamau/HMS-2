@@ -21,7 +21,7 @@ const SUPPORT_CONTACT = {
 
 export default function ContactStrip({ heading = "Need a hand?" }) {
     return (
-        <section className="relative py-14 sm:py-20" id="contact">
+        <section className="relative py-14 sm:py-20">
             <div className="max-w-5xl mx-auto px-6">
                 <div className="text-center mb-10">
                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white ring-1 ring-brand-200 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">

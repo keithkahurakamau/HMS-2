@@ -24,12 +24,17 @@ class SupportTicket(Base):
 
     ticket_id = Column(Integer, primary_key=True)
 
-    # Who raised it
-    tenant_id = Column(Integer, nullable=False, index=True)        # NOT a hard FK — master DB only
-    tenant_name = Column(String(255), nullable=False)
+    # Who raised it. tenant_id/tenant_name are nullable because inbound email
+    # (EMAIL-003) can arrive from a contact we can't yet attribute to a tenant;
+    # those land in the "Unassigned" bucket for superadmin triage.
+    tenant_id = Column(Integer, nullable=True, index=True)         # NOT a hard FK — master DB only
+    tenant_name = Column(String(255), nullable=True)
     submitter_email = Column(String(255), nullable=False)
     submitter_name = Column(String(255), nullable=False)
     submitter_user_id = Column(Integer, nullable=True)             # tenant-DB user_id, informational
+
+    # How the ticket entered the system: 'app' (in-product form) | 'email' (inbound).
+    origin = Column(String(20), nullable=False, server_default="app")
 
     # What it's about
     subject = Column(String(200), nullable=False)
@@ -72,10 +77,18 @@ class SupportMessage(Base):
         index=True,
         nullable=False,
     )
-    author_kind = Column(String(20), nullable=False)               # staff | platform
+    author_kind = Column(String(20), nullable=False)               # staff | platform | customer
     author_name = Column(String(255), nullable=False)
     author_id = Column(Integer, nullable=True)                     # staff: tenant user_id; platform: superadmin admin_id
     body = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    # Inbound-email fields (EMAIL-003). 'app' for in-product messages.
+    source = Column(String(20), nullable=False, server_default="app")     # app | email
+    # Provider Message-ID — dedupes webhook retries and powers In-Reply-To
+    # threading on outbound platform replies. Unique (multiple NULLs allowed).
+    external_message_id = Column(String(255), nullable=True, unique=True, index=True)
+    from_email = Column(String(255), nullable=True)                # inbound sender (no author_id)
+    from_name = Column(String(255), nullable=True)
 
     ticket = relationship("SupportTicket", back_populates="messages")
