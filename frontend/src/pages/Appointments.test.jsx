@@ -43,6 +43,17 @@ import Appointments from './Appointments';
 /*  Fixtures                                                           */
 /* ------------------------------------------------------------------ */
 
+// A datetime-local value safely in the future, recomputed each run. The form's
+// datetime input carries a `min="now"` constraint, so a hardcoded calendar date
+// silently becomes invalid once that day passes — submission is then blocked by
+// HTML5 validation and never reaches apiClient.post. Deriving from Date.now()
+// keeps the test date-stable.
+const futureApptDt = (() => {
+    const d = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:30`;
+})();
+
 const mkAppt = (overrides = {}) => ({
     appointment_id:    1,
     patient_id:        10,
@@ -234,7 +245,7 @@ describe('<Appointments /> — create form', () => {
         // The datetime-local input — find by type attribute.
         const dt = document.querySelector('input[type="datetime-local"]');
         expect(dt).toBeTruthy();
-        await user.type(dt, '2026-05-20T09:30');
+        await user.type(dt, futureApptDt);
 
         // Submit
         await user.click(screen.getByRole('button', { name: /^book appointment$/i }));
@@ -247,7 +258,7 @@ describe('<Appointments /> — create form', () => {
         expect(payload).toEqual(expect.objectContaining({
             patient_id:       10,
             doctor_id:        20,
-            appointment_date: '2026-05-20T09:30',
+            appointment_date: futureApptDt,
         }));
 
         await waitFor(() => {
@@ -385,7 +396,7 @@ describe('<Appointments /> — conflict surfacing', () => {
         await user.selectOptions(required[0], '10');
         await user.selectOptions(required[1], '20');
         const dt = document.querySelector('input[type="datetime-local"]');
-        await user.type(dt, '2026-05-20T09:30');
+        await user.type(dt, futureApptDt);
         await user.click(screen.getByRole('button', { name: /^book appointment$/i }));
 
         await waitFor(() => {
