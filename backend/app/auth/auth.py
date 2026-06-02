@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
@@ -18,6 +18,7 @@ from app.core.security import (
     generate_reset_token,
 )
 from app.core.limiter import limiter
+from app.services.auth_emails import send_password_reset_email
 from pydantic import BaseModel, EmailStr, field_validator
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
@@ -402,12 +403,17 @@ RESET_TOKEN_TTL_MINUTES = 60
 
 @router.post("/forgot-password")
 @limiter.limit("3/minute")
-async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+async def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     Issues a single-use password reset token. Always returns 200 — never leak
-    whether an email is registered. In a production deployment the token would
-    be emailed via SMTP; here we return it inline (under "dev_token") so the
-    flow can be tested end-to-end.
+    whether an email is registered. When EMAIL_ENABLED is on, the reset link is
+    emailed via the configured SMTP relay. When it's off (dev/CI) we surface the
+    token inline (under "dev_token") so the flow can still be tested end-to-end.
     """
     user = db.query(User).filter(User.email == payload.email).first()
 
@@ -431,11 +437,21 @@ async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: 
         db.add(record)
         db.commit()
 
-        # In production, dispatch an email here. Until SMTP is wired, surface
-        # the token in non-production environments only.
-        # AUTH-005: gate on APP_ENV (single source of truth), not MPESA_ENV —
-        # a prod deploy with sandbox Daraja previously leaked reset tokens.
-        if not settings.is_production:
+        # Dispatch the email after the response is sent (BackgroundTasks). The
+        # link must carry the tenant id — reset tokens live in the tenant DB.
+        send_password_reset_email(
+            background_tasks,
+            to=user.email,
+            raw_token=raw_token,
+            tenant_id=request.headers.get("X-Tenant-ID"),
+            recipient_name=getattr(user, "full_name", None),
+        )
+
+        # Only surface the raw token inline when no email will actually go out
+        # AND we're not in production. AUTH-005: gate on APP_ENV (single source
+        # of truth), not MPESA_ENV — a prod deploy with sandbox Daraja
+        # previously leaked reset tokens.
+        if not settings.EMAIL_ENABLED and not settings.is_production:
             response["dev_token"] = raw_token
 
     return response

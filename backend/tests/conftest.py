@@ -27,7 +27,7 @@ def make_cookies(email: str) -> dict:
     db = _get_tenant_db()
     user = db.query(User).filter(User.email == email).first()
     assert user is not None, f"User not found: {email}"
-    access_token, refresh_token = create_tokens(subject=user.user_id, tenant_id=TENANT)
+    access_token, refresh_token, _jti, _expires_at = create_tokens(subject=user.user_id, tenant_id=TENANT)
     db.close()
     return {"access_token": access_token, "refresh_token": refresh_token}
 

@@ -40,6 +40,33 @@ class Settings(BaseSettings):
     PAYHERO_WEBHOOK_CIDRS: str = ""
     PUBLIC_BASE_URL: str = ""                  # https://… used for callback URLs
 
+    # ── Email / SMTP (EMAIL-001) ───────────────────────────────────────
+    # Provider-agnostic: any SMTP relay works (Gmail, Mailgun, Resend,
+    # AWS SES — they all expose an SMTP endpoint). Swap providers by
+    # editing these env vars; no code change required.
+    #
+    # EMAIL_ENABLED is the master switch. When false (the dev default) the
+    # service logs the rendered message instead of sending, and auth flows
+    # keep surfacing tokens inline (dev_token) so local testing still works.
+    EMAIL_ENABLED: bool = False
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: SecretStr = SecretStr("")
+    SMTP_USE_TLS: bool = True                  # STARTTLS on port 587
+    SMTP_USE_SSL: bool = False                 # implicit TLS on port 465
+    SMTP_TIMEOUT_SECONDS: int = 15
+    EMAIL_FROM: str = ""                        # noreply@yourplatform.com
+    EMAIL_FROM_NAME: str = "MediFleet"
+    # Reply-To address. Set to your support inbox (e.g. support@medifleet.app)
+    # so when a client hits "reply" on a system email it reaches the support
+    # team. Receiving those replies still requires MX/inbound configured on the
+    # mail provider for that domain — see docs.
+    EMAIL_REPLY_TO: str = ""
+    # Where emailed links (password reset, invites) point. Falls back to the
+    # first CORS origin when unset so dev "just works".
+    FRONTEND_BASE_URL: str = ""
+
     @field_validator("SECRET_KEY")
     @classmethod
     def _secret_strength(cls, v: SecretStr) -> SecretStr:
@@ -112,6 +139,21 @@ class Settings(BaseSettings):
     @property
     def payhero_webhook_secret(self) -> str:
         return self.PAYHERO_WEBHOOK_SECRET.get_secret_value()
+
+    @property
+    def smtp_password(self) -> str:
+        return self.SMTP_PASSWORD.get_secret_value()
+
+    @property
+    def frontend_base_url(self) -> str:
+        """Base URL emailed links point at. Explicit FRONTEND_BASE_URL wins;
+        otherwise fall back to the first configured CORS origin (dev), then
+        to a localhost guess so a missing config never crashes link building.
+        """
+        if self.FRONTEND_BASE_URL.strip():
+            return self.FRONTEND_BASE_URL.strip().rstrip("/")
+        origins = self.cors_origin_list
+        return (origins[0] if origins else "http://localhost:5173").rstrip("/")
 
     @property
     def jwt_secret(self) -> str:

@@ -1,17 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List
 
 from app.config.database import get_db
 from app.models.user import User
+from app.models.auth_tokens import PasswordResetToken
 from app.schemas.user import UserCreate, UserResponse
 from app.core.dependencies import get_current_user, RequirePermission, resolve_effective_permissions
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, generate_reset_token, hash_token
 from app.core.modules import (
     get_tenant_flags_cached,
     resolve_enabled_modules,
     serialize_module_catalogue,
 )
+from app.services.auth_emails import send_staff_invite_email, RESET_TOKEN_TTL_MINUTES
 from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/users", tags=["User Management"])
@@ -73,22 +77,58 @@ def list_users(db: Session = Depends(get_db)):
     return db.query(User).all()
 
 @router.post("/", response_model=UserResponse, dependencies=[Depends(RequirePermission("users:manage"))])
-def create_user(user_in: UserCreate, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    """Provisions a new staff account."""
+def create_user(
+    user_in: UserCreate,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+    send_invite: bool = Query(True, description="Email the new user a set-password invite link."),
+):
+    """Provisions a new staff account.
+
+    When ``send_invite`` is true (default) the user is emailed a single-use
+    set-password link so they choose their own credentials — the admin never
+    has to hand out a password. The link rides the same reset-token rail as
+    /auth/forgot-password and is tenant-scoped.
+    """
     # Enforce unique email
     if db.query(User).filter(User.email == user_in.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user_data = user_in.model_dump()
     user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
-    
+
     new_user = User(**user_data)
     db.add(new_user)
     db.flush()
 
+    invite_token = None
+    if send_invite:
+        # Mint a set-password token (reuses the password-reset machinery) and
+        # require the user to set their own password before the temp one sticks.
+        invite_token = generate_reset_token()
+        db.add(PasswordResetToken(
+            user_id=new_user.user_id,
+            token_hash=hash_token(invite_token),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES),
+            used=False,
+            requested_ip=request.client.host if request.client else None,
+        ))
+
     log_audit(db, current_user["user_id"], "CREATE", "User", str(new_user.user_id), None, {"email": new_user.email}, request.client.host)
     db.commit()
     db.refresh(new_user)
+
+    if invite_token:
+        send_staff_invite_email(
+            background_tasks,
+            to=new_user.email,
+            raw_token=invite_token,
+            tenant_id=request.headers.get("X-Tenant-ID"),
+            recipient_name=getattr(new_user, "full_name", None),
+        )
+
     return new_user
 
 @router.patch("/{user_id}/deactivate", dependencies=[Depends(RequirePermission("users:manage"))])
