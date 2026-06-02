@@ -156,20 +156,24 @@ def process_inbound(db: Session, payload: dict) -> InboundResult:
             return _append_reply(db, ticket, sender_name, sender_email, body, message_id)
         # Ref present but no match / wrong sender → fall through to the gate.
 
-    # 3) Known-contact gate for new tickets.
+    # 3) Sender gate. By default any inbound becomes a ticket (unknown senders
+    #    land Unassigned). Strict mode (SUPPORT_INBOUND_KNOWN_CONTACTS_ONLY)
+    #    rejects senders without a prior ticket.
+    from app.config.settings import settings
     prior = _known_contact_ticket(db, sender_email)
-    if prior is None:
+    if prior is None and settings.SUPPORT_INBOUND_KNOWN_CONTACTS_ONLY:
         logger.info("[inbound] rejected unknown sender %r (subject=%r)", sender_email, subject)
         return InboundResult("rejected", "unknown sender — not an existing contact")
 
-    # 4) New ticket, attributed to the contact's most recent tenant.
+    # 4) New ticket. Attributed to the contact's most recent tenant when known;
+    #    otherwise Unassigned (tenant_id=None) for superadmin triage.
     desk = resolve_desk(to_addresses)
     ticket = SupportTicket(
-        tenant_id=prior.tenant_id,
-        tenant_name=prior.tenant_name,
+        tenant_id=prior.tenant_id if prior else None,
+        tenant_name=prior.tenant_name if prior else None,
         submitter_email=sender_email,
-        submitter_name=sender_name or prior.submitter_name,
-        submitter_user_id=prior.submitter_user_id,
+        submitter_name=sender_name or (prior.submitter_name if prior else sender_name),
+        submitter_user_id=prior.submitter_user_id if prior else None,
         origin="email",
         subject=subject[:200],
         category=desk_to_category(desk),

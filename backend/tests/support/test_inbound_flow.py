@@ -48,10 +48,20 @@ def _payload(**kw):
     return base
 
 
-def test_unknown_sender_rejected(db):
+def test_unknown_sender_creates_unassigned_ticket_by_default(db):
+    # Default policy: accept all inbound; unknown sender → Unassigned ticket.
+    res = si.process_inbound(db, _payload(**{"from": "stranger@nope.com"}))
+    assert res.action == "created"
+    t = db.query(SupportTicket).filter(SupportTicket.ticket_id == res.ticket_id).one()
+    assert t.tenant_id is None and t.origin == "email"   # Unassigned
+
+
+def test_unknown_sender_rejected_in_strict_mode(db, monkeypatch):
+    from app.config.settings import settings
+    monkeypatch.setattr(settings, "SUPPORT_INBOUND_KNOWN_CONTACTS_ONLY", True)
     res = si.process_inbound(db, _payload(**{"from": "stranger@nope.com"}))
     assert res.action == "rejected"
-    assert db.query(SupportTicket).count() == 1  # nothing created
+    assert db.query(SupportTicket).count() == 1  # only the seed
 
 
 def test_known_sender_creates_ticket_with_tenant_attribution(db):
@@ -80,15 +90,20 @@ def test_reply_threads_into_existing_ticket_and_reopens(db):
     assert db.query(SupportMessage).filter(SupportMessage.ticket_id == seed.ticket_id).count() == 1
 
 
-def test_reply_with_wrong_sender_does_not_thread(db):
+def test_reply_with_wrong_sender_does_not_hijack_ticket(db):
     seed = db.query(SupportTicket).first()
-    # Unknown sender referencing a real ticket → must not append, must reject.
+    before = db.query(SupportMessage).filter(SupportMessage.ticket_id == seed.ticket_id).count()
+    # A non-owner referencing someone else's ticket must NOT append to it.
     res = si.process_inbound(db, _payload(**{
         "from": "imposter@evil.com",
         "subject": f"Re: [#MF-{seed.ticket_id:06d}] Old ticket",
         "message_id": "<reply-2@mail.com>",
     }))
-    assert res.action == "rejected"
+    # Default policy: it becomes their own new (Unassigned) ticket, not an append.
+    assert res.action == "created"
+    assert res.ticket_id != seed.ticket_id
+    after = db.query(SupportMessage).filter(SupportMessage.ticket_id == seed.ticket_id).count()
+    assert after == before  # seed thread untouched
 
 
 def test_duplicate_message_id_is_ignored(db):

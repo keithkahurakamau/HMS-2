@@ -88,6 +88,11 @@ class Settings(BaseSettings):
     # Domain used to build per-ticket reply addresses (support+ticket-<id>@…)
     # and to recognise our own inbound recipients.
     SUPPORT_INBOUND_DOMAIN: str = "medifleet.app"
+    # When True, only senders who already have a ticket can email in (strict
+    # anti-spam). When False (default), ANY inbound email from a recognised
+    # recipient address becomes a ticket — unknown senders land in the
+    # "Unassigned" bucket. Default False so real customer emails actually arrive.
+    SUPPORT_INBOUND_KNOWN_CONTACTS_ONLY: bool = False
 
     # ── Outbound email events / suppression (EMAIL-004) ────────────────
     # Resend "events" webhook → /api/public/email/events records delivery

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
     LifeBuoy, Search, Filter, Send, RefreshCw, Activity, MessageSquare,
     Building2, Calendar, CheckCircle2, AlertCircle, Clock, ShieldCheck,
+    Mail, Globe, Headphones, Wallet, Wrench,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 
@@ -29,6 +30,14 @@ const CATEGORIES = ['Billing', 'Bug', 'Feature', 'Account', 'Onboarding', 'Other
 const PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'];
 const STATUSES = Object.keys(STATUS_META);
 
+// Desks group categories so the team can work one queue at a time. Mirrors the
+// outbound sender mapping (Billing→finance, Bug/Feature→technical, else support).
+const DESKS = {
+    Support:   { cats: ['Account', 'Onboarding', 'Other'], icon: Headphones },
+    Finance:   { cats: ['Billing'],                         icon: Wallet },
+    Technical: { cats: ['Bug', 'Feature'],                  icon: Wrench },
+};
+
 export default function SupportInbox() {
     const [tickets, setTickets] = useState([]);
     const [summary, setSummary] = useState({});
@@ -39,6 +48,12 @@ export default function SupportInbox() {
     const [statusFilter, setStatusFilter] = useState('Open');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [priorityFilter, setPriorityFilter] = useState('');
+    const [deskFilter, setDeskFilter] = useState('');   // '' = all desks
+
+    // Desk grouping is applied client-side over the fetched list.
+    const visibleTickets = deskFilter
+        ? tickets.filter(t => DESKS[deskFilter].cats.includes(t.category))
+        : tickets;
 
     const [reply, setReply] = useState('');
     const [sendingReply, setSendingReply] = useState(false);
@@ -162,6 +177,35 @@ export default function SupportInbox() {
                 })}
             </div>
 
+            {/* Desk tabs — Support / Finance / Technical */}
+            <div className="flex gap-2 flex-wrap" role="tablist" aria-label="Support desks">
+                {['', ...Object.keys(DESKS)].map(d => {
+                    const Icon = d ? DESKS[d].icon : LifeBuoy;
+                    const count = d
+                        ? tickets.filter(t => DESKS[d].cats.includes(t.category)).length
+                        : tickets.length;
+                    const selected = deskFilter === d;
+                    return (
+                        <button
+                            key={d || 'all'}
+                            type="button"
+                            role="tab"
+                            aria-selected={selected}
+                            onClick={() => setDeskFilter(d)}
+                            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium ring-1 ring-inset transition-colors cursor-pointer ${
+                                selected
+                                    ? 'bg-brand-600 text-white ring-brand-600'
+                                    : 'bg-white text-ink-700 ring-ink-200 hover:bg-ink-50'
+                            }`}
+                        >
+                            <Icon size={15} aria-hidden="true" />
+                            {d || 'All desks'}
+                            <span className={`text-2xs font-semibold rounded-full px-1.5 py-0.5 ${selected ? 'bg-white/20' : 'bg-ink-100 text-ink-600'}`}>{count}</span>
+                        </button>
+                    );
+                })}
+            </div>
+
             {/* Filters */}
             <div className="card p-3 flex flex-col sm:flex-row flex-wrap gap-3 sm:items-center">
                 <div className="relative flex-1 min-w-0 sm:min-w-[16rem]">
@@ -215,14 +259,14 @@ export default function SupportInbox() {
                         <div className="flex-1 flex items-center justify-center text-ink-600 p-10">
                             <Activity className="animate-spin mr-2 text-brand-600" size={18} aria-hidden="true" /> Loading…
                         </div>
-                    ) : tickets.length === 0 ? (
+                    ) : visibleTickets.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-ink-500 p-10 text-center">
                             <LifeBuoy size={36} className="mb-3 text-ink-400" aria-hidden="true" />
                             <p className="text-sm">No tickets match the filters.</p>
                         </div>
                     ) : (
                         <ul className="overflow-y-auto custom-scrollbar divide-y divide-ink-100">
-                            {tickets.map(t => {
+                            {visibleTickets.map(t => {
                                 const meta = STATUS_META[t.status] || {};
                                 const isActiveTicket = active?.ticket_id === t.ticket_id;
                                 return (
@@ -240,12 +284,19 @@ export default function SupportInbox() {
                                                 <span className={`px-2 py-0.5 rounded-full text-2xs font-semibold ring-1 ring-inset shrink-0 ${meta.color}`}>{t.status}</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-xs text-ink-600 mt-1">
-                                                <Building2 size={11} aria-hidden="true" /> <span className="truncate">{t.tenant_name}</span>
+                                                <Building2 size={11} aria-hidden="true" />
+                                                <span className={`truncate ${t.tenant_name ? '' : 'italic text-ink-400'}`}>{t.tenant_name || 'Unassigned'}</span>
                                             </div>
                                             <div className="flex items-center gap-3 text-2xs text-ink-500 mt-1 flex-wrap">
                                                 <span className="font-mono">#{t.ticket_id}</span>
                                                 <span>{t.category}</span>
                                                 <span>{t.priority}</span>
+                                                {(t.origin === 'email' || t.origin === 'web') && (
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+                                                        {t.origin === 'email' ? <Mail size={9} aria-hidden="true" /> : <Globe size={9} aria-hidden="true" />}
+                                                        {t.origin === 'email' ? 'Email' : 'Web'}
+                                                    </span>
+                                                )}
                                                 <span className="ml-auto flex items-center gap-1 shrink-0"><Calendar size={10} aria-hidden="true" /> {new Date(t.created_at).toLocaleDateString()}</span>
                                             </div>
                                         </button>
@@ -270,10 +321,16 @@ export default function SupportInbox() {
                                     <div className="min-w-0">
                                         <h2 className="text-base font-semibold text-ink-900 truncate">{active.subject}</h2>
                                         <div className="flex items-center gap-2 sm:gap-3 text-xs text-ink-600 mt-1 flex-wrap">
-                                            <span className="flex items-center gap-1"><Building2 size={11} aria-hidden="true" /> {active.tenant_name}</span>
+                                            <span className="flex items-center gap-1"><Building2 size={11} aria-hidden="true" /> {active.tenant_name || 'Unassigned'}</span>
                                             <span className="font-mono">#{active.ticket_id}</span>
                                             <span>{active.category}</span>
                                             <span>P: {active.priority}</span>
+                                            {(active.origin === 'email' || active.origin === 'web') && (
+                                                <span className="inline-flex items-center gap-1 text-teal-700">
+                                                    {active.origin === 'email' ? <Mail size={11} aria-hidden="true" /> : <Globe size={11} aria-hidden="true" />}
+                                                    {active.origin === 'email' ? 'Email' : 'Web'}
+                                                </span>
+                                            )}
                                         </div>
                                         <p className="text-2xs text-ink-500 mt-1 truncate">Raised by {active.submitter_name} &lt;{active.submitter_email}&gt;</p>
                                     </div>
