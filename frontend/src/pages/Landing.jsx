@@ -12,6 +12,7 @@ import {
 import Logo from '../components/Logo';
 import CountUp from '../components/CountUp';
 import ContactStrip from '../components/ContactStrip';
+import ContactForm from '../components/ContactForm';
 import Reveal from '../components/Reveal';
 import PremiumBackground from '../components/PremiumBackground';
 import Seo from '../components/Seo';
@@ -65,7 +66,7 @@ export default function Landing() {
                     <div className="lg:col-span-7 animate-slide-up">
                         <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 ring-1 ring-brand-200 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">
                             <Sparkles size={12} className="text-teal-500" />
-                            Multi-tenant clinical cloud · est. 2024
+                            Multi-tenant clinical cloud · est. 2026
                         </span>
                         <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tightest leading-[1.05]">
                             Care that{' '}
@@ -249,8 +250,24 @@ export default function Landing() {
                 </div>
             </section>
 
-            {/* ============== Contact strip ============== */}
-            <ContactStrip heading="Talk to a human" />
+            {/* ============== Contact form ============== */}
+            <section className="relative py-14 sm:py-20" id="contact">
+                <div className="max-w-2xl mx-auto px-6">
+                    <div className="text-center mb-8">
+                        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white ring-1 ring-brand-200 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">
+                            Get in touch
+                        </span>
+                        <h2 className="mt-4 text-2xl sm:text-3xl font-semibold tracking-tight text-ink-900">Send us a message</h2>
+                        <p className="mt-2 text-sm text-ink-600 max-w-xl mx-auto">
+                            Tell us about your hospital and what you need — we'll get back to you within one business day.
+                        </p>
+                    </div>
+                    <ContactForm />
+                </div>
+            </section>
+
+            {/* ============== Contact strip (other channels) ============== */}
+            <ContactStrip heading="Prefer to reach us directly?" />
 
             {/* ============== Footer ============== */}
             <footer className="border-t border-ink-200/70 bg-white/60 backdrop-blur-md">

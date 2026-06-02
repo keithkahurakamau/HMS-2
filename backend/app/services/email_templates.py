@@ -172,3 +172,38 @@ def render_ticket_reply(
         "added to the same ticket.\n"
     )
     return subject, html_out, text_out
+
+
+def render_contact_message(
+    *, name: str, email: str, message: str,
+    subject: str | None = None, company: str | None = None,
+) -> Tuple[str, str, str]:
+    """Internal notification email for a website contact-form submission.
+
+    Sent to the support inbox; Reply-To is set to the visitor's address by the
+    caller so the team can reply straight to the prospect.
+    """
+    line = (subject or "New website enquiry").strip()
+    email_subject = f"[Contact] {line} — from {name}".strip()
+    rows = [("Name", name), ("Email", email)]
+    if company:
+        rows.append(("Company", company))
+    if subject:
+        rows.append(("Subject", subject))
+    rows_html = "".join(
+        f'<tr><td style="padding:4px 12px 4px 0;font-size:13px;color:{_MUTED};white-space:nowrap;">{_e(k)}</td>'
+        f'<td style="padding:4px 0;font-size:14px;color:{_INK};">{_e(v)}</td></tr>'
+        for k, v in rows
+    )
+    body_html = (
+        f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">{rows_html}</table>'
+        f'<div style="margin:0;padding:14px 16px;background:#f9fafb;border-left:3px solid {_BRAND};'
+        f'font-size:15px;line-height:22px;color:{_INK};white-space:pre-wrap;">{_e(message)}</div>'
+    )
+    html_out = _layout(heading="New contact enquiry", body_html=body_html)
+    text_out = (
+        "New website contact enquiry\n\n"
+        + "".join(f"{k}: {v}\n" for k, v in rows)
+        + f"\nMessage:\n{message}\n"
+    )
+    return email_subject, html_out, text_out

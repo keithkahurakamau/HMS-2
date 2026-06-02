@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     EMAIL_FROM_SUPPORT: str = ""               # support@medifleet.app
     EMAIL_FROM_FINANCE: str = ""               # finance@medifleet.app
     EMAIL_FROM_TECHNICAL: str = ""             # technical@medifleet.app
+    # Where the public landing-page contact form delivers leads. Point this at
+    # a real mailbox you actually read (Gmail, Google Workspace, etc.) — NOT an
+    # address whose MX routes back into Resend inbound. Falls back to
+    # EMAIL_REPLY_TO then EMAIL_FROM.
+    CONTACT_RECIPIENT_EMAIL: str = ""
     # Where emailed links (password reset, invites) point. Falls back to the
     # first CORS origin when unset so dev "just works".
     FRONTEND_BASE_URL: str = ""

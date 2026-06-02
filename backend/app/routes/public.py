@@ -4,21 +4,24 @@ import logging
 import secrets
 import string
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status, Query, Response
 from sqlalchemy.orm import Session, sessionmaker
 from jose import jwt
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import List, Optional, Dict, Any
 import re
 
 from app.config.database import get_master_db, get_tenant_engine
 from app.config.settings import settings
 from app.core.dependencies import require_superadmin
+from app.core.limiter import limiter
 from app.models.master import Tenant, SuperAdmin
 from app.models.patient import Patient
 from app.models.user import User, Role
 from app.core.security import get_password_hash, verify_password, create_tokens
 from app.services.tenant_provisioning import provision_tenant
+from app.services.email_service import email_service
+from app.services.email_templates import render_contact_message
 
 logger = logging.getLogger(__name__)
 
@@ -740,3 +743,55 @@ def superadmin_me(admin: dict = Depends(require_superadmin)):
     bootstrap to verify the cookie is still valid (the JWT itself is HttpOnly
     so the SPA can't decode it locally)."""
     return admin
+
+
+# =====================================================================
+# Public contact form — landing-page lead capture
+# =====================================================================
+class ContactRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    message: str = Field(min_length=1, max_length=5000)
+    subject: Optional[str] = Field(default=None, max_length=160)
+    company: Optional[str] = Field(default=None, max_length=160)
+    # Honeypot: a hidden field real users never see. Bots fill it; we drop
+    # those silently. Kept loose (no length cap) so a filled value validates
+    # and we can detect-and-discard rather than 422.
+    website: Optional[str] = None
+
+
+@router.post("/contact")
+@limiter.limit("5/minute")
+async def submit_contact(
+    request: Request,
+    payload: ContactRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Public website contact form → emails the support inbox.
+
+    Unauthenticated; CSRF is satisfied by the SPA's double-submit token. The
+    notification's Reply-To is the visitor's address so the team replies
+    straight to the prospect. Independent of the inbound-ticket pipeline (which
+    is restricted to known contacts) — this is open lead capture.
+    """
+    # Honeypot tripped → act successful, send nothing.
+    if payload.website:
+        logger.info("[contact] honeypot tripped from %s — dropped", payload.email)
+        return {"message": "Thanks — we'll be in touch shortly."}
+
+    recipient = settings.CONTACT_RECIPIENT_EMAIL or settings.EMAIL_REPLY_TO or settings.EMAIL_FROM_SUPPORT or settings.EMAIL_FROM
+    if recipient:
+        subject, html, text = render_contact_message(
+            name=payload.name, email=payload.email, message=payload.message,
+            subject=payload.subject, company=payload.company,
+        )
+        background_tasks.add_task(
+            email_service.send,
+            to=recipient, subject=subject, html=html, text=text,
+            reply_to=payload.email,
+        )
+    else:
+        logger.error("[contact] no recipient configured (EMAIL_REPLY_TO/EMAIL_FROM) — message dropped")
+
+    # Always a friendly success — never leak config/delivery state to the public.
+    return {"message": "Thanks — we'll be in touch shortly."}
