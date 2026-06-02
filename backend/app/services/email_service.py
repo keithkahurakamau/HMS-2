@@ -128,6 +128,14 @@ class EmailService:
             logger.error("[email] no EMAIL_FROM / SMTP_USER configured — cannot send '%s' to %s", subject, to)
             return False
 
+        # Opt-in suppression (EMAIL-004): skip addresses that hard-bounced or
+        # filed a spam complaint. Off by default so tests/dev never hit the DB.
+        if settings.EMAIL_SUPPRESSION_ENABLED:
+            from app.services.email_suppression import is_suppressed
+            if is_suppressed(to):
+                logger.info("[email] '%s' to %s skipped — address is suppressed", subject, to)
+                return False
+
         message = EmailMessage()
         message["From"] = formataddr((from_name or settings.EMAIL_FROM_NAME, from_addr))
         message["To"] = to

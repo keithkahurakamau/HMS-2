@@ -89,6 +89,14 @@ class Settings(BaseSettings):
     # and to recognise our own inbound recipients.
     SUPPORT_INBOUND_DOMAIN: str = "medifleet.app"
 
+    # ── Outbound email events / suppression (EMAIL-004) ────────────────
+    # Resend "events" webhook → /api/public/email/events records delivery
+    # events and auto-suppresses hard bounces / spam complaints.
+    EMAIL_EVENTS_ENABLED: bool = False
+    EMAIL_EVENTS_SIGNING_SECRET: SecretStr = SecretStr("")
+    # When true, EmailService.send skips addresses on the suppression list.
+    EMAIL_SUPPRESSION_ENABLED: bool = False
+
     @field_validator("SECRET_KEY")
     @classmethod
     def _secret_strength(cls, v: SecretStr) -> SecretStr:
@@ -169,6 +177,10 @@ class Settings(BaseSettings):
     @property
     def support_inbound_signing_secret(self) -> str:
         return self.SUPPORT_INBOUND_SIGNING_SECRET.get_secret_value()
+
+    @property
+    def email_events_signing_secret(self) -> str:
+        return self.EMAIL_EVENTS_SIGNING_SECRET.get_secret_value()
 
     def email_from_for(self, desk: str | None) -> str:
         """Resolve the From address for a desk ('support'|'finance'|'technical').

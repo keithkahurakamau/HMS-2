@@ -23,6 +23,8 @@ from app.core.security import get_password_hash, verify_password, create_tokens
 from app.services.tenant_provisioning import provision_tenant
 from app.services.email_service import email_service
 from app.services.email_templates import render_contact_message
+from app.services.support_inbound import verify_signature
+from app.services.email_suppression import process_event as process_email_event
 
 logger = logging.getLogger(__name__)
 
@@ -831,3 +833,45 @@ async def submit_contact(
 
     # Always a friendly success — never leak config/delivery state to the public.
     return {"message": "Thanks — we'll be in touch shortly."}
+
+
+# =====================================================================
+# Resend outbound-email events webhook (EMAIL-004)
+# =====================================================================
+@router.post("/email/events")
+@limiter.limit("120/minute")
+async def email_events_webhook(
+    request: Request,
+    master_db: Session = Depends(get_master_db),
+):
+    """Receives Resend delivery events (sent/delivered/bounced/complained/…),
+    records them, and suppresses hard bounces + spam complaints.
+
+    Machine-to-machine: CSRF-exempt (see main.py), HMAC-signature gated, and a
+    404 when disabled so we don't advertise an unconfigured endpoint.
+    """
+    if not settings.EMAIL_EVENTS_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    raw = await request.body()
+    signature = (
+        request.headers.get("svix-signature")
+        or request.headers.get("x-webhook-signature")
+        or ""
+    )
+    if not verify_signature(raw, signature, settings.email_events_signing_secret):
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed payload")
+
+    try:
+        result = process_email_event(master_db, payload)
+    except Exception:
+        logger.exception("[email-events] failed to process event")
+        master_db.rollback()
+        result = {"recorded": False}
+    # 200 so the provider stops retrying.
+    return result

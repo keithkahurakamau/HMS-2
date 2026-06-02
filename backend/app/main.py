@@ -212,6 +212,8 @@ _CSRF_EXEMPT_PATHS = (
     # Inbound support email — called by the mail provider, not a browser.
     # Gated by HMAC signature instead of CSRF (EMAIL-003).
     "/api/public/support/inbound",
+    # Resend outbound-email events webhook (EMAIL-004) — same rationale.
+    "/api/public/email/events",
 )
 
 

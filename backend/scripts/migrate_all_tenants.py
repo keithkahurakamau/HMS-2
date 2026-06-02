@@ -58,9 +58,9 @@ from app.config.database import Base, DATABASE_URL  # noqa: E402,F401
 # Keep this list in sync with app/models/ — every .py file there belongs here.
 from app.models import (  # noqa: E402,F401
     accounting, audit, auth_tokens, billing, breach, cheque, clinical,
-    idempotency, inventory, laboratory, master, medical_history, messaging,
-    notification, patient, payhero, radiology, referral, settings as _settings,
-    support, user, wards,
+    email_events, idempotency, inventory, laboratory, master, medical_history,
+    messaging, notification, patient, payhero, radiology, referral,
+    settings as _settings, support, user, wards,
 )
 
 
@@ -173,6 +173,30 @@ MASTER_DB_PATCHES: list[str] = [
     "ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS from_email VARCHAR(255);",
     "ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS from_name VARCHAR(255);",
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_support_messages_external_id ON support_messages (external_message_id);",
+    # EMAIL-004 outbound delivery tracking (master DB only). Idempotent.
+    """
+    CREATE TABLE IF NOT EXISTS email_events (
+        event_id    SERIAL PRIMARY KEY,
+        event_type  VARCHAR(64) NOT NULL,
+        email       VARCHAR(255),
+        message_id  VARCHAR(255),
+        reason      VARCHAR(255),
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_email_events_event_type ON email_events (event_type);",
+    "CREATE INDEX IF NOT EXISTS ix_email_events_email      ON email_events (email);",
+    "CREATE INDEX IF NOT EXISTS ix_email_events_message_id ON email_events (message_id);",
+    "CREATE INDEX IF NOT EXISTS ix_email_events_created_at ON email_events (created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_email_events_type_created ON email_events (event_type, created_at);",
+    """
+    CREATE TABLE IF NOT EXISTS email_suppressions (
+        email       VARCHAR(255) PRIMARY KEY,
+        reason      VARCHAR(64) NOT NULL,
+        detail      TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    """,
     # ab3c9e5d27f8 — platform Pay Hero (superadmin subscription billing).
     # These tables + the tenants billing columns live in the MASTER DB. The
     # alembic revision only runs against tenant DBs, so without these explicit
