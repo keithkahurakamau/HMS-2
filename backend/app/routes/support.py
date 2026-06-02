@@ -27,6 +27,7 @@ from app.core.dependencies import RequirePermission, get_current_user, require_s
 from app.models.master import Tenant
 from app.models.support import SupportTicket, SupportMessage
 from app.services import support_inbound
+from app.services.webhook_security import verify_svix_webhook
 
 logger = logging.getLogger(__name__)
 
@@ -476,12 +477,7 @@ async def inbound_email(request: Request, master_db: Session = Depends(get_maste
         raise HTTPException(status_code=404, detail="Not found")
 
     raw = await request.body()
-    signature = (
-        request.headers.get("svix-signature")
-        or request.headers.get("x-webhook-signature")
-        or ""
-    )
-    if not support_inbound.verify_signature(raw, signature, settings.support_inbound_signing_secret):
+    if not verify_svix_webhook(raw, request.headers, settings.support_inbound_signing_secret):
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     import json

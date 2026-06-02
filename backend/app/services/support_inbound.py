@@ -19,8 +19,6 @@ unit-tested directly; ``process_inbound`` is the thin DB orchestrator.
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
 import logging
 import re
 from dataclasses import dataclass
@@ -57,14 +55,8 @@ class InboundResult:
 
 
 # ── Pure helpers (DB-free) ─────────────────────────────────────────────────
-def verify_signature(raw_body: bytes, signature: str, secret: str) -> bool:
-    """Constant-time HMAC-SHA256 check of the provider's webhook signature."""
-    if not secret or not signature:
-        return False
-    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
-    # Accept both "sha256=<hex>" and bare "<hex>" forms.
-    provided = signature.split("=", 1)[-1].strip()
-    return hmac.compare_digest(expected, provided)
+# Webhook signature verification lives in app.services.webhook_security
+# (Svix scheme — Resend signs with whsec_ secrets).
 
 
 def _local_part(addr: str) -> str:

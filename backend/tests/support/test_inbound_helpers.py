@@ -1,28 +1,7 @@
 """Unit tests for the pure inbound-email helpers (no DB, no network)."""
 from __future__ import annotations
 
-import hashlib
-import hmac
-
 from app.services import support_inbound as si
-
-
-# ── signature ───────────────────────────────────────────────────────────────
-def _sign(body: bytes, secret: str) -> str:
-    return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-
-
-def test_verify_signature_accepts_valid():
-    body, secret = b'{"a":1}', "s3cret"
-    assert si.verify_signature(body, _sign(body, secret), secret) is True
-    assert si.verify_signature(body, "sha256=" + _sign(body, secret), secret) is True
-
-
-def test_verify_signature_rejects_tampered_or_empty():
-    body, secret = b'{"a":1}', "s3cret"
-    assert si.verify_signature(body, _sign(b'{"a":2}', secret), secret) is False
-    assert si.verify_signature(body, "", secret) is False
-    assert si.verify_signature(body, _sign(body, secret), "") is False
 
 
 # ── desk / category ───────────────────────────────────────────────────────────
