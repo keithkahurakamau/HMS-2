@@ -51,6 +51,8 @@ import app.routes.accounting as accounting_module
 import app.routes.accounting_config as accounting_config_module
 import app.routes.accounting_debtors as accounting_debtors_module
 import app.routes.accounting_bank as accounting_bank_module
+import app.routes.accounting_budget as accounting_budget_module
+import app.routes.accounting_notes as accounting_notes_module
 
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -289,6 +291,8 @@ app.include_router(accounting_module.router)
 app.include_router(accounting_config_module.router)
 app.include_router(accounting_debtors_module.router)
 app.include_router(accounting_bank_module.router)
+app.include_router(accounting_budget_module.router)
+app.include_router(accounting_notes_module.router)
 app.include_router(branding_module.router)
 app.include_router(branding_module.public_router)
 

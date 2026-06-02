@@ -8,15 +8,20 @@ import {
     BarChart3, Download,
     Users as UsersIcon, Send, FileText, Wallet,
     Landmark, ArrowDownToLine, Check, Slash,
-    Receipt, Search,
+    Receipt, Search, Target, FileMinus,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import BudgetingTab from './accounting/BudgetingTab';
+import NotesTab from './accounting/NotesTab';
+import BulkAllocateModal from './accounting/BulkAllocateModal';
 
 const TABS = [
     { key: 'coa',        label: 'Chart of Accounts', icon: BookOpen },
     { key: 'journal',    label: 'Journal Entries',   icon: CalendarRange },
     { key: 'txlog',      label: 'Transaction Log',   icon: Receipt },
     { key: 'reports',    label: 'Reports',           icon: BarChart3 },
+    { key: 'budgets',    label: 'Budgets',           icon: Target },
+    { key: 'notes',      label: 'Debit/Credit Notes', icon: FileMinus },
     { key: 'debtors',    label: 'Debtors',           icon: UsersIcon },
     { key: 'bank',       label: 'Bank',              icon: Landmark },
     { key: 'config',     label: 'Configuration',     icon: Sliders },
@@ -77,6 +82,8 @@ export default function Accounting() {
             {tab === 'journal'    && <JournalEntriesTab />}
             {tab === 'txlog'      && <TransactionLogTab />}
             {tab === 'reports'    && <ReportsTab />}
+            {tab === 'budgets'    && <BudgetingTab />}
+            {tab === 'notes'      && <NotesTab />}
             {tab === 'debtors'    && <DebtorsTab />}
             {tab === 'bank'       && <BankTab />}
             {tab === 'config'     && <ConfigurationTab />}
@@ -2435,6 +2442,7 @@ function DepositsSection() {
     const [loading, setLoading] = useState(true);
     const [open, setOpen] = useState(false);
     const [applying, setApplying] = useState(null);
+    const [allocating, setAllocating] = useState(null);
 
     const load = async () => {
         setLoading(true);
@@ -2483,12 +2491,18 @@ function DepositsSection() {
                                             {d.status}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-1.5 text-right">
+                                    <td className="px-4 py-1.5 text-right space-x-3 whitespace-nowrap">
                                         {avail > 0 && (
-                                            <button onClick={() => setApplying(d)}
-                                                    className="text-xs text-brand-700 hover:underline">
-                                                Apply
-                                            </button>
+                                            <>
+                                                <button onClick={() => setApplying(d)}
+                                                        className="text-xs text-brand-700 hover:underline">
+                                                    Apply
+                                                </button>
+                                                <button onClick={() => setAllocating(d)}
+                                                        className="text-xs text-brand-700 hover:underline">
+                                                    Bulk allocate
+                                                </button>
+                                            </>
                                         )}
                                     </td>
                                 </tr>
@@ -2502,6 +2516,9 @@ function DepositsSection() {
             {applying && <DepositApplyModal deposit={applying}
                                             onClose={() => setApplying(null)}
                                             onSaved={() => { setApplying(null); load(); }} />}
+            {allocating && <BulkAllocateModal deposit={allocating}
+                                              onClose={() => setAllocating(null)}
+                                              onSaved={() => { setAllocating(null); load(); }} />}
         </div>
     );
 }

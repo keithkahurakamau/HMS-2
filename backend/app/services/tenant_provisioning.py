@@ -188,6 +188,8 @@ PERMISSION_CATALOG: tuple[tuple[str, str], ...] = (
     ("accounting:journal.create",  "Draft journal entries"),
     ("accounting:journal.post",    "Approve and post journal entries"),
     ("accounting:settings.manage", "Configure accounting periods, currencies, mappings"),
+    ("accounting:budget.manage",   "Create and edit budgets; view budget-vs-actual"),
+    ("accounting:notes.manage",    "Issue and post debit/credit notes"),
 )
 
 PERMISSIONS: list[str] = [code for code, _desc in PERMISSION_CATALOG]
@@ -230,6 +232,7 @@ ROLE_GRANTS = {
     "Accountant": [
         "accounting:view", "accounting:journal.create", "accounting:journal.post",
         "accounting:settings.manage",
+        "accounting:budget.manage", "accounting:notes.manage",
         "billing:read", "cheques:read", "mpesa:read", "payhero:manage",
         "analytics:view",
         *_BASE,
