@@ -167,8 +167,8 @@ export default function AdminDashboard() {
                                 onClick={() => setActiveTab(key)}
                                 className={`flex-1 min-w-[7rem] flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all
                                             ${isActive
-                                                ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70'
-                                                : 'text-ink-600 hover:text-ink-900 hover:bg-white/60'}`}
+                                                ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70'
+                                                : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 hover:bg-white/60'}`}
                             >
                                 <Icon size={15} className={isActive ? 'text-brand-600' : 'text-ink-400'} />
                                 {label}
@@ -230,7 +230,7 @@ export default function AdminDashboard() {
 
             {/* TAB 2: STAFF DIRECTORY */}
             {activeTab === 'staff' && (
-                <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                <div className="flex-1 bg-white dark:bg-ink-900 border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
                     <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50">
                         <div className="relative w-full max-w-md">
                             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -247,7 +247,7 @@ export default function AdminDashboard() {
 
                     <div className="flex-1 overflow-auto">
                         <table className="w-full text-left text-sm text-slate-600 min-w-[800px]">
-                            <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
+                            <thead className="bg-white dark:bg-ink-900 text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
                                 <tr>
                                     <th className="px-6 py-4">Staff Member</th>
                                     <th className="px-6 py-4">Role & Access</th>
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
 
             {/* TAB 3: MASTER PRICING CATALOG */}
             {activeTab === 'pricing' && (
-                <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                <div className="flex-1 bg-white dark:bg-ink-900 border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
                     <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50">
                         <div className="relative w-full max-w-md">
                             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -351,7 +351,7 @@ export default function AdminDashboard() {
 
                     <div className="flex-1 overflow-auto">
                         <table className="w-full text-left text-sm text-slate-600 min-w-[800px]">
-                            <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
+                            <thead className="bg-white dark:bg-ink-900 text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
                                 <tr>
                                     <th className="px-6 py-4">Service / Test Name</th>
                                     <th className="px-6 py-4">Category</th>
@@ -399,14 +399,14 @@ export default function AdminDashboard() {
 
             {/* TAB 5: SYSTEM AUDIT LOGS */}
             {activeTab === 'audit' && (
-                <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                <div className="flex-1 bg-white dark:bg-ink-900 border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
                     <div className="p-4 border-b border-slate-100 bg-slate-50">
                         <h2 className="font-bold text-slate-800 flex items-center gap-2"><ShieldAlert className="text-red-500" size={20}/> Immutable Security Ledger</h2>
                         <p className="text-xs text-slate-500 mt-1">Tracks all critical CREATE, UPDATE, and DELETE operations across the hospital infrastructure.</p>
                     </div>
                     <div className="flex-1 overflow-auto">
                         <table className="w-full text-left text-sm text-slate-600 min-w-[800px]">
-                            <thead className="bg-white text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
+                            <thead className="bg-white dark:bg-ink-900 text-slate-500 text-xs uppercase font-bold border-b border-slate-200 sticky top-0">
                                 <tr>
                                     <th className="px-6 py-3">Timestamp (UTC)</th>
                                     <th className="px-6 py-3">Actor (User ID)</th>
@@ -445,7 +445,7 @@ export default function AdminDashboard() {
             {isStaffModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsStaffModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-2xl flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-slate-100 bg-slate-900 text-white shrink-0 flex justify-between items-center">
                             <div>
                                 <h2 className="text-xl font-bold flex items-center gap-2"><UserPlus size={24} className="text-brand-400" /> Provision Account</h2>
@@ -467,7 +467,7 @@ export default function AdminDashboard() {
                                 </div>
                             </form>
                         </div>
-                        <div className="p-6 border-t border-slate-200 bg-white flex gap-3 shrink-0">
+                        <div className="p-6 border-t border-slate-200 bg-white dark:bg-ink-900 flex gap-3 shrink-0">
                             <button type="submit" form="staffForm" disabled={isSubmitting} className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white py-3 rounded-lg font-bold shadow-sm flex items-center justify-center gap-2 transition-colors">
                                 {isSubmitting ? 'Provisioning...' : 'Create Account & Grant Access'}
                             </button>
@@ -480,13 +480,13 @@ export default function AdminDashboard() {
             {isPricingModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsPricingModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
                         <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">{pricingForm.catalog_id ? "Edit Service Package" : "Create Service Package"}</h2>
                                 <p className="text-xs text-slate-500 mt-1">Configure pricing for Billing module.</p>
                             </div>
-                            <button onClick={() => setIsPricingModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer"><X size={20} aria-hidden="true" /></button>
+                            <button onClick={() => setIsPricingModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
                         <div className="p-6">
                             <form id="pricingForm" onSubmit={handleSavePricing} className="space-y-4">
@@ -496,7 +496,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-1.5">Category <span className="text-red-500">*</span></label>
-                                    <select required value={pricingForm.category} onChange={e => setPricingForm({ ...pricingForm, category: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                                    <select required value={pricingForm.category} onChange={e => setPricingForm({ ...pricingForm, category: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900">
                                         <option>Consultation</option>
                                         <option>Laboratory</option>
                                         <option>Radiology</option>
@@ -529,13 +529,13 @@ export default function AdminDashboard() {
             {isEditRoleModalOpen && selectedUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsEditRoleModalOpen(false)}></div>
-                    <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+                    <div className="relative w-full max-w-sm bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
                         <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">Edit RBAC Access</h2>
                                 <p className="text-xs text-slate-500 mt-1">Modifying roles for {selectedUser.full_name}</p>
                             </div>
-                            <button onClick={() => setIsEditRoleModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer"><X size={20} aria-hidden="true" /></button>
+                            <button onClick={() => setIsEditRoleModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
                         <div className="p-6">
                             <form id="editRoleForm" onSubmit={handleUpdateRole} className="space-y-4">

@@ -246,9 +246,9 @@ export default function Billing() {
                                             <span className={inv.status === 'Pending M-Pesa' ? 'badge-success' : 'badge-warn'}>{inv.status}</span>
                                             <span className="text-2xs font-mono text-ink-400">INV-{inv.invoice_id}</span>
                                         </div>
-                                        <h4 className="font-semibold text-ink-900 text-sm">{inv.patient_name}</h4>
+                                        <h4 className="font-semibold text-ink-900 dark:text-ink-100 text-sm">{inv.patient_name}</h4>
                                         <p className="text-xs text-ink-500 mb-3">{inv.patient_opd}</p>
-                                        <div className="flex justify-between items-center border-t border-ink-100 pt-3">
+                                        <div className="flex justify-between items-center border-t border-ink-100 dark:border-ink-800 pt-3">
                                             <span className="text-xs text-ink-500">Balance due</span>
                                             <span className="font-semibold text-brand-700">KES {(inv.total_amount - inv.amount_paid).toFixed(2)}</span>
                                         </div>
@@ -282,7 +282,7 @@ export default function Billing() {
 
                             <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 bg-ink-50/40 custom-scrollbar">
                                 <div>
-                                    <h3 className="section-eyebrow mb-3 border-b border-ink-100 pb-2">Itemized breakdown</h3>
+                                    <h3 className="section-eyebrow mb-3 border-b border-ink-100 dark:border-ink-800 pb-2">Itemized breakdown</h3>
                                     <div className="card-flush overflow-hidden overflow-x-auto">
                                         <table className="table-clean min-w-[500px]">
                                             <thead>
@@ -295,14 +295,14 @@ export default function Billing() {
                                             <tbody>
                                                 {activeInvoice.items.map(item => (
                                                     <tr key={item.id}>
-                                                        <td className="font-medium text-ink-900">{item.description}</td>
+                                                        <td className="font-medium text-ink-900 dark:text-ink-100">{item.description}</td>
                                                         <td><span className="badge-neutral">{item.item_type}</span></td>
                                                         <td className="text-right font-semibold">{item.amount.toFixed(2)}</td>
                                                     </tr>
                                                 ))}
-                                                <tr className="bg-ink-50 font-semibold">
-                                                    <td colSpan="2" className="text-right text-ink-700">Subtotal</td>
-                                                    <td className="text-right text-ink-900">{activeInvoice.total_amount.toFixed(2)}</td>
+                                                <tr className="bg-ink-50 dark:bg-ink-900/40 font-semibold">
+                                                    <td colSpan="2" className="text-right text-ink-700 dark:text-ink-300">Subtotal</td>
+                                                    <td className="text-right text-ink-900 dark:text-ink-100">{activeInvoice.total_amount.toFixed(2)}</td>
                                                 </tr>
                                                 {activeInvoice.amount_paid > 0 && (
                                                     <tr className="bg-accent-50 font-semibold text-accent-700">
@@ -316,7 +316,7 @@ export default function Billing() {
                                 </div>
 
                                 <div>
-                                    <h3 className="section-eyebrow mb-3 border-b border-ink-100 pb-2">Receive payment</h3>
+                                    <h3 className="section-eyebrow mb-3 border-b border-ink-100 dark:border-ink-800 pb-2">Receive payment</h3>
                                     <form onSubmit={handleProcessPayment} className="card p-5 sm:p-6">
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
                                             {[
@@ -332,7 +332,7 @@ export default function Billing() {
                                                 };
                                                 return (
                                                     <button type="button" key={key} onClick={() => setPaymentMethod(key)}
-                                                        className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${isActive ? accentMap[accent] : 'border-ink-200 text-ink-500 hover:border-ink-300 hover:bg-ink-50'}`}>
+                                                        className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${isActive ? accentMap[accent] : 'border-ink-200 dark:border-ink-800 text-ink-500 hover:border-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50'}`}>
                                                         <Icon size={22} />
                                                         <span className="font-semibold text-sm">{label}</span>
                                                     </button>
@@ -371,9 +371,9 @@ export default function Billing() {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-[calc(100vh-160px)] flex flex-col items-center justify-center border-2 border-dashed border-ink-200 rounded-2xl bg-white text-ink-400">
+                        <div className="h-[calc(100vh-160px)] flex flex-col items-center justify-center border-2 border-dashed border-ink-200 dark:border-ink-800 rounded-2xl bg-white dark:bg-ink-900 text-ink-400">
                             <Receipt size={56} className="mb-4 text-ink-300" />
-                            <p className="text-base font-semibold text-ink-600">Select an invoice to process payment</p>
+                            <p className="text-base font-semibold text-ink-600 dark:text-ink-400">Select an invoice to process payment</p>
                             <p className="text-xs text-ink-400 mt-1">Pick from the queue on the left.</p>
                         </div>
                     )}
@@ -383,10 +383,10 @@ export default function Billing() {
             {/* --- M-PESA PROCESSING OVERLAY (full-screen, matches pharmacy) --- */}
             {mpesaStatus && (
                 <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-elevated w-full max-w-md">
-                        <div className="flex items-center justify-between p-4 border-b border-ink-100">
+                    <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md">
+                        <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                             <div>
-                                <h3 className="text-sm font-semibold text-ink-900">M-Pesa payment</h3>
+                                <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100">M-Pesa payment</h3>
                                 {activeInvoice && (
                                     <p className="text-xs text-ink-500">
                                         {activeInvoice.patient_name} · Invoice #{activeInvoice.invoice_id}
@@ -418,8 +418,8 @@ export default function Billing() {
             {isLedgerOpen && (
                 <div className="fixed inset-0 z-50 flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsLedgerOpen(false)}></div>
-                    <div className="relative w-full max-w-4xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-ink-900 to-ink-950 text-white shrink-0 flex justify-between items-center">
+                    <div className="relative w-full max-w-4xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-ink-900 to-ink-950 text-white shrink-0 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2"><Smartphone size={20} className="text-accent-400" /> M-Pesa Receipts Ledger</h2>
                                 <p className="text-sm text-ink-400 mt-1">Verify real-time STK push statuses and Daraja receipt codes.</p>
@@ -446,9 +446,9 @@ export default function Billing() {
                                             mpesaLogs.map((log) => (
                                                 <tr key={log.id}>
                                                     <td className="text-ink-500">{new Date(log.created_at).toLocaleString()}</td>
-                                                    <td className="font-semibold text-ink-800">{log.phone_number}</td>
+                                                    <td className="font-semibold text-ink-800 dark:text-ink-200">{log.phone_number}</td>
                                                     <td className="font-semibold text-brand-700">INV-{log.invoice_id}</td>
-                                                    <td className="font-semibold text-ink-900">{log.amount ? log.amount.toFixed(2) : '-'}</td>
+                                                    <td className="font-semibold text-ink-900 dark:text-ink-100">{log.amount ? log.amount.toFixed(2) : '-'}</td>
                                                     <td className="text-ink-500 max-w-xs truncate">{log.receipt_number || log.result_desc || 'Waiting for callback…'}</td>
                                                     <td className="text-right">
                                                         <span className={log.status === 'Success' ? 'badge-success' : log.status === 'Failed' ? 'badge-danger' : 'badge-warn animate-pulse-soft'}>

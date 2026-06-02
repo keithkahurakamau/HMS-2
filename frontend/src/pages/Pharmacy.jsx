@@ -266,13 +266,13 @@ export default function Pharmacy() {
             {/* GLOBAL PHARMACY HEADER & TABS */}
             <div data-tour="pharmacy-tabs" className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Pharmacy mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
-                    <button role="tab" aria-selected={activeTab === 'rx'} onClick={() => setActiveTab('rx')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'rx' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                    <button role="tab" aria-selected={activeTab === 'rx'} onClick={() => setActiveTab('rx')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'rx' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <Pill size={16} className={activeTab === 'rx' ? 'text-brand-600' : 'text-ink-400'} /> Rx Fulfillment
                     </button>
-                    <button role="tab" aria-selected={activeTab === 'otc'} onClick={() => setActiveTab('otc')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'otc' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                    <button role="tab" aria-selected={activeTab === 'otc'} onClick={() => setActiveTab('otc')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'otc' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <Store size={16} className={activeTab === 'otc' ? 'text-accent-600' : 'text-ink-400'} /> OTC Point of Sale
                     </button>
-                    <button role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'transactions' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                    <button role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'transactions' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <History size={16} className={activeTab === 'transactions' ? 'text-brand-600' : 'text-ink-400'} /> Transactions
                     </button>
                 </div>
@@ -290,14 +290,14 @@ export default function Pharmacy() {
                         <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
                             <div className="flex items-center gap-3">
                                 <Package className="text-brand-600" size={18} />
-                                <h2 className="font-semibold text-ink-900 text-base tracking-tight">Pending prescriptions</h2>
+                                <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Pending prescriptions</h2>
                                 <span className="badge-warn">{queue.length} Awaiting</span>
                             </div>
                             <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                         </button>
 
                         {isQueueOpen && (
-                            <div className="border-t border-ink-100 p-4 bg-white rounded-b-2xl">
+                            <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
                                 {isLoadingQueue ? (
                                     <div className="text-center py-8 text-ink-400">
                                         <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} />
@@ -313,13 +313,13 @@ export default function Pharmacy() {
                                                 <button key={order.id} type="button"
                                                     aria-label={`Open prescription ${order.id} for ${order.patient}`}
                                                     onClick={() => {setActiveOrder(order); setIsQueueOpen(false);}}
-                                                    className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white border-ink-200 hover:border-brand-300 hover:-translate-y-0.5'}`}>
+                                                    className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 hover:-translate-y-0.5'}`}>
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <h3 className="font-semibold text-sm text-ink-900">{order.patient}</h3>
+                                                        <h3 className="font-semibold text-sm text-ink-900 dark:text-ink-100">{order.patient}</h3>
                                                         {order.priority === 'High' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft" />}
                                                     </div>
                                                     <div className="flex justify-between items-center text-xs text-brand-700 font-mono mb-1"><span>{order.id}</span></div>
-                                                    <div className="flex justify-between items-center text-xs text-ink-400"><span>{order.doctor}</span><span className="bg-ink-100 px-2 py-0.5 rounded-full text-ink-600 flex items-center gap-1"><Clock size={10} /> {order.time}</span></div>
+                                                    <div className="flex justify-between items-center text-xs text-ink-400"><span>{order.doctor}</span><span className="bg-ink-100 dark:bg-ink-800 px-2 py-0.5 rounded-full text-ink-600 dark:text-ink-400 flex items-center gap-1"><Clock size={10} /> {order.time}</span></div>
                                                 </button>
                                             );
                                         })}
@@ -333,17 +333,17 @@ export default function Pharmacy() {
                         {!activeOrder ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40">
                                 <Pill size={56} className="mb-4 text-ink-300" strokeWidth={1.5} />
-                                <h3 className="text-base font-semibold text-ink-600 mb-1">Select a prescription</h3>
+                                <h3 className="text-base font-semibold text-ink-600 dark:text-ink-400 mb-1">Select a prescription</h3>
                                 <p className="text-sm">Choose an order from the queue to dispense.</p>
                             </div>
                         ) : (
                             <>
                                 <div className="shrink-0 flex flex-col">
-                                    <div className="p-4 border-b border-ink-100 bg-white flex justify-between items-center z-10">
+                                    <div className="p-4 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-between items-center z-10">
                                         <div className="flex items-center gap-3">
                                             <div className="w-11 h-11 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 text-white flex items-center justify-center shadow-glow"><FileWarning size={18} /></div>
                                             <div>
-                                                <h1 className="text-lg font-semibold text-ink-900 tracking-tight">Rx: {activeOrder.id}</h1>
+                                                <h1 className="text-lg font-semibold text-ink-900 dark:text-ink-100 tracking-tight">Rx: {activeOrder.id}</h1>
                                                 <p className="text-xs font-medium text-ink-500">{activeOrder.patient} &middot; {activeOrder.op_no} &middot; {activeOrder.doctor}</p>
                                             </div>
                                         </div>
@@ -364,14 +364,14 @@ export default function Pharmacy() {
                                         <div key={idx} className="card-flush p-5">
                                             <div className="flex justify-between items-start gap-4">
                                                 <div className="flex-1">
-                                                    <h4 className="font-semibold text-base text-ink-900 tracking-tight">{med.drug}</h4>
-                                                    <div className="flex gap-5 mt-3 text-sm text-ink-700">
+                                                    <h4 className="font-semibold text-base text-ink-900 dark:text-ink-100 tracking-tight">{med.drug}</h4>
+                                                    <div className="flex gap-5 mt-3 text-sm text-ink-700 dark:text-ink-300">
                                                         <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Dosage</span>{med.dosage}</div>
                                                         <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Freq</span>{med.frequency}</div>
                                                         <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Duration</span>{med.duration}</div>
                                                     </div>
                                                 </div>
-                                                <label className="flex items-center gap-2 text-xs font-medium text-ink-700 cursor-pointer p-2.5 border border-ink-200 rounded-lg hover:bg-ink-50 shrink-0">
+                                                <label className="flex items-center gap-2 text-xs font-medium text-ink-700 dark:text-ink-300 cursor-pointer p-2.5 border border-ink-200 dark:border-ink-800 rounded-lg hover:bg-ink-50 dark:hover:bg-ink-800/50 shrink-0">
                                                     <input type="checkbox" className="w-4 h-4 text-brand-600 rounded border-ink-300 focus:ring-brand-500" /> Packed
                                                 </label>
                                             </div>
@@ -379,7 +379,7 @@ export default function Pharmacy() {
                                     ))}
                                 </div>
 
-                                <div data-tour="pharmacy-rx-actions" className="p-4 border-t border-ink-100 bg-white flex flex-wrap justify-end gap-2 shrink-0 z-10">
+                                <div data-tour="pharmacy-rx-actions" className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap justify-end gap-2 shrink-0 z-10">
                                     <button
                                         onClick={() => printPrescription({
                                             patient: { full_name: activeOrder.patient, outpatient_no: activeOrder.op_no, allergies: activeOrder.allergies },
@@ -410,7 +410,7 @@ export default function Pharmacy() {
                 <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
                     {/* LEFT PANEL: INVENTORY SEARCH */}
                     <div data-tour="pharmacy-otc-search" className="flex-1 card flex flex-col overflow-hidden">
-                        <div className="p-4 border-b border-ink-100 bg-ink-50/40">
+                        <div className="p-4 border-b border-ink-100 dark:border-ink-800 bg-ink-50/40">
                             <div className="relative">
                                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                                 <input
@@ -432,10 +432,10 @@ export default function Pharmacy() {
                             ) : (
                                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                                     {filteredInventory.map(item => (
-                                        <div key={item.batch_id} className="border border-ink-200 rounded-xl p-3 hover:border-accent-300 hover:shadow-soft transition-all bg-white flex flex-col justify-between">
+                                        <div key={item.batch_id} className="border border-ink-200 dark:border-ink-800 rounded-xl p-3 hover:border-accent-300 hover:shadow-soft transition-all bg-white dark:bg-ink-900 flex flex-col justify-between">
                                             <div>
                                                 <div className="flex justify-between items-start mb-1 gap-2">
-                                                    <h4 className="font-semibold text-sm text-ink-900">{item.name}</h4>
+                                                    <h4 className="font-semibold text-sm text-ink-900 dark:text-ink-100">{item.name}</h4>
                                                     <span className="badge-neutral">{item.category}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2 mt-2">
@@ -449,7 +449,7 @@ export default function Pharmacy() {
                                                 onClick={() => addToCart(item)}
                                                 disabled={item.quantity === 0}
                                                 aria-label={`Add ${item.name} (batch ${item.batch_number}) to cart`}
-                                                className="mt-3 w-full py-1.5 bg-ink-50 border border-ink-200 hover:bg-accent-50 hover:border-accent-300 hover:text-accent-700 text-ink-700 text-sm font-semibold rounded-lg flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                className="mt-3 w-full py-1.5 bg-ink-50 dark:bg-ink-900/40 border border-ink-200 dark:border-ink-800 hover:bg-accent-50 hover:border-accent-300 hover:text-accent-700 text-ink-700 dark:text-ink-300 text-sm font-semibold rounded-lg flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                             >
                                                 <Plus size={14} /> Add
                                             </button>
@@ -462,8 +462,8 @@ export default function Pharmacy() {
 
                     {/* RIGHT PANEL: SHOPPING CART */}
                     <div className="w-full md:w-96 card flex flex-col overflow-hidden shrink-0">
-                        <div className="p-4 border-b border-ink-100 bg-ink-50/40 flex justify-between items-center">
-                            <h3 className="font-semibold text-ink-900 flex items-center gap-2 tracking-tight">
+                        <div className="p-4 border-b border-ink-100 dark:border-ink-800 bg-ink-50/40 flex justify-between items-center">
+                            <h3 className="font-semibold text-ink-900 dark:text-ink-100 flex items-center gap-2 tracking-tight">
                                 <ShoppingCart size={16} className="text-accent-600" /> Current sale
                             </h3>
                             <span className="badge-success">{cart.length} Items</span>
@@ -479,15 +479,15 @@ export default function Pharmacy() {
                                 cart.map(item => (
                                     <div key={item.batch_id} className="card-flush p-3">
                                         <div className="flex justify-between items-start mb-2 gap-2">
-                                            <h4 className="font-semibold text-sm text-ink-800 line-clamp-1">{item.name}</h4>
+                                            <h4 className="font-semibold text-sm text-ink-800 dark:text-ink-200 line-clamp-1">{item.name}</h4>
                                             <button onClick={() => removeFromCart(item.batch_id)} aria-label="Remove" className="text-ink-400 hover:text-rose-600 transition-colors p-0.5"><Trash2 size={15} /></button>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-xs font-medium text-ink-500">KES {item.unit_price} &times; {item.qty}</span>
-                                            <div className="flex items-center gap-1 bg-ink-50 border border-ink-200 rounded-lg p-0.5">
-                                                <button onClick={() => updateQty(item.batch_id, -1)} aria-label="Decrease" className="p-1 hover:bg-white rounded text-ink-600"><Minus size={13} /></button>
+                                            <div className="flex items-center gap-1 bg-ink-50 dark:bg-ink-900/40 border border-ink-200 dark:border-ink-800 rounded-lg p-0.5">
+                                                <button onClick={() => updateQty(item.batch_id, -1)} aria-label="Decrease" className="p-1 hover:bg-white rounded text-ink-600 dark:text-ink-400"><Minus size={13} /></button>
                                                 <span className="text-sm font-semibold w-6 text-center">{item.qty}</span>
-                                                <button onClick={() => updateQty(item.batch_id, 1)} aria-label="Increase" className="p-1 hover:bg-white rounded text-ink-600"><Plus size={13} /></button>
+                                                <button onClick={() => updateQty(item.batch_id, 1)} aria-label="Increase" className="p-1 hover:bg-white rounded text-ink-600 dark:text-ink-400"><Plus size={13} /></button>
                                             </div>
                                         </div>
                                     </div>
@@ -495,10 +495,10 @@ export default function Pharmacy() {
                             )}
                         </div>
 
-                        <div data-tour="pharmacy-pay" className="p-4 border-t border-ink-100 bg-white">
+                        <div data-tour="pharmacy-pay" className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900">
                             <div className="flex justify-between items-center mb-3">
                                 <span className="section-eyebrow">Subtotal</span>
-                                <span className="text-xl font-semibold text-ink-900 tracking-tight">KES {cartTotal.toLocaleString()}</span>
+                                <span className="text-xl font-semibold text-ink-900 dark:text-ink-100 tracking-tight">KES {cartTotal.toLocaleString()}</span>
                             </div>
                             <OtcPayBar
                                 disabled={cart.length === 0 || isProcessing}
@@ -719,7 +719,7 @@ function TransactionsTab() {
                         disabled={loading}>
                     {loading ? 'Loading...' : 'Apply'}
                 </button>
-                <div className="ml-auto text-xs text-ink-600">
+                <div className="ml-auto text-xs text-ink-600 dark:text-ink-400">
                     <span className="mr-3">Charged: <strong>KES {total.toLocaleString()}</strong></span>
                     <span>Collected: <strong>KES {paid.toLocaleString()}</strong></span>
                 </div>
@@ -727,7 +727,7 @@ function TransactionsTab() {
 
             <div className="overflow-x-auto border border-ink-200/70 rounded-lg">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-3 py-2 font-medium">Date</th>
                             <th className="text-left px-3 py-2 font-medium">Item</th>
@@ -740,7 +740,7 @@ function TransactionsTab() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {loading ? (
                             <tr><td colSpan={9} className="px-3 py-6 text-ink-500">Loading...</td></tr>
                         ) : rows.length === 0 ? (
@@ -762,10 +762,10 @@ function TransactionsTab() {
                                         r.invoice_status === 'Paid' ? 'bg-emerald-50 text-emerald-700' :
                                         r.invoice_status === 'Partially Paid' ? 'bg-amber-50 text-amber-700' :
                                         r.invoice_status?.includes('Pending') ? 'bg-sky-50 text-sky-700' :
-                                        'bg-ink-50 text-ink-600'
+                                        'bg-ink-50 dark:bg-ink-900/40 text-ink-600 dark:text-ink-400'
                                     )}>{r.invoice_status}</span>
                                 </td>
-                                <td className="px-3 py-1.5 text-ink-600">{r.cashier || '—'}</td>
+                                <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{r.cashier || '—'}</td>
                                 <td className="px-3 py-1.5 text-right">
                                     <button onClick={() => printReceipt(r.dispense_id)}
                                             className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
@@ -784,7 +784,7 @@ function TransactionsTab() {
 function Field({ label, children }) {
     return (
         <label className="block">
-            <span className="block text-xs font-medium text-ink-600 mb-1">{label}</span>
+            <span className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">{label}</span>
             {children}
         </label>
     );
@@ -898,10 +898,10 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
 
     return (
         <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-elevated w-full max-w-md">
-                <div className="flex items-center justify-between p-4 border-b border-ink-100">
+            <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md">
+                <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <div>
-                        <h3 className="text-sm font-semibold text-ink-900">Collect payment</h3>
+                        <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Collect payment</h3>
                         <p className="text-xs text-ink-500">
                             {patientName ? `${patientName} · ` : ''}Invoice #{invoiceId} · KES {Number(amountDue || 0).toLocaleString()}
                         </p>
@@ -924,7 +924,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                         />
                     ) : (
                         <>
-                            <div className="flex gap-2 border-b border-ink-100">
+                            <div className="flex gap-2 border-b border-ink-100 dark:border-ink-800">
                                 <button onClick={() => setMethod('cash')}
                                         className={'flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
                                             (method === 'cash' ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-500')}>
@@ -943,14 +943,14 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                             </div>
 
                             <label className="block">
-                                <span className="block text-xs font-medium text-ink-600 mb-1">Amount</span>
+                                <span className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">Amount</span>
                                 <input type="number" step="0.01" className="input" value={amount}
                                        onChange={(e) => setAmount(e.target.value)} />
                             </label>
 
                             {method === 'mpesa' && (
                                 <label className="block">
-                                    <span className="block text-xs font-medium text-ink-600 mb-1">Phone number</span>
+                                    <span className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">Phone number</span>
                                     <input className="input" value={phone}
                                            onChange={(e) => setPhone(e.target.value)}
                                            placeholder="07XXXXXXXX or 2547XXXXXXXX" />
@@ -958,7 +958,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                             )}
 
                             <label className="block">
-                                <span className="block text-xs font-medium text-ink-600 mb-1">
+                                <span className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">
                                     Reference (optional)
                                 </span>
                                 <input className="input" value={reference}
@@ -968,7 +968,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
 
                             <div className="flex justify-end gap-2 pt-2">
                                 <button onClick={onClose}
-                                        className="px-3 py-2 rounded-lg border border-ink-200 text-sm font-medium hover:bg-ink-50">
+                                        className="px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50">
                                     Cancel
                                 </button>
                                 <button onClick={submit} disabled={submitting}

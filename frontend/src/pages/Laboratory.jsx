@@ -278,11 +278,11 @@ export default function Laboratory() {
             <div data-tour="lab-tabs" className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" aria-label="Laboratory mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
                     <button role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <Microscope size={16} className={activeTab === 'queue' ? 'text-brand-600' : 'text-ink-400'} /> Lab Operations
                     </button>
                     <button role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <FileDigit size={16} className={activeTab === 'catalog' ? 'text-accent-600' : 'text-ink-400'} /> Test Catalog
                     </button>
                 </div>
@@ -295,14 +295,14 @@ export default function Laboratory() {
                         <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
                             <div className="flex items-center gap-3">
                                 <TestTube className="text-brand-600" size={18} />
-                                <h2 className="font-semibold text-ink-900 text-base tracking-tight">Pending lab orders</h2>
+                                <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Pending lab orders</h2>
                                 <span className="badge-brand">{queue.length} Tests</span>
                             </div>
                             <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                         </button>
 
                         {isQueueOpen && (
-                            <div className="border-t border-ink-100 p-4 bg-white rounded-b-2xl">
+                            <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
                                 {isLoading ? (
                                     <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Syncing orders…</div>
                                 ) : queue.length === 0 ? (
@@ -313,13 +313,13 @@ export default function Laboratory() {
                                             const active = activeTest?.test_id === order.test_id;
                                             return (
                                                 <button key={order.test_id} type="button" onClick={() => handleTestSelect(order)}
-                                                        className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white border-ink-200 hover:border-brand-300 hover:-translate-y-0.5'}`}>
+                                                        className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 hover:-translate-y-0.5'}`}>
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <h3 className="font-semibold text-sm text-ink-900 line-clamp-1">{order.test_name}</h3>
+                                                        <h3 className="font-semibold text-sm text-ink-900 dark:text-ink-100 line-clamp-1">{order.test_name}</h3>
                                                         {order.priority === 'STAT' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft shrink-0" />}
                                                     </div>
                                                     <div className="flex justify-between items-center text-xs text-ink-500 mb-2">
-                                                        <span className="font-medium text-ink-800">{order.patient}</span>
+                                                        <span className="font-medium text-ink-800 dark:text-ink-200">{order.patient}</span>
                                                         <span className="font-mono text-2xs text-ink-400">#{order.test_id}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center text-xs">
@@ -340,23 +340,23 @@ export default function Laboratory() {
                         {!activeTest ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40">
                                 <FlaskConical size={56} className="mb-4 text-ink-300" strokeWidth={1.5} />
-                                <h3 className="text-base font-semibold text-ink-600 mb-1">Laboratory workbench</h3>
+                                <h3 className="text-base font-semibold text-ink-600 dark:text-ink-400 mb-1">Laboratory workbench</h3>
                                 <p className="text-sm">Select a pending test from the queue to process specimens and enter results.</p>
                             </div>
                         ) : (
                             <>
-                                <div className="shrink-0 p-5 border-b border-ink-100 bg-white flex justify-between items-center z-10">
+                                <div className="shrink-0 p-5 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-between items-center z-10">
                                     <div className="flex gap-4 items-center flex-1 min-w-0">
                                         <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100">
                                             <Microscope size={20} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <h1 className="text-lg font-semibold text-ink-900 tracking-tight truncate">{activeTest.test_name}</h1>
+                                                <h1 className="text-lg font-semibold text-ink-900 dark:text-ink-100 tracking-tight truncate">{activeTest.test_name}</h1>
                                                 {activeTest.priority === 'STAT' && <span className="badge-danger animate-pulse-soft">STAT</span>}
                                             </div>
                                             <p className="text-xs font-medium text-ink-500 truncate">
-                                                Patient: <span className="text-ink-700">{activeTest.patient}</span> · Ordered by: <span className="text-ink-700">{activeTest.doctor}</span> · #{activeTest.test_id}
+                                                Patient: <span className="text-ink-700 dark:text-ink-300">{activeTest.patient}</span> · Ordered by: <span className="text-ink-700 dark:text-ink-300">{activeTest.doctor}</span> · #{activeTest.test_id}
                                             </p>
                                         </div>
                                         {(activeTest.status === 'Completed' || activeTest.result_summary) && (
@@ -378,7 +378,7 @@ export default function Laboratory() {
                                     {activeTest.status === 'Pending Collection' ? (
                                         <div className="card p-6 text-center py-12">
                                             <TestTube size={44} className="mx-auto text-ink-300 mb-4" />
-                                            <h3 className="text-base font-semibold text-ink-800 mb-1">Awaiting specimen collection</h3>
+                                            <h3 className="text-base font-semibold text-ink-800 dark:text-ink-200 mb-1">Awaiting specimen collection</h3>
                                             <p className="text-sm text-ink-500 mb-6 max-w-md mx-auto">
                                                 This test's catalog entry requests a barcode label. You can generate one — or skip
                                                 the labelling step entirely if your workflow doesn't need it.
@@ -399,13 +399,13 @@ export default function Laboratory() {
                                         <>
                                             {/* Discrete result entry — driven by lab_catalog_parameters */}
                                             <div className="card-flush p-5 sm:p-6 animate-fade-in">
-                                                <h3 className="section-eyebrow mb-5 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                                <h3 className="section-eyebrow mb-5 border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2">
                                                     <Activity className="text-brand-600" size={16} /> Enter results
                                                 </h3>
 
                                                 {activeParameters.length > 0 ? (
                                                     <div className="space-y-3 overflow-x-auto pb-2">
-                                                        <div className="grid grid-cols-12 gap-3 items-center bg-ink-50 p-3 rounded-xl ring-1 ring-ink-100 text-2xs font-semibold text-ink-500 uppercase tracking-wider min-w-[600px]">
+                                                        <div className="grid grid-cols-12 gap-3 items-center bg-ink-50 dark:bg-ink-900/40 p-3 rounded-xl ring-1 ring-ink-100 text-2xs font-semibold text-ink-500 uppercase tracking-wider min-w-[600px]">
                                                             <div className="col-span-4">Parameter</div>
                                                             <div className="col-span-3">Value</div>
                                                             <div className="col-span-2">Unit</div>
@@ -413,8 +413,8 @@ export default function Laboratory() {
                                                             <div className="col-span-1 text-center">Flag</div>
                                                         </div>
                                                         {activeParameters.map(param => (
-                                                            <div key={param.parameter_id} className="grid grid-cols-12 gap-3 items-center border-b border-ink-100 pb-2 min-w-[600px]">
-                                                                <div className="col-span-4 font-medium text-sm text-ink-700">{param.name}</div>
+                                                            <div key={param.parameter_id} className="grid grid-cols-12 gap-3 items-center border-b border-ink-100 dark:border-ink-800 pb-2 min-w-[600px]">
+                                                                <div className="col-span-4 font-medium text-sm text-ink-700 dark:text-ink-300">{param.name}</div>
                                                                 <div className="col-span-3">
                                                                     {param.value_type === 'choice' && param.choices ? (
                                                                         <select className="input" value={results[param.key] || ''}
@@ -459,7 +459,7 @@ export default function Laboratory() {
 
                                             {/* Reagent picker */}
                                             <div className="card-flush p-5 sm:p-6 border-l-4 border-l-amber-400">
-                                                <h3 className="section-eyebrow mb-4 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                                <h3 className="section-eyebrow mb-4 border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2">
                                                     <Package className="text-amber-500" size={16} /> Reagents &amp; consumables used
                                                 </h3>
 
@@ -496,7 +496,7 @@ export default function Laboratory() {
                                                             <tbody>
                                                                 {consumedItems.map(item => (
                                                                     <tr key={item.batch_id}>
-                                                                        <td className="font-medium text-ink-900">
+                                                                        <td className="font-medium text-ink-900 dark:text-ink-100">
                                                                             {item.name} <span className="text-xs text-ink-500">({item.batch_no})</span>
                                                                             {item.is_reusable && <span className="ml-2 badge-success text-2xs">Reusable</span>}
                                                                         </td>
@@ -522,7 +522,7 @@ export default function Laboratory() {
 
                                 {/* Footer */}
                                 {activeTest.status !== 'Pending Collection' && (
-                                    <div className="p-4 border-t border-ink-100 bg-white flex justify-end gap-2 shrink-0 z-10">
+                                    <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0 z-10">
                                         <button onClick={handleRejectSample} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
                                             <XCircle size={16} /> Reject sample
                                         </button>
@@ -540,10 +540,10 @@ export default function Laboratory() {
             {/* ─────────────── Mode 2: Test Catalog (editable) ─────────────── */}
             {activeTab === 'catalog' && (
                 <div className="flex-1 card flex flex-col overflow-hidden">
-                    <div className="p-5 border-b border-ink-100 bg-ink-50/40 flex justify-between items-center flex-wrap gap-3">
+                    <div className="p-5 border-b border-ink-100 dark:border-ink-800 bg-ink-50/40 flex justify-between items-center flex-wrap gap-3">
                         <div>
                             <span className="section-eyebrow">Admin</span>
-                            <h2 className="text-base font-semibold text-ink-900 mt-1 flex items-center gap-2 tracking-tight">
+                            <h2 className="text-base font-semibold text-ink-900 dark:text-ink-100 mt-1 flex items-center gap-2 tracking-tight">
                                 <Settings className="text-ink-400" size={18} /> Managed test directory
                             </h2>
                             <p className="text-sm text-ink-500 mt-1">Add or revise tests, parameters, reference ranges and pricing.</p>
@@ -575,12 +575,12 @@ export default function Laboratory() {
                                 ) : catalog.map((test) => (
                                     <tr key={test.catalog_id} className={!test.is_active ? 'opacity-50' : ''}>
                                         <td>
-                                            <div className="font-semibold text-ink-900">{test.test_name}</div>
+                                            <div className="font-semibold text-ink-900 dark:text-ink-100">{test.test_name}</div>
                                             <div className="text-xs font-mono text-ink-500 mt-0.5">PKG-LAB-{String(test.catalog_id).padStart(4, '0')}</div>
                                         </td>
-                                        <td className="font-medium text-ink-700">{test.category}</td>
+                                        <td className="font-medium text-ink-700 dark:text-ink-300">{test.category}</td>
                                         <td><span className="badge-neutral">{test.default_specimen_type || 'General'}</span></td>
-                                        <td className="text-xs text-ink-600">{(test.parameters || []).length} field(s)</td>
+                                        <td className="text-xs text-ink-600 dark:text-ink-400">{(test.parameters || []).length} field(s)</td>
                                         <td className="font-mono">{Number(test.base_price).toFixed(2)}</td>
                                         <td>{test.requires_barcode ? <span className="badge-warn text-2xs">Required</span> : <span className="badge-neutral text-2xs">Optional</span>}</td>
                                         <td>{test.is_active ? <span className="badge-success text-2xs">Active</span> : <span className="badge-neutral text-2xs">Inactive</span>}</td>
@@ -602,16 +602,16 @@ export default function Laboratory() {
             {editorOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
-                    <div className="relative w-full max-w-3xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="flex items-center justify-between p-5 border-b border-ink-100 bg-white shrink-0">
+                    <div className="relative w-full max-w-3xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shrink-0">
                             <div>
                                 <span className="section-eyebrow">{editing ? 'Edit test' : 'New test'}</span>
-                                <h2 className="text-xl font-semibold text-ink-900 mt-1 flex items-center gap-2">
+                                <h2 className="text-xl font-semibold text-ink-900 dark:text-ink-100 mt-1 flex items-center gap-2">
                                     <FlaskConical size={20} className="text-brand-600" />
                                     {editing ? `Editing ${editing.test_name}` : 'Configure a new lab test'}
                                 </h2>
                             </div>
-                            <button onClick={() => setEditorOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
+                            <button onClick={() => setEditorOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
@@ -667,7 +667,7 @@ export default function Laboratory() {
 
                             <div className="card p-5">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="font-semibold text-ink-900">Result parameters</h3>
+                                    <h3 className="font-semibold text-ink-900 dark:text-ink-100">Result parameters</h3>
                                     <button onClick={addParamRow} className="btn-secondary"><Plus size={14} /> Add parameter</button>
                                 </div>
                                 {catalogForm.parameters.length === 0 ? (
@@ -675,7 +675,7 @@ export default function Laboratory() {
                                 ) : (
                                     <div className="space-y-2">
                                         {catalogForm.parameters.map((p, idx) => (
-                                            <div key={idx} className="grid grid-cols-12 gap-2 items-start border-b border-ink-100 pb-2">
+                                            <div key={idx} className="grid grid-cols-12 gap-2 items-start border-b border-ink-100 dark:border-ink-800 pb-2">
                                                 <input className="input col-span-2" placeholder="key" value={p.key}
                                                        onChange={e => setParamField(idx, 'key', e.target.value)} />
                                                 <input className="input col-span-3" placeholder="Display name" value={p.name}
@@ -706,7 +706,7 @@ export default function Laboratory() {
                             </div>
                         </div>
 
-                        <div className="p-4 border-t border-ink-100 bg-white flex justify-end gap-2 shrink-0">
+                        <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0">
                             <button onClick={() => setEditorOpen(false)} className="btn-secondary">Cancel</button>
                             <button onClick={saveCatalog} className="btn-primary"><Save size={15} /> Save</button>
                         </div>

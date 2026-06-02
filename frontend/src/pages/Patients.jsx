@@ -469,7 +469,7 @@ export default function Patients() {
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                                 sexFilter === s
                                     ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200'
-                                    : 'text-ink-700 hover:bg-ink-50'
+                                    : 'text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50'
                             }`}
                         >
                             {s || 'All'}
@@ -485,7 +485,7 @@ export default function Patients() {
             <div className="hidden md:block card overflow-visible">
                 <div className="overflow-x-auto overflow-y-visible">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-ink-50 text-ink-600 text-2xs uppercase font-semibold tracking-[0.14em]">
+                        <thead className="bg-ink-50 dark:bg-ink-900/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
                             <tr>
                                 <th className="px-5 py-3">Patient</th>
                                 <th className="px-5 py-3">Contact</th>
@@ -494,7 +494,7 @@ export default function Patients() {
                                 <th className="px-5 py-3 text-right">Manage</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 text-ink-700">
+                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-300">
                             {isLoading ? (
                                 <tr>
                                     <td colSpan="5" className="px-6 py-12 text-center text-ink-500">
@@ -506,7 +506,7 @@ export default function Patients() {
                                 <tr>
                                     <td colSpan="5" className="px-6 py-16 text-center text-ink-500">
                                         <Users size={36} className="mx-auto mb-2 text-ink-300" aria-hidden="true" />
-                                        <p className="text-sm font-medium text-ink-700">No patients match the current filters.</p>
+                                        <p className="text-sm font-medium text-ink-700 dark:text-ink-300">No patients match the current filters.</p>
                                         <p className="text-xs mt-1">Try clearing the search or registering a new patient.</p>
                                     </td>
                                 </tr>
@@ -523,7 +523,7 @@ export default function Patients() {
                                                         {initialsOf(patient)}
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <div className="font-semibold text-ink-900 truncate">{patient.surname}, {patient.other_names}</div>
+                                                        <div className="font-semibold text-ink-900 dark:text-ink-100 truncate">{patient.surname}, {patient.other_names}</div>
                                                         <div className="flex items-center gap-2 text-xs text-ink-500 mt-0.5">
                                                             <span className="font-mono text-brand-700">{patient.outpatient_no}</span>
                                                             <span aria-hidden="true">·</span>
@@ -535,7 +535,7 @@ export default function Patients() {
 
                                             {/* Contact */}
                                             <td className="px-5 py-3 align-top text-xs">
-                                                <div className="flex items-center gap-1.5 text-ink-700">
+                                                <div className="flex items-center gap-1.5 text-ink-700 dark:text-ink-300">
                                                     <Phone size={12} className="text-ink-400 shrink-0" aria-hidden="true" />
                                                     <span className="truncate">{patient.telephone_1 || '—'}</span>
                                                 </div>
@@ -550,7 +550,7 @@ export default function Patients() {
 
                                             {/* Vitals */}
                                             <td className="px-5 py-3 align-top text-xs">
-                                                <div className="flex items-center gap-1.5 text-ink-700">
+                                                <div className="flex items-center gap-1.5 text-ink-700 dark:text-ink-300">
                                                     <Droplet size={12} className="text-rose-500 shrink-0" aria-hidden="true" />
                                                     <span>{patient.blood_group && patient.blood_group !== 'Unknown' ? patient.blood_group : 'Unknown'}</span>
                                                 </div>
@@ -623,7 +623,7 @@ export default function Patients() {
                 ) : visiblePatients.length === 0 ? (
                     <div className="card p-8 text-center text-ink-500">
                         <Users size={32} className="mx-auto mb-2 text-ink-300" aria-hidden="true" />
-                        <p className="text-sm font-medium text-ink-700">No patients match the current filters.</p>
+                        <p className="text-sm font-medium text-ink-700 dark:text-ink-300">No patients match the current filters.</p>
                     </div>
                 ) : (
                     visiblePatients.map(patient => {
@@ -636,7 +636,7 @@ export default function Patients() {
                                         {initialsOf(patient)}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="font-semibold text-ink-900 truncate">{patient.surname}, {patient.other_names}</h3>
+                                        <h3 className="font-semibold text-ink-900 dark:text-ink-100 truncate">{patient.surname}, {patient.other_names}</h3>
                                         <div className="text-xs text-ink-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                             <span className="font-mono text-brand-700">{patient.outpatient_no}</span>
                                             <span>{patient.sex}{age !== null ? ` · ${age}y` : ''}</span>
@@ -662,28 +662,28 @@ export default function Patients() {
                                 <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
                                     <div>
                                         <dt className="text-ink-500">Phone</dt>
-                                        <dd className="text-ink-900 flex items-center gap-1 mt-0.5">
+                                        <dd className="text-ink-900 dark:text-ink-100 flex items-center gap-1 mt-0.5">
                                             <Phone size={11} className="text-ink-400" aria-hidden="true" />
                                             <span className="truncate">{patient.telephone_1 || '—'}</span>
                                         </dd>
                                     </div>
                                     <div>
                                         <dt className="text-ink-500">Residence</dt>
-                                        <dd className="text-ink-900 flex items-center gap-1 mt-0.5">
+                                        <dd className="text-ink-900 dark:text-ink-100 flex items-center gap-1 mt-0.5">
                                             <MapPin size={11} className="text-ink-400" aria-hidden="true" />
                                             <span className="truncate">{patient.residence || patient.town || '—'}</span>
                                         </dd>
                                     </div>
                                     <div>
                                         <dt className="text-ink-500">Blood</dt>
-                                        <dd className="text-ink-900 flex items-center gap-1 mt-0.5">
+                                        <dd className="text-ink-900 dark:text-ink-100 flex items-center gap-1 mt-0.5">
                                             <Droplet size={11} className="text-rose-500" aria-hidden="true" />
                                             {patient.blood_group && patient.blood_group !== 'Unknown' ? patient.blood_group : 'Unknown'}
                                         </dd>
                                     </div>
                                     <div>
                                         <dt className="text-ink-500">Registered</dt>
-                                        <dd className="text-ink-900 mt-0.5" title={patient.registered_on ? new Date(patient.registered_on).toLocaleString() : ''}>
+                                        <dd className="text-ink-900 dark:text-ink-100 mt-0.5" title={patient.registered_on ? new Date(patient.registered_on).toLocaleString() : ''}>
                                             {formatRelative(patient.registered_on)}
                                         </dd>
                                     </div>
@@ -726,17 +726,17 @@ export default function Patients() {
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
 
-                    <div className="relative w-full max-w-4xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="flex items-center justify-between p-6 border-b border-ink-100 bg-white shrink-0">
+                    <div className="relative w-full max-w-4xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="flex items-center justify-between p-6 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shrink-0">
                             <div>
                                 <span className="section-eyebrow">New registration</span>
-                                <h2 className="text-xl font-semibold text-ink-900 tracking-tight mt-1 flex items-center gap-2">
+                                <h2 className="text-xl font-semibold text-ink-900 dark:text-ink-100 tracking-tight mt-1 flex items-center gap-2">
                                     <UserPlus className="text-brand-600" size={20} />
                                     Patient registration
                                 </h2>
                                 <p className="text-sm text-ink-500 mt-1">Complete the form to generate an Outpatient Number.</p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full transition-colors">
+                            <button onClick={() => setIsModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -746,7 +746,7 @@ export default function Patients() {
                                 
                                 {/* SECTION 1: Identity */}
                                 <div className="card p-5 sm:p-6">
-                                    <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                    <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2">
                                         <ShieldCheck size={16} /> Identity & Demographics
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -839,7 +839,7 @@ export default function Patients() {
 
                                 {/* SECTION 2: Contact & Location */}
                                 <div className="card p-5 sm:p-6">
-                                    <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                    <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2">
                                         <MapPin size={16} /> Contact & Location
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -873,7 +873,7 @@ export default function Patients() {
                                 {/* SECTION 3: Employment & Next of Kin */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     <div className="card p-5 sm:p-6">
-                                        <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                        <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2">
                                             <Briefcase size={16} /> Employment
                                         </h3>
                                         <div className="space-y-4">
@@ -892,7 +892,7 @@ export default function Patients() {
                                         </div>
                                     </div>
                                     <div className="card p-5 sm:p-6">
-                                        <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                        <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2">
                                             <Phone size={16} /> Next of Kin
                                         </h3>
                                         <div className="space-y-4">
@@ -914,7 +914,7 @@ export default function Patients() {
 
                                 {/* SECTION 4: Clinical Baselines & Notes */}
                                 <div className="card p-5 sm:p-6">
-                                    <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                    <h3 className="section-eyebrow text-brand-700 mb-4 border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2">
                                         <HeartPulse size={16} /> Clinical Baselines & Notes
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -952,14 +952,14 @@ export default function Patients() {
                                             className="mt-1"
                                         />
                                         <div className="flex-1">
-                                            <label htmlFor="reg-consent" className="font-medium text-ink-900 cursor-pointer">
+                                            <label htmlFor="reg-consent" className="font-medium text-ink-900 dark:text-ink-100 cursor-pointer">
                                                 Patient has consented to treatment (KDPA Section 30)
                                             </label>
-                                            <p className="text-xs text-ink-600 mt-1">
+                                            <p className="text-xs text-ink-600 dark:text-ink-400 mt-1">
                                                 Required before clinicians can record any clinical entry. Uncheck only if the patient hasn't agreed yet — you can capture written consent later from the Medical History page.
                                             </p>
                                             <div className="mt-3 flex items-center gap-2">
-                                                <label htmlFor="reg-consent-method" className="text-xs text-ink-600">Method:</label>
+                                                <label htmlFor="reg-consent-method" className="text-xs text-ink-600 dark:text-ink-400">Method:</label>
                                                 <select
                                                     id="reg-consent-method"
                                                     value={consentForm.method}
@@ -979,7 +979,7 @@ export default function Patients() {
                             </form>
                         </div>
 
-                        <div className="p-5 border-t border-ink-100 bg-white flex gap-3 shrink-0">
+                        <div className="p-5 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex gap-3 shrink-0">
                             <button type="button" onClick={() => setIsModalOpen(false)} className="btn-secondary">
                                 Cancel
                             </button>
@@ -1080,8 +1080,8 @@ const ACUITY_PRESETS = [
     { value: 1, label: 'Critical',  hint: 'Resuscitate now',     className: 'bg-rose-50 text-rose-800 border-rose-200' },
     { value: 2, label: 'High',      hint: 'See within 10 min',   className: 'bg-amber-50 text-amber-800 border-amber-200' },
     { value: 3, label: 'Normal',    hint: 'Routine triage',      className: 'bg-brand-50 text-brand-800 border-brand-200' },
-    { value: 4, label: 'Low',       hint: 'Can wait',            className: 'bg-ink-50 text-ink-700 border-ink-200' },
-    { value: 5, label: 'Non-urgent', hint: 'Walk-in',            className: 'bg-ink-50 text-ink-700 border-ink-200' },
+    { value: 4, label: 'Low',       hint: 'Can wait',            className: 'bg-ink-50 dark:bg-ink-900/40 text-ink-700 dark:text-ink-300 border-ink-200 dark:border-ink-800' },
+    { value: 5, label: 'Non-urgent', hint: 'Walk-in',            className: 'bg-ink-50 dark:bg-ink-900/40 text-ink-700 dark:text-ink-300 border-ink-200 dark:border-ink-800' },
 ];
 
 function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
@@ -1129,16 +1129,16 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
             aria-modal="true"
             aria-labelledby="route-modal-title"
         >
-            <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-lg max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-lg max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
                 {/* Header */}
-                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-start gap-3 shrink-0">
+                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-900/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0 flex items-start gap-3">
                         <div className={`shrink-0 w-10 h-10 rounded-xl border flex items-center justify-center ${target.accent}`} aria-hidden="true">
                             <Icon size={18} />
                         </div>
                         <div className="min-w-0">
                             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">Route to {target.label}</p>
-                            <h2 id="route-modal-title" className="text-base font-semibold text-ink-900 tracking-tight truncate">{fullName}</h2>
+                            <h2 id="route-modal-title" className="text-base font-semibold text-ink-900 dark:text-ink-100 tracking-tight truncate">{fullName}</h2>
                             <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
                         </div>
                     </div>
@@ -1146,7 +1146,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer shrink-0"
+                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 dark:hover:bg-ink-800 cursor-pointer shrink-0"
                     >
                         <X size={18} aria-hidden="true" />
                     </button>
@@ -1155,7 +1155,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4">
                     {/* Acuity */}
                     <div>
-                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 mb-1.5">Triage acuity</p>
+                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-300 mb-1.5">Triage acuity</p>
                         <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5" role="radiogroup" aria-label="Triage acuity">
                             {ACUITY_PRESETS.map(p => {
                                 const active = acuity === p.value;
@@ -1168,7 +1168,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                                         onClick={() => setAcuity(p.value)}
                                         title={p.hint}
                                         className={`rounded-md border px-2 py-1.5 text-left transition-colors cursor-pointer ${
-                                            active ? `${p.className} ring-2 ring-offset-1 ring-brand-500/20 font-semibold` : 'bg-white border-ink-200 hover:bg-ink-50 text-ink-700'
+                                            active ? `${p.className} ring-2 ring-offset-1 ring-brand-500/20 font-semibold` : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:bg-ink-50 dark:hover:bg-ink-800/50 text-ink-700 dark:text-ink-300'
                                         }`}
                                     >
                                         <p className="text-2xs font-semibold uppercase tracking-wider">{p.label}</p>
@@ -1182,7 +1182,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                     {/* Staff picker */}
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
-                            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+                            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-300">
                                 Assign to {target.role ? <span className="text-ink-500 normal-case tracking-normal">({target.role})</span> : ''}
                             </p>
                             <span className="text-2xs text-ink-500">{isLoading ? 'Loading…' : `${filtered.length} available`}</span>
@@ -1199,7 +1199,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Search by name or specialization…"
-                                    className="w-full bg-white border border-ink-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                    className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-ink-900 dark:text-ink-100 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                 />
                             </div>
                         )}
@@ -1210,7 +1210,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                             className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
                                 selectedId === ''
                                     ? 'bg-brand-50/60 border-brand-200'
-                                    : 'bg-white border-ink-200 hover:bg-ink-50'
+                                    : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:bg-ink-50 dark:hover:bg-ink-800/50'
                             }`}
                         >
                             <span className="flex items-center gap-2 min-w-0">
@@ -1223,13 +1223,13 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                                     onChange={() => setSelectedId('')}
                                     className="accent-brand-600"
                                 />
-                                <span className="text-sm font-medium text-ink-900">Send unassigned</span>
+                                <span className="text-sm font-medium text-ink-900 dark:text-ink-100">Send unassigned</span>
                             </span>
                             <span className="text-2xs text-ink-500">Anyone on the {target.label} queue can claim</span>
                         </label>
 
                         {/* Staff list */}
-                        <div className="mt-1.5 max-h-64 overflow-y-auto custom-scrollbar rounded-lg border border-ink-200 divide-y divide-ink-100">
+                        <div className="mt-1.5 max-h-64 overflow-y-auto custom-scrollbar rounded-lg border border-ink-200 dark:border-ink-800 divide-y divide-ink-100 dark:divide-ink-800">
                             {isLoading ? (
                                 <div className="p-6 text-center text-ink-500 text-sm">
                                     <Activity className="animate-spin inline mr-2 text-brand-600" size={16} aria-hidden="true" /> Loading staff…
@@ -1248,7 +1248,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                                         key={s.user_id}
                                         htmlFor={`staff-${s.user_id}`}
                                         className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer transition-colors ${
-                                            isPicked ? 'bg-brand-50/60' : 'hover:bg-ink-50'
+                                            isPicked ? 'bg-brand-50/60' : 'hover:bg-ink-50 dark:hover:bg-ink-800/50'
                                         }`}
                                     >
                                         <span className="flex items-center gap-2 min-w-0">
@@ -1262,7 +1262,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                                                 className="accent-brand-600"
                                             />
                                             <span className="min-w-0">
-                                                <span className="block text-sm font-medium text-ink-900 truncate">{s.full_name}</span>
+                                                <span className="block text-sm font-medium text-ink-900 dark:text-ink-100 truncate">{s.full_name}</span>
                                                 {s.specialization && (
                                                     <span className="block text-2xs text-ink-500 truncate">{s.specialization}</span>
                                                 )}
@@ -1277,7 +1277,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                 </div>
 
                 {/* Footer */}
-                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
+                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-900/40 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
                     <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
                     <button
                         type="button"
@@ -1380,22 +1380,22 @@ function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport
                 width: MENU_WIDTH,
                 opacity: pos.ready ? 1 : 0,
             }}
-            className="bg-white rounded-xl shadow-elevated border border-ink-200 py-2 z-[60] text-left animate-fade-in"
+            className="bg-white dark:bg-ink-900 rounded-xl shadow-elevated border border-ink-200 dark:border-ink-800 py-2 z-[60] text-left animate-fade-in"
         >
             <div className="px-3 pt-1 pb-1.5 text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em]">Manage</div>
-            <button type="button" role="menuitem" onClick={() => onView(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
+            <button type="button" role="menuitem" onClick={() => onView(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
                 <Eye size={15} className="text-ink-500" aria-hidden="true" /> View history
             </button>
-            <button type="button" role="menuitem" onClick={() => onEdit(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
+            <button type="button" role="menuitem" onClick={() => onEdit(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
                 <Edit size={15} className="text-ink-500" aria-hidden="true" /> Edit details
             </button>
-            <button type="button" role="menuitem" onClick={() => onPrint(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
+            <button type="button" role="menuitem" onClick={() => onPrint(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
                 <Printer size={15} className="text-ink-500" aria-hidden="true" /> Print card
             </button>
-            <button type="button" role="menuitem" onClick={() => onExport(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 hover:bg-ink-50 flex items-center gap-2.5 cursor-pointer">
+            <button type="button" role="menuitem" onClick={() => onExport(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
                 <Download size={15} className="text-ink-500" aria-hidden="true" /> Export (KDPA S.26)
             </button>
-            <div className="border-t border-ink-100 my-1.5" role="separator" />
+            <div className="border-t border-ink-100 dark:border-ink-800 my-1.5" role="separator" />
             <button type="button" role="menuitem" onClick={() => onDeactivate(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer">
                 <UserMinus size={15} aria-hidden="true" /> Deactivate
             </button>
@@ -1473,13 +1473,13 @@ function EditPatientModal({ patient, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-2xl shadow-elevated w-full max-w-3xl max-h-[90vh] flex flex-col">
-                <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
+            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-3xl max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div>
-                        <h3 className="text-lg font-semibold text-ink-900">Edit patient</h3>
+                        <h3 className="text-lg font-semibold text-ink-900 dark:text-ink-100">Edit patient</h3>
                         <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
                     </div>
-                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full transition-colors">
+                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full transition-colors">
                         <X size={18} />
                     </button>
                 </div>
@@ -1550,7 +1550,7 @@ function EditPatientModal({ patient, onClose, onSaved }) {
                     </div>
                 </form>
 
-                <div className="p-5 border-t border-ink-100 bg-white flex gap-3 shrink-0">
+                <div className="p-5 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex gap-3 shrink-0">
                     <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
                     <button type="submit" form="editPatientForm" disabled={isSubmitting} className="btn-primary flex-1 py-3">
                         {isSubmitting ? (<><Activity className="animate-spin" size={16} /> Saving…</>) : (<><Save size={16} /> Save changes</>)}
