@@ -16,6 +16,7 @@ from app.config.settings import settings
 from app.core.dependencies import require_superadmin
 from app.core.limiter import limiter
 from app.models.master import Tenant, SuperAdmin
+from app.models.support import SupportTicket, SupportMessage
 from app.models.patient import Patient
 from app.models.user import User, Role
 from app.core.security import get_password_hash, verify_password, create_tokens
@@ -766,19 +767,54 @@ async def submit_contact(
     request: Request,
     payload: ContactRequest,
     background_tasks: BackgroundTasks,
+    master_db: Session = Depends(get_master_db),
 ):
-    """Public website contact form → emails the support inbox.
+    """Public website contact form → support ticket + email notification.
 
-    Unauthenticated; CSRF is satisfied by the SPA's double-submit token. The
-    notification's Reply-To is the visitor's address so the team replies
-    straight to the prospect. Independent of the inbound-ticket pipeline (which
-    is restricted to known contacts) — this is open lead capture.
+    Unauthenticated; CSRF is satisfied by the SPA's double-submit token. Files
+    an "Unassigned" (tenant-less) ticket in the platform inbox so leads are
+    durable + assignable, AND emails the operator (Reply-To = visitor) so they
+    can reply straight away. Independent of the inbound-email pipeline (which is
+    restricted to known contacts) — this is open lead capture.
     """
-    # Honeypot tripped → act successful, send nothing.
+    # Honeypot tripped → act successful, persist/send nothing.
     if payload.website:
         logger.info("[contact] honeypot tripped from %s — dropped", payload.email)
         return {"message": "Thanks — we'll be in touch shortly."}
 
+    # 1) Durable record: an Unassigned ticket in the superadmin inbox.
+    #    Best-effort — a DB hiccup must not fail the public form.
+    body = payload.message.strip()
+    if payload.company:
+        body = f"Company: {payload.company}\n\n{body}"
+    try:
+        ticket = SupportTicket(
+            tenant_id=None, tenant_name=None,           # Unassigned — triage later
+            submitter_email=payload.email,
+            submitter_name=payload.name,
+            origin="web",
+            subject=(payload.subject or "Website enquiry")[:200],
+            category="Onboarding",                      # prospects → onboarding queue
+            priority="Normal",
+            status="Open",
+        )
+        master_db.add(ticket)
+        master_db.flush()
+        master_db.add(SupportMessage(
+            ticket_id=ticket.ticket_id,
+            author_kind="customer",
+            author_name=payload.name,
+            source="web",
+            from_email=payload.email,
+            from_name=payload.name,
+            body=body,
+        ))
+        master_db.commit()
+    except Exception:
+        logger.exception("[contact] failed to create lead ticket for %s", payload.email)
+        master_db.rollback()
+
+    # 2) Notify the operator by email (Reply-To = the visitor).
     recipient = settings.CONTACT_RECIPIENT_EMAIL or settings.EMAIL_REPLY_TO or settings.EMAIL_FROM_SUPPORT or settings.EMAIL_FROM
     if recipient:
         subject, html, text = render_contact_message(
@@ -791,7 +827,7 @@ async def submit_contact(
             reply_to=payload.email,
         )
     else:
-        logger.error("[contact] no recipient configured (EMAIL_REPLY_TO/EMAIL_FROM) — message dropped")
+        logger.error("[contact] no recipient configured (EMAIL_REPLY_TO/EMAIL_FROM) — email skipped")
 
     # Always a friendly success — never leak config/delivery state to the public.
     return {"message": "Thanks — we'll be in touch shortly."}
