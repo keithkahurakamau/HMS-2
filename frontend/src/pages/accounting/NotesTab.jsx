@@ -5,8 +5,9 @@ import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import { CheckCircle2, Slash, Trash2 } from 'lucide-react';
 import {
-    SectionHeader, DataCard, ModalShell, ModalActions, Field, formatAmount, todayISO,
+    SectionHeader, DataCard, ModalShell, ModalActions, Field,
 } from './ui';
+import { formatAmount, todayISO } from './format';
 
 const NOTE_STATUS_BADGE = {
     draft:  'bg-amber-50 text-amber-700 ring-1 ring-amber-200',

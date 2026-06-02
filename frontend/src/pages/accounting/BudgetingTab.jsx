@@ -5,8 +5,9 @@ import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import { Target, BarChart3, Pencil } from 'lucide-react';
 import {
-    SectionHeader, DataCard, ModalShell, ModalActions, Field, formatAmount,
+    SectionHeader, DataCard, ModalShell, ModalActions, Field,
 } from './ui';
+import { formatAmount } from './format';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

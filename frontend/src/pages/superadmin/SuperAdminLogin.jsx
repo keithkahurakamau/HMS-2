@@ -6,30 +6,9 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Logo from '../../components/Logo';
-
-// The JWT itself now lives in an HttpOnly cookie ('superadmin_token') and is
-// not readable from JS — these two markers exist only to drive the UI:
-//  - NAME_KEY: display name in the sidebar.
-//  - EXPIRES_KEY: TTL hint so the route guard can bounce expired sessions
-//    without a round-trip; the server still has the final say (a stale
-//    marker beats only the first navigation, then /superadmin/me 401s and
-//    the interceptor clears everything).
-const NAME_KEY = 'hms_superadmin_name';
-const EXPIRES_KEY = 'hms_superadmin_expires_at';
-
-export const isSuperAdminAuthenticated = () => {
-    const expiresAt = parseInt(localStorage.getItem(EXPIRES_KEY) || '0', 10);
-    if (!expiresAt || Date.now() >= expiresAt) {
-        clearSuperAdminSession();
-        return false;
-    }
-    return true;
-};
-
-export const clearSuperAdminSession = () => {
-    localStorage.removeItem(NAME_KEY);
-    localStorage.removeItem(EXPIRES_KEY);
-};
+// Session markers + guards live in a non-component sibling so this file
+// exports only the page component (keeps Fast Refresh working).
+import { NAME_KEY, EXPIRES_KEY, isSuperAdminAuthenticated } from './superAdminAuth';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Superadmin login — dramatic dark hero surface.                            */

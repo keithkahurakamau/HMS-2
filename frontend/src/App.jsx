@@ -16,7 +16,8 @@ import Seo from './components/Seo';
 // helper, which is read synchronously by SuperAdminProtectedRoute.
 import Landing from './pages/Landing';
 import Login from './pages/Login';
-import SuperAdminLogin, { isSuperAdminAuthenticated } from './pages/superadmin/SuperAdminLogin';
+import SuperAdminLogin from './pages/superadmin/SuperAdminLogin';
+import { isSuperAdminAuthenticated } from './pages/superadmin/superAdminAuth';
 
 // Lazy page imports — each becomes its own chunk, fetched on first visit.
 // Keeps the initial bundle small; authenticated modules load on demand.

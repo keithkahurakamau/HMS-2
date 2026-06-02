@@ -3,13 +3,8 @@
  * notes, and bulk-allocation views render with identical styling. */
 import React from 'react';
 import { X, Plus } from 'lucide-react';
-
-export const formatAmount = (v) => {
-    const n = Number(v ?? 0);
-    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
-export const todayISO = () => new Date().toISOString().slice(0, 10);
+// formatAmount / todayISO moved to ./format (non-component file) so this file
+// exports only components — keeps Fast Refresh working.
 
 export function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg, newLabel = 'New' }) {
     return (

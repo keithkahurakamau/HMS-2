@@ -5,7 +5,7 @@ import {
     ShieldAlert, LogOut, Search, Activity, Users, LifeBuoy,
     Menu, X, Smartphone, Wallet, KeyRound,
 } from 'lucide-react';
-import { clearSuperAdminSession } from '../../pages/superadmin/SuperAdminLogin';
+import { clearSuperAdminSession } from '../../pages/superadmin/superAdminAuth';
 import { apiClient } from '../../api/client';
 import { useJourney } from '../../context/JourneyContext';
 import Logo from '../Logo';

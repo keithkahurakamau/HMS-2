@@ -4,7 +4,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
-import { ModalShell, ModalActions, Field, formatAmount } from './ui';
+import { ModalShell, ModalActions, Field } from './ui';
+import { formatAmount } from './format';
 
 export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
     const available = Number(deposit.amount) - Number(deposit.amount_applied || 0);
