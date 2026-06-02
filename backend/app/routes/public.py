@@ -751,12 +751,20 @@ def superadmin_me(admin: dict = Depends(require_superadmin)):
 # =====================================================================
 # Public contact form — landing-page lead capture
 # =====================================================================
+# Contact-form department → ticket category (→ superadmin desk tab).
+#   general → Onboarding (Support desk) · billing → Billing (Finance desk)
+#   technical → Bug (Technical desk)
+_DEPARTMENT_CATEGORY = {"general": "Onboarding", "billing": "Billing", "technical": "Bug"}
+
+
 class ContactRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
     message: str = Field(min_length=1, max_length=5000)
     subject: Optional[str] = Field(default=None, max_length=160)
     company: Optional[str] = Field(default=None, max_length=160)
+    # Which team the enquiry is for. Unknown values fall back to 'general'.
+    department: Optional[str] = Field(default="general", max_length=20)
     # Honeypot: a hidden field real users never see. Bots fill it; we drop
     # those silently. Kept loose (no length cap) so a filled value validates
     # and we can detect-and-discard rather than 422.
@@ -784,8 +792,10 @@ async def submit_contact(
         logger.info("[contact] honeypot tripped from %s — dropped", payload.email)
         return {"message": "Thanks — we'll be in touch shortly."}
 
-    # 1) Durable record: an Unassigned ticket in the superadmin inbox.
-    #    Best-effort — a DB hiccup must not fail the public form.
+    # 1) Durable record: an Unassigned ticket in the superadmin inbox, routed to
+    #    the chosen department's desk. Best-effort — a DB hiccup must not fail
+    #    the public form.
+    category = _DEPARTMENT_CATEGORY.get((payload.department or "general").lower(), "Onboarding")
     body = payload.message.strip()
     if payload.company:
         body = f"Company: {payload.company}\n\n{body}"
@@ -796,7 +806,7 @@ async def submit_contact(
             submitter_name=payload.name,
             origin="web",
             subject=(payload.subject or "Website enquiry")[:200],
-            category="Onboarding",                      # prospects → onboarding queue
+            category=category,                          # routes to the desk tab
             priority="Normal",
             status="Open",
         )

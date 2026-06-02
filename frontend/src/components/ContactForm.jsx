@@ -12,7 +12,7 @@ import { apiClient } from '../api/client';
  * offers phone / WhatsApp / mailto for people who prefer those).
  */
 export default function ContactForm() {
-    const [form, setForm] = useState({ name: '', email: '', company: '', message: '', website: '' });
+    const [form, setForm] = useState({ name: '', email: '', company: '', message: '', department: 'general', website: '' });
     const [submitting, setSubmitting] = useState(false);
     const [sent, setSent] = useState(false);
 
@@ -78,12 +78,22 @@ export default function ContactForm() {
                 </div>
             </div>
 
-            <div>
-                <label htmlFor="cf-company" className="label">Hospital / organization <span className="text-ink-400 font-normal">(optional)</span></label>
-                <div className="relative">
-                    <Building2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-                    <input id="cf-company" type="text" value={form.company} onChange={set('company')}
-                        className="input pl-9" placeholder="Nairobi Community Hospital" maxLength={160} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label htmlFor="cf-company" className="label">Hospital / organization <span className="text-ink-400 font-normal">(optional)</span></label>
+                    <div className="relative">
+                        <Building2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+                        <input id="cf-company" type="text" value={form.company} onChange={set('company')}
+                            className="input pl-9" placeholder="Nairobi Community Hospital" maxLength={160} />
+                    </div>
+                </div>
+                <div>
+                    <label htmlFor="cf-department" className="label">What's this about?</label>
+                    <select id="cf-department" value={form.department} onChange={set('department')} className="input">
+                        <option value="general">General enquiry / Sales</option>
+                        <option value="billing">Billing &amp; payments</option>
+                        <option value="technical">Technical support</option>
+                    </select>
                 </div>
             </div>
 

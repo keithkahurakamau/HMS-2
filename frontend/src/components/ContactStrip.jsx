@@ -60,6 +60,30 @@ export default function ContactStrip({ heading = "Need a hand?" }) {
                         hint="Replies within one business day"
                     />
                 </div>
+
+                {/* Email a specific team — routes to the matching desk */}
+                <div className="mt-8">
+                    <p className="text-center text-2xs font-semibold uppercase tracking-[0.16em] text-ink-500 mb-3">Email a specific team</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {[
+                            { label: 'Support', email: 'support@medifleet.app', hint: 'Accounts & general help' },
+                            { label: 'Billing', email: 'finance@medifleet.app', hint: 'Invoices & payments' },
+                            { label: 'Technical', email: 'technical@medifleet.app', hint: 'Bugs & integrations' },
+                        ].map((t) => (
+                            <a
+                                key={t.email}
+                                href={`mailto:${t.email}`}
+                                className="group flex items-center gap-3 rounded-xl bg-white ring-1 ring-ink-200 hover:ring-brand-300 px-4 py-3 transition-all"
+                            >
+                                <Mail size={16} className="text-brand-600 shrink-0" />
+                                <span className="min-w-0">
+                                    <span className="block text-sm font-semibold text-ink-900 group-hover:text-brand-700 transition-colors">{t.label}</span>
+                                    <span className="block text-2xs text-ink-500 truncate">{t.email}</span>
+                                </span>
+                            </a>
+                        ))}
+                    </div>
+                </div>
             </div>
         </section>
     );
