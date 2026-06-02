@@ -431,15 +431,15 @@ describe('<Patients /> — view history', () => {
         const view = await screen.findByRole('menuitem', { name: /view history/i });
         await user.click(view);
 
-        // The page navigates via react-router. With MemoryRouter we can verify
-        // the active patient was promoted into the cross-module context by
-        // checking sessionStorage — PatientContext persists every set.
+        // The page navigates via react-router. With MemoryRouter we verify the
+        // active patient was promoted into the cross-module context by checking
+        // sessionStorage. For privacy, PatientContext persists ONLY an opaque
+        // record ref (no PHI) under `hms_active_patient_ref` — `{ ref, at }`.
         await waitFor(() => {
-            const raw = sessionStorage.getItem('hms_active_patient');
+            const raw = sessionStorage.getItem('hms_active_patient_ref');
             expect(raw).toBeTruthy();
             expect(JSON.parse(raw)).toEqual(expect.objectContaining({
-                patient_id: 42,
-                surname:    'Wairimu',
+                ref: 42,
             }));
         });
     });
