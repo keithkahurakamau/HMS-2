@@ -6,6 +6,7 @@ import {
     Send, CheckCircle2, AlertCircle, Phone, Building2, Activity, ShieldCheck,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
+import PasswordInput from '../../components/PasswordInput';
 import usePlatformPaymentSocket from '../../hooks/usePlatformPaymentSocket';
 
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -182,18 +183,18 @@ export default function PlatformSubscriptions() {
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="API username">
-                            <input className="input" type="password" autoComplete="new-password" value={form.payhero_username}
+                            <PasswordInput autoComplete="new-password" value={form.payhero_username}
                                    onChange={set('payhero_username')}
                                    placeholder={health?.config?.uses_credentials ? '•••••• (leave blank to keep)' : 'API username'} />
                         </Field>
                         <Field label="API password">
-                            <input className="input" type="password" autoComplete="new-password" value={form.payhero_password}
+                            <PasswordInput autoComplete="new-password" value={form.payhero_password}
                                    onChange={set('payhero_password')}
                                    placeholder={health?.config?.uses_credentials ? '•••••• (leave blank to keep)' : 'API password'} />
                         </Field>
                     </div>
                     <Field label="Webhook signing secret">
-                        <input className="input" type="password" autoComplete="new-password" value={form.payhero_webhook_secret}
+                        <PasswordInput autoComplete="new-password" value={form.payhero_webhook_secret}
                                onChange={set('payhero_webhook_secret')}
                                placeholder={health?.config?.uses_webhook_secret ? '•••••• (leave blank to keep)' : 'your account webhook secret'} />
                     </Field>

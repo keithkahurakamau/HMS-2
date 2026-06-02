@@ -6,6 +6,7 @@ import {
     Send, CheckCircle2, AlertCircle, Link2, ShieldCheck, Wallet,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
+import PasswordInput from '../../components/PasswordInput';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Superadmin — M-Pesa / Pay Hero provisioning.                              */
@@ -187,20 +188,20 @@ export default function PaymentsManager() {
                         </p>
                         <div className="grid grid-cols-2 gap-3 mt-3">
                             <Field label="Pay Hero username">
-                                <input className="input" type="password" autoComplete="new-password"
+                                <PasswordInput autoComplete="new-password"
                                        value={form.payhero_username}
                                        onChange={e => setForm({ ...form, payhero_username: e.target.value })}
                                        placeholder={config?.uses_per_tenant_creds ? '•••••• (leave blank to keep)' : 'platform default if blank'} />
                             </Field>
                             <Field label="Pay Hero password">
-                                <input className="input" type="password" autoComplete="new-password"
+                                <PasswordInput autoComplete="new-password"
                                        value={form.payhero_password}
                                        onChange={e => setForm({ ...form, payhero_password: e.target.value })}
                                        placeholder={config?.uses_per_tenant_creds ? '•••••• (leave blank to keep)' : 'platform default if blank'} />
                             </Field>
                         </div>
                         <Field label="Webhook signing secret">
-                            <input className="input" type="password" autoComplete="new-password"
+                            <PasswordInput autoComplete="new-password"
                                    value={form.payhero_webhook_secret}
                                    onChange={e => setForm({ ...form, payhero_webhook_secret: e.target.value })}
                                    placeholder={config?.uses_per_tenant_webhook_secret ? '•••••• (leave blank to keep)' : "this hospital's own webhook secret"} />

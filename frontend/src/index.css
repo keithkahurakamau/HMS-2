@@ -196,6 +196,26 @@
       linear-gradient(180deg, rgb(239, 68, 68) 0%, rgb(220, 38, 38) 100%);
   }
 
+  /* Low-emphasis destructive action — text/border only until hover. Used for
+     inline row actions (e.g. disable account) where a full red fill would be
+     too loud in a dense table. */
+  .btn-danger-ghost {
+    @apply btn text-rose-600;
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: inset 0 0 0 1px rgba(225, 29, 72, 0.25);
+  }
+  .btn-danger-ghost:hover:not(:disabled) {
+    @apply text-rose-700;
+    background: rgba(244, 63, 94, 0.08);
+  }
+
+  /* Compact button — for inline/table row actions. Pairs with any btn-* skin. */
+  .btn-xs {
+    @apply gap-1.5 px-2.5 py-1.5 text-xs rounded-lg;
+  }
+
   .btn-success {
     @apply btn text-white;
     background:

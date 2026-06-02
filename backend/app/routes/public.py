@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 import json
 import logging
+import secrets
+import string
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session, sessionmaker
@@ -14,12 +16,64 @@ from app.config.settings import settings
 from app.core.dependencies import require_superadmin
 from app.models.master import Tenant, SuperAdmin
 from app.models.patient import Patient
+from app.models.user import User, Role
 from app.core.security import get_password_hash, verify_password, create_tokens
 from app.services.tenant_provisioning import provision_tenant
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/public", tags=["Public Portal"])
+
+
+def _generate_temp_password(length: int = 14) -> str:
+    """Cryptographically-strong temporary password that satisfies the app's
+    password policy (>=8 chars, upper, lower, digit, special). Used only as a
+    one-time credential the superadmin relays to a locked-out user — it is
+    hashed (Argon2id) before storage and the user is forced to change it on
+    next login. The plaintext is returned to the caller exactly once and is
+    never persisted in clear.
+    """
+    rng = secrets.SystemRandom()
+    specials = "!@#$%^&*"
+    pool = string.ascii_letters + string.digits + specials
+    required = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice(specials),
+    ]
+    rest = [secrets.choice(pool) for _ in range(max(length, 8) - len(required))]
+    chars = required + rest
+    rng.shuffle(chars)
+    return "".join(chars)
+
+
+def _is_locked(user: User) -> bool:
+    return bool(user.locked_until and user.locked_until > datetime.now(timezone.utc))
+
+
+def _serialize_user(t: Tenant, u: User, role_name: Optional[str]) -> Dict[str, Any]:
+    """Safe, plaintext-free projection of a tenant user for the superadmin
+    console. Deliberately omits ``hashed_password`` — passwords are one-way
+    hashed and must never be exposed through the API surface.
+    """
+    return {
+        "tenant_id": t.tenant_id,
+        "tenant_name": t.name,
+        "tenant_db": t.db_name,
+        "user_id": u.user_id,
+        "email": u.email,
+        "full_name": u.full_name,
+        "role": role_name,
+        "specialization": u.specialization,
+        "is_active": bool(u.is_active),
+        "must_change_password": bool(u.must_change_password),
+        "is_locked": _is_locked(u),
+        "locked_until": u.locked_until.isoformat() if u.locked_until else None,
+        "failed_login_attempts": u.failed_login_attempts or 0,
+        "created_at": u.created_at.isoformat() if u.created_at else None,
+        "updated_at": u.updated_at.isoformat() if u.updated_at else None,
+    }
 
 
 def _decode_json(value: Optional[str], default):
@@ -407,6 +461,217 @@ def get_patient_detail(
                 val = val.isoformat()
             out[col] = val
         return out
+    finally:
+        session.close()
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Superadmin cross-tenant User Management.
+#
+#  SECURE BY DESIGN: there is NO endpoint that returns a user's password.
+#  Passwords are Argon2id-hashed (one-way) — they cannot be read back. The
+#  superadmin recovery model is *reset, not reveal*: issue a one-time temp
+#  password (forced change on next login), or lock/unlock/disable an account.
+#  Every mutating action is logged with the acting superadmin's identity.
+# ────────────────────────────────────────────────────────────────────────────
+
+@router.get("/superadmin/users", dependencies=[Depends(require_superadmin)])
+def list_users_across_tenants(
+    tenant_id: Optional[int] = Query(default=None, description="Restrict to one tenant"),
+    search: Optional[str] = Query(default=None, description="Substring filter on name / email / role"),
+    limit_per_tenant: int = Query(default=100, ge=1, le=500),
+    master_db: Session = Depends(get_master_db),
+):
+    """Aggregates staff users across every active tenant database.
+
+    Read-only listing. Passwords are NEVER included — only safe metadata
+    (status, lockout, must-change flag, timestamps). One session per tenant DB
+    so a single bad tenant can't poison the whole response; per-tenant failures
+    are surfaced under ``errors``.
+    """
+    query = master_db.query(Tenant).filter(Tenant.is_active == True)  # noqa: E712
+    if tenant_id:
+        query = query.filter(Tenant.tenant_id == tenant_id)
+    tenants = query.all()
+
+    aggregated: List[Dict[str, Any]] = []
+    errors: List[Dict[str, str]] = []
+    needle = (search or "").strip().lower()
+
+    for t in tenants:
+        try:
+            engine = get_tenant_engine(t.db_name)
+            TenantSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+            session = TenantSession()
+            try:
+                q = session.query(User, Role.name).outerjoin(Role, User.role_id == Role.role_id)
+                if needle:
+                    q = q.filter(
+                        (User.full_name.ilike(f"%{needle}%"))
+                        | (User.email.ilike(f"%{needle}%"))
+                        | (Role.name.ilike(f"%{needle}%"))
+                    )
+                rows = q.order_by(User.full_name.asc()).limit(limit_per_tenant).all()
+                for u, role_name in rows:
+                    aggregated.append(_serialize_user(t, u, role_name))
+            finally:
+                session.close()
+        except Exception as exc:  # noqa: BLE001 — surface, don't crash
+            logger.warning("Failed to read users from tenant %s: %s", t.db_name, exc, exc_info=True)
+            errors.append({"tenant_id": str(t.tenant_id), "tenant_db": t.db_name, "error": "fetch_failed"})
+
+    return {
+        "users": aggregated,
+        "count": len(aggregated),
+        "tenants_scanned": len(tenants),
+        "errors": errors,
+    }
+
+
+def _resolve_active_tenant(master_db: Session, tenant_id: int) -> Tenant:
+    t = master_db.query(Tenant).filter(Tenant.tenant_id == tenant_id, Tenant.is_active == True).first()  # noqa: E712
+    if not t:
+        raise HTTPException(status_code=404, detail="Tenant not found or inactive.")
+    return t
+
+
+class SuperadminPasswordReset(BaseModel):
+    # Optional admin-chosen password. If omitted, a strong temp password is
+    # generated and returned once. Either way the user must change it at login.
+    new_password: Optional[str] = None
+
+    @field_validator("new_password")
+    @classmethod
+    def _min_length(cls, v: Optional[str]):
+        if v is not None and len(v) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        return v
+
+
+@router.post("/superadmin/users/{tenant_id}/{user_id}/reset-password", dependencies=[Depends(require_superadmin)])
+def superadmin_reset_user_password(
+    tenant_id: int,
+    user_id: int,
+    payload: SuperadminPasswordReset,
+    master_db: Session = Depends(get_master_db),
+    admin: dict = Depends(require_superadmin),
+):
+    """Issues a one-time temporary password for a tenant user (RESET, not reveal).
+
+    Sets ``must_change_password`` so the user is forced to choose a new password
+    on next login, clears any lockout, and revokes existing refresh sessions
+    (the old credential is considered compromised). Returns the temporary
+    password exactly once — it is never stored in clear.
+    """
+    from app.models.auth_tokens import RefreshToken
+
+    t = _resolve_active_tenant(master_db, tenant_id)
+    engine = get_tenant_engine(t.db_name)
+    TenantSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = TenantSession()
+    try:
+        u = session.query(User).filter(User.user_id == user_id).first()
+        if not u:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        temp_password = payload.new_password or _generate_temp_password()
+        generated = payload.new_password is None
+
+        u.hashed_password = get_password_hash(temp_password)
+        u.must_change_password = True
+        u.failed_login_attempts = 0
+        u.locked_until = None
+
+        # Revoke live refresh sessions — the prior password is now invalid.
+        try:
+            session.query(RefreshToken).filter(
+                RefreshToken.user_id == u.user_id,
+                RefreshToken.revoked == False,  # noqa: E712
+            ).update({"revoked": True})
+        except Exception as exc:  # noqa: BLE001 — token table is best-effort here
+            logger.warning("reset-password: refresh revoke skipped for tenant %s: %s", t.db_name, exc)
+
+        session.commit()
+
+        # Security audit trail — actor + target, never the password.
+        logger.info(
+            "SUPERADMIN password reset: admin=%s (%s) -> tenant=%s user_id=%s email=%s generated=%s",
+            admin.get("email"), admin.get("admin_id"), t.db_name, u.user_id, u.email, generated,
+        )
+
+        return {
+            "message": "Temporary password issued. The user must change it at next login.",
+            "tenant_id": t.tenant_id,
+            "user_id": u.user_id,
+            "email": u.email,
+            "temporary_password": temp_password,
+            "generated": generated,
+            "must_change_password": True,
+        }
+    finally:
+        session.close()
+
+
+class SuperadminAccountAction(BaseModel):
+    # At least one of these should be set. is_active toggles enable/disable;
+    # unlock clears a lockout (failed attempts + locked_until).
+    is_active: Optional[bool] = None
+    unlock: Optional[bool] = None
+
+
+@router.post("/superadmin/users/{tenant_id}/{user_id}/account", dependencies=[Depends(require_superadmin)])
+def superadmin_update_user_account(
+    tenant_id: int,
+    user_id: int,
+    payload: SuperadminAccountAction,
+    master_db: Session = Depends(get_master_db),
+    admin: dict = Depends(require_superadmin),
+):
+    """Enable/disable a user account and/or clear a lockout. No password access."""
+    if payload.is_active is None and not payload.unlock:
+        raise HTTPException(status_code=400, detail="Nothing to update.")
+
+    from app.models.auth_tokens import RefreshToken
+
+    t = _resolve_active_tenant(master_db, tenant_id)
+    engine = get_tenant_engine(t.db_name)
+    TenantSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = TenantSession()
+    try:
+        u = session.query(User).filter(User.user_id == user_id).first()
+        if not u:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        actions = []
+        if payload.is_active is not None:
+            u.is_active = payload.is_active
+            actions.append("enabled" if payload.is_active else "disabled")
+            # Disabling an account should also kill its live sessions.
+            if payload.is_active is False:
+                try:
+                    session.query(RefreshToken).filter(
+                        RefreshToken.user_id == u.user_id,
+                        RefreshToken.revoked == False,  # noqa: E712
+                    ).update({"revoked": True})
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("account: refresh revoke skipped for tenant %s: %s", t.db_name, exc)
+        if payload.unlock:
+            u.failed_login_attempts = 0
+            u.locked_until = None
+            actions.append("unlocked")
+
+        role_name = session.query(Role.name).filter(Role.role_id == u.role_id).scalar()
+        session.commit()
+
+        logger.info(
+            "SUPERADMIN account update: admin=%s (%s) -> tenant=%s user_id=%s email=%s actions=%s",
+            admin.get("email"), admin.get("admin_id"), t.db_name, u.user_id, u.email, ",".join(actions),
+        )
+
+        return {
+            "message": f"Account {', '.join(actions)}.",
+            "user": _serialize_user(t, u, role_name),
+        }
     finally:
         session.close()
 
