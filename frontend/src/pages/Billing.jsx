@@ -427,7 +427,7 @@ export default function Billing() {
                             <button onClick={() => setIsLedgerOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-400 hover:text-white hover:bg-white/10 transition-colors"><X size={20} /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 bg-ink-50/40 custom-scrollbar">
-                            <div className="card overflow-hidden">
+                            <div className="card overflow-hidden overflow-x-auto">
                                 <table className="table-clean min-w-[800px]">
                                     <thead className="sticky top-0">
                                         <tr>

@@ -18,6 +18,7 @@ export default function ResetPassword() {
     const [newPassword, setNewPassword] = useState('');
     const [confirm, setConfirm] = useState('');
     const [showNew, setShowNew] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
 
@@ -100,21 +101,32 @@ export default function ResetPassword() {
 
                         <div>
                             <label htmlFor="confirm-pw" className="label">Confirm Password</label>
-                            <input
-                                id="confirm-pw"
-                                type="password"
-                                value={confirm}
-                                onChange={(e) => setConfirm(e.target.value)}
-                                placeholder="Confirm new password"
-                                required
-                                className={`input ${
-                                    confirm.length > 0
-                                        ? passwordsMatch
-                                            ? 'border-accent-500 focus:border-accent-500 focus:ring-accent-500/20'
-                                            : 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/20'
-                                        : ''
-                                }`}
-                            />
+                            <div className="relative">
+                                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
+                                <input
+                                    id="confirm-pw"
+                                    type={showConfirm ? 'text' : 'password'}
+                                    value={confirm}
+                                    onChange={(e) => setConfirm(e.target.value)}
+                                    placeholder="Confirm new password"
+                                    required
+                                    className={`input pl-10 pr-10 ${
+                                        confirm.length > 0
+                                            ? passwordsMatch
+                                                ? 'border-accent-500 focus:border-accent-500 focus:ring-accent-500/20'
+                                                : 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/20'
+                                            : ''
+                                    }`}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirm(!showConfirm)}
+                                    aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition-colors"
+                                >
+                                    {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
                         </div>
 
                         {newPassword.length > 0 && (

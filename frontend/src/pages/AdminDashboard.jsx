@@ -8,6 +8,7 @@ import {
     X, ShieldCheck, Edit, Save, Tag, PlusCircle, Building2, KeyRound
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import PasswordInput from '../components/PasswordInput';
 import DepartmentsManager from '../components/admin/DepartmentsManager';
 import RolesManager from '../components/admin/RolesManager';
 import UserPermissionsEditor from '../components/admin/UserPermissionsEditor';
@@ -456,7 +457,7 @@ export default function AdminDashboard() {
                             <form id="staffForm" onSubmit={handleRegisterStaff} className="space-y-4">
                                 <div><label className="block text-xs font-bold text-slate-700 mb-1.5">Full Name</label><input required type="text" value={staffForm.full_name} onChange={e => setStaffForm({...staffForm, full_name: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
                                 <div><label className="block text-xs font-bold text-slate-700 mb-1.5">Email Address (Login ID)</label><input required type="email" value={staffForm.email} onChange={e => setStaffForm({...staffForm, email: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
-                                <div><label className="block text-xs font-bold text-slate-700 mb-1.5">Temporary Password</label><input required type="password" value={staffForm.password} onChange={e => setStaffForm({...staffForm, password: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
+                                <div><label className="block text-xs font-bold text-slate-700 mb-1.5">Temporary Password</label><PasswordInput required value={staffForm.password} onChange={e => setStaffForm({...staffForm, password: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
                                 <hr className="my-6 border-slate-200" />
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-1.5">System Role (RBAC)</label>
