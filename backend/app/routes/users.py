@@ -71,10 +71,31 @@ def get_my_modules(request: Request, current_user: dict = Depends(get_current_us
 # ==========================================
 # 2. USER MANAGEMENT (CRUD)
 # ==========================================
+def _serialize_user(db: Session, user: User) -> dict:
+    """Shape a User into the UserResponse contract.
+
+    UserResponse expects ``role`` as the role *name* (string) and
+    ``permissions`` as a flat list of permission strings — neither is a direct
+    column on User (``role`` is a relationship; permissions are derived). The
+    raw ORM object therefore fails response validation, so we build the dict
+    here. Mirrors the /me + /me/permissions endpoints.
+    """
+    return {
+        "user_id": user.user_id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": user.role.name if user.role else "Unassigned",
+        "permissions": resolve_effective_permissions(db, user) if user.role else [],
+        "is_active": user.is_active,
+        "specialization": user.specialization,
+        "license_number": user.license_number,
+    }
+
+
 @router.get("/", response_model=List[UserResponse], dependencies=[Depends(RequirePermission("users:manage"))])
 def list_users(db: Session = Depends(get_db)):
     """Lists all system users."""
-    return db.query(User).all()
+    return [_serialize_user(db, u) for u in db.query(User).all()]
 
 @router.post("/", response_model=UserResponse, dependencies=[Depends(RequirePermission("users:manage"))])
 def create_user(
@@ -129,7 +150,7 @@ def create_user(
             recipient_name=getattr(new_user, "full_name", None),
         )
 
-    return new_user
+    return _serialize_user(db, new_user)
 
 @router.patch("/{user_id}/deactivate", dependencies=[Depends(RequirePermission("users:manage"))])
 def deactivate_user(user_id: int, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
