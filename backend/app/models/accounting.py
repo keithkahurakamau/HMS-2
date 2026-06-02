@@ -431,10 +431,20 @@ class ClaimScheduleItem(Base):
     member_number = Column(String(80), nullable=True)
     amount_claimed = Column(Numeric(14, 2), nullable=False, default=0)
     amount_approved = Column(Numeric(14, 2), nullable=True)
+    # How much of `amount_claimed` has been settled via bulk deposit
+    # allocation. Bounded [0, amount_claimed] by a CHECK constraint.
+    amount_allocated = Column(Numeric(14, 2), nullable=False, default=0)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     schedule = relationship("ClaimSchedule", back_populates="items")
+
+    __table_args__ = (
+        CheckConstraint(
+            "amount_allocated >= 0 AND amount_allocated <= amount_claimed",
+            name="ck_acc_claim_items_alloc_bounds",
+        ),
+    )
 
 
 DEPOSIT_STATUSES = ("available", "partially_applied", "fully_applied", "refunded")
@@ -479,7 +489,12 @@ class DepositApplication(Base):
     application_id = Column(Integer, primary_key=True)
     deposit_id = Column(Integer, ForeignKey("acc_client_deposits.deposit_id", ondelete="CASCADE"),
                         nullable=False, index=True)
-    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=False, index=True)
+    # An application targets EITHER an invoice (single apply) OR a claim
+    # schedule item (bulk allocation). Both are nullable so the row can
+    # carry whichever target applies.
+    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=True, index=True)
+    claim_item_id = Column(Integer, ForeignKey("acc_claim_schedule_items.item_id"),
+                           nullable=True, index=True)
     amount = Column(Numeric(14, 2), nullable=False)
     applied_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     applied_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -557,4 +572,112 @@ class BankTransaction(Base):
             "reconciliation_status IN ('unreconciled','matched','ignored')",
             name="ck_acc_bank_transactions_recon",
         ),
+    )
+
+
+# ─── Budgeting: budget headers + per-account/period lines ─────────────────────
+
+BUDGET_STATUSES = ("draft", "active", "archived")
+
+
+class Budget(Base):
+    """A named budget for a fiscal year.
+
+    Lifecycle: draft (being built) → active (the live budget compared
+    against actuals) → archived (superseded). Lines hang off this header,
+    one per (account, period).
+    """
+    __tablename__ = "acc_budgets"
+
+    budget_id = Column(Integer, primary_key=True)
+    name = Column(String(160), nullable=False, index=True)
+    fiscal_year = Column(Integer, nullable=False, index=True)
+    status = Column(String(12), nullable=False, default="draft", index=True)
+    notes = Column(Text, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    lines = relationship("BudgetLine", back_populates="budget",
+                         cascade="all, delete-orphan",
+                         order_by="BudgetLine.line_id")
+
+    __table_args__ = (
+        UniqueConstraint("name", "fiscal_year", name="uq_acc_budgets_name_year"),
+        CheckConstraint("status IN ('draft','active','archived')",
+                        name="ck_acc_budgets_status"),
+    )
+
+
+class BudgetLine(Base):
+    """A single budgeted amount for one account in one fiscal period."""
+    __tablename__ = "acc_budget_lines"
+
+    line_id = Column(Integer, primary_key=True)
+    budget_id = Column(Integer, ForeignKey("acc_budgets.budget_id", ondelete="CASCADE"),
+                       nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("acc_accounts.account_id"), nullable=False, index=True)
+    period_id = Column(Integer, ForeignKey("acc_fiscal_periods.period_id"), nullable=False, index=True)
+    amount = Column(Numeric(20, 4), nullable=False, default=0)
+
+    budget = relationship("Budget", back_populates="lines")
+    account = relationship("Account")
+
+    __table_args__ = (
+        UniqueConstraint("budget_id", "account_id", "period_id",
+                         name="uq_acc_budget_lines_budget_account_period"),
+        CheckConstraint("amount >= 0", name="ck_acc_budget_lines_amount_nonneg"),
+    )
+
+
+# ─── Debit / Credit notes ─────────────────────────────────────────────────────
+
+NOTE_TYPES = ("debit", "credit")
+NOTE_STATUSES = ("draft", "posted", "void")
+
+
+class AdjustmentNote(Base):
+    """A debit or credit note — a post-invoice adjustment to a receivable.
+
+    A *credit note* reduces what a customer owes (e.g. a refund/discount):
+    Dr Revenue / Cr Accounts Receivable. A *debit note* increases it
+    (e.g. an undercharge correction): Dr Accounts Receivable / Cr Revenue.
+
+    The note itself is just a request until posted. `post_note` builds a
+    balanced journal entry through the normal posting service and stores
+    the resulting `journal_entry_id`; `void_note` reverses that entry.
+    Never set `status='posted'` here — go through the service.
+    """
+    __tablename__ = "acc_adjustment_notes"
+
+    note_id = Column(Integer, primary_key=True)
+    note_number = Column(String(40), unique=True, nullable=False, index=True)  # DN-/CN-YYYYMM-NNNN
+    note_type = Column(String(10), nullable=False, index=True)  # debit | credit
+    note_date = Column(Date, nullable=False, index=True)
+    amount = Column(Numeric(20, 4), nullable=False)
+
+    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=True, index=True)
+    target_entry_id = Column(Integer, ForeignKey("acc_journal_entries.entry_id"), nullable=True)
+
+    debit_account_id = Column(Integer, ForeignKey("acc_accounts.account_id"), nullable=False)
+    credit_account_id = Column(Integer, ForeignKey("acc_accounts.account_id"), nullable=False)
+    currency_code = Column(String(3), nullable=False, default="KES")
+    reason = Column(Text, nullable=True)
+
+    status = Column(String(10), nullable=False, default="draft", index=True)
+    journal_entry_id = Column(Integer, ForeignKey("acc_journal_entries.entry_id"), nullable=True)
+
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    posted_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    posted_at = Column(DateTime(timezone=True), nullable=True)
+    voided_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    voided_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("note_type IN ('debit','credit')", name="ck_acc_adjustment_notes_type"),
+        CheckConstraint("status IN ('draft','posted','void')", name="ck_acc_adjustment_notes_status"),
+        CheckConstraint("amount > 0", name="ck_acc_adjustment_notes_amount_positive"),
+        CheckConstraint("debit_account_id <> credit_account_id",
+                        name="ck_acc_adjustment_notes_distinct_accounts"),
     )
