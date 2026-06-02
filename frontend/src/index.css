@@ -112,11 +112,17 @@
    */
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-semibold
-           transition-all duration-200 select-none cursor-pointer
+           select-none cursor-pointer
            focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500
            disabled:opacity-50 disabled:cursor-not-allowed;
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     backdrop-filter: blur(20px) saturate(180%);
+    /* Scope the transition to cheap properties only. Using `transition-all`
+       here made the browser also animate backdrop-filter/filter on hover,
+       thrashing the compositor layer and causing flicker/stutter app-wide. */
+    transition: transform 200ms ease, box-shadow 200ms ease,
+                background 200ms ease, background-color 200ms ease,
+                color 200ms ease, border-color 200ms ease;
     box-shadow:
       inset 0 0 0 1px rgba(255, 255, 255, 0.35),
       inset 0 1px 0 rgba(255, 255, 255, 0.55),
@@ -258,8 +264,9 @@
 
   /* Stat / metric tile */
   .stat-tile {
-    @apply card p-5 sm:p-6 flex flex-col gap-4 transition-all duration-200
+    @apply card p-5 sm:p-6 flex flex-col gap-4 duration-200
            hover:shadow-elevated hover:-translate-y-0.5;
+    transition-property: transform, box-shadow;
   }
   .stat-icon {
     @apply w-11 h-11 rounded-xl flex items-center justify-center ring-1 ring-inset;
@@ -444,6 +451,62 @@ html.dark body {
   color-scheme: dark;
   background-color: #020617;
   color: #e2e8f0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Dark-mode foundation for the shared design primitives.
+
+   Most modules are built from these classes, so theming them here gives
+   every module dark mode at once (matching the hand-tuned Messages module)
+   without editing each page. Module-specific raw colours (bg-white,
+   text-ink-900 …) still need per-element `dark:` variants — this covers the
+   common chrome: cards, inputs, tables, badges, glass.
+   ink: 900=#0f172a 850=#111827 800=#1e293b 700=#334155 300=#cbd5e1 …
+   --------------------------------------------------------------------- */
+html.dark .card,
+html.dark .card-flush,
+html.dark .card-elevated {
+  background-color: #0f172a;        /* ink-900 */
+  border-color: #1e293b;            /* ink-800 */
+}
+html.dark .card-elevated { box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5); }
+
+/* Inputs — both the .input class and bare form controls in modules. */
+html.dark .input,
+html.dark input[type="text"], html.dark input[type="email"],
+html.dark input[type="password"], html.dark input[type="number"],
+html.dark input[type="tel"], html.dark input[type="search"],
+html.dark input[type="date"], html.dark input[type="time"],
+html.dark input[type="datetime-local"],
+html.dark select, html.dark textarea {
+  background-color: #0f172a;        /* ink-900 */
+  border-color: #334155;            /* ink-700 */
+  color: #e2e8f0;                   /* ink-200 */
+}
+html.dark .input::placeholder,
+html.dark input::placeholder,
+html.dark textarea::placeholder { color: #64748b; }   /* ink-500 */
+
+html.dark .label { color: #cbd5e1; }                  /* ink-300 */
+
+/* Tables — header + row hover. */
+html.dark thead th {
+  background-color: rgba(30, 41, 59, 0.5);            /* ink-800/50 */
+  color: #94a3b8;                                     /* ink-400 */
+}
+html.dark tbody tr:hover { background-color: rgba(30, 41, 59, 0.4); }
+html.dark td, html.dark th { border-color: #1e293b; }
+
+/* Neutral badge (coloured badges already read fine on dark). */
+html.dark .badge-neutral {
+  background-color: #1e293b; color: #cbd5e1;          /* ink-800 / ink-300 */
+  --tw-ring-color: #334155;
+}
+
+/* Frosted glass cards — flip the white substrate to a dark one. */
+html.dark .glass-card {
+  background-color: rgba(15, 23, 42, 0.72);           /* ink-900/72 */
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* ---------------------------------------------------------------------
