@@ -118,11 +118,22 @@ class DepositApplyRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class BulkAllocationItem(BaseModel):
+    item_id: int
+    amount: Decimal = Field(gt=0)
+
+
+class BulkAllocateRequest(BaseModel):
+    allocations: List[BulkAllocationItem] = Field(min_length=1)
+    notes: Optional[str] = None
+
+
 class DepositApplicationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     application_id: int
     deposit_id: int
-    invoice_id: int
+    invoice_id: Optional[int]
+    claim_item_id: Optional[int]
     amount: Decimal
     applied_by: int
     applied_at: datetime
@@ -435,6 +446,106 @@ def apply_deposit(deposit_id: int, payload: DepositApplyRequest, db: Session = D
         reference=f"INV-{invoice.invoice_id}",
         user_id=user_id,
     )
+
+    db.commit()
+    db.refresh(dep)
+    return dep
+
+
+@router.post("/deposits/{deposit_id}/allocate-bulk", response_model=DepositResponse,
+             dependencies=[WRITE])
+def allocate_deposit_bulk(deposit_id: int, payload: BulkAllocateRequest,
+                          db: Session = Depends(get_db),
+                          current_user=Depends(get_current_user)):
+    """Split one deposit across many claim-schedule items in a single
+    all-or-nothing transaction.
+
+    Every line is validated against the deposit's remaining balance AND
+    the targeted item's unallocated remainder *before* anything is
+    mutated, so a single bad line rejects the whole batch.
+    """
+    dep = db.query(ClientDeposit).with_for_update().filter(
+        ClientDeposit.deposit_id == deposit_id).first()
+    if not dep:
+        raise HTTPException(404, detail="Deposit not found.")
+    if dep.status not in ("available", "partially_applied"):
+        raise HTTPException(400, detail=f"Deposit status '{dep.status}' cannot be allocated.")
+
+    # Reject duplicate item ids and pre-sum the request.
+    seen: set[int] = set()
+    requested: dict[int, Decimal] = {}
+    total_requested = Decimal(0)
+    for alloc in payload.allocations:
+        if alloc.item_id in seen:
+            raise HTTPException(400, detail=f"Duplicate item_id {alloc.item_id} in allocation.")
+        seen.add(alloc.item_id)
+        amt = Decimal(alloc.amount)
+        requested[alloc.item_id] = amt
+        total_requested += amt
+
+    available = Decimal(dep.amount) - Decimal(dep.amount_applied)
+    if total_requested > available:
+        raise HTTPException(
+            400,
+            detail=f"Allocation total {total_requested} exceeds deposit balance {available}.",
+        )
+
+    # Lock + validate every targeted item before mutating anything.
+    items = (
+        db.query(ClaimScheduleItem)
+        .with_for_update()
+        .filter(ClaimScheduleItem.item_id.in_(requested.keys()))
+        .all()
+    )
+    items_by_id = {it.item_id: it for it in items}
+    for item_id, amt in requested.items():
+        item = items_by_id.get(item_id)
+        if not item:
+            raise HTTPException(404, detail=f"Claim item {item_id} not found.")
+        item_available = Decimal(item.amount_claimed) - Decimal(item.amount_allocated)
+        if amt > item_available:
+            raise HTTPException(
+                400,
+                detail=(f"Allocation {amt} to item {item_id} exceeds its unallocated "
+                        f"remainder {item_available}."),
+            )
+
+    user_id = _user_id(current_user)
+
+    # Apply — all validated, so this loop cannot partially fail on bounds.
+    for item_id, amt in requested.items():
+        item = items_by_id[item_id]
+        item.amount_allocated = Decimal(item.amount_allocated) + amt
+
+        application = DepositApplication(
+            deposit_id=dep.deposit_id,
+            invoice_id=None,
+            claim_item_id=item.item_id,
+            amount=amt,
+            applied_by=user_id,
+            notes=payload.notes,
+        )
+        db.add(application)
+        db.flush()
+
+        # Ledger: clear the patient deposit liability against the receivable.
+        # Dr Patient Deposits (2170) / Cr Accounts Receivable (1140).
+        post_from_event(
+            db,
+            source_key="billing.deposit.bulk_allocated",
+            source_id=application.application_id,
+            amount=amt,
+            on_date=date.today(),
+            memo=f"Deposit {dep.deposit_number} allocated to claim item #{item.item_id}",
+            reference=dep.deposit_number,
+            user_id=user_id,
+        )
+
+    dep.amount_applied = Decimal(dep.amount_applied) + total_requested
+    if dep.amount_applied >= Decimal(dep.amount):
+        dep.status = "fully_applied"
+    else:
+        dep.status = "partially_applied"
 
     db.commit()
     db.refresh(dep)

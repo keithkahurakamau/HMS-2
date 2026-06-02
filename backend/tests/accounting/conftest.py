@@ -112,6 +112,7 @@ SEED_MAPPINGS = [
     ("billing.payment.mpesa",      "1130", "1140"),
     ("billing.deposit.received",   "1110", "2170"),
     ("billing.deposit.applied",    "2170", "1140"),
+    ("billing.deposit.bulk_allocated", "2170", "1140"),
     ("pharmacy.dispense.revenue",  "1140", "4500"),
     ("pharmacy.dispense.cogs",     "5100", "1160"),
     ("cheques.deposit.cleared",    "1120", "1140"),
@@ -202,6 +203,8 @@ def db(_engine) -> Iterator[Session]:
     # Clean accounting + billing + pharmacy/inventory tables between tests.
     for tbl in [
         "acc_bank_transactions", "acc_bank_accounts",
+        "acc_budget_lines", "acc_budgets",
+        "acc_adjustment_notes",
         "acc_deposit_applications", "acc_client_deposits",
         "acc_claim_schedule_items", "acc_claim_schedules",
         "acc_ledger_mappings", "acc_price_list", "acc_medical_schemes",
