@@ -312,6 +312,22 @@ class TestPatientUpdate:
         finally:
             _cleanup(client, receptionist_cookies, body["patient_id"])
 
+    def test_put_email_null_clears_it(self, client, receptionist_cookies):
+        """The 'No email address' toggle sends email=null to clear a stored
+        address; a blank '' is also accepted (coerced to None) at registration."""
+        body = _register(client, receptionist_cookies, email="patient@example.com")
+        try:
+            assert body.get("email") == "patient@example.com"
+            r = client.put(
+                f"/api/patients/{body['patient_id']}",
+                cookies=receptionist_cookies,
+                json={"email": None},
+            )
+            assert r.status_code == 200, r.text
+            assert r.json()["email"] in (None, ""), r.text
+        finally:
+            _cleanup(client, receptionist_cookies, body["patient_id"])
+
     def test_put_writes_audit_log(self, client, admin_cookies, receptionist_cookies):
         """Admin can query /api/admin/audit-logs — we look for our UPDATE entry."""
         body = _register(client, receptionist_cookies)

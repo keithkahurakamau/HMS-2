@@ -181,6 +181,10 @@ export default function Patients() {
 
     // Form State (defaults at module scope — see DEFAULT_FORM_STATE)
     const [formData, setFormData] = useState(DEFAULT_FORM_STATE);
+    // Many patients (esp. older walk-ins) have no email. Default to "no email"
+    // and only reveal the field when the receptionist marks one as available,
+    // so a blank email is an explicit choice rather than a skipped field.
+    const [regHasEmail, setRegHasEmail] = useState(false);
 
     // KDPA Section 30 — Treatment consent must exist before any clinical
     // write. We capture it inline at registration so the patient is
@@ -313,6 +317,7 @@ export default function Patients() {
 
             setIsModalOpen(false);
             setFormData(DEFAULT_FORM_STATE);
+            setRegHasEmail(false);
             setConsentForm(DEFAULT_CONSENT_STATE);
             fetchPatients();
         } catch (error) {
@@ -888,8 +893,23 @@ export default function Patients() {
                                             <input id="reg-tel-2" type="text" name="telephone_2" value={formData.telephone_2} onChange={handleInputChange} className="input" />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label htmlFor="reg-email" className="label">Email Address</label>
-                                            <input id="reg-email" type="email" name="email" value={formData.email} onChange={handleInputChange} className="input" />
+                                            <label htmlFor="reg-email-avail" className="label">Email Address</label>
+                                            <select
+                                                id="reg-email-avail"
+                                                value={regHasEmail ? 'available' : 'none'}
+                                                onChange={(e) => {
+                                                    const has = e.target.value === 'available';
+                                                    setRegHasEmail(has);
+                                                    if (!has) setFormData(f => ({ ...f, email: '' }));
+                                                }}
+                                                className="input"
+                                            >
+                                                <option value="none">No email address</option>
+                                                <option value="available">Has an email address</option>
+                                            </select>
+                                            {regHasEmail && (
+                                                <input id="reg-email" type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="patient@example.com" className="input mt-2" />
+                                            )}
                                         </div>
                                         <div className="md:col-span-2">
                                             <label htmlFor="reg-residence" className="label">Residence (Estate/Area)</label>
@@ -1479,6 +1499,10 @@ function EditPatientModal({ patient, onClose, onSaved }) {
         notes:             patient.notes             ?? '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // Mirror the registration UX: a patient may simply have no email. Seed the
+    // toggle from the existing record so editing a patient who has one keeps it
+    // visible, while a patient without one starts collapsed.
+    const [editHasEmail, setEditHasEmail] = useState(Boolean(patient.email));
     const handle = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
     const submit = async (e) => {
@@ -1497,6 +1521,10 @@ function EditPatientModal({ patient, onClose, onSaved }) {
                     KEEP_EMPTY.has(k) || (v !== '' && v !== null && v !== undefined)
                 )
             );
+            // If the user marked "No email address", send an explicit null so a
+            // previously-stored email is actually cleared (the blank-strip above
+            // would otherwise omit the field and leave the old value in place).
+            if (!editHasEmail) payload.email = null;
             await apiClient.put(`/patients/${patient.patient_id}`, payload);
             toast.success('Patient updated.');
             await onSaved();
@@ -1567,7 +1595,24 @@ function EditPatientModal({ patient, onClose, onSaved }) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div><label className="label">Phone 1</label><input name="telephone_1" value={form.telephone_1} onChange={handle} className="input" /></div>
                         <div><label className="label">Phone 2</label><input name="telephone_2" value={form.telephone_2} onChange={handle} className="input" /></div>
-                        <div className="md:col-span-2"><label className="label">Email</label><input type="email" name="email" value={form.email} onChange={handle} className="input" /></div>
+                        <div className="md:col-span-2">
+                            <label className="label">Email</label>
+                            <select
+                                value={editHasEmail ? 'available' : 'none'}
+                                onChange={(e) => {
+                                    const has = e.target.value === 'available';
+                                    setEditHasEmail(has);
+                                    if (!has) setForm(f => ({ ...f, email: '' }));
+                                }}
+                                className="input"
+                            >
+                                <option value="none">No email address</option>
+                                <option value="available">Has an email address</option>
+                            </select>
+                            {editHasEmail && (
+                                <input type="email" name="email" value={form.email} onChange={handle} placeholder="patient@example.com" className="input mt-2" />
+                            )}
+                        </div>
                         <div><label className="label">Residence</label><input name="residence" value={form.residence} onChange={handle} className="input" /></div>
                         <div><label className="label">Town</label><input name="town" value={form.town} onChange={handle} className="input" /></div>
                     </div>
