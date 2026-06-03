@@ -9,6 +9,7 @@ import { clearSuperAdminSession } from '../../pages/superadmin/superAdminAuth';
 import { apiClient } from '../../api/client';
 import { useJourney } from '../../context/JourneyContext';
 import Logo from '../Logo';
+import ThemeToggle from '../ThemeToggle';
 
 // Route → tour-journey map for the on-first-visit walkthrough, mirroring the
 // tenant MainLayout convention. Prefix match handles any nested paths. Only
@@ -163,13 +164,13 @@ export default function SuperAdminLayout() {
                         >
                             <Menu size={20} aria-hidden="true" />
                         </button>
-                        <div className="hidden sm:flex items-center gap-2 pl-2.5 pr-3 py-1.5 bg-accent-50 ring-1 ring-accent-100 rounded-full">
-                            <Activity size={14} className="text-accent-600" aria-hidden="true" />
-                            <span className="text-2xs font-semibold text-accent-700 uppercase tracking-wider whitespace-nowrap">All systems operational</span>
+                        <div className="hidden sm:flex items-center gap-2 pl-2.5 pr-3 py-1.5 bg-accent-50 dark:bg-accent-500/10 ring-1 ring-accent-100 dark:ring-accent-500/20 rounded-full">
+                            <Activity size={14} className="text-accent-600 dark:text-accent-400" aria-hidden="true" />
+                            <span className="text-2xs font-semibold text-accent-700 dark:text-accent-300 uppercase tracking-wider whitespace-nowrap">All systems operational</span>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         <div className="relative hidden md:block">
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
                             <label htmlFor="console-search" className="sr-only">Quick search tenants</label>
@@ -177,9 +178,12 @@ export default function SuperAdminLayout() {
                                 id="console-search"
                                 type="search"
                                 placeholder="Quick search tenants…"
-                                className="bg-white border border-ink-200 rounded-full pl-9 pr-4 py-1.5 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 w-64 transition-all"
+                                className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-700 rounded-full pl-9 pr-4 py-1.5 text-sm text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 w-64 transition-all"
                             />
                         </div>
+                        {/* Operator-scoped theme switch — independent of any tenant
+                            client's preference (stored under hms_admin_theme). */}
+                        <ThemeToggle scope="admin" compact />
                     </div>
                 </header>
 

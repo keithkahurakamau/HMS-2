@@ -3,13 +3,17 @@ import React from 'react';
 // Static tone lookups — module scope so they're allocated once, not rebuilt
 // every render. On dark surfaces (superadmin console) the chip backgrounds
 // become translucent overlays that read crisply on ink-950.
+// Light tones carry `dark:` companions so a workspace page header (default
+// surface="light") flips cleanly in dark mode. The DARK_TONES map below is for
+// the always-dark superadmin console (surface="dark"), which renders dark
+// regardless of the html.dark class.
 const LIGHT_TONES = {
-    brand:   { chip: 'bg-brand-50 text-brand-700 ring-brand-100',     eyebrow: 'text-brand-700' },
-    teal:    { chip: 'bg-teal-50 text-teal-700 ring-teal-100',        eyebrow: 'text-teal-700' },
-    accent:  { chip: 'bg-accent-50 text-accent-700 ring-accent-100',  eyebrow: 'text-accent-700' },
-    neutral: { chip: 'bg-ink-100 text-ink-700 ring-ink-200',          eyebrow: 'text-ink-500' },
-    warning: { chip: 'bg-amber-50 text-amber-700 ring-amber-100',     eyebrow: 'text-amber-700' },
-    rose:    { chip: 'bg-rose-50 text-rose-700 ring-rose-100',        eyebrow: 'text-rose-700' },
+    brand:   { chip: 'bg-brand-50 text-brand-700 ring-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20',     eyebrow: 'text-brand-700 dark:text-brand-300' },
+    teal:    { chip: 'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/20',           eyebrow: 'text-teal-700 dark:text-teal-300' },
+    accent:  { chip: 'bg-accent-50 text-accent-700 ring-accent-100 dark:bg-accent-500/10 dark:text-accent-300 dark:ring-accent-500/20', eyebrow: 'text-accent-700 dark:text-accent-300' },
+    neutral: { chip: 'bg-ink-100 text-ink-700 ring-ink-200 dark:bg-white/[0.06] dark:text-ink-200 dark:ring-white/10',                eyebrow: 'text-ink-500 dark:text-ink-400' },
+    warning: { chip: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20',     eyebrow: 'text-amber-700 dark:text-amber-300' },
+    rose:    { chip: 'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20',           eyebrow: 'text-rose-700 dark:text-rose-300' },
 };
 const DARK_TONES = {
     brand:   { chip: 'bg-brand-500/10 text-brand-300 ring-brand-500/20', eyebrow: 'text-brand-300' },
@@ -82,7 +86,7 @@ export default function PageHeader({
                     </h1>
                     {subtitle && (
                         <p className={`mt-1 text-sm max-w-2xl leading-relaxed ${
-                            isDark ? 'text-ink-400' : 'text-ink-500'
+                            isDark ? 'text-ink-400' : 'text-ink-500 dark:text-ink-400'
                         }`}>
                             {subtitle}
                         </p>

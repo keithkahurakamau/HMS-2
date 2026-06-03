@@ -5,7 +5,7 @@ import {
     Search, User, Activity, FileText, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable,
-    X, Image as ImageIcon, Plus, Minus, ShieldCheck,
+    X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
@@ -22,6 +22,7 @@ export default function ClinicalDesk() {
     const [activePatient, setActivePatient] = useState(null);
     const [isQueueOpen, setIsQueueOpen] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isClosingClinic, setIsClosingClinic] = useState(false);
 
     // --- FORM STATE ---
     const [vitals, setVitals] = useState({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
@@ -73,6 +74,50 @@ export default function ClinicalDesk() {
             toast.error("Failed to load active patient queue.");
         } finally {
             setIsLoadingQueue(false);
+        }
+    };
+
+    // Clears the doctor's workspace back to the empty state. Used when the
+    // patient currently being charted is taken out of the queue.
+    const clearWorkspace = () => {
+        setActivePatient(null);
+        setGlobalActivePatient(null);
+    };
+
+    // Remove a single patient from the queue without charting them — e.g. they
+    // left before being seen. Soft-completes the queue entry server-side so the
+    // visit stays in history but stops showing as "waiting".
+    const handleRemoveFromQueue = async (item) => {
+        if (!window.confirm(`Remove ${item.patient_name} from the queue? They will no longer appear as waiting.`)) return;
+        try {
+            await apiClient.patch(`/queue/${item.queue_id}/checkout`);
+            toast.success(`${item.patient_name} removed from the queue.`);
+            if (activePatient?.queue_id === item.queue_id) clearWorkspace();
+            fetchQueue();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not remove patient from the queue.');
+        }
+    };
+
+    // End-of-clinic-day checkout — clears every patient still waiting in the
+    // Consultation queue so leftover, never-seen patients don't roll into
+    // tomorrow's list.
+    const handleEndClinicDay = async () => {
+        if (!window.confirm(`End the clinic day? This checks out all ${queue.length} patient(s) still waiting in the consultation queue.`)) return;
+        setIsClosingClinic(true);
+        try {
+            const res = await apiClient.post('/queue/end-of-day', { department: 'Consultation' });
+            const n = res.data?.checked_out ?? 0;
+            toast.success(n > 0
+                ? `Clinic closed — ${n} patient(s) checked out of the queue.`
+                : 'Clinic closed — the queue was already empty.');
+            clearWorkspace();
+            setIsQueueOpen(true);
+            fetchQueue();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not close the clinic day.');
+        } finally {
+            setIsClosingClinic(false);
         }
     };
 
@@ -286,17 +331,29 @@ export default function ClinicalDesk() {
 
             {/* TOP PANEL: Collapsible Queue */}
             <div data-tour="clinical-queue" className="card shrink-0 flex flex-col z-20">
-                <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
-                    <div className="flex items-center gap-3">
-                        <Users className="text-brand-600" size={18} />
-                        <h2 className="font-semibold text-ink-900 text-base tracking-tight">Active Queue</h2>
+                <div className="w-full p-4 flex justify-between items-center gap-3 bg-ink-50/60 dark:bg-ink-800/40 rounded-t-2xl">
+                    <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="flex items-center gap-3 min-w-0 hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded-lg">
+                        <Users className="text-brand-600 dark:text-brand-400 shrink-0" size={18} />
+                        <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Active Queue</h2>
                         <span className="badge-brand">{queue.length} Waiting</span>
-                    </div>
-                    <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
-                </button>
+                        <span className="text-ink-500 dark:text-ink-400">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
+                    </button>
+                    {queue.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={handleEndClinicDay}
+                            disabled={isClosingClinic}
+                            title="Check out every patient still waiting in the consultation queue"
+                            className="btn-secondary btn-xs gap-1.5 shrink-0"
+                        >
+                            {isClosingClinic ? <Activity className="animate-spin" size={13} /> : <CalendarX size={13} />}
+                            <span className="hidden sm:inline">End clinic day</span>
+                        </button>
+                    )}
+                </div>
 
                 {isQueueOpen && (
-                    <div className="border-t border-ink-100 p-4 bg-white rounded-b-2xl">
+                    <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
                         {isLoadingQueue ? (
                             <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={22} /> Loading queue&hellip;</div>
                         ) : queue.length === 0 ? (
@@ -304,17 +361,28 @@ export default function ClinicalDesk() {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                 {queue.map((item) => (
-                                    <button key={item.queue_id} type="button" onClick={() => handlePatientSelect(item)}
-                                        className={`text-left p-3 rounded-xl border transition-all duration-150 ${activePatient?.queue_id === item.queue_id ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white border-ink-200 hover:border-brand-300 hover:-translate-y-0.5'}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h3 className="font-semibold text-sm text-ink-900">{item.patient_name}</h3>
-                                            {item.priority === 'High' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft" />}
-                                        </div>
-                                        <div className="flex justify-between items-center text-xs text-ink-500">
-                                            <span className="font-mono">{item.outpatient_no}</span>
-                                            <span className="bg-ink-100 px-2 py-0.5 rounded-full text-ink-600 flex items-center gap-1"><Clock size={10} /> {item.triage_time}</span>
-                                        </div>
-                                    </button>
+                                    <div key={item.queue_id} className="relative group">
+                                        <button type="button" onClick={() => handlePatientSelect(item)}
+                                            className={`w-full text-left p-3 pr-8 rounded-xl border transition-all duration-150 ${activePatient?.queue_id === item.queue_id ? 'bg-brand-50/60 dark:bg-brand-500/15 border-brand-400 dark:border-brand-500/40 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 dark:hover:border-brand-500/40 hover:-translate-y-0.5'}`}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h3 className="font-semibold text-sm text-ink-900 dark:text-white">{item.patient_name}</h3>
+                                                {item.priority === 'High' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft" />}
+                                            </div>
+                                            <div className="flex justify-between items-center text-xs text-ink-500 dark:text-ink-400">
+                                                <span className="font-mono">{item.outpatient_no}</span>
+                                                <span className="bg-ink-100 dark:bg-ink-800 px-2 py-0.5 rounded-full text-ink-600 dark:text-ink-300 flex items-center gap-1"><Clock size={10} /> {item.triage_time}</span>
+                                            </div>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveFromQueue(item)}
+                                            aria-label={`Remove ${item.patient_name} from queue`}
+                                            title="Remove from queue"
+                                            className="absolute top-2 right-2 p-1 rounded-md text-ink-400 hover:text-rose-600 hover:bg-rose-50 dark:text-ink-500 dark:hover:text-rose-400 dark:hover:bg-rose-500/15 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
+                                        >
+                                            <UserMinus size={14} />
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
                         )}
@@ -325,31 +393,31 @@ export default function ClinicalDesk() {
             {/* BOTTOM PANEL: Consultation Workspace */}
             <div className="flex-1 card overflow-hidden flex flex-col z-10 relative">
                 {!activePatient ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40">
-                        <Stethoscope size={56} className="mb-4 text-ink-300" strokeWidth={1.5} />
-                        <h3 className="text-base font-semibold text-ink-600 mb-1">Doctor's workspace</h3>
+                    <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40 dark:bg-ink-800/40">
+                        <Stethoscope size={56} className="mb-4 text-ink-300 dark:text-ink-600" strokeWidth={1.5} />
+                        <h3 className="text-base font-semibold text-ink-600 dark:text-ink-400 mb-1">Doctor's workspace</h3>
                         <p className="text-sm">Select a patient from the queue to begin charting.</p>
                     </div>
                 ) : (
                     <>
                         <div className="shrink-0 flex flex-col">
-                            <div className="p-4 border-b border-ink-100 bg-white flex justify-between items-center z-10">
+                            <div className="p-4 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-between items-center z-10">
                                 <div className="flex items-center gap-3">
                                     <div className="size-11 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 text-white flex items-center justify-center font-semibold text-base shadow-glow">
                                         {activePatient.patient_name?.charAt(0) || 'P'}
                                     </div>
                                     <div>
-                                        <h1 className="text-lg font-semibold text-ink-900 tracking-tight">{activePatient.patient_name}</h1>
-                                        <p className="text-xs font-medium text-ink-500">{activePatient.outpatient_no} &middot; {activePatient.age} yrs &middot; {activePatient.gender}</p>
+                                        <h1 className="text-lg font-semibold text-ink-900 dark:text-white tracking-tight">{activePatient.patient_name}</h1>
+                                        <p className="text-xs font-medium text-ink-500 dark:text-ink-400">{activePatient.outpatient_no} &middot; {activePatient.age} yrs &middot; {activePatient.gender}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {activePatient.allergies && activePatient.allergies.toLowerCase() !== 'none' && (
-                                        <div className="bg-rose-50 ring-1 ring-rose-100 px-3 py-2 rounded-xl flex items-center gap-2">
-                                            <AlertCircle size={16} className="text-rose-600" />
+                                        <div className="bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-100 dark:ring-rose-500/20 px-3 py-2 rounded-xl flex items-center gap-2">
+                                            <AlertCircle size={16} className="text-rose-600 dark:text-rose-400" />
                                             <div>
-                                                <p className="text-2xs font-semibold text-rose-700 uppercase tracking-[0.14em]">Allergies</p>
-                                                <p className="text-xs font-semibold text-rose-700">{activePatient.allergies}</p>
+                                                <p className="text-2xs font-semibold text-rose-700 dark:text-rose-300 uppercase tracking-[0.14em]">Allergies</p>
+                                                <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">{activePatient.allergies}</p>
                                             </div>
                                         </div>
                                     )}
@@ -366,8 +434,8 @@ export default function ClinicalDesk() {
                                             : 'Record KDPA Section 30 treatment consent'}
                                         className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ring-1 ${
                                             hasRecordedConsent
-                                                ? 'bg-emerald-50 ring-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                                                : 'bg-brand-50 ring-brand-200 text-brand-700 hover:bg-brand-100'
+                                                ? 'bg-emerald-50 dark:bg-emerald-500/10 ring-emerald-200 dark:ring-emerald-500/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/15'
+                                                : 'bg-brand-50 dark:bg-brand-500/10 ring-brand-200 dark:ring-brand-500/20 text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-500/15'
                                         }`}
                                     >
                                         <ShieldCheck size={14} />
@@ -381,7 +449,7 @@ export default function ClinicalDesk() {
                                 pre-selected and the relevant section auto-expanded.
                                 The first item lands on the full chart (no entry_type
                                 filter) so the doctor sees everything at a glance. */}
-                            <div className="bg-ink-50/40 border-b border-ink-100 p-2 flex gap-1.5 overflow-x-auto custom-scrollbar">
+                            <div className="bg-ink-50/40 dark:bg-ink-800/40 border-b border-ink-100 dark:border-ink-800 p-2 flex gap-1.5 overflow-x-auto custom-scrollbar">
                                 {[
                                     { icon: History,   label: 'Medical Hx',    entry_type: null },
                                     { icon: Scissors,  label: 'Surgical Hx',   entry_type: 'SURGICAL_HISTORY' },
@@ -396,7 +464,7 @@ export default function ClinicalDesk() {
                                             if (entry_type) params.set('entry_type', entry_type);
                                             navigate(`/app/medical-history?${params.toString()}`);
                                         }}
-                                        className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-white border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:border-brand-300 hover:text-brand-700 transition-colors"
+                                        className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-400 rounded-lg text-xs font-medium hover:border-brand-300 dark:hover:border-brand-500/40 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                     >
                                         <Icon size={13} /> {label}
                                     </button>
@@ -404,13 +472,13 @@ export default function ClinicalDesk() {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
 
                             {/* Vitals Entry */}
                             <div data-tour="clinical-vitals" className="card-flush p-5 border-l-4 border-l-brand-500">
-                                <div className="flex justify-between items-center mb-4 border-b border-ink-100 pb-3">
+                                <div className="flex justify-between items-center mb-4 border-b border-ink-100 dark:border-ink-800 pb-3">
                                     <h3 className="section-eyebrow flex items-center gap-2"><Activity size={16} className="text-brand-500" /> Vital signs</h3>
-                                    <button onClick={() => handleNotImplemented('Vitals Trends')} className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"><Activity size={13} /> View trends</button>
+                                    <button onClick={() => handleNotImplemented('Vitals Trends')} className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1"><Activity size={13} /> View trends</button>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
                                     <div><label className="label">BP (mmHg)</label><input type="text" value={vitals.bp} onChange={(e) => setVitals({...vitals, bp: e.target.value})} placeholder="120/80" className="input" /></div>
@@ -418,15 +486,15 @@ export default function ClinicalDesk() {
                                     <div><label className="label">Resp (bpm)</label><input type="number" value={vitals.rr} onChange={(e) => setVitals({...vitals, rr: e.target.value})} placeholder="16" className="input" /></div>
                                     <div><label className="label">Temp (°C)</label><input type="number" step="0.1" value={vitals.temp} onChange={(e) => setVitals({...vitals, temp: e.target.value})} placeholder="37.2" className="input" /></div>
                                     <div><label className="label">SpO₂ (%)</label><input type="number" value={vitals.spo2} onChange={(e) => setVitals({...vitals, spo2: e.target.value})} placeholder="98" className="input" /></div>
-                                    <div><label className="label">Weight (kg)</label><input type="number" value={vitals.weight} onChange={(e) => setVitals({...vitals, weight: e.target.value})} placeholder="70" className="input bg-brand-50/40" /></div>
-                                    <div><label className="label">Height (cm)</label><input type="number" value={vitals.height} onChange={(e) => setVitals({...vitals, height: e.target.value})} placeholder="175" className="input bg-brand-50/40" /></div>
-                                    <div><label className="label text-brand-700">BMI</label><div className="input bg-brand-50 ring-1 ring-brand-200 text-brand-800 font-semibold text-center">{calculateBMI()}</div></div>
+                                    <div><label className="label">Weight (kg)</label><input type="number" value={vitals.weight} onChange={(e) => setVitals({...vitals, weight: e.target.value})} placeholder="70" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
+                                    <div><label className="label">Height (cm)</label><input type="number" value={vitals.height} onChange={(e) => setVitals({...vitals, height: e.target.value})} placeholder="175" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
+                                    <div><label className="label text-brand-700 dark:text-brand-300">BMI</label><div className="input bg-brand-50 dark:bg-brand-500/10 ring-1 ring-brand-200 dark:ring-brand-500/20 text-brand-800 dark:text-brand-300 font-semibold text-center">{calculateBMI()}</div></div>
                                 </div>
                             </div>
 
                             {/* Clinical Documentation (SOAP) */}
                             <div className="card-flush p-5 border-l-4 border-l-ink-700 space-y-4">
-                                <h3 className="section-eyebrow border-b border-ink-100 pb-3 flex items-center gap-2"><FileText size={16} className="text-ink-600" /> Clinical documentation</h3>
+                                <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><FileText size={16} className="text-ink-600 dark:text-ink-400" /> Clinical documentation</h3>
                                 <div><label className="label">Chief complaint (CC)</label><input type="text" value={clinicalNotes.cc} onChange={(e) => setClinicalNotes({...clinicalNotes, cc: e.target.value})} className="input" placeholder="e.g. Severe headache for 3 days" /></div>
                                 <div><label className="label">History of present illness (HPI)</label><textarea rows="3" value={clinicalNotes.hpi} onChange={(e) => setClinicalNotes({...clinicalNotes, hpi: e.target.value})} className="input resize-none" placeholder="Narrative of the patient's symptoms…"></textarea></div>
                                 <div><label className="label">Physical examination (Objective)</label><textarea rows="3" value={clinicalNotes.objective} onChange={(e) => setClinicalNotes({...clinicalNotes, objective: e.target.value})} className="input resize-none" placeholder="Systematic findings…"></textarea></div>
@@ -434,21 +502,21 @@ export default function ClinicalDesk() {
 
                             {/* Orders & Prescriptions */}
                             <div data-tour="clinical-diagnoses" className="card-flush p-5 border-l-4 border-l-accent-500 space-y-4">
-                                <h3 className="section-eyebrow border-b border-ink-100 pb-3 flex items-center gap-2"><Pill size={16} className="text-accent-600" /> Diagnosis &amp; orders</h3>
+                                <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><Pill size={16} className="text-accent-600 dark:text-accent-400" /> Diagnosis &amp; orders</h3>
 
                                 <div className="relative">
                                     <label className="label">Final diagnosis (ICD-10)</label>
                                     <input type="text" value={icdSearch} onChange={(e) => { setIcdSearch(e.target.value); setShowIcdDropdown(true); }} onFocus={() => setShowIcdDropdown(true)} className="input" placeholder="Type to search ICD-10 codes…" />
                                     {showIcdDropdown && icdSearch.length > 0 && (
-                                        <div className="absolute z-30 w-full mt-1 bg-white border border-ink-200 rounded-xl shadow-elevated max-h-48 overflow-y-auto custom-scrollbar">
-                                            {filteredIcd.length > 0 ? filteredIcd.map((code, idx) => (<button type="button" key={idx} onClick={() => {setIcdSearch(code); setShowIcdDropdown(false);}} className="block w-full text-left px-4 py-2 hover:bg-brand-50 text-sm">{code}</button>)) : <div className="px-4 py-3 text-sm text-ink-500">No codes found.</div>}
+                                        <div className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-elevated max-h-48 overflow-y-auto custom-scrollbar">
+                                            {filteredIcd.length > 0 ? filteredIcd.map((code, idx) => (<button type="button" key={idx} onClick={() => {setIcdSearch(code); setShowIcdDropdown(false);}} className="block w-full text-left px-4 py-2 hover:bg-brand-50 dark:hover:bg-brand-500/15 text-sm dark:text-ink-200">{code}</button>)) : <div className="px-4 py-3 text-sm text-ink-500 dark:text-ink-400">No codes found.</div>}
                                         </div>
                                     )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="rounded-xl border border-ink-200 p-4">
-                                        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 mb-3 flex items-center gap-2"><TestTube size={13} /> Investigations</h4>
+                                    <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
+                                        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><TestTube size={13} /> Investigations</h4>
                                         <div className="flex gap-2">
                                             <button
                                                 type="button"
@@ -466,8 +534,8 @@ export default function ClinicalDesk() {
                                             </button>
                                         </div>
                                     </div>
-                                    <div data-tour="clinical-prescriptions" className="rounded-xl border border-accent-200 bg-accent-50/40 p-4">
-                                        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-700 mb-3 flex items-center gap-2"><Pill size={13} /> Medications (routed to Pharmacy)</h4>
+                                    <div data-tour="clinical-prescriptions" className="rounded-xl border border-accent-200 dark:border-accent-500/20 bg-accent-50/40 dark:bg-accent-500/10 p-4">
+                                        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-700 dark:text-accent-300 mb-3 flex items-center gap-2"><Pill size={13} /> Medications (routed to Pharmacy)</h4>
                                         <textarea rows="2" value={clinicalNotes.plan} onChange={(e) => setClinicalNotes({...clinicalNotes, plan: e.target.value})} className="input resize-none" placeholder="Enter prescription instructions to send to Pharmacy…"></textarea>
                                     </div>
                                 </div>
@@ -482,7 +550,7 @@ export default function ClinicalDesk() {
                                             type="button"
                                             onClick={() => setIsFollowUpOpen(true)}
                                             className={`input text-left flex items-center justify-between gap-2 cursor-pointer ${
-                                                pendingFollowUp ? 'text-ink-900 border-brand-300 bg-brand-50/40' : 'text-ink-400'
+                                                pendingFollowUp ? 'text-ink-900 dark:text-white border-brand-300 dark:border-brand-500/40 bg-brand-50/40 dark:bg-brand-500/10' : 'text-ink-400'
                                             }`}
                                         >
                                             <span className="truncate">
@@ -491,16 +559,16 @@ export default function ClinicalDesk() {
                                                     : 'Select date…'}
                                             </span>
                                             {pendingFollowUp
-                                                ? <CheckCircle2 size={13} className="text-accent-600 shrink-0" aria-hidden="true" />
+                                                ? <CheckCircle2 size={13} className="text-accent-600 dark:text-accent-400 shrink-0" aria-hidden="true" />
                                                 : <CalendarPlus size={13} className="text-ink-400 shrink-0" aria-hidden="true" />}
                                         </button>
                                         {pendingFollowUp && (
-                                            <p className="text-2xs text-ink-500 mt-1">
-                                                With <span className="font-medium text-ink-700">{pendingFollowUp.doctor_name}</span>.{' '}
+                                            <p className="text-2xs text-ink-500 dark:text-ink-400 mt-1">
+                                                With <span className="font-medium text-ink-700 dark:text-ink-200">{pendingFollowUp.doctor_name}</span>.{' '}
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsFollowUpOpen(true)}
-                                                    className="text-brand-700 hover:text-brand-800 cursor-pointer underline"
+                                                    className="text-brand-700 dark:text-brand-300 hover:text-brand-800 dark:hover:text-brand-200 cursor-pointer underline"
                                                 >
                                                     Change
                                                 </button>
@@ -509,34 +577,34 @@ export default function ClinicalDesk() {
                                     </div>
                                 </div>
 
-                                <label htmlFor="chargeFee" className="border border-brand-200 bg-brand-50/50 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-brand-50/80 transition-colors">
+                                <label htmlFor="chargeFee" className="border border-brand-200 dark:border-brand-500/20 bg-brand-50/50 dark:bg-brand-500/10 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-brand-50/80 dark:hover:bg-brand-500/15 transition-colors">
                                     <div className="flex items-center gap-3">
                                         <input type="checkbox" id="chargeFee" checked={chargeConsultation} onChange={(e) => setChargeConsultation(e.target.checked)} className="size-5 text-brand-600 rounded border-brand-300 focus:ring-brand-500" />
                                         <div>
-                                            <span className="text-sm font-semibold text-brand-900 block">Authorize consultation fee</span>
-                                            <span className="text-xs text-brand-700">Automatically generate a consultation invoice at the cashier.</span>
+                                            <span className="text-sm font-semibold text-brand-900 dark:text-brand-200 block">Authorize consultation fee</span>
+                                            <span className="text-xs text-brand-700 dark:text-brand-300">Automatically generate a consultation invoice at the cashier.</span>
                                         </div>
                                     </div>
-                                    <span className="text-base font-semibold text-brand-700">KES 1,000</span>
+                                    <span className="text-base font-semibold text-brand-700 dark:text-brand-300">KES 1,000</span>
                                 </label>
                             </div>
                         </div>
 
                         {/* Footer actions */}
-                        <div data-tour="clinical-submit" className="p-4 border-t border-ink-100 bg-white flex flex-wrap justify-between items-center gap-3 shrink-0 z-10">
+                        <div data-tour="clinical-submit" className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap justify-between items-center gap-3 shrink-0 z-10">
                             <div className="flex gap-2">
                                 <button data-tour="clinical-save-draft" onClick={() => handleClinicalSubmit('Draft')} disabled={isSubmitting} className="btn-secondary"><Save size={15} /> Save draft</button>
                                 <button onClick={() => handleNotImplemented('External Referrals')} className="btn-ghost"><ArrowRightLeft size={15} /> Refer patient</button>
                             </div>
 
                             <div className="flex gap-2">
-                                <button data-tour="clinical-send-billing" onClick={() => handleClinicalSubmit('Billed')} disabled={isSubmitting} className="btn-secondary text-brand-700 border-brand-200 hover:bg-brand-50">
+                                <button data-tour="clinical-send-billing" onClick={() => handleClinicalSubmit('Billed')} disabled={isSubmitting} className="btn-secondary text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-500/30 hover:bg-brand-50 dark:hover:bg-brand-500/15">
                                     <Receipt size={15} /> Send to billing
                                 </button>
                                 <button data-tour="clinical-forward-pharmacy" onClick={() => handleClinicalSubmit('Pharmacy')} disabled={isSubmitting} className="btn-success">
                                     <Pill size={15} /> Forward to pharmacy
                                 </button>
-                                <button data-tour="clinical-finalize" onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 text-white hover:bg-ink-900 shadow-soft">
+                                <button data-tour="clinical-finalize" onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 dark:bg-ink-700 text-white hover:bg-ink-900 dark:hover:bg-ink-600 shadow-soft">
                                     <FileSignature size={15} /> Finalize &amp; sign
                                 </button>
                             </div>
@@ -596,24 +664,24 @@ function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
             <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-2xl shadow-elevated w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
+            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
                             <ShieldCheck size={17} />
                         </div>
                         <div>
-                            <h3 className="text-base font-semibold text-ink-900 tracking-tight">Record treatment consent</h3>
-                            <p className="text-xs text-ink-500">KDPA Section 30 · {patient.patient_name}</p>
+                            <h3 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">Record treatment consent</h3>
+                            <p className="text-xs text-ink-500 dark:text-ink-400">KDPA Section 30 · {patient.patient_name}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
+                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full">
                         <X size={18} />
                     </button>
                 </div>
 
                 <div className="p-5 space-y-4 overflow-y-auto">
-                    <p className="text-sm text-ink-700 leading-relaxed">
+                    <p className="text-sm text-ink-700 dark:text-ink-200 leading-relaxed">
                         The patient agrees to assessment, diagnosis, and treatment for this encounter.
                         Recording consent lets you save SOAP notes and forward to Pharmacy / Billing.
                     </p>
@@ -627,7 +695,7 @@ function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit 
                         >
                             {CONSENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                         </select>
-                        <p className="text-2xs text-ink-500 mt-1">
+                        <p className="text-2xs text-ink-500 dark:text-ink-400 mt-1">
                             Use <strong>Verbal</strong> for in-person consent, <strong>Written</strong> when a signed
                             form is on file, <strong>Implied</strong> only in emergencies where the patient can't
                             communicate.
@@ -646,7 +714,7 @@ function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit 
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-ink-100 flex justify-end gap-2 bg-ink-50/40">
+                <div className="p-4 border-t border-ink-100 dark:border-ink-800 flex justify-end gap-2 bg-ink-50/40 dark:bg-ink-800/40">
                     <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
                     <button
                         type="button"
@@ -756,20 +824,20 @@ function LabOrderModal({ patient, onClose }) {
             aria-modal="true"
             aria-labelledby="lab-order-title"
         >
-            <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-3xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
-                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-start gap-3 shrink-0">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-3xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0">
                         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">New lab order</p>
-                        <h2 id="lab-order-title" className="text-base sm:text-lg font-semibold text-ink-900 tracking-tight truncate">
+                        <h2 id="lab-order-title" className="text-base sm:text-lg font-semibold text-ink-900 dark:text-white tracking-tight truncate">
                             {patient.patient_name}
                         </h2>
-                        <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
+                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 font-mono">{patient.outpatient_no}</p>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer shrink-0"
+                        className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 cursor-pointer shrink-0"
                     >
                         <X size={18} aria-hidden="true" />
                     </button>
@@ -777,7 +845,7 @@ function LabOrderModal({ patient, onClose }) {
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     {/* Search */}
-                    <div className="px-4 sm:px-6 py-3 border-b border-ink-200 bg-white sticky top-0 z-10">
+                    <div className="px-4 sm:px-6 py-3 border-b border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 sticky top-0 z-10">
                         <div className="relative">
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
                             <label htmlFor="lab-search" className="sr-only">Search tests</label>
@@ -787,7 +855,7 @@ function LabOrderModal({ patient, onClose }) {
                                 placeholder="Search lab tests by name or specimen…"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="w-full bg-white border border-ink-200 rounded-lg pl-9 pr-3 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg pl-9 pr-3 py-2 text-sm text-ink-900 dark:text-white placeholder-ink-400 dark:placeholder-ink-500 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                             />
                         </div>
                     </div>
@@ -795,11 +863,11 @@ function LabOrderModal({ patient, onClose }) {
                     {/* Catalog list */}
                     <div className="p-4 sm:p-6 space-y-1.5">
                         {isLoading ? (
-                            <div className="text-center py-8 text-ink-500">
+                            <div className="text-center py-8 text-ink-500 dark:text-ink-400">
                                 <Activity className="animate-spin inline mr-2 text-brand-600" size={18} aria-hidden="true" /> Loading catalog…
                             </div>
                         ) : filtered.length === 0 ? (
-                            <p className="text-center py-8 text-ink-500 text-sm">No tests match your search.</p>
+                            <p className="text-center py-8 text-ink-500 dark:text-ink-400 text-sm">No tests match your search.</p>
                         ) : filtered.map(item => {
                             const state = selection[item.catalog_id];
                             const isSelected = !!state?.selected;
@@ -808,8 +876,8 @@ function LabOrderModal({ patient, onClose }) {
                                     key={item.catalog_id}
                                     className={`rounded-lg border transition-colors ${
                                         isSelected
-                                            ? 'bg-brand-50/60 border-brand-200'
-                                            : 'bg-white border-ink-200 hover:bg-ink-50'
+                                            ? 'bg-brand-50/60 dark:bg-brand-500/10 border-brand-200 dark:border-brand-500/20'
+                                            : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:bg-ink-50 dark:hover:bg-ink-800/50'
                                     }`}
                                 >
                                     <label
@@ -825,8 +893,8 @@ function LabOrderModal({ patient, onClose }) {
                                             className="mt-0.5 size-4 accent-brand-600 cursor-pointer"
                                         />
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-medium text-ink-900 truncate">{item.test_name}</p>
-                                            <p className="text-xs text-ink-500 mt-0.5 truncate">
+                                            <p className="text-sm font-medium text-ink-900 dark:text-white truncate">{item.test_name}</p>
+                                            <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 truncate">
                                                 {item.specimen_type || 'Unknown specimen'}
                                                 {item.base_price !== undefined && item.base_price !== null
                                                     ? ` · KES ${Number(item.base_price).toLocaleString('en-KE')}`
@@ -836,24 +904,24 @@ function LabOrderModal({ patient, onClose }) {
                                     </label>
                                     {isSelected && (
                                         <div className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                            <label className="sm:col-span-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
+                                            <label className="sm:col-span-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400">
                                                 Priority
                                                 <select
                                                     value={state.priority}
                                                     onChange={e => updateField(item.catalog_id, 'priority', e.target.value)}
-                                                    className="mt-1 w-full bg-white border border-ink-200 rounded-md px-2 py-1.5 text-xs text-ink-900 normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                                    className="mt-1 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-md px-2 py-1.5 text-xs text-ink-900 dark:text-white normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                                 >
                                                     {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                                                 </select>
                                             </label>
-                                            <label className="sm:col-span-2 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
+                                            <label className="sm:col-span-2 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400">
                                                 Clinical notes (optional)
                                                 <input
                                                     type="text"
                                                     value={state.clinical_notes}
                                                     onChange={e => updateField(item.catalog_id, 'clinical_notes', e.target.value)}
                                                     placeholder="e.g. fasting since 8pm yesterday"
-                                                    className="mt-1 w-full bg-white border border-ink-200 rounded-md px-2 py-1.5 text-xs text-ink-900 normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                                    className="mt-1 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-md px-2 py-1.5 text-xs text-ink-900 dark:text-white normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                                 />
                                             </label>
                                         </div>
@@ -864,9 +932,9 @@ function LabOrderModal({ patient, onClose }) {
                     </div>
                 </div>
 
-                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-2 shrink-0">
-                    <p className="text-xs text-ink-600">
-                        <span className="font-semibold text-ink-900">{selectedItems.length}</span> test{selectedItems.length === 1 ? '' : 's'} selected
+                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-2 shrink-0">
+                    <p className="text-xs text-ink-600 dark:text-ink-400">
+                        <span className="font-semibold text-ink-900 dark:text-white">{selectedItems.length}</span> test{selectedItems.length === 1 ? '' : 's'} selected
                     </p>
                     <div className="flex gap-2">
                         <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
@@ -957,20 +1025,20 @@ function ImagingOrderModal({ patient, onClose }) {
             aria-modal="true"
             aria-labelledby="imaging-order-title"
         >
-            <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-2xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
-                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-start gap-3 shrink-0">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-2xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0">
                         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">New imaging order</p>
-                        <h2 id="imaging-order-title" className="text-base sm:text-lg font-semibold text-ink-900 tracking-tight truncate">
+                        <h2 id="imaging-order-title" className="text-base sm:text-lg font-semibold text-ink-900 dark:text-white tracking-tight truncate">
                             {patient.patient_name}
                         </h2>
-                        <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
+                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 font-mono">{patient.outpatient_no}</p>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer shrink-0"
+                        className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 cursor-pointer shrink-0"
                     >
                         <X size={18} aria-hidden="true" />
                     </button>
@@ -979,7 +1047,7 @@ function ImagingOrderModal({ patient, onClose }) {
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4">
                     {/* Catalog picker */}
                     <div>
-                        <label htmlFor="img-search" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Catalogue</label>
+                        <label htmlFor="img-search" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200">Catalogue</label>
                         <div className="relative mt-1.5">
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
                             <input
@@ -988,18 +1056,18 @@ function ImagingOrderModal({ patient, onClose }) {
                                 placeholder="Search by exam name or modality…"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="w-full bg-white border border-ink-200 rounded-lg pl-9 pr-3 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg pl-9 pr-3 py-2 text-sm text-ink-900 dark:text-white placeholder-ink-400 dark:placeholder-ink-500 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                             />
                         </div>
-                        <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-ink-200 custom-scrollbar">
+                        <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-ink-200 dark:border-ink-800 custom-scrollbar">
                             {isLoading ? (
-                                <div className="p-4 text-center text-ink-500 text-sm">
+                                <div className="p-4 text-center text-ink-500 dark:text-ink-400 text-sm">
                                     <Activity className="animate-spin inline mr-2 text-brand-600" size={16} aria-hidden="true" /> Loading…
                                 </div>
                             ) : filtered.length === 0 ? (
-                                <p className="p-4 text-center text-ink-500 text-sm">No exams match.</p>
+                                <p className="p-4 text-center text-ink-500 dark:text-ink-400 text-sm">No exams match.</p>
                             ) : (
-                                <ul className="divide-y divide-ink-100">
+                                <ul className="divide-y divide-ink-100 dark:divide-ink-800">
                                     {filtered.map(item => {
                                         const isPicked = pickedId === item.catalog_id;
                                         return (
@@ -1009,14 +1077,14 @@ function ImagingOrderModal({ patient, onClose }) {
                                                     onClick={() => { setPickedId(item.catalog_id); setCustomName(''); }}
                                                     aria-pressed={isPicked}
                                                     className={`w-full text-left px-3 py-2 transition-colors cursor-pointer ${
-                                                        isPicked ? 'bg-brand-50' : 'hover:bg-ink-50'
+                                                        isPicked ? 'bg-brand-50 dark:bg-brand-500/10' : 'hover:bg-ink-50 dark:hover:bg-ink-800/50'
                                                     }`}
                                                 >
                                                     <div className="flex items-center justify-between gap-2">
-                                                        <span className="text-sm font-medium text-ink-900 truncate">{item.exam_name}</span>
+                                                        <span className="text-sm font-medium text-ink-900 dark:text-white truncate">{item.exam_name}</span>
                                                         {isPicked && <CheckCircle2 size={14} className="text-brand-700 shrink-0" aria-hidden="true" />}
                                                     </div>
-                                                    <div className="text-xs text-ink-500 mt-0.5">
+                                                    <div className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
                                                         {item.modality || 'Unknown modality'}
                                                         {item.base_price !== undefined && item.base_price !== null
                                                             ? ` · KES ${Number(item.base_price).toLocaleString('en-KE')}`
@@ -1033,7 +1101,7 @@ function ImagingOrderModal({ patient, onClose }) {
 
                     {/* Custom exam fallback */}
                     <div>
-                        <label htmlFor="img-custom" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+                        <label htmlFor="img-custom" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200">
                             Or custom exam (when not in catalog)
                         </label>
                         <input
@@ -1042,35 +1110,35 @@ function ImagingOrderModal({ patient, onClose }) {
                             value={customName}
                             onChange={e => { setCustomName(e.target.value); if (e.target.value) setPickedId(null); }}
                             placeholder="e.g. X-Ray Right Wrist AP/Lat"
-                            className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                            className="mt-1.5 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white placeholder-ink-400 dark:placeholder-ink-500 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                         />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <label className="sm:col-span-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+                        <label className="sm:col-span-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200">
                             Priority
                             <select
                                 value={priority}
                                 onChange={e => setPriority(e.target.value)}
-                                className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                className="mt-1.5 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                             >
                                 {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                             </select>
                         </label>
-                        <label className="sm:col-span-2 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+                        <label className="sm:col-span-2 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200">
                             Clinical notes
                             <textarea
                                 value={clinicalNotes}
                                 onChange={e => setClinicalNotes(e.target.value)}
                                 rows="2"
                                 placeholder="Clinical question, indication, or area of interest"
-                                className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-none"
+                                className="mt-1.5 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white normal-case tracking-normal focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-none"
                             />
                         </label>
                     </div>
                 </div>
 
-                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
+                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
                     <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
                     <button
                         type="button"
@@ -1209,20 +1277,20 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
             aria-modal="true"
             aria-labelledby="followup-title"
         >
-            <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
-                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-start gap-3 shrink-0">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0">
                         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">Schedule follow-up</p>
-                        <h2 id="followup-title" className="text-base sm:text-lg font-semibold text-ink-900 tracking-tight truncate">
+                        <h2 id="followup-title" className="text-base sm:text-lg font-semibold text-ink-900 dark:text-white tracking-tight truncate">
                             {patient.patient_name}
                         </h2>
-                        <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
+                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 font-mono">{patient.outpatient_no}</p>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 cursor-pointer shrink-0"
+                        className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 cursor-pointer shrink-0"
                     >
                         <X size={18} aria-hidden="true" />
                     </button>
@@ -1230,14 +1298,14 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4">
                     <div>
-                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 mb-1.5">Common cadences</p>
+                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200 mb-1.5">Common cadences</p>
                         <div className="flex flex-wrap gap-1.5">
                             {QUICK_PICKS.map(q => (
                                 <button
                                     key={q.label}
                                     type="button"
                                     onClick={() => applyQuickPick(q.add)}
-                                    className="inline-flex items-center px-2.5 py-1.5 rounded-md text-2xs font-semibold bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 cursor-pointer"
+                                    className="inline-flex items-center px-2.5 py-1.5 rounded-md text-2xs font-semibold bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-500/20 hover:bg-brand-100 dark:hover:bg-brand-500/20 cursor-pointer"
                                 >
                                     {q.label}
                                 </button>
@@ -1246,13 +1314,13 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
                     </div>
 
                     <div>
-                        <label htmlFor="fu-doctor" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Doctor</label>
+                        <label htmlFor="fu-doctor" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200">Doctor</label>
                         <select
                             id="fu-doctor"
                             value={doctorId}
                             onChange={e => setDoctorId(e.target.value)}
                             disabled={isLoadingDoctors}
-                            className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                            className="mt-1.5 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                         >
                             {isLoadingDoctors ? (
                                 <option>Loading doctors…</option>
@@ -1270,38 +1338,38 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label htmlFor="fu-date" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Date</label>
+                            <label htmlFor="fu-date" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200">Date</label>
                             <input
                                 id="fu-date"
                                 type="date"
                                 value={date}
                                 onChange={e => setDate(e.target.value)}
                                 min={toDateInput(new Date())}
-                                className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                className="mt-1.5 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                             />
                         </div>
                         <div>
-                            <label htmlFor="fu-time" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Time</label>
+                            <label htmlFor="fu-time" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200">Time</label>
                             <input
                                 id="fu-time"
                                 type="time"
                                 value={time}
                                 onChange={e => setTime(e.target.value)}
                                 step={60 * 30}
-                                className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                className="mt-1.5 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                             />
                         </div>
                     </div>
 
-                    <div className="rounded-lg border border-ink-200 bg-ink-50/40">
-                        <div className="px-3 py-2 border-b border-ink-200 flex items-center justify-between text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600">
+                    <div className="rounded-lg border border-ink-200 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/40">
+                        <div className="px-3 py-2 border-b border-ink-200 dark:border-ink-800 flex items-center justify-between text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400">
                             <span>Doctor's bookings on {date || '—'}</span>
                             {busy && <Activity size={12} className="animate-spin text-brand-600" aria-hidden="true" />}
                         </div>
                         {bookings.length === 0 ? (
-                            <p className="px-3 py-3 text-xs text-ink-500">No appointments yet for this day.</p>
+                            <p className="px-3 py-3 text-xs text-ink-500 dark:text-ink-400">No appointments yet for this day.</p>
                         ) : (
-                            <ul className="divide-y divide-ink-100 max-h-32 overflow-y-auto">
+                            <ul className="divide-y divide-ink-100 dark:divide-ink-800 max-h-32 overflow-y-auto">
                                 {bookings.map(b => {
                                     const d = b.appointment_date ? new Date(b.appointment_date) : null;
                                     const pad = (n) => String(n).padStart(2, '0');
@@ -1309,8 +1377,8 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
                                     const isYou = b.patient_id === patient.patient_id;
                                     return (
                                         <li key={b.appointment_id} className="px-3 py-1.5 flex items-center justify-between gap-2 text-xs">
-                                            <span className={`font-mono ${time === slot ? 'text-rose-700 font-semibold' : 'text-ink-700'}`}>{slot}</span>
-                                            <span className={isYou ? 'text-brand-700 italic' : 'text-ink-500'}>
+                                            <span className={`font-mono ${time === slot ? 'text-rose-700 dark:text-rose-300 font-semibold' : 'text-ink-700 dark:text-ink-200'}`}>{slot}</span>
+                                            <span className={isYou ? 'text-brand-700 dark:text-brand-300 italic' : 'text-ink-500 dark:text-ink-400'}>
                                                 {isYou ? 'this patient' : `patient #${b.patient_id}`} · {b.status}
                                             </span>
                                         </li>
@@ -1321,19 +1389,19 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
                     </div>
 
                     <div>
-                        <label htmlFor="fu-notes" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700">Notes</label>
+                        <label htmlFor="fu-notes" className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200">Notes</label>
                         <textarea
                             id="fu-notes"
                             value={notes}
                             onChange={e => setNotes(e.target.value)}
                             rows="2"
                             placeholder="What should this follow-up review?"
-                            className="mt-1.5 w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-none"
+                            className="mt-1.5 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white placeholder-ink-400 dark:placeholder-ink-500 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-none"
                         />
                     </div>
                 </div>
 
-                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
+                <div className="px-4 sm:px-6 py-3 border-t border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
                     <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
                     <button
                         type="button"

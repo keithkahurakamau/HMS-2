@@ -205,11 +205,11 @@ export default function Support() {
                     role="tab"
                     aria-selected={!statusFilter}
                     className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                        !statusFilter ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-ink-700 hover:bg-ink-50'
+                        !statusFilter ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50'
                     }`}
                 >
                     All
-                    <span className={`text-2xs font-semibold tabular-nums ${!statusFilter ? 'text-brand-700' : 'text-ink-500'}`}>{tickets.length}</span>
+                    <span className={`text-2xs font-semibold tabular-nums ${!statusFilter ? 'text-brand-700' : 'text-ink-500 dark:text-ink-400'}`}>{tickets.length}</span>
                 </button>
                 {Object.keys(STATUS_META).map(s => {
                     const isActive = statusFilter === s;
@@ -222,12 +222,12 @@ export default function Support() {
                             role="tab"
                             aria-selected={isActive}
                             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                                isActive ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-ink-700 hover:bg-ink-50'
+                                isActive ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50'
                             }`}
                         >
                             <span className={`size-1.5 rounded-full ${STATUS_DOT_COLOR[s]}`} aria-hidden="true" />
                             {s}
-                            <span className={`text-2xs font-semibold tabular-nums ${isActive ? 'text-brand-700' : 'text-ink-500'}`}>{count}</span>
+                            <span className={`text-2xs font-semibold tabular-nums ${isActive ? 'text-brand-700' : 'text-ink-500 dark:text-ink-400'}`}>{count}</span>
                         </button>
                     );
                 })}
@@ -246,7 +246,7 @@ export default function Support() {
                             <p className="text-sm">No tickets yet. Click "New ticket" to raise one.</p>
                         </div>
                     ) : (
-                        <ul className="overflow-y-auto custom-scrollbar divide-y divide-ink-100">
+                        <ul className="overflow-y-auto custom-scrollbar divide-y divide-ink-100 dark:divide-ink-800">
                             {sortedTickets.map(t => {
                                 const meta = STATUS_META[t.status] || {};
                                 const active = activeTicket?.ticket_id === t.ticket_id;
@@ -258,7 +258,7 @@ export default function Support() {
                                             onClick={() => openTicket(t.ticket_id)}
                                             aria-current={active ? 'true' : undefined}
                                             className={`w-full p-4 text-left transition-colors cursor-pointer flex gap-3 items-start ${
-                                                active ? 'bg-brand-50/60' : 'hover:bg-ink-50/60'
+                                                active ? 'bg-brand-50/60 dark:bg-brand-900/20' : 'hover:bg-ink-50/60 dark:hover:bg-ink-800/50'
                                             }`}
                                         >
                                             <span
@@ -267,10 +267,10 @@ export default function Support() {
                                             />
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex justify-between items-start gap-2 mb-1">
-                                                    <h3 className="font-semibold text-sm text-ink-900 line-clamp-1 flex-1">{t.subject}</h3>
+                                                    <h3 className="font-semibold text-sm text-ink-900 dark:text-white line-clamp-1 flex-1">{t.subject}</h3>
                                                     <span className={`${meta.badge} shrink-0`}>{t.status}</span>
                                                 </div>
-                                                <div className="flex items-center gap-2 sm:gap-3 text-xs text-ink-500 mt-1 flex-wrap">
+                                                <div className="flex items-center gap-2 sm:gap-3 text-xs text-ink-500 dark:text-ink-400 mt-1 flex-wrap">
                                                     <span className="font-mono">#{t.ticket_id}</span>
                                                     <span>{t.category}</span>
                                                     <span>{t.priority}</span>
@@ -296,11 +296,11 @@ export default function Support() {
                         </div>
                     ) : (
                         <>
-                            <div className="p-4 border-b border-ink-100 bg-ink-50/60">
+                            <div className="p-4 border-b border-ink-100 dark:border-ink-800 bg-ink-50/60 dark:bg-ink-800/40">
                                 <div className="flex justify-between items-start gap-3 mb-1">
                                     <div className="min-w-0">
-                                        <h2 className="text-base font-semibold text-ink-900 truncate">{activeTicket.subject}</h2>
-                                        <div className="flex items-center gap-2 sm:gap-3 text-xs text-ink-500 mt-1 flex-wrap">
+                                        <h2 className="text-base font-semibold text-ink-900 dark:text-white truncate">{activeTicket.subject}</h2>
+                                        <div className="flex items-center gap-2 sm:gap-3 text-xs text-ink-500 dark:text-ink-400 mt-1 flex-wrap">
                                             <span className="font-mono">#{activeTicket.ticket_id}</span>
                                             <span>{activeTicket.category}</span>
                                             <span>Priority: {activeTicket.priority}</span>
@@ -337,18 +337,18 @@ export default function Support() {
                                     return (
                                         <div key={m.message_id} className={`flex ${isPlatform ? 'justify-start' : 'justify-end'}`}>
                                             <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-3 border ${
-                                                isPlatform ? 'bg-amber-50 border-amber-200' : 'bg-brand-50 border-brand-200'
+                                                isPlatform ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20' : 'bg-brand-50 dark:bg-brand-900/20 border-brand-200 dark:border-brand-500/20'
                                             }`}>
                                                 <div className="flex items-baseline justify-between gap-3 mb-1">
-                                                    <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 inline-flex items-center gap-1.5">
-                                                        {isPlatform && <ShieldCheck size={11} className="text-amber-700" aria-hidden="true" />}
+                                                    <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-700 dark:text-ink-200 inline-flex items-center gap-1.5">
+                                                        {isPlatform && <ShieldCheck size={11} className="text-amber-700 dark:text-amber-300" aria-hidden="true" />}
                                                         {isPlatform ? 'MediFleet Team' : m.author_name}
                                                     </span>
-                                                    <span className="text-2xs text-ink-500 shrink-0" title={new Date(m.created_at).toLocaleString()}>
+                                                    <span className="text-2xs text-ink-500 dark:text-ink-400 shrink-0" title={new Date(m.created_at).toLocaleString()}>
                                                         {formatRelative(m.created_at)}
                                                     </span>
                                                 </div>
-                                                <p className="text-sm text-ink-900 whitespace-pre-wrap leading-relaxed">{m.body}</p>
+                                                <p className="text-sm text-ink-900 dark:text-white whitespace-pre-wrap leading-relaxed">{m.body}</p>
                                             </div>
                                         </div>
                                     );
@@ -356,7 +356,7 @@ export default function Support() {
                             </div>
 
                             {activeTicket.status !== 'Closed' && (
-                                <div data-tour="support-reply" className="p-3 border-t border-ink-100 bg-white flex gap-2">
+                                <div data-tour="support-reply" className="p-3 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex gap-2">
                                     <textarea rows="2" className="input flex-1 resize-none" placeholder="Reply to MediFleet support…"
                                               value={reply} onChange={e => setReply(e.target.value)} />
                                     <button onClick={sendReply} disabled={sendingReply || !reply.trim()} className="btn-primary self-end disabled:opacity-50">
@@ -373,14 +373,14 @@ export default function Support() {
             {isNewOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsNewOpen(false)} />
-                    <div className="relative w-full max-w-xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="flex justify-between items-center p-5 border-b border-ink-100">
-                            <h2 className="text-xl font-semibold flex items-center gap-2"><LifeBuoy size={20} className="text-brand-600" /> Raise a ticket</h2>
+                    <div className="relative w-full max-w-xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="flex justify-between items-center p-5 border-b border-ink-100 dark:border-ink-800">
+                            <h2 className="text-xl font-semibold flex items-center gap-2 dark:text-white"><LifeBuoy size={20} className="text-brand-600" /> Raise a ticket</h2>
                             <button onClick={() => setIsNewOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
-                        <form onSubmit={submitNew} className="flex-1 overflow-y-auto p-5 bg-ink-50/60 space-y-4">
+                        <form onSubmit={submitNew} className="flex-1 overflow-y-auto p-5 bg-ink-50/60 dark:bg-ink-800/40 space-y-4">
                             <div>
                                 <label className="label">Subject *</label>
                                 <input required className="input" value={draft.subject} maxLength="200"
@@ -409,7 +409,7 @@ export default function Support() {
                                           onChange={e => setDraft({ ...draft, body: e.target.value })}
                                           placeholder="Describe the issue, what you expected, and what happened. Include steps, screenshots URLs, or error messages." />
                             </div>
-                            <div className="flex justify-end gap-2 pt-3 border-t border-ink-100">
+                            <div className="flex justify-end gap-2 pt-3 border-t border-ink-100 dark:border-ink-800">
                                 <button type="button" onClick={() => setIsNewOpen(false)} className="btn-secondary">Cancel</button>
                                 <button type="submit" disabled={submitting} className="btn-primary">
                                     {submitting ? <Activity size={15} className="animate-spin" /> : <Send size={15} />} Submit

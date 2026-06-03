@@ -127,42 +127,42 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
-                <div className="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div className="relative w-full max-w-3xl bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+                <div className="p-5 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-between items-center">
                     <div className="min-w-0">
-                        <h2 className="text-lg font-bold text-slate-900 truncate">
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white truncate">
                             Permissions: {user.full_name}
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-xs text-slate-500 dark:text-ink-400 mt-1">
                             Role: <span className="font-semibold">{data?.role || user.role}</span> ·
                             Effective permissions are role defaults + grants − revokes.
                         </p>
                     </div>
-                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer">
+                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/50 cursor-pointer">
                         <X size={20} aria-hidden="true" />
                     </button>
                 </div>
 
                 {loading ? (
-                    <div className="flex-1 flex items-center justify-center py-16 text-slate-400">
+                    <div className="flex-1 flex items-center justify-center py-16 text-slate-400 dark:text-ink-400">
                         <Activity className="animate-spin mr-2" /> Loading…
                     </div>
                 ) : isAdmin ? (
                     <div className="p-8 text-center">
                         <ShieldCheck size={32} className="mx-auto mb-3 text-amber-500" />
-                        <p className="text-sm font-bold text-slate-900 mb-1">Admin permissions are wildcard</p>
-                        <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        <p className="text-sm font-bold text-slate-900 dark:text-white mb-1">Admin permissions are wildcard</p>
+                        <p className="text-xs text-slate-500 dark:text-ink-400 max-w-md mx-auto">
                             The Admin role grants every permission and cannot be overridden on a per-user basis.
                             Reassign this user to a different role first if you want to limit their access.
                         </p>
                     </div>
                 ) : (
                     <>
-                        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-white">
-                            <div className="text-xs text-slate-500">
-                                <span className="font-semibold text-slate-700">{effectivePreview.size}</span> effective permission{effectivePreview.size === 1 ? '' : 's'}
+                        <div className="px-5 py-3 border-b border-slate-100 dark:border-ink-800 flex items-center justify-between bg-white dark:bg-ink-900">
+                            <div className="text-xs text-slate-500 dark:text-ink-400">
+                                <span className="font-semibold text-slate-700 dark:text-ink-200">{effectivePreview.size}</span> effective permission{effectivePreview.size === 1 ? '' : 's'}
                                 {Object.keys(draft).length > 0 && (
-                                    <span className="ml-2 text-amber-600 font-semibold">
+                                    <span className="ml-2 text-amber-600 dark:text-amber-400 font-semibold">
                                         ({Object.values(draft).filter(s => s === 'grant').length} grant, {Object.values(draft).filter(s => s === 'revoke').length} revoke)
                                     </span>
                                 )}
@@ -170,7 +170,7 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                             <button
                                 onClick={resetAll}
                                 disabled={Object.keys(draft).length === 0}
-                                className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1 px-2 py-1 disabled:opacity-40"
+                                className="text-xs font-semibold text-slate-600 dark:text-ink-400 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 px-2 py-1 disabled:opacity-40"
                             >
                                 <RotateCcw size={12} /> Clear all overrides
                             </button>
@@ -179,8 +179,8 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
                             {Object.entries(grouped).map(([cat, perms]) => (
                                 <div key={cat}>
-                                    <h4 className="text-2xs font-bold uppercase tracking-wider text-slate-500 mb-2">{cat}</h4>
-                                    <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+                                    <h4 className="text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-ink-400 mb-2">{cat}</h4>
+                                    <ul className="divide-y divide-slate-100 dark:divide-ink-800 border border-slate-200 dark:border-ink-800 rounded-lg overflow-hidden">
                                         {perms.map((p) => {
                                             const fromRole = rolePerms.has(p.codename);
                                             const overrideState = draft[p.codename] || 'inherit';
@@ -189,34 +189,34 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                                                 <li
                                                     key={p.codename}
                                                     className={`grid grid-cols-12 gap-3 items-center px-3 py-2.5 ${
-                                                        overrideState !== 'inherit' ? 'bg-amber-50/40' : 'bg-white'
+                                                        overrideState !== 'inherit' ? 'bg-amber-50/40 dark:bg-amber-500/10' : 'bg-white dark:bg-ink-900'
                                                     }`}
                                                 >
                                                     <div className="col-span-6 min-w-0">
-                                                        <p className="text-xs font-mono font-bold text-slate-900 truncate">
+                                                        <p className="text-xs font-mono font-bold text-slate-900 dark:text-white truncate">
                                                             {p.codename}
                                                         </p>
-                                                        <p className="text-2xs text-slate-500 truncate mt-0.5">
+                                                        <p className="text-2xs text-slate-500 dark:text-ink-400 truncate mt-0.5">
                                                             {p.description || '—'}
                                                         </p>
                                                         <div className="flex gap-1.5 mt-1 flex-wrap">
                                                             {fromRole && (
-                                                                <span className="text-2xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider">
+                                                                <span className="text-2xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-ink-800/40 text-slate-600 dark:text-ink-400 font-semibold uppercase tracking-wider">
                                                                     from role
                                                                 </span>
                                                             )}
                                                             {overrideState === 'grant' && (
-                                                                <span className="text-2xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold uppercase tracking-wider">
+                                                                <span className="text-2xs px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold uppercase tracking-wider">
                                                                     + granted
                                                                 </span>
                                                             )}
                                                             {overrideState === 'revoke' && (
-                                                                <span className="text-2xs px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 font-semibold uppercase tracking-wider">
+                                                                <span className="text-2xs px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 font-semibold uppercase tracking-wider">
                                                                     − revoked
                                                                 </span>
                                                             )}
                                                             <span className={`text-2xs px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider ${
-                                                                effective ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-500'
+                                                                effective ? 'bg-brand-100 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300' : 'bg-slate-100 dark:bg-ink-800/40 text-slate-500 dark:text-ink-400'
                                                             }`}>
                                                                 {effective ? '✓ effective' : '✗ no access'}
                                                             </span>
@@ -257,10 +257,10 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                             ))}
                         </div>
 
-                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
+                        <div className="p-4 border-t border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-end gap-3 shrink-0">
                             <button
                                 onClick={onClose}
-                                className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg"
+                                className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-ink-300 hover:bg-slate-200 dark:hover:bg-ink-800/50 rounded-lg"
                             >
                                 Cancel
                             </button>
@@ -283,9 +283,9 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
 
 function SegmentBtn({ children, active, onClick, disabled, tone = 'brand', title }) {
     const tones = {
-        brand: active ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-white',
-        emerald: active ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-white',
-        rose: active ? 'bg-rose-600 text-white' : 'text-slate-600 hover:bg-white',
+        brand: active ? 'bg-brand-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-ink-800',
+        emerald: active ? 'bg-emerald-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-ink-800',
+        rose: active ? 'bg-rose-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-ink-800',
     };
     return (
         <button
@@ -293,7 +293,7 @@ function SegmentBtn({ children, active, onClick, disabled, tone = 'brand', title
             onClick={onClick}
             disabled={disabled}
             title={title}
-            className={`text-2xs font-bold px-2.5 py-1 rounded-md border border-slate-200 inline-flex items-center gap-1 transition-colors ${tones[tone]} disabled:opacity-30 disabled:cursor-not-allowed`}
+            className={`text-2xs font-bold px-2.5 py-1 rounded-md border border-slate-200 dark:border-ink-800 inline-flex items-center gap-1 transition-colors ${tones[tone]} disabled:opacity-30 disabled:cursor-not-allowed`}
         >
             {children}
         </button>

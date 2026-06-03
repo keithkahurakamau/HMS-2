@@ -485,9 +485,9 @@ export default function Pharmacy() {
                                         <div className="flex justify-between items-center">
                                             <span className="text-xs font-medium text-ink-500">KES {item.unit_price} &times; {item.qty}</span>
                                             <div className="flex items-center gap-1 bg-ink-50 dark:bg-ink-900/40 border border-ink-200 dark:border-ink-800 rounded-lg p-0.5">
-                                                <button onClick={() => updateQty(item.batch_id, -1)} aria-label="Decrease" className="p-1 hover:bg-white rounded text-ink-600 dark:text-ink-400"><Minus size={13} /></button>
+                                                <button onClick={() => updateQty(item.batch_id, -1)} aria-label="Decrease" className="p-1 hover:bg-white dark:hover:bg-ink-800 rounded text-ink-600 dark:text-ink-400"><Minus size={13} /></button>
                                                 <span className="text-sm font-semibold w-6 text-center">{item.qty}</span>
-                                                <button onClick={() => updateQty(item.batch_id, 1)} aria-label="Increase" className="p-1 hover:bg-white rounded text-ink-600 dark:text-ink-400"><Plus size={13} /></button>
+                                                <button onClick={() => updateQty(item.batch_id, 1)} aria-label="Increase" className="p-1 hover:bg-white dark:hover:bg-ink-800 rounded text-ink-600 dark:text-ink-400"><Plus size={13} /></button>
                                             </div>
                                         </div>
                                     </div>

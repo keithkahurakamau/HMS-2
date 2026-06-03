@@ -78,23 +78,23 @@ export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
     return (
         <ModalShell title={`Bulk-allocate deposit ${deposit.deposit_number}`} onClose={onClose} wide>
             <div className="flex items-center justify-between text-sm mb-3">
-                <span className="text-ink-600">
+                <span className="text-ink-600 dark:text-ink-400">
                     Patient #{deposit.patient_id} · Available:{' '}
                     <span className="font-mono font-semibold">{formatAmount(available)}</span>
                 </span>
-                <span className={'font-mono ' + (remainingDeposit < 0 ? 'text-rose-600' : 'text-ink-600')}>
+                <span className={'font-mono ' + (remainingDeposit < 0 ? 'text-rose-600' : 'text-ink-600 dark:text-ink-400')}>
                     Allocated {formatAmount(total)} · Remaining {formatAmount(remainingDeposit)}
                 </span>
             </div>
 
             {loading ? (
-                <div className="p-6 text-sm text-ink-500">Loading claim items...</div>
+                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading claim items...</div>
             ) : items.length === 0 ? (
-                <div className="p-6 text-sm text-ink-500">No claim items with an unallocated balance.</div>
+                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">No claim items with an unallocated balance.</div>
             ) : (
-                <div className="border border-ink-200 rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
+                <div className="border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
                     <table className="w-full text-sm">
-                        <thead className="bg-ink-50 text-ink-600 sticky top-0">
+                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 sticky top-0">
                             <tr>
                                 <th className="text-left px-3 py-2 font-medium">Claim</th>
                                 <th className="text-left px-3 py-2 font-medium">Patient</th>
@@ -103,7 +103,7 @@ export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
                                 <th className="text-right px-3 py-2 font-medium w-36">Allocate</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100">
+                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                             {items.map(it => (
                                 <tr key={it.item_id}>
                                     <td className="px-3 py-1.5 font-mono text-xs">{it.schedule_number}</td>

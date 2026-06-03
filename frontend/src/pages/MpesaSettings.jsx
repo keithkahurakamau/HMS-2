@@ -105,10 +105,10 @@ export default function MpesaSettings() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Editor */}
-                <div data-tour="mpesa-editor" className="lg:col-span-2 bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5">
+                <div data-tour="mpesa-editor" className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
                     <div data-tour="mpesa-shortcode">
                     <SectionHead icon={Hash} title="Your Safaricom shortcode" />
-                    <p className="text-xs text-ink-500 -mt-3">
+                    <p className="text-xs text-ink-500 dark:text-ink-400 -mt-3">
                         Enter the PayBill or Buy-Goods Till you already own. Payments made
                         to this shortcode are routed into MediFleet.
                     </p>
@@ -127,7 +127,7 @@ export default function MpesaSettings() {
                             </select>
                         </Field>
                     </div>
-                    <p className="text-xs text-ink-500 -mt-2 inline-flex items-start gap-1.5">
+                    <p className="text-xs text-ink-500 dark:text-ink-400 -mt-2 inline-flex items-start gap-1.5">
                         <ShieldCheck size={13} className="mt-0.5 text-brand-600 shrink-0" />
                         MediFleet activates M-Pesa for your till on its end — there's nothing
                         else for you to set up or copy from anywhere.
@@ -136,7 +136,7 @@ export default function MpesaSettings() {
 
                     <div data-tour="mpesa-settlement">
                     <SectionHead icon={Building2} title="Settlement bank" />
-                    <p className="text-xs text-ink-500 -mt-3">
+                    <p className="text-xs text-ink-500 dark:text-ink-400 -mt-3">
                         Proceeds are deposited into <strong>your hospital's own bank account</strong> on the
                         settlement schedule agreed at onboarding. MediFleet never holds your money —
                         it routes the payment and settles straight to you.
@@ -176,7 +176,7 @@ export default function MpesaSettings() {
                         </Field>
                     </div>
 
-                    <div className="flex justify-end pt-2 border-t border-ink-100">
+                    <div className="flex justify-end pt-2 border-t border-ink-100 dark:border-ink-800">
                         <button onClick={save} disabled={saving}
                                 className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                             {saving ? 'Saving…' : 'Save settings'}
@@ -188,9 +188,9 @@ export default function MpesaSettings() {
                 <div className="space-y-4">
                     <div data-tour="mpesa-status"><StatusCard config={config} loading={loading} /></div>
 
-                    <div data-tour="mpesa-test" className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-5 space-y-3">
+                    <div data-tour="mpesa-test" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5 space-y-3">
                         <SectionHead icon={Send} title="Send a test M-Pesa prompt" />
-                        <p className="text-xs text-ink-500">
+                        <p className="text-xs text-ink-500 dark:text-ink-400">
                             Sends a real KES&nbsp;1 prompt to the phone below. It doesn't
                             actually charge — the customer can decline.
                         </p>
@@ -202,16 +202,16 @@ export default function MpesaSettings() {
                             {testing ? 'Sending…' : 'Send test'}
                         </button>
                         {config?.configured && !config?.mpesa_active && (
-                            <p className="text-xs text-amber-700">
+                            <p className="text-xs text-amber-700 dark:text-amber-300">
                                 The test prompt unlocks once MediFleet activates M-Pesa for your till.
                             </p>
                         )}
                         {config?.last_test_at && (
-                            <div className="text-xs text-ink-600 pt-2 border-t border-ink-100">
+                            <div className="text-xs text-ink-600 dark:text-ink-400 pt-2 border-t border-ink-100 dark:border-ink-800">
                                 <div>Last: <span className="font-mono">{new Date(config.last_test_at).toLocaleString()}</span></div>
                                 <div>Status: <strong>{config.last_test_status}</strong></div>
                                 {config.last_test_message && (
-                                    <div className="text-ink-500 mt-1">{config.last_test_message}</div>
+                                    <div className="text-ink-500 dark:text-ink-400 mt-1">{config.last_test_message}</div>
                                 )}
                             </div>
                         )}
@@ -225,11 +225,11 @@ export default function MpesaSettings() {
 
 function MoneyFlowNote() {
     return (
-        <div data-tour="mpesa-flow" className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-emerald-900 mb-2 inline-flex items-center gap-2">
+        <div data-tour="mpesa-flow" className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-300 mb-2 inline-flex items-center gap-2">
                 <Wallet size={16} /> How your money flows
             </h3>
-            <p className="text-sm text-emerald-900 leading-relaxed">
+            <p className="text-sm text-emerald-900 dark:text-emerald-200 leading-relaxed">
                 When a patient pays by M-Pesa, the money goes through your own Safaricom
                 shortcode and settles directly into <strong>your hospital's bank account</strong> on
                 your settlement schedule. <strong>MediFleet never holds or touches your money</strong> —
@@ -242,11 +242,11 @@ function MoneyFlowNote() {
 
 function MpesaChecklist() {
     return (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-amber-900 mb-2 inline-flex items-center gap-2">
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-2 inline-flex items-center gap-2">
                 <ShieldCheck size={16} /> Before you start
             </h3>
-            <ol className="list-decimal pl-5 text-sm text-amber-900 space-y-1">
+            <ol className="list-decimal pl-5 text-sm text-amber-900 dark:text-amber-200 space-y-1">
                 <li>You must already have a Safaricom <strong>PayBill or Buy Goods Till</strong>. Tills are issued via Safaricom Business support and require business registration + KRA PIN.</li>
                 <li>Enter that shortcode and your settlement bank below, then save. <strong>MediFleet</strong> takes care of activating M-Pesa for your till on its end.</li>
                 <li>The settlement schedule (daily / weekly) is agreed during onboarding and managed by MediFleet.</li>
@@ -257,10 +257,10 @@ function MpesaChecklist() {
 }
 
 function StatusCard({ config, loading }) {
-    if (loading) return <div className="bg-white border border-ink-200/70 rounded-2xl p-5 text-sm text-ink-500">Loading…</div>;
+    if (loading) return <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-5 text-sm text-ink-500 dark:text-ink-400">Loading…</div>;
     if (!config?.configured) {
         return (
-            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 text-sm text-rose-800 inline-flex items-start gap-2">
+            <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-2xl p-5 text-sm text-rose-800 dark:text-rose-300 inline-flex items-start gap-2">
                 <AlertCircle size={16} className="mt-0.5" />
                 <div>
                     <div className="font-semibold">Not configured</div>
@@ -270,20 +270,20 @@ function StatusCard({ config, loading }) {
         );
     }
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl p-5 text-sm space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-emerald-700">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-5 text-sm space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-300">
                 <CheckCircle2 size={16} /> Saved
             </div>
-            <div className="text-ink-700">
-                <div><span className="text-ink-500">Shortcode:</span> <span className="font-mono">{config.shortcode}</span> ({config.shortcode_type})</div>
-                <div><span className="text-ink-500">Settles to:</span> <span className="font-mono">{config.settlement_bank_name} · {config.settlement_account_number}</span></div>
+            <div className="text-ink-700 dark:text-ink-200">
+                <div><span className="text-ink-500 dark:text-ink-400">Shortcode:</span> <span className="font-mono">{config.shortcode}</span> ({config.shortcode_type})</div>
+                <div><span className="text-ink-500 dark:text-ink-400">Settles to:</span> <span className="font-mono">{config.settlement_bank_name} · {config.settlement_account_number}</span></div>
             </div>
             {config.mpesa_active ? (
-                <div className="text-xs inline-flex items-center gap-1.5 text-emerald-700 pt-2 border-t border-ink-100 w-full">
+                <div className="text-xs inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 pt-2 border-t border-ink-100 dark:border-ink-800 w-full">
                     <CheckCircle2 size={14} /> M-Pesa is live — you can collect payments at the till and pharmacy.
                 </div>
             ) : (
-                <div className="text-xs inline-flex items-start gap-1.5 text-amber-700 pt-2 border-t border-ink-100 w-full">
+                <div className="text-xs inline-flex items-start gap-1.5 text-amber-700 dark:text-amber-300 pt-2 border-t border-ink-100 dark:border-ink-800 w-full">
                     <AlertCircle size={14} className="mt-0.5 shrink-0" />
                     Awaiting MediFleet to activate M-Pesa for your till. Collection stays disabled until then.
                 </div>
@@ -294,7 +294,7 @@ function StatusCard({ config, loading }) {
 
 function SectionHead({ icon: Icon, title }) {
     return (
-        <h3 className="text-sm font-semibold text-ink-900 inline-flex items-center gap-2 border-b border-ink-100 pb-2 w-full">
+        <h3 className="text-sm font-semibold text-ink-900 dark:text-white inline-flex items-center gap-2 border-b border-ink-100 dark:border-ink-800 pb-2 w-full">
             <Icon size={16} className="text-brand-600" /> {title}
         </h3>
     );
@@ -303,7 +303,7 @@ function SectionHead({ icon: Icon, title }) {
 function Field({ label, children }) {
     return (
         <label className="block">
-            <span className="block text-xs font-medium text-ink-600 mb-1">{label}</span>
+            <span className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">{label}</span>
             {children}
         </label>
     );

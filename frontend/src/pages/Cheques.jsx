@@ -252,14 +252,14 @@ export default function Cheques() {
             {/* Direction tabs — incoming (received) vs outgoing (issued).
                 Sticky inside the page so the user can scan a long table
                 without losing the tab strip. */}
-            <div data-tour="cheque-direction-tabs" className="inline-flex p-1 rounded-2xl bg-ink-100/70 ring-1 ring-ink-200/60 shadow-soft">
+            <div data-tour="cheque-direction-tabs" className="inline-flex p-1 rounded-2xl bg-ink-100/70 dark:bg-ink-800/40 ring-1 ring-ink-200/60 dark:ring-ink-800 shadow-soft">
                 <button
                     type="button"
                     onClick={() => switchDirection('incoming')}
                     className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                         direction === 'incoming'
                             ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
-                            : 'text-ink-600 hover:text-ink-900 hover:bg-white/60'
+                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-ink-800/50'
                     }`}
                 >
                     <ArrowDownCircle size={15} /> Incoming
@@ -270,7 +270,7 @@ export default function Cheques() {
                     className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                         direction === 'outgoing'
                             ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
-                            : 'text-ink-600 hover:text-ink-900 hover:bg-white/60'
+                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-ink-800/50'
                     }`}
                 >
                     <ArrowUpCircle size={15} /> Outgoing
@@ -282,10 +282,10 @@ export default function Cheques() {
                 {kpiTiles.map((tile) => {
                     const s = summary[tile.key] || { count: 0, total: 0 };
                     const ring = {
-                        blue:    'bg-blue-50    ring-blue-200    text-blue-700',
-                        amber:   'bg-amber-50   ring-amber-200   text-amber-700',
-                        emerald: 'bg-emerald-50 ring-emerald-200 text-emerald-700',
-                        rose:    'bg-rose-50    ring-rose-200    text-rose-700',
+                        blue:    'bg-blue-50    ring-blue-200    text-blue-700    dark:bg-blue-500/10    dark:ring-blue-500/20    dark:text-blue-300',
+                        amber:   'bg-amber-50   ring-amber-200   text-amber-700   dark:bg-amber-500/10   dark:ring-amber-500/20   dark:text-amber-300',
+                        emerald: 'bg-emerald-50 ring-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:ring-emerald-500/20 dark:text-emerald-300',
+                        rose:    'bg-rose-50    ring-rose-200    text-rose-700    dark:bg-rose-500/10    dark:ring-rose-500/20    dark:text-rose-300',
                     }[tile.accent];
                     const TileIcon = tile.icon;
                     return (
@@ -329,7 +329,7 @@ export default function Cheques() {
                         {(direction === 'incoming' ? DRAWER_TYPES : PAYEE_TYPES).map(d => <option key={d}>{d}</option>)}
                     </select>
                 </div>
-                <span className="ml-auto text-xs text-ink-500">{cheques.length} cheque{cheques.length === 1 ? '' : 's'}</span>
+                <span className="ml-auto text-xs text-ink-500 dark:text-ink-400">{cheques.length} cheque{cheques.length === 1 ? '' : 's'}</span>
             </div>
 
             {/* Table */}
@@ -353,45 +353,45 @@ export default function Cheques() {
                                     <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Loading…
                                 </td></tr>
                             ) : cheques.length === 0 ? (
-                                <tr><td colSpan="7" className="text-center py-10 text-ink-500">No cheques match the current filters.</td></tr>
+                                <tr><td colSpan="7" className="text-center py-10 text-ink-500 dark:text-ink-400">No cheques match the current filters.</td></tr>
                             ) : cheques.map(c => {
                                 const meta = STATUS_META[c.status] || {};
                                 const counterparty = c.direction === 'incoming' ? c.drawer_name : c.payee_name;
                                 const counterpartyType = c.direction === 'incoming' ? c.drawer_type : c.payee_type;
                                 const counterpartyDate = c.direction === 'incoming' ? c.date_received : (c.date_issued || c.created_at);
                                 return (
-                                    <tr key={c.cheque_id} className="hover:bg-ink-50/40">
-                                        <td className="font-mono text-xs font-semibold text-brand-700">{c.cheque_number}</td>
+                                    <tr key={c.cheque_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
+                                        <td className="font-mono text-xs font-semibold text-brand-700 dark:text-brand-400">{c.cheque_number}</td>
                                         <td>
-                                            <div className="font-medium text-ink-900">{counterparty || '—'}</div>
-                                            <div className="text-2xs text-ink-500">{counterpartyType}</div>
+                                            <div className="font-medium text-ink-900 dark:text-white">{counterparty || '—'}</div>
+                                            <div className="text-2xs text-ink-500 dark:text-ink-400">{counterpartyType}</div>
                                         </td>
                                         <td>
-                                            <div className="text-sm text-ink-700">{c.bank_name}</div>
-                                            {c.bank_branch && <div className="text-2xs text-ink-500">{c.bank_branch}</div>}
+                                            <div className="text-sm text-ink-700 dark:text-ink-200">{c.bank_name}</div>
+                                            {c.bank_branch && <div className="text-2xs text-ink-500 dark:text-ink-400">{c.bank_branch}</div>}
                                         </td>
                                         <td className="font-mono text-sm">{c.currency} {Number(c.amount).toLocaleString()}</td>
-                                        <td className="text-xs text-ink-500">
+                                        <td className="text-xs text-ink-500 dark:text-ink-400">
                                             <Calendar size={11} className="inline mr-1 text-ink-400" />
                                             {counterpartyDate ? new Date(counterpartyDate).toLocaleDateString() : '—'}
                                         </td>
                                         <td><span className={meta.badge}>{c.status}</span></td>
                                         <td data-tour="cheque-row-actions" className="text-right">
-                                            <button onClick={() => setActive(c)} className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded" aria-label="View">
+                                            <button onClick={() => setActive(c)} className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded" aria-label="View">
                                                 <Eye size={15} />
                                             </button>
                                             {/* Incoming actions */}
                                             {c.direction === 'incoming' && c.status === 'Received' && (
-                                                <button onClick={() => openAction(c, 'deposit')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100">
+                                                <button onClick={() => openAction(c, 'deposit')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20">
                                                     Deposit
                                                 </button>
                                             )}
                                             {c.direction === 'incoming' && c.status === 'Deposited' && (
                                                 <>
-                                                    <button onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100">
+                                                    <button onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20">
                                                         Clear
                                                     </button>
-                                                    <button onClick={() => openAction(c, 'bounce')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-rose-700 bg-rose-50 hover:bg-rose-100">
+                                                    <button onClick={() => openAction(c, 'bounce')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-rose-700 bg-rose-50 hover:bg-rose-100 dark:text-rose-300 dark:bg-rose-500/10 dark:hover:bg-rose-500/20">
                                                         Bounce
                                                     </button>
                                                 </>
@@ -399,23 +399,23 @@ export default function Cheques() {
                                             {/* Outgoing actions */}
                                             {c.direction === 'outgoing' && c.status === 'Issued' && (
                                                 <>
-                                                    <button onClick={() => openAction(c, 'dispatch')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100">
+                                                    <button onClick={() => openAction(c, 'dispatch')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20">
                                                         Dispatch
                                                     </button>
-                                                    <button onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100">
+                                                    <button onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100 dark:text-orange-300 dark:bg-orange-500/10 dark:hover:bg-orange-500/20">
                                                         Stop
                                                     </button>
                                                 </>
                                             )}
                                             {c.direction === 'outgoing' && c.status === 'Dispatched' && (
                                                 <>
-                                                    <button onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100">
+                                                    <button onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20">
                                                         Clear
                                                     </button>
-                                                    <button onClick={() => openAction(c, 'return')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-rose-700 bg-rose-50 hover:bg-rose-100">
+                                                    <button onClick={() => openAction(c, 'return')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-rose-700 bg-rose-50 hover:bg-rose-100 dark:text-rose-300 dark:bg-rose-500/10 dark:hover:bg-rose-500/20">
                                                         Return
                                                     </button>
-                                                    <button onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100">
+                                                    <button onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100 dark:text-orange-300 dark:bg-orange-500/10 dark:hover:bg-orange-500/20">
                                                         Stop
                                                     </button>
                                                 </>
@@ -423,7 +423,7 @@ export default function Cheques() {
                                             {/* Cancel available in any non-terminal state */}
                                             {(c.direction === 'incoming' && ['Received', 'Deposited'].includes(c.status)
                                               || c.direction === 'outgoing' && ['Issued', 'Dispatched'].includes(c.status)) && (
-                                                <button onClick={() => openAction(c, 'cancel')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-ink-600 bg-ink-100 hover:bg-ink-200">
+                                                <button onClick={() => openAction(c, 'cancel')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-ink-600 bg-ink-100 hover:bg-ink-200 dark:text-ink-300 dark:bg-ink-800/40 dark:hover:bg-ink-800/60">
                                                     Cancel
                                                 </button>
                                             )}
@@ -440,8 +440,8 @@ export default function Cheques() {
             {isNewOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsNewOpen(false)} />
-                    <div className="relative w-full max-w-2xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
+                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
                                 <span className="section-eyebrow">Finance</span>
                                 <h2 className="text-xl font-semibold mt-1 flex items-center gap-2">
@@ -449,20 +449,20 @@ export default function Cheques() {
                                     {newDraft.direction === 'incoming' ? 'Record received cheque' : 'Issue new cheque'}
                                 </h2>
                             </div>
-                            <button onClick={() => setIsNewOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
+                            <button onClick={() => setIsNewOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
-                        <form onSubmit={submitNew} className="flex-1 overflow-y-auto p-5 bg-ink-50/60 space-y-4">
+                        <form onSubmit={submitNew} className="flex-1 overflow-y-auto p-5 bg-ink-50/60 dark:bg-ink-800/40 space-y-4">
                             {/* Direction toggle inside the modal so the receptionist can flip
                                 even after opening the form. Persists the active tab choice. */}
-                            <div className="inline-flex p-1 rounded-xl bg-white ring-1 ring-ink-200">
+                            <div className="inline-flex p-1 rounded-xl bg-white dark:bg-ink-900 ring-1 ring-ink-200 dark:ring-ink-800">
                                 <button type="button"
                                     onClick={() => setNewDraft(EMPTY_INCOMING)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                                         newDraft.direction === 'incoming'
                                             ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white'
-                                            : 'text-ink-600 hover:text-ink-900'
+                                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'
                                     }`}
                                 >
                                     <ArrowDownCircle size={13} /> Incoming
@@ -472,7 +472,7 @@ export default function Cheques() {
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                                         newDraft.direction === 'outgoing'
                                             ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white'
-                                            : 'text-ink-600 hover:text-ink-900'
+                                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'
                                     }`}
                                 >
                                     <ArrowUpCircle size={13} /> Outgoing
@@ -578,7 +578,7 @@ export default function Cheques() {
                                               onChange={e => setNewDraft({ ...newDraft, notes: e.target.value })} />
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-2 pt-3 border-t border-ink-100">
+                            <div className="flex justify-end gap-2 pt-3 border-t border-ink-100 dark:border-ink-800">
                                 <button type="button" onClick={() => setIsNewOpen(false)} className="btn-secondary">Cancel</button>
                                 <button type="submit" disabled={submitting} className="btn-primary">
                                     {submitting ? <Activity size={15} className="animate-spin" /> : <Save size={15} />}
@@ -594,21 +594,21 @@ export default function Cheques() {
             {active && !actionPanel && (
                 <div className="fixed inset-0 z-40 flex justify-end pointer-events-none">
                     <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setActive(null)} />
-                    <div className="relative w-full max-w-md bg-white h-full shadow-elevated flex flex-col animate-slide-in-right pointer-events-auto">
-                        <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right pointer-events-auto">
+                        <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
                                 <span className="section-eyebrow">Cheque</span>
-                                <h2 className="text-lg font-semibold mt-1">#{active.cheque_number}</h2>
-                                <p className="text-xs text-ink-500 mt-0.5">{active.drawer_name}</p>
+                                <h2 className="text-lg font-semibold mt-1 dark:text-white">#{active.cheque_number}</h2>
+                                <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">{active.drawer_name}</p>
                             </div>
-                            <button onClick={() => setActive(null)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
+                            <button onClick={() => setActive(null)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full">
                                 <X size={18} />
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-5 space-y-3">
                             <div className="flex items-center gap-2">
                                 <span className={STATUS_META[active.status]?.badge}>{active.status}</span>
-                                <span className="font-mono text-sm text-ink-700">{active.currency} {Number(active.amount).toLocaleString()}</span>
+                                <span className="font-mono text-sm text-ink-700 dark:text-ink-200">{active.currency} {Number(active.amount).toLocaleString()}</span>
                             </div>
                             <Field label="Bank" value={`${active.bank_name}${active.bank_branch ? ` · ${active.bank_branch}` : ''}`} />
                             <Field label="Drawer type" value={active.drawer_type} />
@@ -629,9 +629,9 @@ export default function Cheques() {
             {/* ── Action panels ── */}
             {actionPanel && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-elevated w-full max-w-md p-6 animate-slide-up">
-                        <h3 className="text-lg font-semibold text-ink-900 mb-1 capitalize">{actionPanel} cheque</h3>
-                        <p className="text-xs text-ink-500 mb-4">#{active?.cheque_number} · KES {Number(active?.amount).toLocaleString()}</p>
+                    <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md p-6 animate-slide-up">
+                        <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-1 capitalize">{actionPanel} cheque</h3>
+                        <p className="text-xs text-ink-500 dark:text-ink-400 mb-4">#{active?.cheque_number} · KES {Number(active?.amount).toLocaleString()}</p>
 
                         {actionPanel === 'deposit' && (
                             <div className="space-y-3">
@@ -650,7 +650,7 @@ export default function Cheques() {
                         )}
                         {actionPanel === 'clear' && (
                             <div className="space-y-3">
-                                <p className="text-sm text-ink-600">Marking this cheque as cleared posts a <span className="font-semibold">Payment</span> against the linked invoice (if any). This action cannot be undone.</p>
+                                <p className="text-sm text-ink-600 dark:text-ink-400">Marking this cheque as cleared posts a <span className="font-semibold">Payment</span> against the linked invoice (if any). This action cannot be undone.</p>
                                 <div>
                                     <label className="label">Clearance date</label>
                                     <input type="date" className="input" value={actionDraft.clearance_date || ''}
@@ -667,9 +667,9 @@ export default function Cheques() {
                             </div>
                         )}
 
-                        <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-ink-100">
+                        <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-ink-100 dark:border-ink-800">
                             <button onClick={() => { setActionPanel(null); }} className="btn-secondary">Cancel</button>
-                            <button onClick={submitAction} className={actionPanel === 'bounce' || actionPanel === 'cancel' ? 'btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50' : 'btn-primary'}>
+                            <button onClick={submitAction} className={actionPanel === 'bounce' || actionPanel === 'cancel' ? 'btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-500/30 dark:hover:bg-rose-500/10' : 'btn-primary'}>
                                 Confirm {actionPanel}
                             </button>
                         </div>
@@ -681,7 +681,7 @@ export default function Cheques() {
 }
 
 function Field({ label, value, accent }) {
-    const tone = accent === 'rose' ? 'text-rose-700' : 'text-ink-800';
+    const tone = accent === 'rose' ? 'text-rose-700 dark:text-rose-300' : 'text-ink-800 dark:text-ink-200';
     return (
         <div className="text-sm">
             <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-400">{label}</div>

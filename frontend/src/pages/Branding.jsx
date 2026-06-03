@@ -106,7 +106,7 @@ export default function Branding() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-24 text-ink-400">
+            <div className="flex items-center justify-center py-24 text-ink-400 dark:text-ink-500">
                 <Activity className="animate-spin mr-2" size={20} /> Loading branding…
             </div>
         );
@@ -114,7 +114,7 @@ export default function Branding() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <Link to="/app/settings" className="inline-flex items-center gap-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 hover:text-brand-700 transition-colors cursor-pointer -mb-3">
+            <Link to="/app/settings" className="inline-flex items-center gap-1 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 hover:text-brand-700 transition-colors cursor-pointer -mb-3">
                 <ArrowLeft size={12} /> Settings
             </Link>
             <PageHeader
@@ -198,7 +198,7 @@ export default function Branding() {
                             placeholder="#10b981 (emerald)"
                             onChange={(v) => set('brand_accent', v)}
                         />
-                        <p className="text-xs text-ink-500 leading-relaxed">
+                        <p className="text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
                             Tip: pick hues that pass a 4.5:1 contrast ratio against white. The defaults
                             already do.
                         </p>
@@ -244,15 +244,15 @@ export default function Branding() {
                                             onClick={() => setTemplate('primary_template', opt.key)}
                                             className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
                                                 active
-                                                    ? 'border-brand-400 bg-brand-50 ring-2 ring-brand-200'
-                                                    : 'border-ink-200 bg-white hover:border-brand-200 hover:bg-brand-50/30'
+                                                    ? 'border-brand-400 bg-brand-50 dark:bg-brand-500/10 ring-2 ring-brand-200 dark:ring-brand-500/20'
+                                                    : 'border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 hover:border-brand-200 hover:bg-brand-50/30 dark:hover:bg-ink-800/50'
                                             }`}
                                         >
                                             <div className="flex items-center justify-between">
-                                                <span className="text-sm font-semibold text-ink-900">{opt.label}</span>
+                                                <span className="text-sm font-semibold text-ink-900 dark:text-white">{opt.label}</span>
                                                 {active && <CheckCircle2 size={14} className="text-brand-600" />}
                                             </div>
-                                            <p className="mt-1 text-xs text-ink-500">{opt.hint}</p>
+                                            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">{opt.hint}</p>
                                         </button>
                                     );
                                 })}
@@ -265,8 +265,8 @@ export default function Branding() {
                                 onChange={(e) => setTemplate('show_logo', e.target.checked)}
                                 className="sr-only peer"
                             />
-                            <span className="w-11 h-6 bg-ink-200 rounded-full peer peer-checked:bg-brand-500 transition relative after:absolute after:left-0.5 after:top-0.5 after:bg-white after:rounded-full after:w-5 after:h-5 after:transition peer-checked:after:translate-x-5" />
-                            <span className="text-sm font-medium text-ink-700">Print my logo on documents</span>
+                            <span className="w-11 h-6 bg-ink-200 dark:bg-ink-700 rounded-full peer peer-checked:bg-brand-500 transition relative after:absolute after:left-0.5 after:top-0.5 after:bg-white after:rounded-full after:w-5 after:h-5 after:transition peer-checked:after:translate-x-5" />
+                            <span className="text-sm font-medium text-ink-700 dark:text-ink-200">Print my logo on documents</span>
                         </label>
                     </div>
                 </Section>
@@ -298,12 +298,12 @@ export default function Branding() {
 function Section({ span, icon, title, desc, children, tour }) {
     return (
         <section data-tour={tour} className={`col-span-12 ${span} card overflow-hidden`}>
-            <div className="px-5 py-3 border-b border-ink-100 bg-ink-50/40 flex items-center gap-2">
+            <div className="px-5 py-3 border-b border-ink-100 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/40 flex items-center gap-2">
                 <span className="text-brand-600">{icon}</span>
-                <h2 className="text-sm font-semibold text-ink-900 tracking-tight">{title}</h2>
+                <h2 className="text-sm font-semibold text-ink-900 dark:text-white tracking-tight">{title}</h2>
             </div>
             <div className="p-5 space-y-4">
-                <p className="text-xs text-ink-500 leading-relaxed">{desc}</p>
+                <p className="text-xs text-ink-500 dark:text-ink-400 leading-relaxed">{desc}</p>
                 {children}
             </div>
         </section>
@@ -342,7 +342,7 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
 
     return (
         <div className="space-y-3">
-            <div className={`relative ${aspectClass} rounded-2xl border border-dashed border-ink-300 bg-ink-50/40 overflow-hidden flex items-center justify-center group`}>
+            <div className={`relative ${aspectClass} rounded-2xl border border-dashed border-ink-300 dark:border-ink-700 bg-ink-50/40 dark:bg-ink-800/40 overflow-hidden flex items-center justify-center group`}>
                 {value ? (
                     <>
                         <img src={value} alt="Preview" className="absolute inset-0 w-full h-full object-contain bg-white" />
@@ -350,7 +350,7 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
                             <button
                                 type="button"
                                 onClick={() => inputRef.current?.click()}
-                                className="px-3 py-2 rounded-lg bg-white text-ink-800 text-xs font-semibold shadow-soft hover:bg-brand-50 cursor-pointer flex items-center gap-1.5"
+                                className="px-3 py-2 rounded-lg bg-white dark:bg-ink-800 text-ink-800 dark:text-ink-100 text-xs font-semibold shadow-soft hover:bg-brand-50 dark:hover:bg-ink-700 cursor-pointer flex items-center gap-1.5"
                             >
                                 <Upload size={13} /> Replace
                             </button>
@@ -367,7 +367,7 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
                     <button
                         type="button"
                         onClick={() => inputRef.current?.click()}
-                        className="flex flex-col items-center justify-center w-full h-full text-ink-500 hover:text-brand-700 hover:bg-brand-50/30 transition-colors cursor-pointer"
+                        className="flex flex-col items-center justify-center w-full h-full text-ink-500 dark:text-ink-400 hover:text-brand-700 hover:bg-brand-50/30 dark:hover:bg-ink-800/50 transition-colors cursor-pointer"
                     >
                         <Upload size={22} className="mb-2" />
                         <span className="text-sm font-semibold">Click to upload</span>
@@ -396,7 +396,7 @@ function ColorField({ label, value, placeholder, onChange }) {
     return (
         <div className="flex items-center gap-3">
             <div
-                className="size-10 rounded-xl border border-ink-200 shadow-soft shrink-0"
+                className="size-10 rounded-xl border border-ink-200 dark:border-ink-700 shadow-soft shrink-0"
                 style={{ backgroundColor: isValid && value ? value : '#f1f5f9' }}
             />
             <div className="flex-1">

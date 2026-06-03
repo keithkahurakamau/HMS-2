@@ -53,6 +53,36 @@ const ageFrom = (dob) => {
     return age;
 };
 
+// Coerce a stored DOB into the strict YYYY-MM-DD that <input type="date">
+// requires. Backend serializes a DATE column as "YYYY-MM-DD", but legacy /
+// imported rows can arrive as a full ISO timestamp ("1990-05-15T00:00:00"),
+// which the date input silently rejects and renders blank — and a blank value
+// then gets force-sent on save and 422s the PUT. Slicing to the first 10 chars
+// normalizes both shapes; anything unparseable becomes '' (left for the user).
+const toDateInputValue = (dob) => {
+    if (!dob) return '';
+    const s = String(dob).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+};
+
+// FastAPI returns 422 validation errors as an array of {loc, msg} objects, not
+// a string — rendering that array straight into a toast shows "[object Object]".
+// Flatten it into a readable, field-prefixed sentence.
+const apiErrorMessage = (err, fallback = 'Something went wrong') => {
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+        return detail
+            .map((d) => {
+                const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : null;
+                return field ? `${field}: ${d.msg}` : d.msg;
+            })
+            .filter(Boolean)
+            .join('; ') || fallback;
+    }
+    return fallback;
+};
+
 const isToday = (iso) => {
     if (!iso) return false;
     const d = new Date(iso);
@@ -1429,7 +1459,7 @@ function EditPatientModal({ patient, onClose, onSaved }) {
         surname:           patient.surname           ?? '',
         other_names:       patient.other_names       ?? '',
         sex:               patient.sex               ?? 'Male',
-        date_of_birth:     patient.date_of_birth     ?? '',
+        date_of_birth:     toDateInputValue(patient.date_of_birth),
         marital_status:    patient.marital_status    ?? 'Single',
         blood_group:       patient.blood_group       ?? 'Unknown',
         allergies:         patient.allergies         ?? '',
@@ -1457,10 +1487,11 @@ function EditPatientModal({ patient, onClose, onSaved }) {
         try {
             // Strip empty optional fields so we don't overwrite existing
             // values with "" on a save the user didn't intend to clear.
-            // Required-equivalent fields (surname/other_names/sex/dob)
-            // stay even if technically empty so backend validation catches
-            // accidental wipes loudly.
-            const KEEP_EMPTY = new Set(['surname', 'other_names', 'sex', 'date_of_birth']);
+            // surname/other_names/sex stay even if blank so the backend sees the
+            // intended values; date_of_birth is deliberately NOT force-kept —
+            // an empty date string fails strict date validation (422), so we
+            // simply omit it when blank and leave the stored DOB untouched.
+            const KEEP_EMPTY = new Set(['surname', 'other_names', 'sex']);
             const payload = Object.fromEntries(
                 Object.entries(form).filter(([k, v]) =>
                     KEEP_EMPTY.has(k) || (v !== '' && v !== null && v !== undefined)
@@ -1470,7 +1501,7 @@ function EditPatientModal({ patient, onClose, onSaved }) {
             toast.success('Patient updated.');
             await onSaved();
         } catch (err) {
-            toast.error(err.response?.data?.detail || 'Update failed');
+            toast.error(apiErrorMessage(err, 'Update failed'));
         } finally {
             setIsSubmitting(false);
         }

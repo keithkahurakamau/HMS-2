@@ -118,7 +118,7 @@ export default function PlatformSettings() {
                 tone="accent"
                 meta={
                     isLoading ? (
-                        <span className="text-ink-500 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" aria-hidden="true" /> Probing</span>
+                        <span className="text-ink-500 dark:text-ink-400 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" aria-hidden="true" /> Probing</span>
                     ) : (
                         <span className="badge-success inline-flex items-center gap-1.5">
                             <Server size={11} aria-hidden="true" /> Operational
@@ -129,19 +129,19 @@ export default function PlatformSettings() {
 
             {sections.map(({ title, icon: Icon, rows }) => (
                 <section key={title} className="card overflow-hidden" aria-labelledby={`section-${title}`}>
-                    <div className="px-5 py-3 border-b border-ink-200 bg-ink-50 flex items-center gap-2">
+                    <div className="px-5 py-3 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex items-center gap-2">
                         <Icon size={15} className="text-brand-600" aria-hidden="true" />
-                        <h2 id={`section-${title}`} className="font-semibold text-ink-900 text-sm tracking-tight">{title}</h2>
+                        <h2 id={`section-${title}`} className="font-semibold text-ink-900 dark:text-white text-sm tracking-tight">{title}</h2>
                     </div>
-                    <ul className="divide-y divide-ink-100">
+                    <ul className="divide-y divide-ink-100 dark:divide-ink-800">
                         {rows.map(({ label, value, badge, mono, hint }) => (
                             <li key={label} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                 <div className="min-w-0">
-                                    <p className="text-sm text-ink-900 font-medium">{label}</p>
-                                    {hint && <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">{hint}</p>}
+                                    <p className="text-sm text-ink-900 dark:text-white font-medium">{label}</p>
+                                    {hint && <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 leading-relaxed">{hint}</p>}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 sm:max-w-[55%] sm:justify-end">
-                                    <span className={mono ? 'font-mono text-accent-700 text-xs break-all' : 'text-ink-900 font-semibold text-sm text-right'}>{value}</span>
+                                    <span className={mono ? 'font-mono text-accent-700 dark:text-accent-300 text-xs break-all' : 'text-ink-900 dark:text-white font-semibold text-sm text-right'}>{value}</span>
                                     {badge === 'success' && (<CheckCircle2 size={14} className="text-accent-600 shrink-0" aria-label="Active" />)}
                                     {badge === 'warning' && (<AlertTriangle size={14} className="text-amber-600 shrink-0" aria-label="Attention" />)}
                                 </div>
@@ -151,9 +151,9 @@ export default function PlatformSettings() {
                 </section>
             ))}
 
-            <p className="text-xs text-ink-500 px-2 leading-relaxed">
-                For a complete env reference see <code className="text-ink-700 bg-ink-100 px-1 py-0.5 rounded font-mono">docs/DEPLOYMENT.md</code>.
-                Sensitive values (<code className="text-ink-700 font-mono">SECRET_KEY</code>, <code className="text-ink-700 font-mono">ENCRYPTION_KEY</code>, M-Pesa secrets) are deliberately not displayed.
+            <p className="text-xs text-ink-500 dark:text-ink-400 px-2 leading-relaxed">
+                For a complete env reference see <code className="text-ink-700 dark:text-ink-200 bg-ink-100 dark:bg-ink-800/50 px-1 py-0.5 rounded font-mono">docs/DEPLOYMENT.md</code>.
+                Sensitive values (<code className="text-ink-700 dark:text-ink-200 font-mono">SECRET_KEY</code>, <code className="text-ink-700 dark:text-ink-200 font-mono">ENCRYPTION_KEY</code>, M-Pesa secrets) are deliberately not displayed.
             </p>
         </div>
     );

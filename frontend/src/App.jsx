@@ -1,8 +1,8 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider, useTheme, applyDocumentTheme } from './context/ThemeContext';
 import { BrandingProvider } from './context/BrandingContext';
 import { ModuleProvider } from './context/ModuleContext';
 import { PatientProvider } from './context/PatientContext';
@@ -107,6 +107,27 @@ const RouteMeta = () => {
   return <Seo noindex title="Secure workspace" />;
 };
 
+// Route-aware dark-mode applier. Dark mode is scoped to two authenticated
+// surfaces, each with its OWN theme preference:
+//   • the tenant workspace (`/app/*`)         → client-controlled `resolved`
+//   • the platform back-office (`/superadmin`) → operator's `resolvedAdmin`,
+//     deliberately independent of the tenant client's choice.
+// Public, auth, and patient-portal routes are always rendered light so a
+// visitor whose OS is in dark mode never lands on a half-dark, broken
+// marketing/login page. Rendered inside <BrowserRouter> so it can read the path.
+const ThemeApplier = () => {
+  const { resolved, resolvedAdmin } = useTheme();
+  const { pathname } = useLocation();
+  const isSuperadmin =
+    pathname.startsWith('/superadmin') && pathname !== '/superadmin/login';
+  const isWorkspace = pathname.startsWith('/app');
+  const applied = isSuperadmin ? resolvedAdmin : isWorkspace ? resolved : 'light';
+  useEffect(() => {
+    applyDocumentTheme(applied);
+  }, [applied]);
+  return null;
+};
+
 // SMART ROUTER
 const RoleBasedRedirect = () => {
     const { user, loading } = useAuth();
@@ -145,6 +166,7 @@ export default function App() {
               module page calls useModuleJourney(). Mounted once at the
               app root so portal target (document.body) is always available. */}
           <JourneyOverlay />
+          <ThemeApplier />
           <RouteMeta />
           <Suspense fallback={<PageFallback />}>
           <Routes>

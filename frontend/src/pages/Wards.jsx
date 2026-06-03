@@ -165,7 +165,7 @@ export default function Wards() {
             <div data-tour="ward-kpis" className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="stat-tile">
                     <div className="flex justify-between items-start">
-                        <div className="stat-icon bg-blue-50 ring-blue-100 text-blue-600"><Activity size={20} /></div>
+                        <div className="stat-icon bg-blue-50 dark:bg-blue-500/10 ring-blue-100 dark:ring-blue-500/20 text-blue-600 dark:text-blue-300"><Activity size={20} /></div>
                     </div>
                     <div>
                         <h3 className="stat-label">Total occupancy</h3>
@@ -177,20 +177,20 @@ export default function Wards() {
                 </div>
                 <div className="stat-tile">
                     <div className="flex justify-between items-start">
-                        <div className="stat-icon bg-accent-50 ring-accent-100 text-accent-600"><Bed size={20} /></div>
+                        <div className="stat-icon bg-accent-50 dark:bg-accent-500/10 ring-accent-100 dark:ring-accent-500/20 text-accent-600 dark:text-accent-300"><Bed size={20} /></div>
                     </div>
                     <div>
                         <h3 className="stat-label">Available capacity</h3>
-                        <p className="stat-value mt-1 text-accent-700">{availableBeds}</p>
+                        <p className="stat-value mt-1 text-accent-700 dark:text-accent-300">{availableBeds}</p>
                     </div>
                 </div>
                 <div className="stat-tile">
                     <div className="flex justify-between items-start">
-                        <div className="stat-icon bg-amber-50 ring-amber-100 text-amber-600"><AlertCircle size={20} /></div>
+                        <div className="stat-icon bg-amber-50 dark:bg-amber-500/10 ring-amber-100 dark:ring-amber-500/20 text-amber-600 dark:text-amber-300"><AlertCircle size={20} /></div>
                     </div>
                     <div>
                         <h3 className="stat-label">Sanitation / maintenance</h3>
-                        <p className="stat-value mt-1 text-amber-700">{totalBeds - occupiedBeds - availableBeds}</p>
+                        <p className="stat-value mt-1 text-amber-700 dark:text-amber-300">{totalBeds - occupiedBeds - availableBeds}</p>
                     </div>
                 </div>
             </div>
@@ -201,18 +201,18 @@ export default function Wards() {
                     <div className="card text-center py-12 text-ink-400"><Activity className="animate-spin mx-auto mb-2" size={20} /> Resolving allocations…</div>
                 ) : wards.map(ward => (
                     <div key={ward.id} className="card overflow-hidden">
-                        <div className="bg-ink-50/60 border-b border-ink-100 p-4 flex justify-between items-center">
-                            <h2 className="text-base font-semibold text-ink-900 tracking-tight">{ward.name}</h2>
-                            <span className="text-xs font-medium text-ink-500">Capacity limit: <span className="text-ink-800 font-semibold">{ward.capacity}</span></span>
+                        <div className="bg-ink-50/60 dark:bg-ink-800/40 border-b border-ink-100 dark:border-ink-800 p-4 flex justify-between items-center">
+                            <h2 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">{ward.name}</h2>
+                            <span className="text-xs font-medium text-ink-500 dark:text-ink-400">Capacity limit: <span className="text-ink-800 dark:text-ink-200 font-semibold">{ward.capacity}</span></span>
                         </div>
 
                         <div className="p-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                             {ward.beds.map(bed => {
                                 const variantBg = {
-                                    Available: 'bg-white border-accent-200',
-                                    Occupied:  'bg-blue-50/60 border-blue-200 hover:border-blue-400 cursor-pointer hover:-translate-y-0.5',
-                                    Cleaning:  'bg-purple-50 border-purple-200',
-                                }[bed.status] || 'bg-amber-50 border-amber-200';
+                                    Available: 'bg-white dark:bg-ink-900 border-accent-200 dark:border-accent-500/20',
+                                    Occupied:  'bg-blue-50/60 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 hover:border-blue-400 cursor-pointer hover:-translate-y-0.5',
+                                    Cleaning:  'bg-purple-50 dark:bg-purple-500/10 border-purple-200 dark:border-purple-500/20',
+                                }[bed.status] || 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20';
                                 const dotBg = {
                                     Available: 'bg-accent-500',
                                     Occupied:  'bg-blue-500 animate-pulse-soft',
@@ -256,8 +256,8 @@ export default function Wards() {
             {isAdmitModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsAdmitModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-brand-600 to-brand-700 text-white shrink-0">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-brand-600 to-brand-700 text-white shrink-0">
                             <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-200">New admission</span>
                             <h2 className="text-lg font-semibold mt-1 flex items-center gap-2"><UserPlus size={20} className="text-brand-200" /> Admit patient</h2>
                             <p className="text-sm text-brand-100/90 mt-1">Allocate a bed and create a new inpatient admission record.</p>
@@ -298,7 +298,7 @@ export default function Wards() {
                             </form>
                         </div>
 
-                        <div className="p-5 border-t border-ink-100 bg-white flex gap-3 shrink-0">
+                        <div className="p-5 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex gap-3 shrink-0">
                             <button type="button" onClick={() => setIsAdmitModalOpen(false)} className="btn-secondary">Cancel</button>
                             <button type="submit" form="admitForm" className="btn-primary flex-1">Allocate &amp; admit</button>
                         </div>
@@ -310,9 +310,9 @@ export default function Wards() {
             {activeBed && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setActiveBed(null)}></div>
-                    <div className="relative w-full max-w-2xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
 
-                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-blue-600 to-blue-700 text-white shrink-0">
+                        <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-blue-600 to-blue-700 text-white shrink-0">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-blue-200">Inpatient chart</span>
@@ -390,7 +390,7 @@ export default function Wards() {
                             </div>
                         </div>
 
-                        <div className="p-5 border-t border-ink-100 bg-white shrink-0 space-y-2">
+                        <div className="p-5 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shrink-0 space-y-2">
                             <button
                                 onClick={() => printAdmissionSlip({
                                     patient: { full_name: activeBed.patient, outpatient_no: activeBed.op_no, inpatient_no: activeBed.inpatient_no, age: activeBed.age, sex: activeBed.sex, blood_group: activeBed.blood_group },

@@ -13,9 +13,9 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const BUDGET_STATUS_BADGE = {
-    draft:    'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-    active:   'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    archived: 'bg-ink-50 text-ink-500 ring-1 ring-ink-200',
+    draft:    'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20',
+    active:   'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20',
+    archived: 'bg-ink-50 text-ink-500 ring-1 ring-ink-200 dark:bg-ink-800/40 dark:text-ink-400 dark:ring-ink-800',
 };
 
 export default function BudgetingTab() {
@@ -45,7 +45,7 @@ export default function BudgetingTab() {
                            onNew={() => setOpenNew(true)} />
             <DataCard loading={loading} empty={budgets.length === 0} emptyMsg="No budgets yet.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Name</th>
                             <th className="text-left px-4 py-2 font-medium">Fiscal year</th>
@@ -54,9 +54,9 @@ export default function BudgetingTab() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {budgets.map(b => (
-                            <tr key={b.budget_id} className="hover:bg-ink-50/40">
+                            <tr key={b.budget_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
                                 <td className="px-4 py-2 font-medium">
                                     <button onClick={() => setSelectedId(b.budget_id)} className="hover:underline">
                                         {b.name}
@@ -68,7 +68,7 @@ export default function BudgetingTab() {
                                         {b.status}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2 text-ink-500 truncate max-w-xs">{b.notes || '—'}</td>
+                                <td className="px-4 py-2 text-ink-500 dark:text-ink-400 truncate max-w-xs">{b.notes || '—'}</td>
                                 <td className="px-4 py-2 text-right">
                                     <button onClick={() => setSelectedId(b.budget_id)}
                                             className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
@@ -166,28 +166,28 @@ function BudgetDetail({ budgetId, onBack }) {
             <div className="flex items-center justify-between">
                 <div>
                     <button onClick={onBack} className="text-xs text-brand-700 hover:underline">← All budgets</button>
-                    <h3 className="text-lg font-semibold text-ink-900 mt-1">
+                    <h3 className="text-lg font-semibold text-ink-900 dark:text-white mt-1">
                         {budget?.name} <span className="text-ink-400 font-normal">· {budget?.fiscal_year}</span>
                     </h3>
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => setView('plan')}
                             className={'inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium ' +
-                                (view === 'plan' ? 'bg-brand-600 text-white' : 'border border-ink-200 text-ink-600 hover:bg-ink-50')}>
+                                (view === 'plan' ? 'bg-brand-600 text-white' : 'border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800/50')}>
                         <Target size={14} /> Plan
                     </button>
                     <button onClick={() => setView('actual')}
                             className={'inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium ' +
-                                (view === 'actual' ? 'bg-brand-600 text-white' : 'border border-ink-200 text-ink-600 hover:bg-ink-50')}>
+                                (view === 'actual' ? 'bg-brand-600 text-white' : 'border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800/50')}>
                         <BarChart3 size={14} /> Budget vs Actual
                     </button>
                 </div>
             </div>
 
             {loading ? (
-                <div className="p-6 text-sm text-ink-500">Loading...</div>
+                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
             ) : periods.length === 0 ? (
-                <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 text-sm text-ink-600">
+                <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 text-sm text-ink-600 dark:text-ink-400">
                     No fiscal periods exist for {budget.fiscal_year} yet.
                     <button onClick={seedYear} className="ml-2 text-brand-700 hover:underline font-medium">
                         Create the 12 monthly periods
@@ -252,16 +252,16 @@ function BudgetGrid({ budget, accounts, periods }) {
     const grandTotal = accounts.reduce((s, a) => s + rowTotal(a.account_id), 0);
 
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-ink-100 text-xs text-ink-500">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-ink-100 dark:border-ink-800 text-xs text-ink-500 dark:text-ink-400">
                 <span>Edit any cell — changes save automatically.</span>
                 {savedAt && <span className="text-emerald-600">Saved {savedAt.toLocaleTimeString()}</span>}
             </div>
             <div className="overflow-x-auto">
                 <table className="text-sm border-collapse">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
-                            <th className="text-left px-3 py-2 font-medium sticky left-0 bg-ink-50/60 z-10 min-w-[220px]">Account</th>
+                            <th className="text-left px-3 py-2 font-medium sticky left-0 bg-ink-50/60 dark:bg-ink-800/40 z-10 min-w-[220px]">Account</th>
                             {periods.map(p => (
                                 <th key={p.period_id} className="text-right px-2 py-2 font-medium min-w-[90px]">
                                     {MONTHS[p.month - 1]}
@@ -270,11 +270,11 @@ function BudgetGrid({ budget, accounts, periods }) {
                             <th className="text-right px-3 py-2 font-medium min-w-[110px]">Total</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {accounts.map(a => (
-                            <tr key={a.account_id} className="hover:bg-ink-50/30">
-                                <td className="px-3 py-1.5 sticky left-0 bg-white z-10">
-                                    <span className="font-mono text-xs text-ink-500">{a.code}</span>{' '}
+                            <tr key={a.account_id} className="hover:bg-ink-50/30 dark:hover:bg-ink-800/50">
+                                <td className="px-3 py-1.5 sticky left-0 bg-white dark:bg-ink-900 z-10">
+                                    <span className="font-mono text-xs text-ink-500 dark:text-ink-400">{a.code}</span>{' '}
                                     {a.name}
                                 </td>
                                 {periods.map(p => {
@@ -292,9 +292,9 @@ function BudgetGrid({ budget, accounts, periods }) {
                             </tr>
                         ))}
                     </tbody>
-                    <tfoot className="bg-ink-50 font-medium">
+                    <tfoot className="bg-ink-50 dark:bg-ink-800/40 font-medium">
                         <tr>
-                            <td className="px-3 py-2 sticky left-0 bg-ink-50 z-10">Total</td>
+                            <td className="px-3 py-2 sticky left-0 bg-ink-50 dark:bg-ink-800/40 z-10 dark:text-ink-200">Total</td>
                             {periods.map(p => (
                                 <td key={p.period_id} className="px-2 py-2 text-right font-mono">{formatAmount(colTotal(p.period_id))}</td>
                             ))}
@@ -326,7 +326,7 @@ function VsActualView({ budgetId, periods }) {
     return (
         <div className="space-y-3">
             <div className="flex items-center gap-2">
-                <span className="text-sm text-ink-600">Period:</span>
+                <span className="text-sm text-ink-600 dark:text-ink-400">Period:</span>
                 <select className="input w-48" value={periodId} onChange={(e) => setPeriodId(e.target.value)}>
                     <option value="">Full year</option>
                     {periods.map(p => (
@@ -339,7 +339,7 @@ function VsActualView({ budgetId, periods }) {
                       emptyMsg="No budget lines to compare yet.">
                 {data && (
                     <table className="w-full text-sm">
-                        <thead className="bg-ink-50/60 text-ink-600">
+                        <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                             <tr>
                                 <th className="text-left px-4 py-2 font-medium">Account</th>
                                 <th className="text-right px-4 py-2 font-medium">Budget</th>
@@ -348,11 +348,11 @@ function VsActualView({ budgetId, periods }) {
                                 <th className="text-right px-4 py-2 font-medium">%</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100">
+                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                             {data.rows.map(r => (
-                                <tr key={r.account_id} className="hover:bg-ink-50/40">
+                                <tr key={r.account_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
                                     <td className="px-4 py-2">
-                                        <span className="font-mono text-xs text-ink-500">{r.code}</span> {r.name}
+                                        <span className="font-mono text-xs text-ink-500 dark:text-ink-400">{r.code}</span> {r.name}
                                     </td>
                                     <td className="px-4 py-2 text-right font-mono">{formatAmount(r.budget)}</td>
                                     <td className="px-4 py-2 text-right font-mono">{formatAmount(r.actual)}</td>
@@ -360,15 +360,15 @@ function VsActualView({ budgetId, periods }) {
                                         (Number(r.variance) < 0 ? 'text-rose-600' : 'text-emerald-700')}>
                                         {formatAmount(r.variance)}
                                     </td>
-                                    <td className="px-4 py-2 text-right text-ink-500">
+                                    <td className="px-4 py-2 text-right text-ink-500 dark:text-ink-400">
                                         {r.variance_pct == null ? '—' : `${Number(r.variance_pct).toFixed(1)}%`}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot className="bg-ink-50 font-semibold">
+                        <tfoot className="bg-ink-50 dark:bg-ink-800/40 font-semibold">
                             <tr>
-                                <td className="px-4 py-2">Total</td>
+                                <td className="px-4 py-2 dark:text-ink-200">Total</td>
                                 <td className="px-4 py-2 text-right font-mono">{formatAmount(data.totals.budget)}</td>
                                 <td className="px-4 py-2 text-right font-mono">{formatAmount(data.totals.actual)}</td>
                                 <td className={'px-4 py-2 text-right font-mono ' +

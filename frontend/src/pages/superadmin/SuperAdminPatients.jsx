@@ -118,7 +118,7 @@ export default function SuperAdminPatients() {
                         placeholder="Search by name, OP number, phone…"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full bg-white border border-ink-200 rounded-lg pl-9 pr-4 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                        className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg pl-9 pr-4 py-2 text-sm text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
                     />
                 </div>
                 <div className="relative">
@@ -128,25 +128,25 @@ export default function SuperAdminPatients() {
                         id="tenant-filter"
                         value={tenantFilter}
                         onChange={(e) => setTenantFilter(e.target.value)}
-                        className="w-full sm:w-auto bg-white border border-ink-200 rounded-lg pl-9 pr-8 py-2 text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                        className="w-full sm:w-auto bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg pl-9 pr-8 py-2 text-sm text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                     >
                         <option value="">All tenants ({tenants.length})</option>
                         {tenants.map(t => <option key={t.tenant_id} value={t.tenant_id}>{t.name}</option>)}
                     </select>
                 </div>
-                <div className="text-xs text-ink-500 sm:ml-auto">
+                <div className="text-xs text-ink-500 dark:text-ink-400 sm:ml-auto">
                     {patients.length} record{patients.length === 1 ? '' : 's'}
                 </div>
             </div>
 
             {errors.length > 0 && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-4 text-xs flex items-start gap-2">
-                    <AlertTriangle size={14} className="text-rose-600 shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-200 rounded-xl p-4 text-xs flex items-start gap-2">
+                    <AlertTriangle size={14} className="text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
                     <div>
-                        <p className="font-semibold uppercase tracking-[0.14em] text-2xs text-rose-700">Partial results</p>
+                        <p className="font-semibold uppercase tracking-[0.14em] text-2xs text-rose-700 dark:text-rose-300">Partial results</p>
                         <ul className="mt-1 space-y-0.5">
                             {errors.map((e, i) => (
-                                <li key={i} className="font-mono"><span className="text-rose-900">{e.tenant_db}</span> · {e.error}</li>
+                                <li key={i} className="font-mono"><span className="text-rose-900 dark:text-rose-200">{e.tenant_db}</span> · {e.error}</li>
                             ))}
                         </ul>
                     </div>
@@ -155,11 +155,11 @@ export default function SuperAdminPatients() {
 
             {/* Patient list */}
             {isLoading ? (
-                <div className="card p-12 text-center text-ink-600">
+                <div className="card p-12 text-center text-ink-600 dark:text-ink-400">
                     <Activity className="animate-spin mx-auto mb-2 text-brand-600" size={20} aria-hidden="true" /> Aggregating patients across tenants…
                 </div>
             ) : patients.length === 0 ? (
-                <div className="card p-12 text-center text-ink-500">
+                <div className="card p-12 text-center text-ink-500 dark:text-ink-400">
                     No patients match your filters.
                 </div>
             ) : (
@@ -168,16 +168,16 @@ export default function SuperAdminPatients() {
                         const [, tenantName] = key.split(':');
                         return (
                             <div key={key} className="card overflow-hidden">
-                                <div className="px-5 py-3 border-b border-ink-200 bg-ink-50 flex items-center gap-2">
+                                <div className="px-5 py-3 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex items-center gap-2">
                                     <Building2 size={14} className="text-brand-600" aria-hidden="true" />
-                                    <h2 className="font-semibold text-ink-900 text-sm tracking-tight truncate">{tenantName}</h2>
-                                    <span className="text-2xs text-ink-500 font-mono ml-auto shrink-0">{rows.length} patient{rows.length === 1 ? '' : 's'}</span>
+                                    <h2 className="font-semibold text-ink-900 dark:text-white text-sm tracking-tight truncate">{tenantName}</h2>
+                                    <span className="text-2xs text-ink-500 dark:text-ink-400 font-mono ml-auto shrink-0">{rows.length} patient{rows.length === 1 ? '' : 's'}</span>
                                 </div>
 
                                 {/* Desktop table */}
                                 <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full text-left text-sm">
-                                        <thead className="bg-ink-50 text-ink-600 text-2xs uppercase font-semibold tracking-[0.14em]">
+                                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
                                             <tr>
                                                 <th className="px-5 py-3">OP #</th>
                                                 <th className="px-5 py-3">Name</th>
@@ -188,21 +188,21 @@ export default function SuperAdminPatients() {
                                                 <th className="px-5 py-3 text-right">View</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-ink-100 text-ink-700">
+                                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-200">
                                             {rows.map(p => (
-                                                <tr key={`${p.tenant_id}:${p.patient_id}`} className="hover:bg-ink-50 transition-colors">
+                                                <tr key={`${p.tenant_id}:${p.patient_id}`} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors">
                                                     <td className="px-5 py-3 font-mono text-xs text-brand-700">{p.outpatient_no}</td>
-                                                    <td className="px-5 py-3 font-semibold text-ink-900">{p.surname}, {p.other_names}</td>
+                                                    <td className="px-5 py-3 font-semibold text-ink-900 dark:text-white">{p.surname}, {p.other_names}</td>
                                                     <td className="px-5 py-3 text-xs">{p.sex} · {p.date_of_birth || '—'}</td>
                                                     <td className="px-5 py-3 text-xs"><Phone size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.telephone_1 || '—'}</td>
                                                     <td className="px-5 py-3 text-xs"><MapPin size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.town || '—'}</td>
-                                                    <td className="px-5 py-3 text-xs text-ink-500"><Calendar size={11} className="inline mr-1" aria-hidden="true" /> {p.registered_on ? new Date(p.registered_on).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-5 py-3 text-xs text-ink-500 dark:text-ink-400"><Calendar size={11} className="inline mr-1" aria-hidden="true" /> {p.registered_on ? new Date(p.registered_on).toLocaleDateString() : '—'}</td>
                                                     <td className="px-5 py-3 text-right">
                                                         <button
                                                             type="button"
                                                             onClick={() => openDetail(p)}
                                                             aria-label={`View ${p.outpatient_no}`}
-                                                            className="p-2 rounded-lg text-ink-500 hover:text-brand-700 hover:bg-ink-100 transition-colors cursor-pointer"
+                                                            className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-brand-700 hover:bg-ink-100 dark:hover:bg-ink-800/50 transition-colors cursor-pointer"
                                                         >
                                                             <Eye size={15} aria-hidden="true" />
                                                         </button>
@@ -214,22 +214,22 @@ export default function SuperAdminPatients() {
                                 </div>
 
                                 {/* Mobile card list — preserves info without horizontal scroll */}
-                                <ul className="md:hidden divide-y divide-ink-100">
+                                <ul className="md:hidden divide-y divide-ink-100 dark:divide-ink-800">
                                     {rows.map(p => (
                                         <li key={`${p.tenant_id}:${p.patient_id}-mb`} className="p-4">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
-                                                    <p className="font-semibold text-ink-900 truncate">{p.surname}, {p.other_names}</p>
+                                                    <p className="font-semibold text-ink-900 dark:text-white truncate">{p.surname}, {p.other_names}</p>
                                                     <p className="text-xs text-brand-700 font-mono mt-0.5">{p.outpatient_no}</p>
-                                                    <p className="text-xs text-ink-600 mt-1">{p.sex} · {p.date_of_birth || '—'}</p>
-                                                    <p className="text-xs text-ink-600 mt-0.5 flex items-center gap-1"><Phone size={11} aria-hidden="true" /> {p.telephone_1 || '—'}</p>
-                                                    <p className="text-xs text-ink-500 mt-0.5 flex items-center gap-1"><MapPin size={11} aria-hidden="true" /> {p.town || '—'}</p>
+                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-1">{p.sex} · {p.date_of_birth || '—'}</p>
+                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-0.5 flex items-center gap-1"><Phone size={11} aria-hidden="true" /> {p.telephone_1 || '—'}</p>
+                                                    <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 flex items-center gap-1"><MapPin size={11} aria-hidden="true" /> {p.town || '—'}</p>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => openDetail(p)}
                                                     aria-label={`View ${p.outpatient_no}`}
-                                                    className="shrink-0 inline-flex items-center justify-center size-11 rounded-lg text-ink-500 hover:text-brand-700 hover:bg-ink-100 transition-colors cursor-pointer"
+                                                    className="shrink-0 inline-flex items-center justify-center size-11 rounded-lg text-ink-500 dark:text-ink-400 hover:text-brand-700 hover:bg-ink-100 dark:hover:bg-ink-800/50 transition-colors cursor-pointer"
                                                 >
                                                     <Eye size={18} aria-hidden="true" />
                                                 </button>
@@ -256,39 +256,39 @@ export default function SuperAdminPatients() {
                         onClick={() => setSelected(null)}
                         aria-hidden="true"
                     />
-                    <div className="relative w-full max-w-3xl h-full bg-white border-l border-ink-200 shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex items-start justify-between gap-3 shrink-0">
+                    <div className="relative w-full max-w-3xl h-full bg-white dark:bg-ink-900 border-l border-ink-200 dark:border-ink-800 shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex items-start justify-between gap-3 shrink-0">
                             <div className="min-w-0">
                                 <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">Read-only patient view</span>
-                                <h2 id="patient-detail-title" className="text-base font-semibold text-ink-900 mt-0.5 truncate">{selected.surname}, {selected.other_names}</h2>
-                                <p className="text-xs text-ink-600 mt-0.5">Tenant: <span className="text-ink-900 font-medium">{selected.tenant_name}</span> · OP <span className="font-mono text-brand-700">{selected.outpatient_no}</span></p>
+                                <h2 id="patient-detail-title" className="text-base font-semibold text-ink-900 dark:text-white mt-0.5 truncate">{selected.surname}, {selected.other_names}</h2>
+                                <p className="text-xs text-ink-600 dark:text-ink-400 mt-0.5">Tenant: <span className="text-ink-900 dark:text-white font-medium">{selected.tenant_name}</span> · OP <span className="font-mono text-brand-700">{selected.outpatient_no}</span></p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSelected(null)}
                                 aria-label="Close patient detail"
-                                className="p-2 text-ink-500 hover:text-ink-900 hover:bg-ink-100 rounded-lg cursor-pointer shrink-0"
+                                className="p-2 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-lg cursor-pointer shrink-0"
                             >
                                 <X size={18} aria-hidden="true" />
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
                             {detailLoading ? (
-                                <div className="text-center py-12 text-ink-600">
+                                <div className="text-center py-12 text-ink-600 dark:text-ink-400">
                                     <Activity className="animate-spin mx-auto mb-2 text-brand-600" size={20} aria-hidden="true" /> Loading…
                                 </div>
                             ) : detail ? (
                                 <div className="space-y-4">
-                                    <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-2xs flex items-center gap-2">
+                                    <div className="bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-200 rounded-xl p-3 text-2xs flex items-center gap-2">
                                         <ShieldCheck size={13} aria-hidden="true" /> Read-only — no actions are exposed in this view.
                                     </div>
-                                    <div className="card divide-y divide-ink-100">
+                                    <div className="card divide-y divide-ink-100 dark:divide-ink-800">
                                         {Object.entries(detail).filter(([k]) => k !== 'tenant').map(([k, v]) => (
                                             <div key={k} className="px-4 sm:px-5 py-3 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-3 items-start">
-                                                <div className="text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em]">{k.replace(/_/g, ' ')}</div>
-                                                <div className="sm:col-span-2 text-sm text-ink-900 break-words">
-                                                    {v === null || v === '' ? <span className="text-ink-500 italic">empty</span> :
-                                                        typeof v === 'object' ? <code className="font-mono text-xs text-ink-700">{JSON.stringify(v)}</code> :
+                                                <div className="text-2xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-[0.14em]">{k.replace(/_/g, ' ')}</div>
+                                                <div className="sm:col-span-2 text-sm text-ink-900 dark:text-white break-words">
+                                                    {v === null || v === '' ? <span className="text-ink-500 dark:text-ink-400 italic">empty</span> :
+                                                        typeof v === 'object' ? <code className="font-mono text-xs text-ink-700 dark:text-ink-200">{JSON.stringify(v)}</code> :
                                                         String(v)}
                                                 </div>
                                             </div>
@@ -296,7 +296,7 @@ export default function SuperAdminPatients() {
                                     </div>
                                 </div>
                             ) : (
-                                <p className="text-ink-500 text-sm">Unable to load patient.</p>
+                                <p className="text-ink-500 dark:text-ink-400 text-sm">Unable to load patient.</p>
                             )}
                         </div>
                     </div>

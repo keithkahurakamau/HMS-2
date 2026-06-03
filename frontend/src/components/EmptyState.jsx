@@ -39,13 +39,16 @@ export default function EmptyState({
                 neutral: 'bg-white/[0.06] text-ink-200 ring-white/10',
             }[tone];
         }
+        // Light surface (workspace default) — `dark:` companions so the empty
+        // state flips with the app theme. The dark branch above is for the
+        // always-dark superadmin console (surface="dark").
         return {
-            brand:   'bg-brand-50 text-brand-700 ring-brand-100',
-            teal:    'bg-teal-50 text-teal-700 ring-teal-100',
-            accent:  'bg-accent-50 text-accent-700 ring-accent-100',
-            warning: 'bg-amber-50 text-amber-700 ring-amber-100',
-            rose:    'bg-rose-50 text-rose-700 ring-rose-100',
-            neutral: 'bg-ink-100 text-ink-700 ring-ink-200',
+            brand:   'bg-brand-50 text-brand-700 ring-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20',
+            teal:    'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/20',
+            accent:  'bg-accent-50 text-accent-700 ring-accent-100 dark:bg-accent-500/10 dark:text-accent-300 dark:ring-accent-500/20',
+            warning: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20',
+            rose:    'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20',
+            neutral: 'bg-ink-100 text-ink-700 ring-ink-200 dark:bg-white/[0.06] dark:text-ink-200 dark:ring-white/10',
         }[tone];
     })();
 
@@ -53,7 +56,7 @@ export default function EmptyState({
         <div
             className={[
                 'rounded-2xl border border-dashed text-center',
-                isDark ? 'border-white/10 bg-white/[0.02]' : 'border-ink-300 bg-white/60',
+                isDark ? 'border-white/10 bg-white/[0.02]' : 'border-ink-300 bg-white/60 dark:border-white/10 dark:bg-white/[0.02]',
                 dense ? 'p-6' : 'p-10 sm:p-14',
             ].join(' ')}
         >
@@ -62,11 +65,11 @@ export default function EmptyState({
                     <Icon size={22} aria-hidden="true" />
                 </div>
             )}
-            <h3 className={`mt-4 text-base font-semibold tracking-tight ${isDark ? 'text-white' : 'text-ink-900'}`}>
+            <h3 className={`mt-4 text-base font-semibold tracking-tight ${isDark ? 'text-white' : 'text-ink-900 dark:text-white'}`}>
                 {title}
             </h3>
             {body && (
-                <p className={`mt-1.5 text-sm max-w-md mx-auto leading-relaxed ${isDark ? 'text-ink-400' : 'text-ink-500'}`}>
+                <p className={`mt-1.5 text-sm max-w-md mx-auto leading-relaxed ${isDark ? 'text-ink-400' : 'text-ink-500 dark:text-ink-400'}`}>
                     {body}
                 </p>
             )}
