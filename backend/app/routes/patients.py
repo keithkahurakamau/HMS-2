@@ -98,7 +98,7 @@ def get_patients(request: Request, search: str = Query("", description="Search b
 # ==========================================
 # 2. GET PATIENT BY ID
 # ==========================================
-@router.get("/{patient_id}", dependencies=[Depends(RequirePermission("patients:read"))])
+@router.get("/{patient_id:int}", dependencies=[Depends(RequirePermission("patients:read"))])
 def get_patient_by_id(patient_id: int, db: Session = Depends(get_db)):
     patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
     if not patient:
@@ -188,7 +188,7 @@ def register_patient(patient_in: PatientCreate, request: Request, db: Session = 
 # ==========================================
 # 4. UPDATE PATIENT
 # ==========================================
-@router.put("/{patient_id}", dependencies=[Depends(RequirePermission("patients:write"))])
+@router.put("/{patient_id:int}", dependencies=[Depends(RequirePermission("patients:write"))])
 def update_patient(patient_id: int, patient_in: PatientUpdate, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     # Audit PER-001: the prior update path took `patient_data: dict` and
     # did `setattr(patient, key, value) if hasattr(patient, key)`, which
@@ -230,7 +230,7 @@ def update_patient(patient_id: int, patient_in: PatientUpdate, request: Request,
 # ==========================================
 # 5. DEACTIVATE (SOFT DELETE) PATIENT
 # ==========================================
-@router.delete("/{patient_id}", dependencies=[Depends(RequirePermission("patients:write"))])
+@router.delete("/{patient_id:int}", dependencies=[Depends(RequirePermission("patients:write"))])
 def delete_patient(patient_id: int, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
     if not patient:
@@ -251,7 +251,7 @@ def delete_patient(patient_id: int, request: Request, db: Session = Depends(get_
 # ==========================================
 # 6. GET COMPREHENSIVE HISTORY
 # ==========================================
-@router.get("/{patient_id}/history", dependencies=[Depends(RequirePermission("patients:read"))])
+@router.get("/{patient_id:int}/history", dependencies=[Depends(RequirePermission("patients:read"))])
 def get_patient_history(patient_id: int, db: Session = Depends(get_db)):
     patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
     if not patient:
@@ -286,7 +286,7 @@ class AccessLogPayload(BaseModel):
     reason: str | None = None  # operator-supplied free-text reason
 
 
-@router.post("/{patient_id}/access", dependencies=[Depends(RequirePermission("patients:read"))])
+@router.post("/{patient_id:int}/access", dependencies=[Depends(RequirePermission("patients:read"))])
 def log_patient_access(
     patient_id: int,
     payload: AccessLogPayload,
@@ -411,7 +411,7 @@ def list_staff_by_role(role: str = "", db: Session = Depends(get_db)):
     ]
 
 
-@router.post("/{patient_id}/route", dependencies=[Depends(RequirePermission("patients:write"))])
+@router.post("/{patient_id:int}/route", dependencies=[Depends(RequirePermission("patients:write"))])
 def route_patient(patient_id: int, request: QueueRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Route a registered patient onto a departmental queue.
 

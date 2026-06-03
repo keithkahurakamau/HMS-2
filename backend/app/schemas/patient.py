@@ -1,6 +1,24 @@
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 from typing import Optional
 from datetime import date, datetime
+
+
+class _PatientNorm(BaseModel):
+    """Shared normalizers for the patient request schemas.
+
+    A blank email is the common case for walk-in patients, and the front-end
+    sends the field as an empty string rather than omitting it. EmailStr rejects
+    "" with a cryptic 422 ("must have an @-sign"), so coerce empty/whitespace to
+    None *before* validation — the column is nullable and the route's
+    _normalize_blanks already treats null as "not provided". check_fields=False
+    lets this live on the mixin even though `email` is declared on the children.
+    """
+    @field_validator("email", mode="before", check_fields=False)
+    @classmethod
+    def _blank_email_to_none(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
 # Audit PER-001: the patient registration / update routes previously took
 # `patient_data: dict`, then mass-assigned every supplied key onto the
@@ -11,7 +29,7 @@ from datetime import date, datetime
 _STRICT = ConfigDict(extra="forbid")
 
 
-class PatientCreate(BaseModel):
+class PatientCreate(_PatientNorm):
     model_config = _STRICT
     # Demographics
     surname: str
@@ -54,7 +72,7 @@ class PatientCreate(BaseModel):
     insurance_provider: Optional[str] = None
     insurance_policy_number: Optional[str] = None
 
-class PatientUpdate(BaseModel):
+class PatientUpdate(_PatientNorm):
     model_config = _STRICT
     surname: Optional[str] = None
     other_names: Optional[str] = None
