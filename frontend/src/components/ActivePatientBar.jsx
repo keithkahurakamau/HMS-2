@@ -38,23 +38,23 @@ export default function ActivePatientBar() {
     return (
         <section
             aria-label="Active patient"
-            className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 mb-4 px-4 sm:px-6 lg:px-8 py-2.5 bg-brand-50/95 border-b border-brand-200 backdrop-blur-md shadow-soft"
+            className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 mb-4 px-4 sm:px-6 lg:px-8 py-2.5 bg-brand-50/95 dark:bg-brand-500/10 border-b border-brand-200 dark:border-brand-500/20 backdrop-blur-md shadow-soft"
         >
             <div className="flex items-center gap-3 min-w-0">
                 {/* Avatar */}
-                <div className="shrink-0 size-9 rounded-full bg-white border border-brand-200 flex items-center justify-center text-xs font-semibold text-brand-700" aria-hidden="true">
+                <div className="shrink-0 size-9 rounded-full bg-white dark:bg-ink-900 border border-brand-200 dark:border-brand-500/30 flex items-center justify-center text-xs font-semibold text-brand-700 dark:text-brand-300" aria-hidden="true">
                     {initialsOf(activePatient)}
                 </div>
 
                 {/* Identity */}
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">Active patient</span>
-                        <span className="font-mono text-2xs text-brand-700/80">{activePatient.outpatient_no}</span>
+                        <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700 dark:text-brand-300">Active patient</span>
+                        <span className="font-mono text-2xs text-brand-700/80 dark:text-brand-300/80">{activePatient.outpatient_no}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm font-medium text-ink-900 truncate">
+                    <div className="flex items-center gap-2 text-sm font-medium text-ink-900 dark:text-white truncate">
                         <span className="truncate">{fullName}</span>
-                        <span className="text-ink-500 text-xs hidden sm:inline">
+                        <span className="text-ink-500 dark:text-ink-400 text-xs hidden sm:inline">
                             {activePatient.sex || activePatient.gender || ''}
                             {(activePatient.age !== null && activePatient.age !== undefined) ? `, ${activePatient.age}y` : ''}
                         </span>
@@ -64,7 +64,7 @@ export default function ActivePatientBar() {
                             </span>
                         )}
                         {activePatient.blood_group && activePatient.blood_group !== 'Unknown' && (
-                            <span className="hidden md:inline-flex items-center gap-1 text-xs text-ink-600">
+                            <span className="hidden md:inline-flex items-center gap-1 text-xs text-ink-600 dark:text-ink-400">
                                 <Droplet size={11} className="text-rose-500" aria-hidden="true" />
                                 {activePatient.blood_group}
                             </span>
@@ -77,7 +77,7 @@ export default function ActivePatientBar() {
                     <button
                         type="button"
                         onClick={() => navigate(`/app/medical-history?patient_id=${activePatient.patient_id}`)}
-                        className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-800 hover:bg-brand-100 transition-colors cursor-pointer"
+                        className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-800 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-500/15 transition-colors cursor-pointer"
                         title="Open full chart"
                     >
                         <History size={13} aria-hidden="true" /> Chart
@@ -85,7 +85,7 @@ export default function ActivePatientBar() {
                     <button
                         type="button"
                         onClick={() => navigate('/app/clinical')}
-                        className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-800 hover:bg-brand-100 transition-colors cursor-pointer"
+                        className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-800 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-500/15 transition-colors cursor-pointer"
                         title="Go to Clinical Desk"
                     >
                         <Stethoscope size={13} aria-hidden="true" /> Clinical
@@ -93,7 +93,7 @@ export default function ActivePatientBar() {
                     <button
                         type="button"
                         onClick={() => navigate('/app/laboratory')}
-                        className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-800 hover:bg-brand-100 transition-colors cursor-pointer"
+                        className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-800 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-500/15 transition-colors cursor-pointer"
                         title="Go to Laboratory"
                     >
                         <FlaskConical size={13} aria-hidden="true" /> Lab
@@ -102,7 +102,7 @@ export default function ActivePatientBar() {
                         type="button"
                         onClick={clearActivePatient}
                         aria-label="Clear active patient"
-                        className="inline-flex items-center justify-center size-8 rounded-lg text-brand-700 hover:bg-brand-100 transition-colors cursor-pointer"
+                        className="inline-flex items-center justify-center size-8 rounded-lg text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-500/15 transition-colors cursor-pointer"
                         title="Close active patient"
                     >
                         <X size={16} aria-hidden="true" />

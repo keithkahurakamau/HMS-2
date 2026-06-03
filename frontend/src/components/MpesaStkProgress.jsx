@@ -32,13 +32,13 @@ export default function MpesaStkProgress({
     if (status === 'success') {
         return (
             <div className="text-center py-8 px-4">
-                <div className="mx-auto size-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
-                    <CheckCircle2 className="text-emerald-600" size={34} />
+                <div className="mx-auto size-16 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center mb-4">
+                    <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={34} />
                 </div>
-                <p className="text-base font-semibold text-ink-900">Payment received</p>
+                <p className="text-base font-semibold text-ink-900 dark:text-white">Payment received</p>
                 {receipt && (
-                    <p className="text-sm text-ink-500 mt-1">
-                        M-Pesa receipt <span className="font-mono font-semibold text-ink-700">{receipt}</span>
+                    <p className="text-sm text-ink-500 dark:text-ink-400 mt-1">
+                        M-Pesa receipt <span className="font-mono font-semibold text-ink-700 dark:text-ink-200">{receipt}</span>
                     </p>
                 )}
             </div>
@@ -48,11 +48,11 @@ export default function MpesaStkProgress({
     if (status === 'failed') {
         return (
             <div className="text-center py-8 px-4">
-                <div className="mx-auto size-16 rounded-full bg-rose-100 flex items-center justify-center mb-4">
-                    <XCircle className="text-rose-600" size={34} />
+                <div className="mx-auto size-16 rounded-full bg-rose-100 dark:bg-rose-500/15 flex items-center justify-center mb-4">
+                    <XCircle className="text-rose-600 dark:text-rose-400" size={34} />
                 </div>
-                <p className="text-base font-semibold text-ink-900">Payment failed. Please try again.</p>
-                <p className="text-sm text-ink-500 mt-1">
+                <p className="text-base font-semibold text-ink-900 dark:text-white">Payment failed. Please try again.</p>
+                <p className="text-sm text-ink-500 dark:text-ink-400 mt-1">
                     {errorDesc || 'The customer cancelled the prompt, the PIN timed out, or funds were insufficient.'}
                 </p>
                 {onRetry && (
@@ -78,7 +78,7 @@ export default function MpesaStkProgress({
             <div className="relative mx-auto size-24 mb-4">
                 <svg className="size-24 -rotate-90" viewBox="0 0 72 72">
                     <circle cx="36" cy="36" r={R} fill="none" stroke="currentColor"
-                            className="text-ink-100" strokeWidth="5" />
+                            className="text-ink-100 dark:text-ink-800" strokeWidth="5" />
                     <circle cx="36" cy="36" r={R} fill="none" stroke="currentColor"
                             className="text-brand-600 transition-[stroke-dashoffset] duration-1000 ease-linear"
                             strokeWidth="5" strokeLinecap="round"
@@ -86,19 +86,19 @@ export default function MpesaStkProgress({
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <Smartphone className="text-brand-600 animate-pulse" size={22} />
-                    <span className="text-xs font-mono font-semibold text-ink-700 mt-0.5">{clamped}s</span>
+                    <span className="text-xs font-mono font-semibold text-ink-700 dark:text-ink-200 mt-0.5">{clamped}s</span>
                 </div>
             </div>
-            <p className="text-base font-semibold text-ink-900">
+            <p className="text-base font-semibold text-ink-900 dark:text-white">
                 Prompt sent{phone ? <> to <span className="font-mono">{phone}</span></> : ''}
             </p>
-            <p className="text-sm text-ink-500 mt-1">
+            <p className="text-sm text-ink-500 dark:text-ink-400 mt-1">
                 Ask the customer to enter their M-Pesa PIN on their phone.
             </p>
             {onCancel && (
                 <button
                     onClick={onCancel}
-                    className="mt-5 px-3 py-1.5 rounded-lg border border-ink-200 text-xs font-medium text-ink-600 hover:bg-ink-50"
+                    className="mt-5 px-3 py-1.5 rounded-lg border border-ink-200 dark:border-ink-700 text-xs font-medium text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800"
                 >
                     Cancel
                 </button>

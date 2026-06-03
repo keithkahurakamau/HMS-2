@@ -159,9 +159,9 @@ export default function PlatformSubscriptions() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Config */}
-                <div data-tour="sub-config" className="lg:col-span-2 bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5">
+                <div data-tour="sub-config" className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
                     <SectionHead icon={Wallet} title="Your MediFleet Pay Hero account" />
-                    <p className="text-xs text-ink-500 -mt-3">
+                    <p className="text-xs text-ink-500 dark:text-ink-400 -mt-3">
                         These are MediFleet's OWN account values — subscription proceeds settle to MediFleet's bank.
                     </p>
 
@@ -221,7 +221,7 @@ export default function PlatformSubscriptions() {
                         <Field label="Transaction description"><input className="input" value={form.transaction_desc} onChange={set('transaction_desc')} /></Field>
                     </div>
 
-                    <div className="flex justify-end pt-2 border-t border-ink-100">
+                    <div className="flex justify-end pt-2 border-t border-ink-100 dark:border-ink-800">
                         <button onClick={saveConfig} disabled={saving}
                                 className="px-4 py-2 rounded-lg bg-accent-600 text-white text-sm font-medium hover:bg-accent-700 disabled:opacity-60">
                             {saving ? 'Saving…' : 'Save account'}
@@ -231,7 +231,7 @@ export default function PlatformSubscriptions() {
 
                 {/* Charge a tenant */}
                 <div data-tour="sub-charge" className="space-y-4">
-                    <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-5 space-y-3">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5 space-y-3">
                         <SectionHead icon={Phone} title="Charge a tenant" />
                         <Field label="Tenant">
                             <select className="input" value={chargeTenant} onChange={e => setChargeTenant(e.target.value)}>
@@ -243,7 +243,7 @@ export default function PlatformSubscriptions() {
                             <input className="input" value={chargePhone} onChange={e => setChargePhone(e.target.value)} placeholder="07XXXXXXXX or 2547XXXXXXXX" />
                         </Field>
                         <button onClick={saveContact} disabled={savingContact || !chargeTenant}
-                                className="text-xs text-accent-700 font-medium hover:underline disabled:opacity-50">
+                                className="text-xs text-accent-700 dark:text-accent-300 font-medium hover:underline disabled:opacity-50">
                             {savingContact ? 'Saving…' : 'Save as this tenant’s default billing phone'}
                         </button>
                         <div className="grid grid-cols-2 gap-3 pt-1">
@@ -256,24 +256,24 @@ export default function PlatformSubscriptions() {
                                 {charging ? 'Sending…' : 'Charge subscription'}
                             </button>
                             <button onClick={() => charge(true)} disabled={charging || !health?.ready}
-                                    className="px-3 py-2 rounded-lg border border-accent-200 text-accent-700 text-sm font-medium hover:bg-accent-50 disabled:opacity-60 inline-flex items-center gap-1">
+                                    className="px-3 py-2 rounded-lg border border-accent-200 dark:border-accent-500/30 text-accent-700 dark:text-accent-300 text-sm font-medium hover:bg-accent-50 dark:hover:bg-accent-500/10 disabled:opacity-60 inline-flex items-center gap-1">
                                 <Send size={14} /> Test
                             </button>
                         </div>
                         {!health?.ready && (
-                            <p className="text-xs text-amber-700">Charging unlocks once your account is fully configured (see status above).</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400">Charging unlocks once your account is fully configured (see status above).</p>
                         )}
                     </div>
                 </div>
             </div>
 
             {/* Live activity */}
-            <div data-tour="sub-activity" className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
-                <div className="p-4 border-b border-ink-100 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-ink-900 inline-flex items-center gap-2">
-                        <Activity size={16} className="text-accent-600" /> Subscription activity
+            <div data-tour="sub-activity" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+                <div className="p-4 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-ink-900 dark:text-white inline-flex items-center gap-2">
+                        <Activity size={16} className="text-accent-600 dark:text-accent-400" /> Subscription activity
                     </h3>
-                    <span className="text-2xs uppercase tracking-wider text-accent-700 inline-flex items-center gap-1.5">
+                    <span className="text-2xs uppercase tracking-wider text-accent-700 dark:text-accent-300 inline-flex items-center gap-1.5">
                         <span className="size-1.5 rounded-full bg-accent-500 animate-pulse-soft" /> live
                     </span>
                 </div>
@@ -285,11 +285,11 @@ export default function PlatformSubscriptions() {
 
 function SubsGuide() {
     return (
-        <div data-tour="sub-guide" className="bg-accent-50 border border-accent-200 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-accent-900 mb-2 inline-flex items-center gap-2">
+        <div data-tour="sub-guide" className="bg-accent-50 dark:bg-accent-500/10 border border-accent-200 dark:border-accent-500/20 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-accent-900 dark:text-accent-200 mb-2 inline-flex items-center gap-2">
                 <Wallet size={16} /> This is the only money you receive
             </h3>
-            <p className="text-sm text-accent-900/90 leading-relaxed">
+            <p className="text-sm text-accent-900/90 dark:text-accent-200/90 leading-relaxed">
                 Hospital patient payments never touch you — they settle to each hospital's own bank.
                 <strong> Subscriptions are the one inbound rail:</strong> you charge a tenant's billing
                 phone via M-Pesa and the money lands in <strong>MediFleet's own Pay Hero account</strong>,
@@ -304,17 +304,17 @@ function HealthBanner({ health }) {
     if (!health) return null;
     if (health.ready) {
         return (
-            <div data-tour="sub-health" className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-sm text-emerald-800 inline-flex items-start gap-2 w-full">
+            <div data-tour="sub-health" className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl p-4 text-sm text-emerald-800 dark:text-emerald-300 inline-flex items-start gap-2 w-full">
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
                 <div>
                     <span className="font-semibold">Ready to collect subscriptions.</span>
-                    {health.callback_url && <span className="text-xs text-emerald-700 block mt-0.5 font-mono break-all">callback: {health.callback_url}</span>}
+                    {health.callback_url && <span className="text-xs text-emerald-700 dark:text-emerald-400 block mt-0.5 font-mono break-all">callback: {health.callback_url}</span>}
                 </div>
             </div>
         );
     }
     return (
-        <div data-tour="sub-health" className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900 w-full">
+        <div data-tour="sub-health" className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 text-sm text-amber-900 dark:text-amber-200 w-full">
             <div className="font-semibold inline-flex items-center gap-2 mb-1"><AlertCircle size={16} /> Not ready yet — finish these first</div>
             <ul className="list-disc pl-5 text-xs space-y-0.5">
                 {(health.blockers || []).map((b, i) => <li key={i}>{b}</li>)}
@@ -324,7 +324,7 @@ function HealthBanner({ health }) {
 }
 
 const STATUS_TONE = {
-    Success: 'text-emerald-700', Failed: 'text-rose-700', Pending: 'text-amber-700',
+    Success: 'text-emerald-700 dark:text-emerald-400', Failed: 'text-rose-700 dark:text-rose-400', Pending: 'text-amber-700 dark:text-amber-400',
 };
 
 function TxnTable({ txns, tenants }) {

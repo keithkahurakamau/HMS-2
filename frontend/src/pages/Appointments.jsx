@@ -190,15 +190,15 @@ export default function Appointments() {
                 <div data-tour="appt-list" className="space-y-6">
                     {grouped.map(([day, list]) => (
                         <section key={day}>
-                            <h2 className="section-eyebrow mb-3 sticky top-0 bg-ink-50/95 backdrop-blur-sm py-2 z-[1] flex items-center gap-2">
+                            <h2 className="section-eyebrow mb-3 sticky top-0 bg-ink-50/95 dark:bg-ink-950/95 backdrop-blur-sm py-2 z-[1] flex items-center gap-2">
                                 {new Date(day).toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                                 <span className="text-ink-400 normal-case tracking-normal font-medium">&middot; {list.length}</span>
                             </h2>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                                 {list.map(appt => (
                                     <article key={appt.appointment_id} className="card p-4 flex gap-4 items-start hover:shadow-elevated transition-shadow">
-                                        <div className="w-16 shrink-0 text-center bg-ink-50 ring-1 ring-ink-100 rounded-xl py-2.5">
-                                            <div className="text-lg font-semibold text-ink-900 leading-none">
+                                        <div className="w-16 shrink-0 text-center bg-ink-50 dark:bg-ink-800/40 ring-1 ring-ink-100 dark:ring-ink-800 rounded-xl py-2.5">
+                                            <div className="text-lg font-semibold text-ink-900 dark:text-white leading-none">
                                                 {new Date(appt.appointment_date).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: false })}
                                             </div>
                                             <div className="text-2xs font-semibold text-ink-400 uppercase tracking-wider mt-1">
@@ -207,7 +207,7 @@ export default function Appointments() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <h3 className="font-semibold text-ink-900 truncate flex items-center gap-1.5">
+                                                <h3 className="font-semibold text-ink-900 dark:text-white truncate flex items-center gap-1.5">
                                                     <UserRound size={14} className="text-ink-400" />
                                                     {appt.patient_name}
                                                 </h3>
@@ -216,25 +216,25 @@ export default function Appointments() {
                                                     {appt.status}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-ink-500 mt-1 flex items-center gap-1.5">
+                                            <p className="text-xs text-ink-500 dark:text-ink-400 mt-1 flex items-center gap-1.5">
                                                 <Stethoscope size={12} /> {appt.doctor_name}
                                             </p>
-                                            {appt.notes && <p className="text-xs text-ink-600 mt-2 line-clamp-2 leading-relaxed">{appt.notes}</p>}
+                                            {appt.notes && <p className="text-xs text-ink-600 dark:text-ink-400 mt-2 line-clamp-2 leading-relaxed">{appt.notes}</p>}
 
                                             {appt.status !== 'Completed' && appt.status !== 'Cancelled' && (
                                                 <div data-tour="appt-actions" className="flex flex-wrap gap-1.5 mt-3">
                                                     {appt.status === 'Scheduled' && (
-                                                        <button onClick={() => updateStatus(appt.appointment_id, 'Confirmed')} className="text-xs font-semibold px-2.5 py-1 bg-accent-50 text-accent-700 rounded-lg ring-1 ring-accent-100 hover:bg-accent-100 transition-colors">
+                                                        <button onClick={() => updateStatus(appt.appointment_id, 'Confirmed')} className="text-xs font-semibold px-2.5 py-1 bg-accent-50 dark:bg-accent-500/10 text-accent-700 dark:text-accent-300 rounded-lg ring-1 ring-accent-100 dark:ring-accent-500/20 hover:bg-accent-100 dark:hover:bg-accent-500/20 transition-colors">
                                                             <CheckCircle2 size={12} className="inline mr-1" /> Confirm
                                                         </button>
                                                     )}
-                                                    <button onClick={() => updateStatus(appt.appointment_id, 'Completed')} className="text-xs font-semibold px-2.5 py-1 bg-ink-100 text-ink-700 rounded-lg ring-1 ring-ink-200 hover:bg-ink-200 transition-colors">
+                                                    <button onClick={() => updateStatus(appt.appointment_id, 'Completed')} className="text-xs font-semibold px-2.5 py-1 bg-ink-100 dark:bg-ink-800/40 text-ink-700 dark:text-ink-200 rounded-lg ring-1 ring-ink-200 dark:ring-ink-800 hover:bg-ink-200 dark:hover:bg-ink-800/50 transition-colors">
                                                         Mark completed
                                                     </button>
-                                                    <button onClick={() => updateStatus(appt.appointment_id, 'No-Show')} className="text-xs font-semibold px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg ring-1 ring-amber-100 hover:bg-amber-100 transition-colors">
+                                                    <button onClick={() => updateStatus(appt.appointment_id, 'No-Show')} className="text-xs font-semibold px-2.5 py-1 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-lg ring-1 ring-amber-100 dark:ring-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors">
                                                         No-show
                                                     </button>
-                                                    <button onClick={() => cancel(appt.appointment_id)} className="text-xs font-semibold px-2.5 py-1 bg-rose-50 text-rose-700 rounded-lg ring-1 ring-rose-100 hover:bg-rose-100 transition-colors">
+                                                    <button onClick={() => cancel(appt.appointment_id)} className="text-xs font-semibold px-2.5 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 rounded-lg ring-1 ring-rose-100 dark:ring-rose-500/20 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
                                                         <XCircle size={12} className="inline mr-1" /> Cancel
                                                     </button>
                                                 </div>
@@ -251,8 +251,8 @@ export default function Appointments() {
             {isFormOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/60 backdrop-blur-sm animate-fade-in" role="dialog" aria-modal="true">
                     <div className="card-elevated w-full max-w-lg overflow-hidden animate-slide-up">
-                        <div className="px-5 py-4 border-b border-ink-100 flex justify-between items-center bg-ink-50/60">
-                            <h2 className="font-semibold text-ink-900 flex items-center gap-2 tracking-tight">
+                        <div className="px-5 py-4 border-b border-ink-100 dark:border-ink-800 flex justify-between items-center bg-ink-50/60 dark:bg-ink-800/40">
+                            <h2 className="font-semibold text-ink-900 dark:text-white flex items-center gap-2 tracking-tight">
                                 <CalendarDays size={18} className="text-brand-600" /> New appointment
                             </h2>
                             <button onClick={() => setIsFormOpen(false)} aria-label="Close dialog" className="p-2 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition-colors">

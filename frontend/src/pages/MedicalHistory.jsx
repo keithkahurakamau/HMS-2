@@ -26,15 +26,15 @@ const ENTRY_TYPES = [
 const SEVERITY_LEVELS = ['Mild', 'Moderate', 'Severe', 'Life-threatening', 'N/A'];
 const STATUSES = ['Active', 'Resolved', 'Managed', 'Remission'];
 const colorMap = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200',
-    amber: 'bg-amber-50 text-amber-700 border-amber-200',
-    green: 'bg-green-50 text-green-700 border-green-200',
-    red: 'bg-red-50 text-red-700 border-red-200',
-    rose: 'bg-rose-50 text-rose-700 border-rose-200',
-    slate: 'bg-slate-100 text-slate-700 border-slate-200',
-    pink: 'bg-pink-50 text-pink-700 border-pink-200',
-    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    blue: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/20',
+    purple: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/20',
+    amber: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/20',
+    green: 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-300 border-green-200 dark:border-green-500/20',
+    red: 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/20',
+    rose: 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/20',
+    slate: 'bg-slate-100 dark:bg-ink-800/40 text-slate-700 dark:text-ink-200 border-slate-200 dark:border-ink-800',
+    pink: 'bg-pink-50 dark:bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-500/20',
+    indigo: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/20',
 };
 
 const defaultForm = {
@@ -220,7 +220,7 @@ export default function MedicalHistory() {
                             className="input pl-10"
                         />
                         {showSuggestions && suggestions.length > 0 && (
-                            <div className="absolute z-30 w-full mt-1 bg-white border border-ink-200 rounded-xl shadow-elevated max-h-64 overflow-y-auto top-full left-0 custom-scrollbar">
+                            <div className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-elevated max-h-64 overflow-y-auto top-full left-0 custom-scrollbar">
                                 {suggestions.map(patient => (
                                     <button type="button" key={patient.patient_id}
                                         onMouseDown={() => {
@@ -228,10 +228,10 @@ export default function MedicalHistory() {
                                             setShowSuggestions(false);
                                             fetchChart(patient.patient_id);
                                         }}
-                                        className="w-full text-left px-4 py-3 hover:bg-brand-50 border-b border-ink-100 last:border-0 transition-colors"
+                                        className="w-full text-left px-4 py-3 hover:bg-brand-50 dark:hover:bg-brand-900/20 border-b border-ink-100 dark:border-ink-800 last:border-0 transition-colors"
                                     >
-                                        <div className="font-semibold text-ink-900">{patient.surname}, {patient.other_names}</div>
-                                        <div className="text-xs text-ink-500 mt-0.5">OPD: <span className="font-mono">{patient.outpatient_no}</span> &middot; Phone: {patient.telephone_1}</div>
+                                        <div className="font-semibold text-ink-900 dark:text-white">{patient.surname}, {patient.other_names}</div>
+                                        <div className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">OPD: <span className="font-mono">{patient.outpatient_no}</span> &middot; Phone: {patient.telephone_1}</div>
                                     </button>
                                 ))}
                             </div>
@@ -257,8 +257,8 @@ export default function MedicalHistory() {
 
                 {!isLoading && !chart && (
                     <div className="card p-16 flex flex-col items-center justify-center text-ink-400 border-dashed">
-                        <FileText size={48} className="mb-4 text-ink-200" strokeWidth={1.5} />
-                        <h3 className="text-base font-semibold text-ink-500">No chart loaded</h3>
+                        <FileText size={48} className="mb-4 text-ink-200 dark:text-ink-700" strokeWidth={1.5} />
+                        <h3 className="text-base font-semibold text-ink-500 dark:text-ink-400">No chart loaded</h3>
                         <p className="text-sm mt-1">Search for a patient above to view their complete medical history.</p>
                     </div>
                 )}
@@ -303,11 +303,11 @@ export default function MedicalHistory() {
                         </div>
 
                         {/* KDPA Compliance Notice */}
-                        <div className="bg-amber-50 ring-1 ring-amber-100 rounded-xl p-4 flex items-start gap-3">
-                            <Lock size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                        <div className="bg-amber-50 dark:bg-amber-500/10 ring-1 ring-amber-100 dark:ring-amber-500/20 rounded-xl p-4 flex items-start gap-3">
+                            <Lock size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                             <div className="text-sm">
-                                <p className="font-semibold text-amber-800">KDPA 2019 compliance active</p>
-                                <p className="text-amber-700 mt-0.5 leading-relaxed text-xs">Your access to this chart has been logged per Section 26 of the Kenya Data Protection Act. Sensitive records (mental health, obstetric) are redacted based on your role. All modifications are permanently recorded in the audit trail.</p>
+                                <p className="font-semibold text-amber-800 dark:text-amber-300">KDPA 2019 compliance active</p>
+                                <p className="text-amber-700 dark:text-amber-200 mt-0.5 leading-relaxed text-xs">Your access to this chart has been logged per Section 26 of the Kenya Data Protection Act. Sensitive records (mental health, obstetric) are redacted based on your role. All modifications are permanently recorded in the audit trail.</p>
                             </div>
                         </div>
 
@@ -327,7 +327,7 @@ export default function MedicalHistory() {
                                 <div key={type.key} id={`mh-section-${type.key}`} data-tour={type.key === ENTRY_TYPES[0].key ? 'mh-entry-section' : undefined} className="card overflow-hidden scroll-mt-20">
                                     <button
                                         onClick={() => toggleSection(type.key)}
-                                        className="w-full flex items-center justify-between p-4 hover:bg-ink-50/50 transition-colors"
+                                        className="w-full flex items-center justify-between p-4 hover:bg-ink-50/50 dark:hover:bg-ink-800/50 transition-colors"
                                     >
                                         <div className="flex items-center gap-3">
                                             <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${colorClass}`}>
@@ -339,42 +339,42 @@ export default function MedicalHistory() {
                                     </button>
 
                                     {isOpen && (
-                                        <div className="border-t border-slate-100 p-4">
+                                        <div className="border-t border-slate-100 dark:border-ink-800 p-4">
                                             {entries.length === 0 ? (
-                                                <p className="text-sm text-slate-400 italic text-center py-4">No {type.label.toLowerCase()} entries recorded.</p>
+                                                <p className="text-sm text-slate-400 dark:text-ink-400 italic text-center py-4">No {type.label.toLowerCase()} entries recorded.</p>
                                             ) : (
                                                 <div className="space-y-3">
                                                     {entries.map(entry => (
-                                                        <div key={entry.entry_id} className={`p-4 rounded-xl border ${entry.is_sensitive ? 'border-red-200 bg-red-50/50' : 'border-slate-100 bg-slate-50/50'} relative`}>
+                                                        <div key={entry.entry_id} className={`p-4 rounded-xl border ${entry.is_sensitive ? 'border-red-200 dark:border-red-500/20 bg-red-50/50 dark:bg-red-500/10' : 'border-slate-100 dark:border-ink-800 bg-slate-50/50 dark:bg-ink-800/40'} relative`}>
                                                             <div className="flex items-start justify-between gap-4">
                                                                 <div className="flex-1">
                                                                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                                                                        <h4 className="font-bold text-slate-900">{entry.title}</h4>
+                                                                        <h4 className="font-bold text-slate-900 dark:text-white">{entry.title}</h4>
                                                                         {entry.is_sensitive && (
-                                                                            <span className="flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full border border-red-200">
+                                                                            <span className="flex items-center gap-1 text-[10px] font-bold bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full border border-red-200 dark:border-red-500/20">
                                                                                 <Lock size={9} /> Sensitive
                                                                             </span>
                                                                         )}
                                                                         {entry.severity && entry.severity !== 'N/A' && (
-                                                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${entry.severity === 'Severe' || entry.severity === 'Life-threatening' ? 'bg-red-100 text-red-700' : entry.severity === 'Moderate' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                                                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${entry.severity === 'Severe' || entry.severity === 'Life-threatening' ? 'bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-300' : entry.severity === 'Moderate' ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-300'}`}>
                                                                                 {entry.severity}
                                                                             </span>
                                                                         )}
-                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${entry.status === 'Active' ? 'bg-blue-100 text-blue-700' : entry.status === 'Resolved' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${entry.status === 'Active' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300' : entry.status === 'Resolved' ? 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-300' : 'bg-slate-100 dark:bg-ink-800/40 text-slate-600 dark:text-ink-400'}`}>
                                                                             {entry.status}
                                                                         </span>
                                                                     </div>
-                                                                    <p className="text-sm text-slate-700">{entry.description}</p>
-                                                                    <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+                                                                    <p className="text-sm text-slate-700 dark:text-ink-200">{entry.description}</p>
+                                                                    <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 dark:text-ink-400">
                                                                         {entry.event_date && <span>📅 {entry.event_date}</span>}
                                                                         <span>Recorded: {new Date(entry.created_at).toLocaleDateString()}</span>
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1 shrink-0">
-                                                                    <button onClick={() => openEditModal(entry)} className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
+                                                                    <button onClick={() => openEditModal(entry)} className="p-1.5 text-slate-400 dark:text-ink-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors">
                                                                         <Edit size={14} />
                                                                     </button>
-                                                                    <button onClick={() => handleDelete(entry.entry_id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                                                    <button onClick={() => handleDelete(entry.entry_id)} className="p-1.5 text-slate-400 dark:text-ink-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
                                                                         <Trash2 size={14} />
                                                                     </button>
                                                                 </div>
@@ -390,23 +390,23 @@ export default function MedicalHistory() {
                         })}
 
                         {/* Recent Clinical Visits */}
-                        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                            <div className="p-4 border-b border-slate-100 bg-slate-50">
-                                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Clock size={16} /> Recent Clinical Visits</h3>
+                        <div className="bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl shadow-sm overflow-hidden">
+                            <div className="p-4 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40">
+                                <h3 className="font-bold text-slate-800 dark:text-ink-200 flex items-center gap-2"><Clock size={16} /> Recent Clinical Visits</h3>
                             </div>
                             <div className="p-4 space-y-3">
                                 {(chart.recent_visits || []).length === 0 ? (
-                                    <p className="text-sm text-slate-400 italic text-center py-4">No clinical visits recorded.</p>
+                                    <p className="text-sm text-slate-400 dark:text-ink-400 italic text-center py-4">No clinical visits recorded.</p>
                                 ) : chart.recent_visits.map(visit => (
-                                    <div key={visit.record_id} className="flex gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                    <div key={visit.record_id} className="flex gap-4 p-3 bg-slate-50 dark:bg-ink-800/40 rounded-xl border border-slate-100 dark:border-ink-800">
                                         <div className="w-1 rounded-full bg-brand-500 shrink-0" />
                                         <div className="flex-1">
                                             <div className="flex justify-between items-start">
-                                                <p className="font-bold text-sm text-slate-800">{visit.diagnosis || 'No diagnosis recorded'}</p>
-                                                <span className="text-xs text-slate-400">{visit.date ? new Date(visit.date).toLocaleDateString() : '—'}</span>
+                                                <p className="font-bold text-sm text-slate-800 dark:text-ink-200">{visit.diagnosis || 'No diagnosis recorded'}</p>
+                                                <span className="text-xs text-slate-400 dark:text-ink-400">{visit.date ? new Date(visit.date).toLocaleDateString() : '—'}</span>
                                             </div>
-                                            <p className="text-xs text-slate-500 mt-0.5"><span className="font-medium">Complaint:</span> {visit.chief_complaint || '—'}</p>
-                                            <p className="text-xs text-slate-500"><span className="font-medium">Dr:</span> {visit.doctor}</p>
+                                            <p className="text-xs text-slate-500 dark:text-ink-400 mt-0.5"><span className="font-medium">Complaint:</span> {visit.chief_complaint || '—'}</p>
+                                            <p className="text-xs text-slate-500 dark:text-ink-400"><span className="font-medium">Dr:</span> {visit.doctor}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -420,64 +420,64 @@ export default function MedicalHistory() {
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)} />
-                    <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up max-h-[90vh]">
-                        <div className="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
+                    <div className="relative w-full max-w-lg bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up max-h-[90vh]">
+                        <div className="p-5 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-between items-center shrink-0">
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900">{editEntry ? 'Edit History Entry' : 'Add History Entry'}</h2>
-                                <p className="text-xs text-slate-500 mt-0.5">All entries are audit-logged per KDPA 2019.</p>
+                                <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editEntry ? 'Edit History Entry' : 'Add History Entry'}</h2>
+                                <p className="text-xs text-slate-500 dark:text-ink-400 mt-0.5">All entries are audit-logged per KDPA 2019.</p>
                             </div>
                             <button onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
 
                         <form id="historyForm" onSubmit={handleAddEntry} className="p-5 space-y-4 overflow-y-auto">
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Entry Type <span className="text-red-500">*</span></label>
-                                <select value={form.entry_type} onChange={e => setForm({ ...form, entry_type: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                                <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Entry Type <span className="text-red-500">*</span></label>
+                                <select value={form.entry_type} onChange={e => setForm({ ...form, entry_type: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">
                                     {ENTRY_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
                                 </select>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Title <span className="text-red-500">*</span></label>
-                                <input required type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Appendectomy, Penicillin Allergy" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                                <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Title <span className="text-red-500">*</span></label>
+                                <input required type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Appendectomy, Penicillin Allergy" className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:bg-ink-900 dark:text-white" />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Detailed Description <span className="text-red-500">*</span></label>
-                                <textarea required rows="3" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Full clinical description of the event..." className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none" />
+                                <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Detailed Description <span className="text-red-500">*</span></label>
+                                <textarea required rows="3" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Full clinical description of the event..." className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none dark:bg-ink-900 dark:text-white" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Approximate Date</label>
-                                    <input type="text" value={form.event_date} onChange={e => setForm({ ...form, event_date: e.target.value })} placeholder="e.g. March 2019, 2015" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Approximate Date</label>
+                                    <input type="text" value={form.event_date} onChange={e => setForm({ ...form, event_date: e.target.value })} placeholder="e.g. March 2019, 2015" className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:bg-ink-900 dark:text-white" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Severity</label>
-                                    <select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Severity</label>
+                                    <select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">
                                         {SEVERITY_LEVELS.map(s => <option key={s}>{s}</option>)}
                                     </select>
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Status</label>
-                                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                                <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Status</label>
+                                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">
                                     {STATUSES.map(s => <option key={s}>{s}</option>)}
                                 </select>
                             </div>
 
-                            <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${form.is_sensitive ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
-                                <input type="checkbox" checked={form.is_sensitive} onChange={e => setForm({ ...form, is_sensitive: e.target.checked })} className="mt-0.5 size-4 text-red-600 rounded border-slate-300" />
+                            <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${form.is_sensitive ? 'border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10' : 'border-slate-200 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 hover:bg-slate-100 dark:hover:bg-ink-800/50'}`}>
+                                <input type="checkbox" checked={form.is_sensitive} onChange={e => setForm({ ...form, is_sensitive: e.target.checked })} className="mt-0.5 size-4 text-red-600 rounded border-slate-300 dark:border-ink-700" />
                                 <div>
-                                    <p className="text-sm font-bold text-slate-800 flex items-center gap-2"><Lock size={13} className="text-red-600" /> Mark as Sensitive</p>
-                                    <p className="text-xs text-slate-500 mt-0.5">KDPA: Restricts access to Doctors and Nurses only. Use for Mental Health, HIV, and Obstetric records.</p>
+                                    <p className="text-sm font-bold text-slate-800 dark:text-ink-200 flex items-center gap-2"><Lock size={13} className="text-red-600 dark:text-red-400" /> Mark as Sensitive</p>
+                                    <p className="text-xs text-slate-500 dark:text-ink-400 mt-0.5">KDPA: Restricts access to Doctors and Nurses only. Use for Mental Health, HIV, and Obstetric records.</p>
                                 </div>
                             </label>
                         </form>
 
-                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
-                            <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg">Cancel</button>
+                        <div className="p-4 border-t border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-end gap-3 shrink-0">
+                            <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-ink-300 hover:bg-slate-200 dark:hover:bg-ink-800/50 rounded-lg">Cancel</button>
                             <button type="submit" form="historyForm" disabled={isSubmitting} className="flex items-center gap-2 px-5 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg hover:bg-brand-700 disabled:opacity-50">
                                 {isSubmitting ? <Activity className="animate-spin" size={15} /> : <Save size={15} />}
                                 {editEntry ? 'Save Changes' : 'Add to Chart'}
@@ -560,16 +560,16 @@ function ConsentCard({ patientId, consents, onRecorded }) {
 
     return (
         <div data-tour="consent-card" className="card overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-ink-100">
+            <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                 <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-emerald-50 text-emerald-700 border-emerald-200">
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/20">
                         <ShieldCheck size={14} /> Consents (KDPA Section 30)
                     </span>
                     <span className="badge-neutral">{(consents || []).length}</span>
                     {activeTreatment ? (
-                        <span className="text-xs text-emerald-700">Treatment consent active</span>
+                        <span className="text-xs text-emerald-700 dark:text-emerald-300">Treatment consent active</span>
                     ) : (
-                        <span className="text-xs text-rose-700 font-medium">No active Treatment consent — clinical writes will be blocked</span>
+                        <span className="text-xs text-rose-700 dark:text-rose-300 font-medium">No active Treatment consent — clinical writes will be blocked</span>
                     )}
                 </div>
                 <button
@@ -583,24 +583,24 @@ function ConsentCard({ patientId, consents, onRecorded }) {
 
             {/* Existing consents */}
             {(consents || []).length > 0 && (
-                <ul className="divide-y divide-ink-100">
+                <ul className="divide-y divide-ink-100 dark:divide-ink-800">
                     {consents.map((c) => (
                         <li key={c.consent_id} className="px-4 py-3 flex items-center justify-between text-sm">
                             <div>
-                                <div className="font-medium text-ink-900">
+                                <div className="font-medium text-ink-900 dark:text-white">
                                     {c.consent_type}
-                                    <span className="ml-2 text-xs text-ink-500">({c.consent_method})</span>
+                                    <span className="ml-2 text-xs text-ink-500 dark:text-ink-400">({c.consent_method})</span>
                                     {c.consent_given ? (
-                                        <span className="ml-2 inline-flex items-center gap-1 text-emerald-700 text-xs"><ShieldCheck size={11} /> Granted</span>
+                                        <span className="ml-2 inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300 text-xs"><ShieldCheck size={11} /> Granted</span>
                                     ) : (
-                                        <span className="ml-2 inline-flex items-center gap-1 text-rose-700 text-xs"><X size={11} /> Withheld</span>
+                                        <span className="ml-2 inline-flex items-center gap-1 text-rose-700 dark:text-rose-300 text-xs"><X size={11} /> Withheld</span>
                                     )}
                                 </div>
-                                <div className="text-xs text-ink-500 mt-0.5">
+                                <div className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
                                     Recorded {new Date(c.consented_at).toLocaleString()}
                                     {c.consent_expires_at && ` · expires ${new Date(c.consent_expires_at).toLocaleDateString()}`}
                                 </div>
-                                {c.notes && <div className="text-xs text-ink-600 mt-1 italic">"{c.notes}"</div>}
+                                {c.notes && <div className="text-xs text-ink-600 dark:text-ink-400 mt-1 italic">"{c.notes}"</div>}
                             </div>
                         </li>
                     ))}
@@ -609,7 +609,7 @@ function ConsentCard({ patientId, consents, onRecorded }) {
 
             {/* Inline record form */}
             {open && (
-                <form onSubmit={submit} className="p-4 border-t border-ink-100 bg-ink-50/40 space-y-3">
+                <form onSubmit={submit} className="p-4 border-t border-ink-100 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/40 space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
                             <label className="label">Consent type</label>

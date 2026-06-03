@@ -30,17 +30,17 @@ const TABS = [
 ];
 
 const STATUS_BADGE = {
-    draft:    'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-    posted:   'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    reversed: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+    draft:    'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-500/20',
+    posted:   'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-500/20',
+    reversed: 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-500/20',
 };
 
 const TYPE_TONE = {
-    Asset:     'text-sky-700 bg-sky-50',
-    Liability: 'text-rose-700 bg-rose-50',
-    Equity:    'text-violet-700 bg-violet-50',
-    Revenue:   'text-emerald-700 bg-emerald-50',
-    Expense:   'text-amber-700 bg-amber-50',
+    Asset:     'text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-500/10',
+    Liability: 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-500/10',
+    Equity:    'text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10',
+    Revenue:   'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10',
+    Expense:   'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10',
 };
 
 const formatAmount = (v) => {
@@ -61,7 +61,7 @@ export default function Accounting() {
                 tone="brand"
             />
 
-            <div data-tour="acc-tabs" className="flex flex-wrap gap-2 border-b border-ink-200/70">
+            <div data-tour="acc-tabs" className="flex flex-wrap gap-2 border-b border-ink-200/70 dark:border-ink-800">
                 {TABS.map(({ key, label, icon: Icon }) => (
                     <button
                         key={key}
@@ -69,8 +69,8 @@ export default function Accounting() {
                         className={
                             'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ' +
                             (tab === key
-                                ? 'border-brand-600 text-brand-700'
-                                : 'border-transparent text-ink-500 hover:text-ink-800')
+                                ? 'border-brand-600 text-brand-700 dark:text-brand-300'
+                                : 'border-transparent text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200')
                         }
                     >
                         <Icon size={16} /> {label}
@@ -126,13 +126,13 @@ function ChartOfAccountsTab() {
                 </button>
             </div>
 
-            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-2">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2">
                 {loading ? (
-                    <div className="p-6 text-sm text-ink-500">Loading...</div>
+                    <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
                 ) : tree.length === 0 ? (
-                    <div className="p-6 text-sm text-ink-500">No accounts yet.</div>
+                    <div className="p-6 text-sm text-ink-500 dark:text-ink-400">No accounts yet.</div>
                 ) : (
-                    <div className="divide-y divide-ink-100">
+                    <div className="divide-y divide-ink-100 dark:divide-ink-800">
                         {tree.map((node) => <AccountNode key={node.account_id} node={node} depth={0} />)}
                     </div>
                 )}
@@ -163,30 +163,30 @@ function AccountNode({ node, depth }) {
     return (
         <div>
             <div
-                className="flex items-center gap-2 px-3 py-2 hover:bg-ink-50/60"
+                className="flex items-center gap-2 px-3 py-2 hover:bg-ink-50/60 dark:hover:bg-ink-800/50"
                 style={{ paddingLeft: 12 + depth * 16 }}
             >
                 {hasChildren ? (
-                    <button onClick={() => setOpen(!open)} className="text-ink-400 hover:text-ink-700">
+                    <button onClick={() => setOpen(!open)} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">
                         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
                 ) : (
                     <span className="w-[14px]" />
                 )}
-                <span className="font-mono text-xs text-ink-500 w-16">{node.code}</span>
-                <span className="text-sm font-medium text-ink-900 flex-1">{node.name}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-md ${TYPE_TONE[node.account_type] || 'text-ink-600 bg-ink-50'}`}>
+                <span className="font-mono text-xs text-ink-500 dark:text-ink-400 w-16">{node.code}</span>
+                <span className="text-sm font-medium text-ink-900 dark:text-white flex-1">{node.name}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-md ${TYPE_TONE[node.account_type] || 'text-ink-600 dark:text-ink-400 bg-ink-50 dark:bg-ink-800/40'}`}>
                     {node.account_type}
                 </span>
                 {!node.is_postable && (
                     <span className="text-[10px] uppercase tracking-wider text-ink-400">rollup</span>
                 )}
                 {!node.is_active && (
-                    <span className="text-[10px] uppercase tracking-wider text-rose-400">inactive</span>
+                    <span className="text-[10px] uppercase tracking-wider text-rose-400 dark:text-rose-300">inactive</span>
                 )}
             </div>
             {open && hasChildren && (
-                <div className="divide-y divide-ink-100">
+                <div className="divide-y divide-ink-100 dark:divide-ink-800">
                     {node.children.map((c) => <AccountNode key={c.account_id} node={c} depth={depth + 1} />)}
                 </div>
             )}
@@ -253,7 +253,7 @@ function NewAccountModal({ flatAccounts, onClose, onSaved }) {
                             <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
                     </select>
                 </Field>
-                <label className="flex items-center gap-2 text-sm text-ink-700">
+                <label className="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-200">
                     <input type="checkbox" checked={form.is_postable}
                            onChange={(e) => setForm({ ...form, is_postable: e.target.checked })} />
                     Postable (uncheck for roll-up only)
@@ -327,9 +327,9 @@ function JournalEntriesTab() {
                 </button>
             </div>
 
-            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">#</th>
                             <th className="text-left px-4 py-2 font-medium">Date</th>
@@ -341,11 +341,11 @@ function JournalEntriesTab() {
                             <th className="px-4 py-2"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {loading ? (
-                            <tr><td colSpan={8} className="px-4 py-6 text-ink-500">Loading...</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-6 text-ink-500 dark:text-ink-400">Loading...</td></tr>
                         ) : entries.length === 0 ? (
-                            <tr><td colSpan={8} className="px-4 py-6 text-ink-500">No entries yet.</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-6 text-ink-500 dark:text-ink-400">No entries yet.</td></tr>
                         ) : entries.map((e) => {
                             const totalDr = (e.lines || []).reduce((s, l) => s + Number(l.debit || 0), 0);
                             return (
@@ -354,7 +354,7 @@ function JournalEntriesTab() {
                                     <td className="px-4 py-2">{e.entry_date}</td>
                                     <td className="px-4 py-2">{e.currency_code}</td>
                                     <td className="px-4 py-2">{e.reference || '—'}</td>
-                                    <td className="px-4 py-2 text-ink-600">{e.memo || '—'}</td>
+                                    <td className="px-4 py-2 text-ink-600 dark:text-ink-400">{e.memo || '—'}</td>
                                     <td className="px-4 py-2 text-right font-mono">{formatAmount(totalDr)}</td>
                                     <td className="px-4 py-2">
                                         <span className={`text-xs px-2 py-0.5 rounded-md ${STATUS_BADGE[e.status]}`}>
@@ -364,13 +364,13 @@ function JournalEntriesTab() {
                                     <td className="px-4 py-2 text-right">
                                         {e.status === 'draft' && (
                                             <button onClick={() => post(e.entry_id)}
-                                                    className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline">
+                                                    className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 hover:underline">
                                                 <CheckCircle2 size={14} /> Post
                                             </button>
                                         )}
                                         {e.status === 'posted' && (
                                             <button onClick={() => reverse(e.entry_id)}
-                                                    className="inline-flex items-center gap-1 text-xs text-rose-700 hover:underline">
+                                                    className="inline-flex items-center gap-1 text-xs text-rose-700 dark:text-rose-300 hover:underline">
                                                 <RotateCcw size={14} /> Reverse
                                             </button>
                                         )}
@@ -478,9 +478,9 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                        placeholder="optional" />
             </Field>
 
-            <div className="mt-4 border border-ink-200 rounded-lg overflow-hidden">
+            <div className="mt-4 border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50 text-ink-600">
+                    <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-3 py-2 font-medium">Account</th>
                             <th className="text-right px-3 py-2 font-medium w-32">Debit</th>
@@ -489,7 +489,7 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {lines.map((l, idx) => (
                             <tr key={idx}>
                                 <td className="px-3 py-1.5">
@@ -526,11 +526,11 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                             </tr>
                         ))}
                     </tbody>
-                    <tfoot className="bg-ink-50">
+                    <tfoot className="bg-ink-50 dark:bg-ink-800/40">
                         <tr>
                             <td className="px-3 py-2">
                                 <button onClick={addLine}
-                                        className="text-xs text-brand-700 hover:underline inline-flex items-center gap-1">
+                                        className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                                     <Plus size={12} /> Add line
                                 </button>
                             </td>
@@ -538,11 +538,11 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                             <td className="px-3 py-2 text-right font-mono">{formatAmount(totals.cr)}</td>
                             <td colSpan={2} className="px-3 py-2">
                                 {totals.balanced ? (
-                                    <span className="text-xs text-emerald-700 inline-flex items-center gap-1">
+                                    <span className="text-xs text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-1">
                                         <CheckCircle2 size={12} /> Balanced
                                     </span>
                                 ) : (
-                                    <span className="text-xs text-amber-700 inline-flex items-center gap-1">
+                                    <span className="text-xs text-amber-700 dark:text-amber-300 inline-flex items-center gap-1">
                                         <AlertCircle size={12} /> Out of balance
                                     </span>
                                 )}
@@ -585,24 +585,24 @@ function CurrenciesTab() {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Currencies */}
-            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft">
-                <div className="flex items-center justify-between p-4 border-b border-ink-100">
-                    <h3 className="text-sm font-semibold text-ink-900">Currencies</h3>
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft">
+                <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
+                    <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Currencies</h3>
                     <button onClick={() => setOpenCur(true)}
-                            className="text-xs text-brand-700 hover:underline inline-flex items-center gap-1">
+                            className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                         <Plus size={12} /> Add
                     </button>
                 </div>
-                <div className="divide-y divide-ink-100">
+                <div className="divide-y divide-ink-100 dark:divide-ink-800">
                     {currencies.map((c) => (
                         <div key={c.currency_id} className="flex items-center justify-between px-4 py-2.5">
                             <div>
-                                <div className="text-sm font-medium text-ink-900">
-                                    {c.code}{c.is_base && <span className="ml-2 text-[10px] uppercase tracking-wider text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">base</span>}
+                                <div className="text-sm font-medium text-ink-900 dark:text-white">
+                                    {c.code}{c.is_base && <span className="ml-2 text-[10px] uppercase tracking-wider text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-500/10 px-1.5 py-0.5 rounded">base</span>}
                                 </div>
-                                <div className="text-xs text-ink-500">{c.name}{c.symbol ? ` · ${c.symbol}` : ''}</div>
+                                <div className="text-xs text-ink-500 dark:text-ink-400">{c.name}{c.symbol ? ` · ${c.symbol}` : ''}</div>
                             </div>
-                            <span className={'text-xs ' + (c.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                            <span className={'text-xs ' + (c.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                 {c.is_active ? 'active' : 'inactive'}
                             </span>
                         </div>
@@ -611,22 +611,22 @@ function CurrenciesTab() {
             </div>
 
             {/* FX Rates */}
-            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft">
-                <div className="flex items-center justify-between p-4 border-b border-ink-100">
-                    <h3 className="text-sm font-semibold text-ink-900">Exchange rates</h3>
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft">
+                <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
+                    <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Exchange rates</h3>
                     <button onClick={() => setOpenFx(true)}
-                            className="text-xs text-brand-700 hover:underline inline-flex items-center gap-1">
+                            className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                         <Plus size={12} /> Record rate
                     </button>
                 </div>
-                <div className="divide-y divide-ink-100 max-h-96 overflow-auto">
+                <div className="divide-y divide-ink-100 dark:divide-ink-800 max-h-96 overflow-auto">
                     {rates.length === 0 ? (
-                        <div className="p-6 text-sm text-ink-500">No rates recorded yet.</div>
+                        <div className="p-6 text-sm text-ink-500 dark:text-ink-400">No rates recorded yet.</div>
                     ) : rates.map((r) => (
                         <div key={r.fx_rate_id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                             <span className="font-mono">{r.from_currency} → {r.to_currency}</span>
-                            <span className="font-mono text-ink-700">{Number(r.rate).toFixed(6)}</span>
-                            <span className="text-xs text-ink-500">{r.effective_date}</span>
+                            <span className="font-mono text-ink-700 dark:text-ink-200">{Number(r.rate).toFixed(6)}</span>
+                            <span className="text-xs text-ink-500 dark:text-ink-400">{r.effective_date}</span>
                         </div>
                     ))}
                 </div>
@@ -668,7 +668,7 @@ function NewCurrencyModal({ onClose, onSaved }) {
                 <Field label="Decimals"><input type="number" className="input"
                     value={form.decimals} onChange={(e) => setForm({ ...form, decimals: Number(e.target.value) })} /></Field>
             </div>
-            <label className="flex items-center gap-2 text-sm text-ink-700 mt-3">
+            <label className="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-200 mt-3">
                 <input type="checkbox" checked={form.is_base}
                        onChange={(e) => setForm({ ...form, is_base: e.target.checked })} />
                 Set as base currency
@@ -776,13 +776,13 @@ function SettingsTab() {
         }
     };
 
-    if (!settings) return <div className="text-sm text-ink-500 p-6">Loading...</div>;
+    if (!settings) return <div className="text-sm text-ink-500 dark:text-ink-400 p-6">Loading...</div>;
 
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5 max-w-2xl">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5 max-w-2xl">
             <Field label="Base currency">
-                <input className="input bg-ink-50" value={settings.base_currency_code} disabled />
-                <p className="text-xs text-ink-500 mt-1">
+                <input className="input bg-ink-50 dark:bg-ink-800/40" value={settings.base_currency_code} disabled />
+                <p className="text-xs text-ink-500 dark:text-ink-400 mt-1">
                     Change the base currency from the Currencies tab. Locked once any entry is posted.
                 </p>
             </Field>
@@ -790,7 +790,7 @@ function SettingsTab() {
                 <input type="date" className="input"
                        value={settings.go_live_date || ''}
                        onChange={(e) => setSettings({ ...settings, go_live_date: e.target.value || null })} />
-                <p className="text-xs text-ink-500 mt-1">
+                <p className="text-xs text-ink-500 dark:text-ink-400 mt-1">
                     Auto-posting from other modules will ignore anything dated before this.
                 </p>
             </Field>
@@ -809,7 +809,7 @@ function SettingsTab() {
                     {saving ? 'Saving...' : 'Save settings'}
                 </button>
                 <button onClick={seedYear}
-                        className="px-4 py-2 rounded-lg border border-ink-200 text-sm font-medium hover:bg-ink-50">
+                        className="px-4 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50">
                     Seed fiscal periods for a year
                 </button>
             </div>
@@ -832,7 +832,7 @@ function ConfigurationTab() {
     const [section, setSection] = useState('suppliers');
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
-            <aside className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-2 h-fit">
+            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
                 <nav className="space-y-1">
                     {CONFIG_SECTIONS.map(({ key, label, icon: Icon }) => (
                         <button key={key}
@@ -840,8 +840,8 @@ function ConfigurationTab() {
                                 className={
                                     'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ' +
                                     (section === key
-                                        ? 'bg-brand-50 text-brand-700 font-medium'
-                                        : 'text-ink-600 hover:bg-ink-50')
+                                        ? 'bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300 font-medium'
+                                        : 'text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800/50')
                                 }>
                             <Icon size={16} /> {label}
                         </button>
@@ -882,7 +882,7 @@ function SuppliersSection() {
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No suppliers yet.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Name</th>
                             <th className="text-left px-4 py-2 font-medium">Contact</th>
@@ -892,21 +892,21 @@ function SuppliersSection() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map((s) => (
                             <tr key={s.supplier_id}>
                                 <td className="px-4 py-1.5 font-medium">{s.name}</td>
-                                <td className="px-4 py-1.5 text-ink-600">{s.contact_person || '—'}{s.email ? ` · ${s.email}` : ''}</td>
+                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{s.contact_person || '—'}{s.email ? ` · ${s.email}` : ''}</td>
                                 <td className="px-4 py-1.5 font-mono text-xs">{s.tax_pin || '—'}</td>
                                 <td className="px-4 py-1.5 text-right">{s.payment_terms_days}</td>
                                 <td className="px-4 py-1.5">
-                                    <span className={'text-xs ' + (s.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                    <span className={'text-xs ' + (s.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {s.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
                                     <button onClick={() => { setEditing(s); setOpen(true); }}
-                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                            className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
                         ))}
@@ -1020,7 +1020,7 @@ function InsuranceSection() {
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No providers yet.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Name</th>
                             <th className="text-left px-4 py-2 font-medium">Contact</th>
@@ -1029,20 +1029,20 @@ function InsuranceSection() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map((p) => (
                             <tr key={p.provider_id}>
                                 <td className="px-4 py-1.5 font-medium">{p.name}</td>
-                                <td className="px-4 py-1.5 text-ink-600">{p.contact_person || '—'}{p.email ? ` · ${p.email}` : ''}</td>
+                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{p.contact_person || '—'}{p.email ? ` · ${p.email}` : ''}</td>
                                 <td className="px-4 py-1.5">{p.phone || '—'}</td>
                                 <td className="px-4 py-1.5">
-                                    <span className={'text-xs ' + (p.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                    <span className={'text-xs ' + (p.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {p.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
                                     <button onClick={() => { setEditing(p); setOpen(true); }}
-                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                            className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
                         ))}
@@ -1146,7 +1146,7 @@ function SchemesSection() {
                            disabledMsg="Add an insurance provider first." />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No schemes yet.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Provider</th>
                             <th className="text-left px-4 py-2 font-medium">Scheme</th>
@@ -1156,23 +1156,23 @@ function SchemesSection() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map((s) => (
                             <tr key={s.scheme_id}>
-                                <td className="px-4 py-1.5 text-ink-600">{providerName(s.provider_id)}</td>
+                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{providerName(s.provider_id)}</td>
                                 <td className="px-4 py-1.5 font-medium">{s.name}</td>
                                 <td className="px-4 py-1.5 font-mono text-xs">{s.scheme_code || '—'}</td>
                                 <td className="px-4 py-1.5 text-right font-mono">
                                     {s.coverage_limit ? formatAmount(s.coverage_limit) : '—'}
                                 </td>
                                 <td className="px-4 py-1.5">
-                                    <span className={'text-xs ' + (s.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                    <span className={'text-xs ' + (s.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {s.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
                                     <button onClick={() => { setEditing(s); setOpen(true); }}
-                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                            className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
                         ))}
@@ -1267,7 +1267,7 @@ function PriceListSection() {
             <SectionHeader title="Price List" subtitle="Master list of billable services."
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <div className="flex items-center gap-2">
-                <span className="text-xs text-ink-500">Filter:</span>
+                <span className="text-xs text-ink-500 dark:text-ink-400">Filter:</span>
                 <select className="input max-w-xs" value={filter} onChange={(e) => setFilter(e.target.value)}>
                     <option value="">All categories</option>
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1275,7 +1275,7 @@ function PriceListSection() {
             </div>
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No price items yet.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Code</th>
                             <th className="text-left px-4 py-2 font-medium">Service</th>
@@ -1286,24 +1286,24 @@ function PriceListSection() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map((p) => (
                             <tr key={p.price_id}>
                                 <td className="px-4 py-1.5 font-mono text-xs">{p.service_code}</td>
                                 <td className="px-4 py-1.5">{p.name}</td>
                                 <td className="px-4 py-1.5">
-                                    <span className="text-xs px-2 py-0.5 rounded-md bg-ink-50 text-ink-700">{p.category}</span>
+                                    <span className="text-xs px-2 py-0.5 rounded-md bg-ink-50 dark:bg-ink-800/40 text-ink-700 dark:text-ink-200">{p.category}</span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right font-mono">{formatAmount(p.unit_price)}</td>
                                 <td className="px-4 py-1.5 text-right">{Number(p.tax_rate_pct).toFixed(1)}%</td>
                                 <td className="px-4 py-1.5">
-                                    <span className={'text-xs ' + (p.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                    <span className={'text-xs ' + (p.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {p.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
                                     <button onClick={() => { setEditing(p); setOpen(true); }}
-                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                            className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
                         ))}
@@ -1424,15 +1424,15 @@ function MappingsSection() {
     return (
         <div className="space-y-4">
             <div>
-                <h3 className="text-lg font-semibold text-ink-900">Ledger Mappings</h3>
-                <p className="text-sm text-ink-600 mt-1">
+                <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Ledger Mappings</h3>
+                <p className="text-sm text-ink-600 dark:text-ink-400 mt-1">
                     These tell auto-posting (Phase 4) which accounts to use for each event. Defaults are seeded
                     to match the default CoA — re-point them if you renamed or restructured accounts.
                 </p>
             </div>
             <DataCard loading={loading} empty={catalogue.length === 0} emptyMsg="No mappings.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Source key</th>
                             <th className="text-left px-4 py-2 font-medium">Description</th>
@@ -1441,19 +1441,19 @@ function MappingsSection() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {catalogue.map((c) => (
                             <tr key={c.source_key}>
                                 <td className="px-4 py-1.5 font-mono text-xs">{c.source_key}</td>
-                                <td className="px-4 py-1.5 text-ink-600">{c.description}</td>
+                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{c.description}</td>
                                 <td className="px-4 py-1.5">{codeName(c.mapping?.debit_account_id)}</td>
                                 <td className="px-4 py-1.5">{codeName(c.mapping?.credit_account_id)}</td>
                                 <td className="px-4 py-1.5 text-right">
                                     {c.mapping ? (
                                         <button onClick={() => setEditing(c.mapping)}
-                                                className="text-xs text-brand-700 hover:underline">Edit</button>
+                                                className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                     ) : (
-                                        <span className="text-xs text-amber-700">missing</span>
+                                        <span className="text-xs text-amber-700 dark:text-amber-300">missing</span>
                                     )}
                                 </td>
                             </tr>
@@ -1490,7 +1490,7 @@ function MappingModal({ initial, accounts, onClose, onSaved }) {
 
     return (
         <ModalShell title={`Edit mapping: ${initial.source_key}`} onClose={onClose}>
-            <p className="text-xs text-ink-500 mb-3">
+            <p className="text-xs text-ink-500 dark:text-ink-400 mb-3">
                 When this event fires, Phase 4 auto-posting will Dr the debit account and Cr the credit account.
             </p>
             <div className="grid grid-cols-2 gap-3">
@@ -1519,8 +1519,8 @@ function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg }) {
     return (
         <div className="flex items-start justify-between">
             <div>
-                <h3 className="text-lg font-semibold text-ink-900">{title}</h3>
-                {subtitle && <p className="text-sm text-ink-600 mt-1">{subtitle}</p>}
+                <h3 className="text-lg font-semibold text-ink-900 dark:text-white">{title}</h3>
+                {subtitle && <p className="text-sm text-ink-600 dark:text-ink-400 mt-1">{subtitle}</p>}
             </div>
             <button onClick={onNew} disabled={disabled} title={disabled ? disabledMsg : undefined}
                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed">
@@ -1532,11 +1532,11 @@ function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg }) {
 
 function DataCard({ loading, empty, emptyMsg, children }) {
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
             {loading ? (
-                <div className="p-6 text-sm text-ink-500">Loading...</div>
+                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
             ) : empty ? (
-                <div className="p-6 text-sm text-ink-500">{emptyMsg}</div>
+                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">{emptyMsg}</div>
             ) : children}
         </div>
     );
@@ -1561,14 +1561,14 @@ const SOURCE_OPTIONS = [
 ];
 
 const SOURCE_TONE = {
-    Billing:        'bg-sky-50 text-sky-700 ring-sky-200',
-    Pharmacy:       'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    'Pay Hero':     'bg-teal-50 text-teal-700 ring-teal-200',
-    Insurance:      'bg-violet-50 text-violet-700 ring-violet-200',
-    Cheque:         'bg-amber-50 text-amber-700 ring-amber-200',
-    Debtors:        'bg-rose-50 text-rose-700 ring-rose-200',
-    Bank:           'bg-indigo-50 text-indigo-700 ring-indigo-200',
-    'Manual entry': 'bg-ink-100 text-ink-600 ring-ink-200',
+    Billing:        'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300 ring-sky-200 dark:ring-sky-500/20',
+    Pharmacy:       'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20',
+    'Pay Hero':     'bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 ring-teal-200 dark:ring-teal-500/20',
+    Insurance:      'bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 ring-violet-200 dark:ring-violet-500/20',
+    Cheque:         'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-amber-200 dark:ring-amber-500/20',
+    Debtors:        'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20',
+    Bank:           'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 ring-indigo-200 dark:ring-indigo-500/20',
+    'Manual entry': 'bg-ink-100 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 ring-ink-200 dark:ring-ink-800',
 };
 
 const PAGE_SIZE = 50;
@@ -1637,27 +1637,27 @@ function TransactionLogTab() {
     return (
         <div className="space-y-4">
             {/* Filter bar */}
-            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-3 flex flex-wrap items-end gap-3">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-3 flex flex-wrap items-end gap-3">
                 <div className="relative flex-1 min-w-[180px]">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search entry no., reference, memo…"
-                        className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-ink-200 focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+                        className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-ink-200 dark:border-ink-800 focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
                     />
                 </div>
                 <div>
-                    <label className="block text-xs text-ink-500 mb-1">Source</label>
+                    <label className="block text-xs text-ink-500 dark:text-ink-400 mb-1">Source</label>
                     <select value={source} onChange={(e) => setSource(e.target.value)}
-                            className="text-sm rounded-lg border border-ink-200 px-2 py-2">
+                            className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2">
                         {SOURCE_OPTIONS.map((o) => <option key={o.value || 'all'} value={o.value}>{o.label}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs text-ink-500 mb-1">Status</label>
+                    <label className="block text-xs text-ink-500 dark:text-ink-400 mb-1">Status</label>
                     <select value={status} onChange={(e) => setStatus(e.target.value)}
-                            className="text-sm rounded-lg border border-ink-200 px-2 py-2">
+                            className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2">
                         <option value="">All</option>
                         <option value="posted">Posted</option>
                         <option value="draft">Draft</option>
@@ -1665,25 +1665,25 @@ function TransactionLogTab() {
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs text-ink-500 mb-1">From</label>
+                    <label className="block text-xs text-ink-500 dark:text-ink-400 mb-1">From</label>
                     <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-                           className="text-sm rounded-lg border border-ink-200 px-2 py-2" />
+                           className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2" />
                 </div>
                 <div>
-                    <label className="block text-xs text-ink-500 mb-1">To</label>
+                    <label className="block text-xs text-ink-500 dark:text-ink-400 mb-1">To</label>
                     <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-                           className="text-sm rounded-lg border border-ink-200 px-2 py-2" />
+                           className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2" />
                 </div>
                 <button onClick={exportCsv}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 text-sm font-medium text-ink-700 hover:bg-ink-50">
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50">
                     <Download size={15} /> Export CSV
                 </button>
             </div>
 
             {/* Table */}
-            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Date</th>
                             <th className="text-left px-4 py-2 font-medium">Entry #</th>
@@ -1694,22 +1694,22 @@ function TransactionLogTab() {
                             <th className="text-left px-4 py-2 font-medium">Status</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {loading ? (
-                            <tr><td colSpan={7} className="px-4 py-6 text-ink-500">Loading…</td></tr>
+                            <tr><td colSpan={7} className="px-4 py-6 text-ink-500 dark:text-ink-400">Loading…</td></tr>
                         ) : rows.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-6 text-ink-500">No transactions match these filters.</td></tr>
+                            <tr><td colSpan={7} className="px-4 py-6 text-ink-500 dark:text-ink-400">No transactions match these filters.</td></tr>
                         ) : rows.map((r) => (
-                            <tr key={r.entry_id} className="hover:bg-ink-50/40">
+                            <tr key={r.entry_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
                                 <td className="px-4 py-2 whitespace-nowrap">{r.entry_date}</td>
                                 <td className="px-4 py-2 font-mono text-xs">{r.entry_number}</td>
                                 <td className="px-4 py-2">
-                                    <span className={`text-xs px-2 py-0.5 rounded-md ring-1 ${SOURCE_TONE[r.source_label] || 'bg-ink-100 text-ink-600 ring-ink-200'}`}>
+                                    <span className={`text-xs px-2 py-0.5 rounded-md ring-1 ${SOURCE_TONE[r.source_label] || 'bg-ink-100 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 ring-ink-200 dark:ring-ink-800'}`}>
                                         {r.source_label}
                                     </span>
                                 </td>
                                 <td className="px-4 py-2">{r.reference || '—'}</td>
-                                <td className="px-4 py-2 text-ink-600 max-w-[22rem] truncate" title={r.memo || ''}>{r.memo || '—'}</td>
+                                <td className="px-4 py-2 text-ink-600 dark:text-ink-400 max-w-[22rem] truncate" title={r.memo || ''}>{r.memo || '—'}</td>
                                 <td className="px-4 py-2 text-right font-mono whitespace-nowrap">{formatAmount(r.amount)}</td>
                                 <td className="px-4 py-2">
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${STATUS_BADGE[r.status] || ''}`}>{r.status}</span>
@@ -1721,15 +1721,15 @@ function TransactionLogTab() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between text-sm text-ink-600">
+            <div className="flex items-center justify-between text-sm text-ink-600 dark:text-ink-400">
                 <span>{total === 0 ? 'No records' : `Showing ${pageStart}–${pageEnd} of ${total}`}</span>
                 <div className="flex items-center gap-2">
                     <button disabled={offset === 0 || loading} onClick={() => go(Math.max(0, offset - PAGE_SIZE))}
-                            className="px-3 py-1.5 rounded-lg border border-ink-200 disabled:opacity-40 hover:bg-ink-50">
+                            className="px-3 py-1.5 rounded-lg border border-ink-200 dark:border-ink-800 disabled:opacity-40 hover:bg-ink-50 dark:hover:bg-ink-800/50">
                         Previous
                     </button>
                     <button disabled={pageEnd >= total || loading} onClick={() => go(offset + PAGE_SIZE)}
-                            className="px-3 py-1.5 rounded-lg border border-ink-200 disabled:opacity-40 hover:bg-ink-50">
+                            className="px-3 py-1.5 rounded-lg border border-ink-200 dark:border-ink-800 disabled:opacity-40 hover:bg-ink-50 dark:hover:bg-ink-800/50">
                         Next
                     </button>
                 </div>
@@ -1800,7 +1800,7 @@ function ReportsTab() {
 
     return (
         <div className="space-y-4">
-            <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-4 flex flex-wrap items-end gap-3">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-4 flex flex-wrap items-end gap-3">
                 <Field label="Report">
                     <select className="input" value={report} onChange={(e) => setReport(e.target.value)}>
                         {REPORT_TYPES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
@@ -1826,13 +1826,13 @@ function ReportsTab() {
                 </button>
                 {data && (
                     <button onClick={() => exportReport(report, data)}
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 text-sm font-medium hover:bg-ink-50">
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50">
                         <Download size={14} /> Export CSV
                     </button>
                 )}
             </div>
 
-            {loading && <div className="p-6 text-sm text-ink-500">Loading...</div>}
+            {loading && <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>}
             {!loading && data && report === 'trial-balance'     && <TrialBalanceView data={data} />}
             {!loading && data && report === 'income-statement'  && <IncomeStatementView data={data} />}
             {!loading && data && report === 'balance-sheet'     && <BalanceSheetView data={data} />}
@@ -1887,15 +1887,15 @@ function exportReport(report, data) {
 
 function TrialBalanceView({ data }) {
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
-            <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+            <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Trial Balance — as of {data.as_of}</h3>
-                <span className={'text-xs ' + (Number(data.totals.difference) === 0 ? 'text-emerald-700' : 'text-rose-700')}>
+                <span className={'text-xs ' + (Number(data.totals.difference) === 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                     Difference: {formatAmount(data.totals.difference)}
                 </span>
             </div>
             <table className="w-full text-sm">
-                <thead className="bg-ink-50/60 text-ink-600">
+                <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                     <tr>
                         <th className="text-left px-4 py-2 font-medium">Code</th>
                         <th className="text-left px-4 py-2 font-medium">Account</th>
@@ -1905,9 +1905,9 @@ function TrialBalanceView({ data }) {
                         <th className="text-right px-4 py-2 font-medium">Balance</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100">
+                <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                     {data.rows.length === 0 ? (
-                        <tr><td colSpan={6} className="px-4 py-6 text-ink-500">No posted entries up to this date.</td></tr>
+                        <tr><td colSpan={6} className="px-4 py-6 text-ink-500 dark:text-ink-400">No posted entries up to this date.</td></tr>
                     ) : data.rows.map(r => (
                         <tr key={r.account_id}>
                             <td className="px-4 py-1.5 font-mono text-xs">{r.code}</td>
@@ -1921,7 +1921,7 @@ function TrialBalanceView({ data }) {
                         </tr>
                     ))}
                 </tbody>
-                <tfoot className="bg-ink-50">
+                <tfoot className="bg-ink-50 dark:bg-ink-800/40">
                     <tr>
                         <td colSpan={3} className="px-4 py-2 font-semibold">Totals</td>
                         <td className="px-4 py-2 text-right font-mono font-semibold">{formatAmount(data.totals.debit)}</td>
@@ -1936,21 +1936,21 @@ function TrialBalanceView({ data }) {
 
 function IncomeStatementView({ data }) {
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5">
-            <h3 className="text-sm font-semibold text-ink-900">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+            <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
                 Income Statement — {data.from_date} to {data.to_date}
             </h3>
 
-            <Section label="Revenue" rows={data.revenue} total={data.total_revenue} totalTone="text-emerald-700" />
-            <Section label="Cost of Services" rows={data.cogs} total={data.total_cogs} totalTone="text-amber-700" />
+            <Section label="Revenue" rows={data.revenue} total={data.total_revenue} totalTone="text-emerald-700 dark:text-emerald-300" />
+            <Section label="Cost of Services" rows={data.cogs} total={data.total_cogs} totalTone="text-amber-700 dark:text-amber-300" />
             <Row label="Gross Profit" value={data.gross_profit} bold />
-            <Section label="Operating Expenses" rows={data.operating_expenses} total={data.total_operating_expenses} totalTone="text-amber-700" />
-            <div className="pt-3 border-t-2 border-ink-200">
+            <Section label="Operating Expenses" rows={data.operating_expenses} total={data.total_operating_expenses} totalTone="text-amber-700 dark:text-amber-300" />
+            <div className="pt-3 border-t-2 border-ink-200 dark:border-ink-800">
                 <Row
                     label="Net Income"
                     value={data.net_income}
                     bold
-                    tone={Number(data.net_income) >= 0 ? 'text-emerald-700' : 'text-rose-700'}
+                    tone={Number(data.net_income) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}
                 />
             </div>
         </div>
@@ -1959,30 +1959,30 @@ function IncomeStatementView({ data }) {
 
 function BalanceSheetView({ data }) {
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-5">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-ink-900">Balance Sheet — as of {data.as_of}</h3>
-                <span className={'text-xs ' + (data.balanced ? 'text-emerald-700' : 'text-rose-700')}>
+                <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Balance Sheet — as of {data.as_of}</h3>
+                <span className={'text-xs ' + (data.balanced ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                     {data.balanced ? 'Balanced' : 'Out of balance'}
                 </span>
             </div>
 
-            <Section label="Assets" rows={data.assets} total={data.total_assets} totalTone="text-sky-700" />
+            <Section label="Assets" rows={data.assets} total={data.total_assets} totalTone="text-sky-700 dark:text-sky-300" />
 
-            <div className="pt-3 border-t border-ink-200">
-                <Section label="Liabilities" rows={data.liabilities} total={data.total_liabilities} totalTone="text-rose-700" />
+            <div className="pt-3 border-t border-ink-200 dark:border-ink-800">
+                <Section label="Liabilities" rows={data.liabilities} total={data.total_liabilities} totalTone="text-rose-700 dark:text-rose-300" />
             </div>
 
-            <div className="pt-3 border-t border-ink-200">
-                <h4 className="text-xs font-semibold text-ink-600 uppercase mb-2">Equity</h4>
+            <div className="pt-3 border-t border-ink-200 dark:border-ink-800">
+                <h4 className="text-xs font-semibold text-ink-600 dark:text-ink-400 uppercase mb-2">Equity</h4>
                 {data.equity.map(e => (
                     <Row key={e.account_id} label={`${e.code} — ${e.name}`} value={e.amount} />
                 ))}
                 <Row label="Current Year Earnings" value={data.current_year_earnings} />
-                <Row label="Total Equity" value={data.total_equity} bold tone="text-violet-700" />
+                <Row label="Total Equity" value={data.total_equity} bold tone="text-violet-700 dark:text-violet-300" />
             </div>
 
-            <div className="pt-3 border-t-2 border-ink-200">
+            <div className="pt-3 border-t-2 border-ink-200 dark:border-ink-800">
                 <Row label="Total Liabilities + Equity" value={data.total_liabilities_and_equity} bold />
             </div>
         </div>
@@ -1991,22 +1991,22 @@ function BalanceSheetView({ data }) {
 
 function CashFlowView({ data }) {
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-6 space-y-4">
-            <h3 className="text-sm font-semibold text-ink-900">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
                 Cash Flow — {data.from_date} to {data.to_date}
             </h3>
             <Row label="Operating activities" value={data.operating} />
             <Row label="Investing activities" value={data.investing} />
             <Row label="Financing activities" value={data.financing} />
-            <div className="pt-3 border-t border-ink-200">
+            <div className="pt-3 border-t border-ink-200 dark:border-ink-800">
                 <Row
                     label="Net change in cash"
                     value={data.net_change}
                     bold
-                    tone={Number(data.net_change) >= 0 ? 'text-emerald-700' : 'text-rose-700'}
+                    tone={Number(data.net_change) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}
                 />
             </div>
-            <div className="text-xs text-ink-500 grid grid-cols-2 gap-2 pt-3 border-t border-ink-100">
+            <div className="text-xs text-ink-500 dark:text-ink-400 grid grid-cols-2 gap-2 pt-3 border-t border-ink-100 dark:border-ink-800">
                 <div>Cash in: <span className="font-mono">{formatAmount(data.cash_in)}</span></div>
                 <div>Cash out: <span className="font-mono">{formatAmount(data.cash_out)}</span></div>
             </div>
@@ -2016,15 +2016,15 @@ function CashFlowView({ data }) {
 
 function DailyCollectionsView({ data }) {
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
-            <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+            <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">
                     Daily Collections — {data.from_date} to {data.to_date}
                 </h3>
-                <span className="text-xs text-ink-700">Total: <span className="font-mono font-semibold">{formatAmount(data.total)}</span></span>
+                <span className="text-xs text-ink-700 dark:text-ink-200">Total: <span className="font-mono font-semibold">{formatAmount(data.total)}</span></span>
             </div>
             <table className="w-full text-sm">
-                <thead className="bg-ink-50/60 text-ink-600">
+                <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                     <tr>
                         <th className="text-left px-4 py-2 font-medium">Date</th>
                         <th className="text-left px-4 py-2 font-medium">Code</th>
@@ -2032,9 +2032,9 @@ function DailyCollectionsView({ data }) {
                         <th className="text-right px-4 py-2 font-medium">Amount</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100">
+                <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                     {data.rows.length === 0 ? (
-                        <tr><td colSpan={4} className="px-4 py-6 text-ink-500">No cash collections in this window.</td></tr>
+                        <tr><td colSpan={4} className="px-4 py-6 text-ink-500 dark:text-ink-400">No cash collections in this window.</td></tr>
                     ) : data.rows.map((r, idx) => (
                         <tr key={idx}>
                             <td className="px-4 py-1.5">{r.date}</td>
@@ -2053,14 +2053,14 @@ function Section({ label, rows, total, totalTone }) {
     if (!rows || rows.length === 0) {
         return (
             <div>
-                <h4 className="text-xs font-semibold text-ink-600 uppercase mb-2">{label}</h4>
+                <h4 className="text-xs font-semibold text-ink-600 dark:text-ink-400 uppercase mb-2">{label}</h4>
                 <Row label={`Total ${label}`} value={total} bold tone={totalTone} />
             </div>
         );
     }
     return (
         <div>
-            <h4 className="text-xs font-semibold text-ink-600 uppercase mb-2">{label}</h4>
+            <h4 className="text-xs font-semibold text-ink-600 dark:text-ink-400 uppercase mb-2">{label}</h4>
             {rows.map(r => <Row key={r.account_id} label={`${r.code} — ${r.name}`} value={r.amount} />)}
             <Row label={`Total ${label}`} value={total} bold tone={totalTone} />
         </div>
@@ -2069,9 +2069,9 @@ function Section({ label, rows, total, totalTone }) {
 
 function Row({ label, value, bold, tone }) {
     return (
-        <div className={'flex items-baseline justify-between py-1 ' + (bold ? 'border-t border-ink-100 mt-1 pt-2' : '')}>
-            <span className={'text-sm ' + (bold ? 'font-semibold text-ink-900' : 'text-ink-700')}>{label}</span>
-            <span className={'font-mono text-sm ' + (bold ? 'font-semibold ' : '') + (tone || 'text-ink-900')}>
+        <div className={'flex items-baseline justify-between py-1 ' + (bold ? 'border-t border-ink-100 dark:border-ink-800 mt-1 pt-2' : '')}>
+            <span className={'text-sm ' + (bold ? 'font-semibold text-ink-900 dark:text-white' : 'text-ink-700 dark:text-ink-200')}>{label}</span>
+            <span className={'font-mono text-sm ' + (bold ? 'font-semibold ' : '') + (tone || 'text-ink-900 dark:text-white')}>
                 {formatAmount(value)}
             </span>
         </div>
@@ -2089,24 +2089,24 @@ const DEBTORS_SECTIONS = [
 ];
 
 const CLAIM_STATUS_BADGE = {
-    draft:     'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-    submitted: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200',
-    settled:   'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    rejected:  'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+    draft:     'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-500/20',
+    submitted: 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300 ring-1 ring-sky-200 dark:ring-sky-500/20',
+    settled:   'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-500/20',
+    rejected:  'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-500/20',
 };
 
 const DEPOSIT_STATUS_BADGE = {
-    available:         'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    partially_applied: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-    fully_applied:     'bg-ink-50 text-ink-600 ring-1 ring-ink-200',
-    refunded:          'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+    available:         'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-500/20',
+    partially_applied: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-500/20',
+    fully_applied:     'bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 ring-1 ring-ink-200 dark:ring-ink-800',
+    refunded:          'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-500/20',
 };
 
 function DebtorsTab() {
     const [section, setSection] = useState('claims');
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
-            <aside className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-2 h-fit">
+            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
                 <nav className="space-y-1">
                     {DEBTORS_SECTIONS.map(({ key, label, icon: Icon }) => (
                         <button key={key}
@@ -2114,8 +2114,8 @@ function DebtorsTab() {
                                 className={
                                     'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ' +
                                     (section === key
-                                        ? 'bg-brand-50 text-brand-700 font-medium'
-                                        : 'text-ink-600 hover:bg-ink-50')
+                                        ? 'bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300 font-medium'
+                                        : 'text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800/50')
                                 }>
                             <Icon size={16} /> {label}
                         </button>
@@ -2194,7 +2194,7 @@ function ClaimsSection() {
 
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No claim schedules yet.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Number</th>
                             <th className="text-left px-4 py-2 font-medium">Provider</th>
@@ -2206,16 +2206,16 @@ function ClaimsSection() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map(c => (
-                            <tr key={c.schedule_id} className="hover:bg-ink-50/40">
+                            <tr key={c.schedule_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
                                 <td className="px-4 py-2 font-mono text-xs">
                                     <button onClick={() => setSelected(c)} className="hover:underline">
                                         {c.schedule_number}
                                     </button>
                                 </td>
                                 <td className="px-4 py-2">{providerName(c.provider_id)}</td>
-                                <td className="px-4 py-2 text-ink-600">{c.period_from} → {c.period_to}</td>
+                                <td className="px-4 py-2 text-ink-600 dark:text-ink-400">{c.period_from} → {c.period_to}</td>
                                 <td className="px-4 py-2 text-right">{c.items?.length || 0}</td>
                                 <td className="px-4 py-2 text-right font-mono">{formatAmount(c.total_amount)}</td>
                                 <td className="px-4 py-2 text-right font-mono">{c.settled_amount ? formatAmount(c.settled_amount) : '—'}</td>
@@ -2227,16 +2227,16 @@ function ClaimsSection() {
                                 <td className="px-4 py-2 text-right space-x-2">
                                     {c.status === 'draft' && (
                                         <button onClick={() => submit(c.schedule_id)}
-                                                className="inline-flex items-center gap-1 text-xs text-sky-700 hover:underline">
+                                                className="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-sky-300 hover:underline">
                                             <Send size={12} /> Submit
                                         </button>
                                     )}
                                     {c.status === 'submitted' && (
                                         <>
                                             <button onClick={() => settle(c.schedule_id)}
-                                                    className="text-xs text-emerald-700 hover:underline">Settle</button>
+                                                    className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline">Settle</button>
                                             <button onClick={() => reject(c.schedule_id)}
-                                                    className="text-xs text-rose-700 hover:underline">Reject</button>
+                                                    className="text-xs text-rose-700 dark:text-rose-300 hover:underline">Reject</button>
                                         </>
                                     )}
                                 </td>
@@ -2334,9 +2334,9 @@ function ClaimModal({ providers, onClose, onSaved }) {
                 </Field>
             </div>
 
-            <div className="mt-4 border border-ink-200 rounded-lg overflow-hidden">
+            <div className="mt-4 border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50 text-ink-600">
+                    <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-3 py-2 font-medium">Invoice ref</th>
                             <th className="text-left px-3 py-2 font-medium">Patient</th>
@@ -2345,7 +2345,7 @@ function ClaimModal({ providers, onClose, onSaved }) {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map((it, idx) => (
                             <tr key={idx}>
                                 <td className="px-3 py-1.5"><input className="input" value={it.invoice_reference}
@@ -2367,11 +2367,11 @@ function ClaimModal({ providers, onClose, onSaved }) {
                             </tr>
                         ))}
                     </tbody>
-                    <tfoot className="bg-ink-50">
+                    <tfoot className="bg-ink-50 dark:bg-ink-800/40">
                         <tr>
                             <td colSpan={3} className="px-3 py-2">
                                 <button onClick={addItem}
-                                        className="text-xs text-brand-700 hover:underline inline-flex items-center gap-1">
+                                        className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                                     <Plus size={12} /> Add item
                                 </button>
                             </td>
@@ -2395,25 +2395,25 @@ function ClaimDetailsModal({ claim, providerName, onClose }) {
     return (
         <ModalShell title={`Claim ${claim.schedule_number}`} onClose={onClose} wide>
             <div className="grid grid-cols-3 gap-3 text-sm mb-4">
-                <div><div className="text-xs text-ink-500">Provider</div>{providerName}</div>
-                <div><div className="text-xs text-ink-500">Period</div>{claim.period_from} → {claim.period_to}</div>
-                <div><div className="text-xs text-ink-500">Status</div>
+                <div><div className="text-xs text-ink-500 dark:text-ink-400">Provider</div>{providerName}</div>
+                <div><div className="text-xs text-ink-500 dark:text-ink-400">Period</div>{claim.period_from} → {claim.period_to}</div>
+                <div><div className="text-xs text-ink-500 dark:text-ink-400">Status</div>
                     <span className={`text-xs px-2 py-0.5 rounded-md ${CLAIM_STATUS_BADGE[claim.status]}`}>
                         {claim.status}
                     </span>
                 </div>
-                <div><div className="text-xs text-ink-500">Total claimed</div><span className="font-mono">{formatAmount(claim.total_amount)}</span></div>
-                {claim.settled_amount && <div><div className="text-xs text-ink-500">Settled</div><span className="font-mono">{formatAmount(claim.settled_amount)}</span></div>}
-                {claim.settlement_reference && <div><div className="text-xs text-ink-500">Settlement ref</div>{claim.settlement_reference}</div>}
+                <div><div className="text-xs text-ink-500 dark:text-ink-400">Total claimed</div><span className="font-mono">{formatAmount(claim.total_amount)}</span></div>
+                {claim.settled_amount && <div><div className="text-xs text-ink-500 dark:text-ink-400">Settled</div><span className="font-mono">{formatAmount(claim.settled_amount)}</span></div>}
+                {claim.settlement_reference && <div><div className="text-xs text-ink-500 dark:text-ink-400">Settlement ref</div>{claim.settlement_reference}</div>}
             </div>
             {claim.rejection_reason && (
-                <div className="mb-4 p-3 bg-rose-50 text-rose-700 text-sm rounded-lg">
+                <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 text-sm rounded-lg">
                     Rejected: {claim.rejection_reason}
                 </div>
             )}
-            <div className="border border-ink-200 rounded-lg overflow-hidden">
+            <div className="border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50 text-ink-600">
+                    <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-3 py-2 font-medium">Invoice ref</th>
                             <th className="text-left px-3 py-2 font-medium">Patient</th>
@@ -2421,7 +2421,7 @@ function ClaimDetailsModal({ claim, providerName, onClose }) {
                             <th className="text-right px-3 py-2 font-medium">Amount</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {claim.items.map(it => (
                             <tr key={it.item_id}>
                                 <td className="px-3 py-1.5">{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '—')}</td>
@@ -2461,7 +2461,7 @@ function DepositsSection() {
 
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No deposits yet.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Number</th>
                             <th className="text-left px-4 py-2 font-medium">Patient #</th>
@@ -2474,7 +2474,7 @@ function DepositsSection() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map(d => {
                             const avail = Number(d.amount) - Number(d.amount_applied || 0);
                             return (
@@ -2495,11 +2495,11 @@ function DepositsSection() {
                                         {avail > 0 && (
                                             <>
                                                 <button onClick={() => setApplying(d)}
-                                                        className="text-xs text-brand-700 hover:underline">
+                                                        className="text-xs text-brand-700 dark:text-brand-300 hover:underline">
                                                     Apply
                                                 </button>
                                                 <button onClick={() => setAllocating(d)}
-                                                        className="text-xs text-brand-700 hover:underline">
+                                                        className="text-xs text-brand-700 dark:text-brand-300 hover:underline">
                                                     Bulk allocate
                                                 </button>
                                             </>
@@ -2602,7 +2602,7 @@ function DepositApplyModal({ deposit, onClose, onSaved }) {
 
     return (
         <ModalShell title={`Apply deposit ${deposit.deposit_number}`} onClose={onClose}>
-            <p className="text-sm text-ink-600 mb-3">
+            <p className="text-sm text-ink-600 dark:text-ink-400 mb-3">
                 Patient #{deposit.patient_id} · Available: <span className="font-mono font-semibold">{formatAmount(available)}</span>
             </p>
             <div className="space-y-3">
@@ -2634,16 +2634,16 @@ const BANK_SECTIONS = [
 ];
 
 const RECON_BADGE = {
-    unreconciled: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-    matched:      'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    ignored:      'bg-ink-50 text-ink-500 ring-1 ring-ink-200',
+    unreconciled: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-500/20',
+    matched:      'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-500/20',
+    ignored:      'bg-ink-50 dark:bg-ink-800/40 text-ink-500 dark:text-ink-400 ring-1 ring-ink-200 dark:ring-ink-800',
 };
 
 function BankTab() {
     const [section, setSection] = useState('accounts');
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
-            <aside className="bg-white border border-ink-200/70 rounded-2xl shadow-soft p-2 h-fit">
+            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
                 <nav className="space-y-1">
                     {BANK_SECTIONS.map(({ key, label, icon: Icon }) => (
                         <button key={key}
@@ -2651,8 +2651,8 @@ function BankTab() {
                                 className={
                                     'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ' +
                                     (section === key
-                                        ? 'bg-brand-50 text-brand-700 font-medium'
-                                        : 'text-ink-600 hover:bg-ink-50')
+                                        ? 'bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300 font-medium'
+                                        : 'text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800/50')
                                 }>
                             <Icon size={16} /> {label}
                         </button>
@@ -2700,7 +2700,7 @@ function BankAccountsSection() {
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No bank accounts yet.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Name</th>
                             <th className="text-left px-4 py-2 font-medium">Bank</th>
@@ -2711,22 +2711,22 @@ function BankAccountsSection() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map(b => (
                             <tr key={b.bank_account_id}>
                                 <td className="px-4 py-1.5 font-medium">{b.name}</td>
                                 <td className="px-4 py-1.5">{b.bank_name}{b.branch ? ` · ${b.branch}` : ''}</td>
                                 <td className="px-4 py-1.5 font-mono text-xs">{b.account_number}</td>
                                 <td className="px-4 py-1.5">{b.currency_code}</td>
-                                <td className="px-4 py-1.5 text-ink-600">{accountName(b.gl_account_id)}</td>
+                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{accountName(b.gl_account_id)}</td>
                                 <td className="px-4 py-1.5">
-                                    <span className={'text-xs ' + (b.is_active ? 'text-emerald-700' : 'text-ink-400')}>
+                                    <span className={'text-xs ' + (b.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {b.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
                                     <button onClick={() => { setEditing(b); setOpen(true); }}
-                                            className="text-xs text-brand-700 hover:underline">Edit</button>
+                                            className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
                         ))}
@@ -2851,7 +2851,7 @@ function BankTransactionsSection() {
 
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No transactions.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Date</th>
                             <th className="text-left px-4 py-2 font-medium">Account</th>
@@ -2861,15 +2861,15 @@ function BankTransactionsSection() {
                             <th className="text-left px-4 py-2 font-medium">Status</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map(t => (
                             <tr key={t.bank_transaction_id}>
                                 <td className="px-4 py-1.5">{t.transaction_date}</td>
                                 <td className="px-4 py-1.5">{accountName(t.bank_account_id)}</td>
-                                <td className="px-4 py-1.5 text-ink-700">{t.description}</td>
+                                <td className="px-4 py-1.5 text-ink-700 dark:text-ink-200">{t.description}</td>
                                 <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '—'}</td>
                                 <td className={'px-4 py-1.5 text-right font-mono ' +
-                                    (Number(t.amount) >= 0 ? 'text-emerald-700' : 'text-rose-700')}>
+                                    (Number(t.amount) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                                     {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
                                 </td>
                                 <td className="px-4 py-1.5">
@@ -2994,8 +2994,8 @@ function ReconciliationSection() {
         <div className="space-y-4">
             <div className="flex items-end justify-between">
                 <div>
-                    <h3 className="text-lg font-semibold text-ink-900">Reconciliation</h3>
-                    <p className="text-sm text-ink-600 mt-1">Match unreconciled bank lines to journal entries.</p>
+                    <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Reconciliation</h3>
+                    <p className="text-sm text-ink-600 dark:text-ink-400 mt-1">Match unreconciled bank lines to journal entries.</p>
                 </div>
                 <Field label="Account">
                     <select className="input min-w-[200px]" value={selected}
@@ -3009,7 +3009,7 @@ function ReconciliationSection() {
             <DataCard loading={loading} empty={items.length === 0}
                       emptyMsg={selected ? 'Nothing left to reconcile here.' : 'Pick an account above.'}>
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Date</th>
                             <th className="text-left px-4 py-2 font-medium">Description</th>
@@ -3018,23 +3018,23 @@ function ReconciliationSection() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map(t => (
                             <tr key={t.bank_transaction_id}>
                                 <td className="px-4 py-1.5">{t.transaction_date}</td>
                                 <td className="px-4 py-1.5">{t.description}</td>
                                 <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '—'}</td>
                                 <td className={'px-4 py-1.5 text-right font-mono ' +
-                                    (Number(t.amount) >= 0 ? 'text-emerald-700' : 'text-rose-700')}>
+                                    (Number(t.amount) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                                     {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
                                 </td>
                                 <td className="px-4 py-1.5 text-right space-x-2">
                                     <button onClick={() => setMatching(t)}
-                                            className="text-xs text-emerald-700 hover:underline inline-flex items-center gap-1">
+                                            className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline inline-flex items-center gap-1">
                                         <Check size={12} /> Match
                                     </button>
                                     <button onClick={() => ignore(t.bank_transaction_id)}
-                                            className="text-xs text-ink-500 hover:underline inline-flex items-center gap-1">
+                                            className="text-xs text-ink-500 dark:text-ink-400 hover:underline inline-flex items-center gap-1">
                                         <Slash size={12} /> Ignore
                                     </button>
                                 </td>
@@ -3080,19 +3080,19 @@ function MatchModal({ tx, onClose, onSaved }) {
 
     return (
         <ModalShell title="Match bank transaction" onClose={onClose} wide>
-            <div className="text-sm text-ink-600 mb-3">
+            <div className="text-sm text-ink-600 dark:text-ink-400 mb-3">
                 {tx.transaction_date} · {tx.description} · <span className="font-mono">{formatAmount(tx.amount)}</span>
             </div>
             {loading ? (
-                <div className="p-6 text-sm text-ink-500">Searching for candidates...</div>
+                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Searching for candidates...</div>
             ) : candidates.length === 0 ? (
-                <div className="p-6 text-sm text-ink-500">
+                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">
                     No matching journal lines found within ±7 days at the same amount.
                 </div>
             ) : (
-                <div className="border border-ink-200 rounded-lg overflow-hidden">
+                <div className="border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
-                        <thead className="bg-ink-50 text-ink-600">
+                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                             <tr>
                                 <th className="text-left px-3 py-2 font-medium">Entry</th>
                                 <th className="text-left px-3 py-2 font-medium">Date</th>
@@ -3102,17 +3102,17 @@ function MatchModal({ tx, onClose, onSaved }) {
                                 <th></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100">
+                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                             {candidates.map(c => (
                                 <tr key={c.line_id}>
                                     <td className="px-3 py-1.5 font-mono text-xs">{c.entry_number}</td>
                                     <td className="px-3 py-1.5">{c.entry_date}</td>
                                     <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.debit)}</td>
                                     <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.credit)}</td>
-                                    <td className="px-3 py-1.5 text-ink-600">{c.memo || c.description || '—'}</td>
+                                    <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{c.memo || c.description || '—'}</td>
                                     <td className="px-3 py-1.5 text-right">
                                         <button onClick={() => match(c.line_id)} disabled={saving}
-                                                className="text-xs text-emerald-700 hover:underline">
+                                                className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline">
                                             Match
                                         </button>
                                     </td>
@@ -3123,7 +3123,7 @@ function MatchModal({ tx, onClose, onSaved }) {
                 </div>
             )}
             <div className="flex justify-end pt-4">
-                <button onClick={onClose} className="px-3 py-2 rounded-lg border border-ink-200 text-sm hover:bg-ink-50">Close</button>
+                <button onClick={onClose} className="px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm hover:bg-ink-50 dark:hover:bg-ink-800/50">Close</button>
             </div>
         </ModalShell>
     );
@@ -3137,10 +3137,10 @@ function MatchModal({ tx, onClose, onSaved }) {
 function ModalShell({ title, onClose, wide, children }) {
     return (
         <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={'bg-white rounded-2xl shadow-elevated w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
-                <div className="flex items-center justify-between p-4 border-b border-ink-100">
-                    <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
-                    <button onClick={onClose} className="text-ink-400 hover:text-ink-700">
+            <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
+                <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
+                    <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{title}</h3>
+                    <button onClick={onClose} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">
                         <X size={18} />
                     </button>
                 </div>
@@ -3152,9 +3152,9 @@ function ModalShell({ title, onClose, wide, children }) {
 
 function ModalActions({ onClose, onSubmit, saving, submitLabel = 'Save' }) {
     return (
-        <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-ink-100">
+        <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-ink-100 dark:border-ink-800">
             <button onClick={onClose}
-                    className="px-3 py-2 rounded-lg border border-ink-200 text-sm font-medium hover:bg-ink-50">
+                    className="px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50">
                 Cancel
             </button>
             <button onClick={onSubmit} disabled={saving}
@@ -3168,7 +3168,7 @@ function ModalActions({ onClose, onSubmit, saving, submitLabel = 'Save' }) {
 function Field({ label, children }) {
     return (
         <label className="block">
-            <span className="block text-xs font-medium text-ink-600 mb-1">{label}</span>
+            <span className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">{label}</span>
             {children}
         </label>
     );

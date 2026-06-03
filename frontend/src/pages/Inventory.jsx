@@ -227,7 +227,7 @@ export default function Inventory() {
                     return (
                         <button key={loc.id} onClick={() => setActiveLocation(loc)}
                             className={`flex items-center gap-2 py-2.5 px-5 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex-1 justify-center ${
-                                isActive ? 'bg-ink-900 text-white shadow-soft' : 'text-ink-600 hover:text-ink-900 hover:bg-ink-50'
+                                isActive ? 'bg-ink-900 dark:bg-ink-700 text-white shadow-soft' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-50 dark:hover:bg-ink-800/50'
                             }`}>
                             <Icon size={16} className={isActive ? 'text-brand-300' : 'text-ink-400'} /> {loc.name}
                         </button>
@@ -238,31 +238,31 @@ export default function Inventory() {
             {/* KPI DASHBOARD */}
             <div data-tour="inv-kpis" className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="stat-tile">
-                    <div className="flex justify-between items-start"><div className="stat-icon bg-ink-100 ring-ink-200 text-ink-700"><Package size={20} /></div></div>
+                    <div className="flex justify-between items-start"><div className="stat-icon bg-ink-100 ring-ink-200 text-ink-700 dark:bg-ink-800/40 dark:ring-ink-800 dark:text-ink-200"><Package size={20} /></div></div>
                     <div>
                         <h3 className="stat-label">{activeLocation.name} valuation</h3>
                         <p className="stat-value mt-1">KES {totalInventoryValue.toLocaleString()}</p>
                     </div>
                 </div>
                 <div className="stat-tile">
-                    <div className="flex justify-between items-start"><div className="stat-icon bg-amber-50 ring-amber-100 text-amber-600"><AlertTriangle size={20} /></div></div>
+                    <div className="flex justify-between items-start"><div className="stat-icon bg-amber-50 ring-amber-100 text-amber-600 dark:bg-amber-500/10 dark:ring-amber-500/20 dark:text-amber-300"><AlertTriangle size={20} /></div></div>
                     <div>
                         <h3 className="stat-label">Global restock alerts</h3>
-                        <p className="stat-value mt-1 text-amber-700">{alerts.low_stock} Items</p>
+                        <p className="stat-value mt-1 text-amber-700 dark:text-amber-300">{alerts.low_stock} Items</p>
                     </div>
                 </div>
                 <div className="stat-tile">
-                    <div className="flex justify-between items-start"><div className="stat-icon bg-rose-50 ring-rose-100 text-rose-600"><CalendarClock size={20} /></div></div>
+                    <div className="flex justify-between items-start"><div className="stat-icon bg-rose-50 ring-rose-100 text-rose-600 dark:bg-rose-500/10 dark:ring-rose-500/20 dark:text-rose-300"><CalendarClock size={20} /></div></div>
                     <div>
                         <h3 className="stat-label">Expiring &lt; 90 days</h3>
-                        <p className="stat-value mt-1 text-rose-700">{alerts.expiring} Batches</p>
+                        <p className="stat-value mt-1 text-rose-700 dark:text-rose-300">{alerts.expiring} Batches</p>
                     </div>
                 </div>
             </div>
 
             {/* INVENTORY DATA TABLE */}
             <div data-tour="inv-table" className="card overflow-hidden flex flex-col">
-                <div data-tour="inv-search" className="p-4 border-b border-ink-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-ink-50/40">
+                <div data-tour="inv-search" className="p-4 border-b border-ink-100 dark:border-ink-800 flex flex-col sm:flex-row items-center justify-between gap-3 bg-ink-50/40 dark:bg-ink-800/40">
                     <div className="relative w-full max-w-md">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                         <input type="text" placeholder={`Search ${activeLocation.name} stock…`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="input pl-10" />
@@ -276,7 +276,7 @@ export default function Inventory() {
                             ))}
                         </select>
                         {categoryFilter !== 'All' && (
-                            <button onClick={() => setCategoryFilter('All')} className="text-xs font-semibold text-ink-500 hover:text-ink-900">Clear</button>
+                            <button onClick={() => setCategoryFilter('All')} className="text-xs font-semibold text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white">Clear</button>
                         )}
                     </div>
                 </div>
@@ -300,12 +300,12 @@ export default function Inventory() {
                                 displayedInventory.map((item) => (
                                     <tr key={item.item_id}>
                                         <td>
-                                            <div className="font-semibold text-ink-900">{item.name}</div>
-                                            <div className="text-xs font-mono text-ink-500 mt-0.5">{item.item_code}</div>
+                                            <div className="font-semibold text-ink-900 dark:text-white">{item.name}</div>
+                                            <div className="text-xs font-mono text-ink-500 dark:text-ink-400 mt-0.5">{item.item_code}</div>
                                         </td>
                                         <td><span className="badge-neutral">{item.category}</span></td>
-                                        <td className="font-semibold text-ink-900 text-base">{item.quantity || item.stock_level || 0}</td>
-                                        <td className="text-right font-semibold text-ink-700">KES {item.unit_price}</td>
+                                        <td className="font-semibold text-ink-900 dark:text-white text-base">{item.quantity || item.stock_level || 0}</td>
+                                        <td className="text-right font-semibold text-ink-700 dark:text-ink-200">KES {item.unit_price}</td>
                                     </tr>
                                 ))
                             )}
@@ -318,13 +318,13 @@ export default function Inventory() {
             {isTransferModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsTransferModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-ink-800 to-ink-900 text-white shrink-0">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-ink-800 to-ink-900 text-white shrink-0">
                             <h2 className="text-xl font-bold flex items-center gap-2"><ArrowRightLeft size={24} className="text-brand-400" /> Internal Transfer</h2>
                             <p className="text-sm text-slate-300 mt-1">Move stock from {activeLocation.name} to another department.</p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-ink-50/40 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
                             <form id="transferForm" onSubmit={handleTransfer} className="space-y-5">
                                 <div className="card p-5 space-y-4">
                                     <div>
@@ -365,9 +365,9 @@ export default function Inventory() {
                             </form>
                         </div>
 
-                        <div className="p-5 border-t border-ink-100 bg-white flex gap-3 shrink-0">
+                        <div className="p-5 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex gap-3 shrink-0">
                             <button type="button" onClick={() => setIsTransferModalOpen(false)} className="btn-secondary">Cancel</button>
-                            <button type="submit" form="transferForm" disabled={isTransferring} className="btn flex-1 bg-ink-800 text-white hover:bg-ink-900 shadow-soft">
+                            <button type="submit" form="transferForm" disabled={isTransferring} className="btn flex-1 bg-ink-800 text-white hover:bg-ink-900 dark:bg-ink-700 dark:hover:bg-ink-600 shadow-soft">
                                 {isTransferring ? 'Processing...' : 'Execute Transfer'}
                             </button>
                         </div>
@@ -379,20 +379,20 @@ export default function Inventory() {
             {isProcurementModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsProcurementModalOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="p-6 border-b border-ink-100 bg-gradient-to-br from-brand-600 to-brand-700 text-white shrink-0">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-brand-600 to-brand-700 text-white shrink-0">
                             <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-200">Receive stock</span>
                             <h2 className="text-lg font-semibold mt-1 flex items-center gap-2"><Truck size={20} className="text-brand-200" /> External procurement</h2>
                             <p className="text-sm text-brand-100/90 mt-1">Receive new stock batches from suppliers into {activeLocation.name}.</p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50 dark:bg-ink-800/40">
                             <form id="procurementForm" onSubmit={handleProcurement} className="space-y-6">
                                 <div className="card p-5 space-y-4">
-                                    <div className="flex items-center justify-between pb-3 border-b border-ink-100">
-                                        <h3 className="text-sm font-semibold text-ink-800">Item details</h3>
-                                        <label className="flex items-center gap-2 text-xs font-semibold text-brand-700 cursor-pointer">
-                                            <input type="checkbox" checked={procurementForm.isNewItem} onChange={e => setProcurementForm({...procurementForm, isNewItem: e.target.checked})} className="rounded border-ink-300 text-brand-600 focus:ring-brand-500" />
+                                    <div className="flex items-center justify-between pb-3 border-b border-ink-100 dark:border-ink-800">
+                                        <h3 className="text-sm font-semibold text-ink-800 dark:text-ink-200">Item details</h3>
+                                        <label className="flex items-center gap-2 text-xs font-semibold text-brand-700 dark:text-brand-400 cursor-pointer">
+                                            <input type="checkbox" checked={procurementForm.isNewItem} onChange={e => setProcurementForm({...procurementForm, isNewItem: e.target.checked})} className="rounded border-ink-300 dark:border-ink-700 text-brand-600 focus:ring-brand-500" />
                                             Add as new catalog item
                                         </label>
                                     </div>
@@ -410,7 +410,7 @@ export default function Inventory() {
                                             </select>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-2 gap-4 bg-brand-50/50 p-4 rounded-lg border border-brand-100">
+                                        <div className="grid grid-cols-2 gap-4 bg-brand-50/50 dark:bg-brand-500/10 p-4 rounded-lg border border-brand-100 dark:border-brand-500/20">
                                             <div className="col-span-2">
                                                 <label className="label">Item Name</label>
                                                 <input required type="text" value={procurementForm.new_item_name} onChange={e => setProcurementForm({...procurementForm, new_item_name: e.target.value})} className="input" placeholder="e.g. Paracetamol 500mg" />
@@ -457,7 +457,7 @@ export default function Inventory() {
                             </form>
                         </div>
 
-                        <div className="p-5 border-t border-ink-100 bg-white flex gap-3 shrink-0">
+                        <div className="p-5 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex gap-3 shrink-0">
                             <button type="button" onClick={() => setIsProcurementModalOpen(false)} className="btn-secondary">Cancel</button>
                             <button type="submit" form="procurementForm" disabled={isProcuring} className="btn-primary flex-1">
                                 {isProcuring ? 'Processing…' : 'Confirm delivery'}

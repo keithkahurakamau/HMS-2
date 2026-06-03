@@ -508,6 +508,71 @@ html.dark .glass-card {
   background-color: rgba(15, 23, 42, 0.72);           /* ink-900/72 */
   border-color: rgba(255, 255, 255, 0.08);
 }
+html.dark .card-glass {
+  background-color: rgba(15, 23, 42, 0.70);           /* ink-900/70 */
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Secondary / ghost buttons — their light skin is a white glass substrate that
+   reads as a near-white slab on dark. Flip to a translucent light-on-dark glass
+   so they still read as glass but belong to the dark surface. (primary / danger
+   / success are saturated colour fills and already sit fine on dark.) */
+html.dark .btn-secondary {
+  color: #e2e8f0;                                     /* ink-200 */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 50%),
+    rgba(255, 255, 255, 0.06);
+}
+html.dark .btn-secondary:hover:not(:disabled) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 50%),
+    rgba(255, 255, 255, 0.10);
+}
+html.dark .btn-secondary,
+html.dark .btn:not(.btn-primary):not(.btn-danger):not(.btn-success) {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 1px 1px rgba(0, 0, 0, 0.30),
+    0 6px 14px -2px rgba(0, 0, 0, 0.45);
+}
+html.dark .btn-ghost { color: #94a3b8; }              /* ink-400 */
+html.dark .btn-ghost:hover:not(:disabled) {
+  color: #f8fafc;                                     /* near-white */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 50%),
+    rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 1px 1px rgba(0, 0, 0, 0.30),
+    0 6px 14px -2px rgba(0, 0, 0, 0.45);
+}
+
+/* Section / stat / helper typography — the shared text primitives. */
+html.dark .section-title { color: #f8fafc; }          /* near-white */
+html.dark .section-sub,
+html.dark .section-eyebrow { color: #94a3b8; }        /* ink-400 */
+html.dark .stat-value { color: #f8fafc; }
+html.dark .stat-label { color: #94a3b8; }
+html.dark .helper { color: #94a3b8; }
+
+/* `.table-clean` sets its own header fill / row borders via @apply, so the
+   generic `html.dark thead th` rule above doesn't reach it. */
+html.dark .table-clean { color: #cbd5e1; }            /* ink-300 */
+html.dark .table-clean thead {
+  background-color: rgba(30, 41, 59, 0.5);            /* ink-800/50 */
+  color: #94a3b8;                                     /* ink-400 */
+}
+html.dark .table-clean tbody tr { border-top-color: #1e293b; }   /* ink-800 */
+html.dark .table-clean tbody tr:hover { background-color: rgba(30, 41, 59, 0.4); }
+
+/* Faint grid background — lighten the hairlines so they read on dark. */
+html.dark .bg-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
 
 /* ---------------------------------------------------------------------
    Print rules

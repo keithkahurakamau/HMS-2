@@ -8,13 +8,22 @@ const OPTIONS = [
     { value: 'system', label: 'System', icon: Monitor },
 ];
 
-export default function ThemeToggle({ compact = false }) {
-    const { theme, setTheme } = useTheme();
+// `scope` selects which independent theme this control drives:
+//   • 'tenant' (default) → the client workspace theme (hms_theme)
+//   • 'admin'            → the platform back-office theme (hms_admin_theme),
+//                          independent of any tenant client's choice.
+export default function ThemeToggle({ compact = false, scope = 'tenant' }) {
+    const ctx = useTheme();
+    const isAdmin = scope === 'admin';
+    const theme = isAdmin ? ctx.adminTheme : ctx.theme;
+    const resolved = isAdmin ? ctx.resolvedAdmin : ctx.resolved;
+    const setTheme = isAdmin ? ctx.setAdminTheme : ctx.setTheme;
 
     if (compact) {
-        // Single-button toggle for tight headers.
-        const next = theme === 'dark' ? 'light' : 'dark';
-        const Icon = theme === 'dark' ? Sun : Moon;
+        // Single-button toggle for tight headers. Uses the resolved value so the
+        // icon is correct even when the scope is in 'system' mode.
+        const next = resolved === 'dark' ? 'light' : 'dark';
+        const Icon = resolved === 'dark' ? Sun : Moon;
         return (
             <button
                 type="button"

@@ -183,9 +183,9 @@ export default function TenantsManager() {
             {/* Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'Active tenants',         value: tenants.length, icon: Building2, ring: 'bg-brand-50  ring-brand-100  text-brand-700' },
-                    { label: 'Premium subscriptions',  value: tenants.filter(t => t.is_premium).length, icon: ShieldAlert, ring: 'bg-amber-50 ring-amber-100 text-amber-700' },
-                    { label: 'Database nodes',         value: tenants.length, icon: Database, ring: 'bg-accent-50 ring-accent-100 text-accent-700' },
+                    { label: 'Active tenants',         value: tenants.length, icon: Building2, ring: 'bg-brand-50  ring-brand-100  text-brand-700 dark:bg-brand-500/10 dark:ring-brand-500/20 dark:text-brand-300' },
+                    { label: 'Premium subscriptions',  value: tenants.filter(t => t.is_premium).length, icon: ShieldAlert, ring: 'bg-amber-50 ring-amber-100 text-amber-700 dark:bg-amber-500/10 dark:ring-amber-500/20 dark:text-amber-300' },
+                    { label: 'Database nodes',         value: tenants.length, icon: Database, ring: 'bg-accent-50 ring-accent-100 text-accent-700 dark:bg-accent-500/10 dark:ring-accent-500/20 dark:text-accent-300' },
                 ].map(({ label, value, icon: Icon, ring }) => (
                     <div key={label} className="stat-tile">
                         <div className={`stat-icon ${ring}`} aria-hidden="true">
@@ -198,12 +198,12 @@ export default function TenantsManager() {
                     </div>
                 ))}
                 <div className="stat-tile">
-                    <div className="stat-icon bg-teal-50 ring-teal-100 text-teal-700" aria-hidden="true">
+                    <div className="stat-icon bg-teal-50 ring-teal-100 text-teal-700 dark:bg-teal-500/10 dark:ring-teal-500/20 dark:text-teal-300" aria-hidden="true">
                         <Server size={18} />
                     </div>
                     <div>
                         <p className="stat-label">Server status</p>
-                        <p className="text-base font-semibold text-accent-700 mt-1 flex items-center gap-2">
+                        <p className="text-base font-semibold text-accent-700 dark:text-accent-300 mt-1 flex items-center gap-2">
                             <CheckCircle2 size={16} aria-hidden="true" /> Operational
                         </p>
                     </div>
@@ -212,7 +212,7 @@ export default function TenantsManager() {
 
             {/* Data Table */}
             <div className="card overflow-hidden">
-                <div className="p-4 border-b border-ink-200 flex justify-between items-center">
+                <div className="p-4 border-b border-ink-200 dark:border-ink-800 flex justify-between items-center">
                     <div className="relative">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
                         <label htmlFor="tenant-filter-search" className="sr-only">Filter tenants</label>
@@ -221,13 +221,13 @@ export default function TenantsManager() {
                             type="search"
                             placeholder="Filter tenants…"
                             value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full sm:w-72 bg-white border border-ink-200 rounded-lg pl-9 pr-4 py-2 text-sm text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                            className="w-full sm:w-72 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg pl-9 pr-4 py-2 text-sm text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
                         />
                     </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-ink-50 text-ink-600 text-2xs uppercase font-semibold tracking-[0.14em]">
+                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
                             <tr>
                                 <th className="px-6 py-3">Tenant</th>
                                 <th className="px-6 py-3">Domain routing</th>
@@ -236,28 +236,28 @@ export default function TenantsManager() {
                                 <th className="px-6 py-3 text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 text-ink-700">
+                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-200">
                             {isLoading ? (
-                                <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500">Loading global registry…</td></tr>
+                                <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500 dark:text-ink-400">Loading global registry…</td></tr>
                             ) : filteredTenants.map(tenant => {
                                 const themeRing = {
-                                    blue:    'border-blue-200 bg-blue-50 text-blue-700',
-                                    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-                                    teal:    'border-brand-200 bg-brand-50 text-brand-700',
-                                    rose:    'border-rose-200 bg-rose-50 text-rose-700',
-                                    indigo:  'border-indigo-200 bg-indigo-50 text-indigo-700',
-                                }[tenant.theme_color] || 'border-blue-200 bg-blue-50 text-blue-700';
+                                    blue:    'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300',
+                                    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300',
+                                    teal:    'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-300',
+                                    rose:    'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300',
+                                    indigo:  'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300',
+                                }[tenant.theme_color] || 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300';
                                 return (
-                                    <tr key={tenant.id} className="hover:bg-ink-50 transition-colors group">
+                                    <tr key={tenant.id} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className={`size-9 rounded-xl flex items-center justify-center border ${themeRing}`}>
                                                     <Building2 size={16} />
                                                 </div>
-                                                <span className="font-semibold text-ink-900 group-hover:text-brand-700 transition-colors">{tenant.name}</span>
+                                                <span className="font-semibold text-ink-900 dark:text-white group-hover:text-brand-700 transition-colors">{tenant.name}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-mono text-xs text-ink-600">{tenant.domain}</td>
+                                        <td className="px-6 py-4 font-mono text-xs text-ink-600 dark:text-ink-400">{tenant.domain}</td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
                                                 <Database size={13} className="text-ink-500" aria-hidden="true" />
@@ -301,17 +301,17 @@ export default function TenantsManager() {
                     aria-modal="true"
                     aria-labelledby="edit-tenant-title"
                 >
-                    <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-4xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
-                        <div className="px-4 sm:px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-center shrink-0 gap-3">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-4xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                        <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-center shrink-0 gap-3">
                             <div className="min-w-0">
-                                <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">Tenant configuration</p>
-                                <h2 id="edit-tenant-title" className="text-base sm:text-lg font-semibold text-ink-900 tracking-tight truncate">{editing.name}</h2>
+                                <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700 dark:text-brand-400">Tenant configuration</p>
+                                <h2 id="edit-tenant-title" className="text-base sm:text-lg font-semibold text-ink-900 dark:text-white tracking-tight truncate">{editing.name}</h2>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setEditing(null)}
                                 aria-label="Close"
-                                className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors cursor-pointer shrink-0"
+                                className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 transition-colors cursor-pointer shrink-0"
                             >
                                 <X size={18} aria-hidden="true" />
                             </button>
@@ -320,37 +320,37 @@ export default function TenantsManager() {
                         <form onSubmit={handleEdit} className="flex-1 overflow-y-auto custom-scrollbar">
                             <div className="grid grid-cols-1 lg:grid-cols-5">
                                 {/* ── LEFT column: identity + database + custom flags + notes ───── */}
-                                <div className="lg:col-span-2 p-5 sm:p-6 space-y-4 border-b lg:border-b-0 lg:border-r border-ink-200 bg-white">
+                                <div className="lg:col-span-2 p-5 sm:p-6 space-y-4 border-b lg:border-b-0 lg:border-r border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900">
                                     <div>
-                                        <label htmlFor="tenant-name" className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Display Name</label>
+                                        <label htmlFor="tenant-name" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Display Name</label>
                                         <input
                                             id="tenant-name"
                                             required
                                             type="text"
                                             value={editForm.name}
                                             onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                                            className="w-full bg-white border border-ink-200 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
+                                            className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
                                         />
                                     </div>
                                     <div>
-                                        <label htmlFor="tenant-domain" className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Subdomain Route</label>
+                                        <label htmlFor="tenant-domain" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Subdomain Route</label>
                                         <input
                                             id="tenant-domain"
                                             required
                                             type="text"
                                             value={editForm.domain}
                                             onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })}
-                                            className="w-full bg-white border border-ink-200 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
+                                            className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label htmlFor="tenant-theme" className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Theme</label>
+                                            <label htmlFor="tenant-theme" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Theme</label>
                                             <select
                                                 id="tenant-theme"
                                                 value={editForm.theme_color}
                                                 onChange={(e) => setEditForm({ ...editForm, theme_color: e.target.value })}
-                                                className="w-full bg-white border border-ink-200 rounded-lg px-3 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
+                                                className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
                                             >
                                                 <option value="blue">Blue</option>
                                                 <option value="emerald">Emerald</option>
@@ -359,34 +359,34 @@ export default function TenantsManager() {
                                             </select>
                                         </div>
                                         <div>
-                                            <label htmlFor="tenant-tier" className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Tier</label>
+                                            <label htmlFor="tenant-tier" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Tier</label>
                                             <select
                                                 id="tenant-tier"
                                                 value={editForm.is_premium ? 'true' : 'false'}
                                                 onChange={(e) => setEditForm({ ...editForm, is_premium: e.target.value === 'true' })}
-                                                className="w-full bg-white border border-ink-200 rounded-lg px-3 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
+                                                className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
                                             >
                                                 <option value="false">Standard</option>
                                                 <option value="true">Premium</option>
                                             </select>
                                         </div>
                                     </div>
-                                    <div className="bg-ink-50 border border-ink-200 rounded-lg p-3 text-xs text-ink-600">
-                                        Database name <code className="text-ink-900 font-mono bg-white px-1.5 py-0.5 rounded border border-ink-200">{editing.db_name}</code> is immutable.
+                                    <div className="bg-ink-50 dark:bg-ink-800/40 border border-ink-200 dark:border-ink-800 rounded-lg p-3 text-xs text-ink-600 dark:text-ink-400">
+                                        Database name <code className="text-ink-900 dark:text-ink-100 font-mono bg-white dark:bg-ink-800 px-1.5 py-0.5 rounded border border-ink-200 dark:border-ink-700">{editing.db_name}</code> is immutable.
                                     </div>
                                 </div>
 
                                 {/* ── RIGHT column: package configuration ─────────────────────────── */}
-                                <div className="lg:col-span-3 p-5 sm:p-6 space-y-4 bg-ink-50/40">
+                                <div className="lg:col-span-3 p-5 sm:p-6 space-y-4 bg-ink-50/40 dark:bg-ink-800/40">
                                     {/* Package header */}
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-start gap-2.5 min-w-0">
-                                            <div className="size-9 rounded-lg bg-brand-50 ring-1 ring-inset ring-brand-100 flex items-center justify-center shrink-0">
-                                                <Package size={16} className="text-brand-700" aria-hidden="true" />
+                                            <div className="size-9 rounded-lg bg-brand-50 dark:bg-brand-500/10 ring-1 ring-inset ring-brand-100 dark:ring-brand-500/20 flex items-center justify-center shrink-0">
+                                                <Package size={16} className="text-brand-700 dark:text-brand-400" aria-hidden="true" />
                                             </div>
                                             <div className="min-w-0">
-                                                <h3 className="text-sm font-semibold text-ink-900 tracking-tight">Package configuration</h3>
-                                                <p className="text-xs text-ink-500 mt-0.5">Modules this hospital has access to.</p>
+                                                <h3 className="text-sm font-semibold text-ink-900 dark:text-white tracking-tight">Package configuration</h3>
+                                                <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Modules this hospital has access to.</p>
                                             </div>
                                         </div>
                                         {moduleCatalogue.length > 0 && (() => {
@@ -405,7 +405,7 @@ export default function TenantsManager() {
                                     </div>
 
                                     {moduleCatalogue.length === 0 ? (
-                                        <p className="text-xs text-ink-500 italic bg-white border border-ink-200 rounded-lg p-3">
+                                        <p className="text-xs text-ink-500 dark:text-ink-400 italic bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg p-3">
                                             Module catalogue unavailable — use the custom-flag editor on the right.
                                         </p>
                                     ) : (
@@ -413,7 +413,7 @@ export default function TenantsManager() {
                                             {/* Search + bulk actions */}
                                             <div className="flex flex-col sm:flex-row gap-2">
                                                 <div className="relative flex-1 min-w-0">
-                                                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
+                                                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400 dark:text-ink-500" aria-hidden="true" />
                                                     <label htmlFor="module-search" className="sr-only">Search modules</label>
                                                     <input
                                                         id="module-search"
@@ -421,7 +421,7 @@ export default function TenantsManager() {
                                                         value={moduleSearch}
                                                         onChange={(e) => setModuleSearch(e.target.value)}
                                                         placeholder="Search modules…"
-                                                        className="w-full bg-white border border-ink-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-ink-900 placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                                        className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-ink-900 dark:text-white placeholder-ink-400 dark:placeholder-ink-500 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                                     />
                                                 </div>
                                                 <div className="flex gap-1.5">
@@ -432,7 +432,7 @@ export default function TenantsManager() {
                                                             moduleCatalogue.filter(m => !m.always_on).forEach(m => { flags[m.key] = true; });
                                                             setEditForm({ ...editForm, feature_flags: flags });
                                                         }}
-                                                        className="text-2xs font-semibold px-2.5 py-1.5 bg-white border border-ink-200 rounded-lg text-ink-700 hover:bg-ink-50 cursor-pointer"
+                                                        className="text-2xs font-semibold px-2.5 py-1.5 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50 cursor-pointer"
                                                     >
                                                         Enable all
                                                     </button>
@@ -443,7 +443,7 @@ export default function TenantsManager() {
                                                             moduleCatalogue.filter(m => !m.always_on).forEach(m => { flags[m.key] = false; });
                                                             setEditForm({ ...editForm, feature_flags: flags });
                                                         }}
-                                                        className="text-2xs font-semibold px-2.5 py-1.5 bg-white border border-ink-200 rounded-lg text-ink-700 hover:bg-ink-50 cursor-pointer"
+                                                        className="text-2xs font-semibold px-2.5 py-1.5 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50 cursor-pointer"
                                                     >
                                                         Disable all
                                                     </button>
@@ -464,17 +464,17 @@ export default function TenantsManager() {
                                                         {alwaysOn.length > 0 && (
                                                             <div>
                                                                 <div className="flex items-center gap-2 mb-1.5">
-                                                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">Base subscription</p>
-                                                                    <span className="text-[10px] text-ink-400">always on · cannot be disabled</span>
+                                                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-ink-400">Base subscription</p>
+                                                                    <span className="text-[10px] text-ink-400 dark:text-ink-500">always on · cannot be disabled</span>
                                                                 </div>
                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                                                     {alwaysOn.map((m) => (
-                                                                        <div key={m.key} className="flex items-center justify-between gap-2 bg-white border border-ink-200 rounded-md px-2.5 py-1.5">
+                                                                        <div key={m.key} className="flex items-center justify-between gap-2 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-md px-2.5 py-1.5">
                                                                             <div className="min-w-0">
-                                                                                <p className="text-xs font-medium text-ink-900 truncate">{m.label}</p>
-                                                                                <p className="text-[10px] text-ink-500 truncate font-mono">{m.key}</p>
+                                                                                <p className="text-xs font-medium text-ink-900 dark:text-white truncate">{m.label}</p>
+                                                                                <p className="text-[10px] text-ink-500 dark:text-ink-400 truncate font-mono">{m.key}</p>
                                                                             </div>
-                                                                            <Lock size={12} className="text-ink-400 shrink-0" aria-label="Always on" />
+                                                                            <Lock size={12} className="text-ink-400 dark:text-ink-500 shrink-0" aria-label="Always on" />
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -484,8 +484,8 @@ export default function TenantsManager() {
                                                         {optional.length > 0 && (
                                                             <div>
                                                                 <div className="flex items-center gap-2 mb-1.5">
-                                                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">Add-on modules</p>
-                                                                    <span className="text-[10px] text-ink-400">à la carte</span>
+                                                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-ink-400">Add-on modules</p>
+                                                                    <span className="text-[10px] text-ink-400 dark:text-ink-500">à la carte</span>
                                                                 </div>
                                                                 <div className="space-y-1.5">
                                                                     {optional.map((m) => {
@@ -498,18 +498,18 @@ export default function TenantsManager() {
                                                                                 htmlFor={`mod-${m.key}`}
                                                                                 className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer transition-colors border ${
                                                                                     enabled
-                                                                                        ? 'bg-brand-50/60 border-brand-200 hover:bg-brand-50'
-                                                                                        : 'bg-white border-ink-200 hover:bg-ink-50'
+                                                                                        ? 'bg-brand-50/60 dark:bg-brand-500/10 border-brand-200 dark:border-brand-500/20 hover:bg-brand-50 dark:hover:bg-brand-500/20'
+                                                                                        : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:bg-ink-50 dark:hover:bg-ink-800/50'
                                                                                 }`}
                                                                             >
                                                                                 <div className="min-w-0">
                                                                                     <div className="flex items-center gap-2">
-                                                                                        <p className="text-sm font-medium text-ink-900 truncate">{m.label}</p>
+                                                                                        <p className="text-sm font-medium text-ink-900 dark:text-white truncate">{m.label}</p>
                                                                                         {enabled && (
-                                                                                            <span className="text-[10px] font-semibold text-accent-700 uppercase tracking-wider shrink-0">On</span>
+                                                                                            <span className="text-[10px] font-semibold text-accent-700 dark:text-accent-300 uppercase tracking-wider shrink-0">On</span>
                                                                                         )}
                                                                                     </div>
-                                                                                    <p className="text-xs text-ink-500 truncate mt-0.5">{m.description}</p>
+                                                                                    <p className="text-xs text-ink-500 dark:text-ink-400 truncate mt-0.5">{m.description}</p>
                                                                                 </div>
                                                                                 <span className="shrink-0 inline-flex items-center">
                                                                                     <input
@@ -533,7 +533,7 @@ export default function TenantsManager() {
                                                         )}
 
                                                         {alwaysOn.length === 0 && optional.length === 0 && (
-                                                            <p className="text-xs text-ink-500 italic text-center py-4">
+                                                            <p className="text-xs text-ink-500 dark:text-ink-400 italic text-center py-4">
                                                                 No modules match "{moduleSearch}".
                                                             </p>
                                                         )}
@@ -546,25 +546,25 @@ export default function TenantsManager() {
                             </div>
 
                             {/* ── BELOW the columns: advanced flags + limits + notes ──────────── */}
-                            <div className="p-5 sm:p-6 space-y-4 border-t border-ink-200 bg-white">
+                            <div className="p-5 sm:p-6 space-y-4 border-t border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                             {/* Custom flags — escape hatch for ad-hoc keys that aren't in the
                                 canonical module catalogue. Most operators won't need this; it's
                                 here so forward-compat with new flags doesn't require a frontend
                                 redeploy. */}
-                            <details className="bg-ink-50 border border-ink-200 rounded-lg p-4">
-                                <summary className="cursor-pointer text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em]">Custom flags (advanced)</summary>
+                            <details className="bg-ink-50 dark:bg-ink-800/40 border border-ink-200 dark:border-ink-800 rounded-lg p-4">
+                                <summary className="cursor-pointer text-2xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-[0.14em]">Custom flags (advanced)</summary>
                                 <div className="mt-3 space-y-2">
                                     {(() => {
                                         const known = new Set(moduleCatalogue.map((m) => m.key));
                                         const customs = Object.entries(editForm.feature_flags || {}).filter(([k]) => !known.has(k));
                                         if (customs.length === 0) {
-                                            return <p className="text-xs text-ink-500 italic">No custom flags. Use the field below to add one.</p>;
+                                            return <p className="text-xs text-ink-500 dark:text-ink-400 italic">No custom flags. Use the field below to add one.</p>;
                                         }
                                         return customs.map(([k, v]) => (
                                             <div key={k} className="flex items-center justify-between gap-2 text-sm">
-                                                <code className="text-ink-700 font-mono text-xs truncate">{k}</code>
+                                                <code className="text-ink-700 dark:text-ink-200 font-mono text-xs truncate">{k}</code>
                                                 <div className="flex items-center gap-2 shrink-0">
                                                     <label className="inline-flex items-center cursor-pointer">
                                                         <span className="sr-only">Toggle {k}</span>
@@ -581,7 +581,7 @@ export default function TenantsManager() {
                                                         const next = { ...editForm.feature_flags };
                                                         delete next[k];
                                                         setEditForm({ ...editForm, feature_flags: next });
-                                                    }} className="text-ink-500 hover:text-rose-600 cursor-pointer p-1 -m-1 rounded" aria-label={`Remove ${k}`}>
+                                                    }} className="text-ink-500 dark:text-ink-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer p-1 -m-1 rounded" aria-label={`Remove ${k}`}>
                                                         <X size={14} aria-hidden="true" />
                                                     </button>
                                                 </div>
@@ -597,14 +597,14 @@ export default function TenantsManager() {
                                         placeholder="flag_key"
                                         value={flagDraft.key}
                                         onChange={(e) => setFlagDraft({ ...flagDraft, key: e.target.value })}
-                                        className="flex-1 min-w-0 bg-white border border-ink-200 rounded-lg px-3 py-2 text-xs text-ink-900 font-mono focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                        className="flex-1 min-w-0 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-xs text-ink-900 dark:text-white font-mono focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                     />
                                     <label htmlFor="flag-value" className="sr-only">Custom flag value</label>
                                     <select
                                         id="flag-value"
                                         value={flagDraft.value ? 'true' : 'false'}
                                         onChange={(e) => setFlagDraft({ ...flagDraft, value: e.target.value === 'true' })}
-                                        className="bg-white border border-ink-200 rounded-lg px-3 py-2 text-xs text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                        className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-xs text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                     >
                                         <option value="true">On</option>
                                         <option value="false">Off</option>
@@ -616,25 +616,25 @@ export default function TenantsManager() {
                                             feature_flags: { ...editForm.feature_flags, [flagDraft.key.trim()]: flagDraft.value },
                                         });
                                         setFlagDraft({ key: '', value: true });
-                                    }} className="px-3 py-2 bg-ink-100 hover:bg-ink-200 text-ink-700 rounded-lg text-xs font-semibold cursor-pointer">Add</button>
+                                    }} className="px-3 py-2 bg-ink-100 dark:bg-ink-800 hover:bg-ink-200 dark:hover:bg-ink-700 text-ink-700 dark:text-ink-200 rounded-lg text-xs font-semibold cursor-pointer">Add</button>
                                 </div>
                             </details>
 
                             {/* Plan limits */}
-                            <div className="bg-ink-50 border border-ink-200 rounded-lg p-4">
+                            <div className="bg-ink-50 dark:bg-ink-800/40 border border-ink-200 dark:border-ink-800 rounded-lg p-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <div>
-                                        <p className="text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em]">Plan limits</p>
-                                        <p className="text-xs text-ink-500 mt-0.5">Numeric caps — max_users, storage_gb, max_patients…</p>
+                                        <p className="text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em]">Plan limits</p>
+                                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Numeric caps — max_users, storage_gb, max_patients…</p>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     {Object.keys(editForm.plan_limits || {}).length === 0 && (
-                                        <p className="text-xs text-ink-500 italic">No limits set.</p>
+                                        <p className="text-xs text-ink-500 dark:text-ink-400 italic">No limits set.</p>
                                     )}
                                     {Object.entries(editForm.plan_limits || {}).map(([k, v]) => (
                                         <div key={k} className="grid grid-cols-12 gap-2 items-center">
-                                            <code className="col-span-5 text-ink-700 font-mono text-xs truncate">{k}</code>
+                                            <code className="col-span-5 text-ink-700 dark:text-ink-200 font-mono text-xs truncate">{k}</code>
                                             <label htmlFor={`limit-${k}`} className="sr-only">{k}</label>
                                             <input
                                                 id={`limit-${k}`}
@@ -645,13 +645,13 @@ export default function TenantsManager() {
                                                     ...editForm,
                                                     plan_limits: { ...editForm.plan_limits, [k]: parseFloat(e.target.value) || 0 },
                                                 })}
-                                                className="col-span-6 bg-white border border-ink-200 rounded-lg px-3 py-1.5 text-xs text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                                className="col-span-6 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-1.5 text-xs text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                             />
                                             <button type="button" onClick={() => {
                                                 const next = { ...editForm.plan_limits };
                                                 delete next[k];
                                                 setEditForm({ ...editForm, plan_limits: next });
-                                            }} className="col-span-1 text-ink-500 hover:text-rose-600 cursor-pointer p-1 -m-1 rounded" aria-label={`Remove ${k}`}>
+                                            }} className="col-span-1 text-ink-500 dark:text-ink-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer p-1 -m-1 rounded" aria-label={`Remove ${k}`}>
                                                 <X size={14} aria-hidden="true" />
                                             </button>
                                         </div>
@@ -665,7 +665,7 @@ export default function TenantsManager() {
                                         placeholder="limit_key"
                                         value={limitDraft.key}
                                         onChange={(e) => setLimitDraft({ ...limitDraft, key: e.target.value })}
-                                        className="flex-1 min-w-0 bg-white border border-ink-200 rounded-lg px-3 py-2 text-xs text-ink-900 font-mono focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                        className="flex-1 min-w-0 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-xs text-ink-900 dark:text-white font-mono focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                     />
                                     <label htmlFor="limit-val" className="sr-only">New limit value</label>
                                     <input
@@ -674,7 +674,7 @@ export default function TenantsManager() {
                                         placeholder="0"
                                         value={limitDraft.value}
                                         onChange={(e) => setLimitDraft({ ...limitDraft, value: parseFloat(e.target.value) || 0 })}
-                                        className="w-24 bg-white border border-ink-200 rounded-lg px-3 py-2 text-xs text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                        className="w-24 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-xs text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                     />
                                     <button type="button" onClick={() => {
                                         if (!limitDraft.key.trim()) return;
@@ -683,25 +683,25 @@ export default function TenantsManager() {
                                             plan_limits: { ...editForm.plan_limits, [limitDraft.key.trim()]: limitDraft.value },
                                         });
                                         setLimitDraft({ key: '', value: 0 });
-                                    }} className="px-3 py-2 bg-ink-100 hover:bg-ink-200 text-ink-700 rounded-lg text-xs font-semibold cursor-pointer">Add</button>
+                                    }} className="px-3 py-2 bg-ink-100 dark:bg-ink-800 hover:bg-ink-200 dark:hover:bg-ink-700 text-ink-700 dark:text-ink-200 rounded-lg text-xs font-semibold cursor-pointer">Add</button>
                                 </div>
                             </div>
                                 </div>  {/* close advanced grid */}
 
                                 <div>
-                                    <label htmlFor="tenant-notes" className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Operator notes</label>
+                                    <label htmlFor="tenant-notes" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Operator notes</label>
                                     <textarea
                                         id="tenant-notes"
                                         rows="3"
                                         value={editForm.notes}
                                         onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                                        className="w-full bg-white border border-ink-200 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none resize-none"
+                                        className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none resize-none"
                                         placeholder="Internal note. Not visible to the tenant."
                                     />
                                 </div>
                             </div>  {/* close advanced wrapper */}
 
-                            <div className="px-5 sm:px-6 py-4 border-t border-ink-200 bg-ink-50 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sticky bottom-0">
+                            <div className="px-5 sm:px-6 py-4 border-t border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sticky bottom-0">
                                 <button type="button" onClick={() => setEditing(null)} className="btn-secondary cursor-pointer">Cancel</button>
                                 <button type="submit" disabled={savingEdit}
                                     className="btn-primary disabled:opacity-50 cursor-pointer">
@@ -720,32 +720,32 @@ export default function TenantsManager() {
                 surfaces. */}
             {provisionResult && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/40 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
-                        <div className="px-6 py-4 border-b border-amber-100 bg-amber-50">
-                            <h2 className="text-base font-semibold text-amber-900 tracking-tight">Tenant ready &mdash; admin temporary password</h2>
-                            <p className="text-xs text-amber-800 mt-1">Shown once. Deliver to the admin via a secure channel.</p>
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
+                        <div className="px-6 py-4 border-b border-amber-100 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10">
+                            <h2 className="text-base font-semibold text-amber-900 dark:text-amber-300 tracking-tight">Tenant ready &mdash; admin temporary password</h2>
+                            <p className="text-xs text-amber-800 dark:text-amber-400 mt-1">Shown once. Deliver to the admin via a secure channel.</p>
                         </div>
                         <div className="p-6 space-y-3 text-sm">
-                            <div className="bg-ink-50 border border-ink-200 rounded-xl p-4">
-                                <div className="text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em] mb-2">Tenant</div>
-                                <div className="text-ink-900 font-semibold">{provisionResult.db_name}</div>
+                            <div className="bg-ink-50 dark:bg-ink-800/40 border border-ink-200 dark:border-ink-800 rounded-xl p-4">
+                                <div className="text-2xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-[0.14em] mb-2">Tenant</div>
+                                <div className="text-ink-900 dark:text-white font-semibold">{provisionResult.db_name}</div>
                             </div>
-                            <div className="bg-ink-50 border border-ink-200 rounded-xl p-4">
-                                <div className="text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em] mb-2">Admin email</div>
-                                <div className="text-ink-900 font-mono text-xs break-all">{provisionResult.admin_email}</div>
+                            <div className="bg-ink-50 dark:bg-ink-800/40 border border-ink-200 dark:border-ink-800 rounded-xl p-4">
+                                <div className="text-2xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-[0.14em] mb-2">Admin email</div>
+                                <div className="text-ink-900 dark:text-white font-mono text-xs break-all">{provisionResult.admin_email}</div>
                             </div>
-                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                                <div className="text-2xs font-semibold text-amber-800 uppercase tracking-[0.14em] mb-2">Temporary password</div>
-                                <code className="text-ink-900 font-mono text-base break-all select-all">{provisionResult.admin_temp_password}</code>
+                            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4">
+                                <div className="text-2xs font-semibold text-amber-800 dark:text-amber-400 uppercase tracking-[0.14em] mb-2">Temporary password</div>
+                                <code className="text-ink-900 dark:text-white font-mono text-base break-all select-all">{provisionResult.admin_temp_password}</code>
                                 <button
                                     type="button"
                                     onClick={() => { navigator.clipboard.writeText(provisionResult.admin_temp_password); toast.success('Copied'); }}
-                                    className="mt-3 inline-flex items-center gap-1 text-xs text-amber-800 hover:text-amber-900 font-semibold cursor-pointer"
+                                    className="mt-3 inline-flex items-center gap-1 text-xs text-amber-800 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 font-semibold cursor-pointer"
                                 >
                                     Copy to clipboard
                                 </button>
                             </div>
-                            <p className="text-xs text-ink-500 leading-relaxed">
+                            <p className="text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
                                 The admin will be forced to choose a new password on first login.
                             </p>
                             <div className="flex justify-end pt-2">
@@ -761,40 +761,40 @@ export default function TenantsManager() {
             {/* Provision Modal */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/80 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white border border-ink-200 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
-                        <div className="px-6 py-4 border-b border-ink-200 bg-ink-50 flex justify-between items-center">
-                            <h2 className="text-base font-semibold text-ink-900 tracking-tight">Provision new tenant</h2>
-                            <button onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors cursor-pointer"><X size={18} /></button>
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
+                        <div className="px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-center">
+                            <h2 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">Provision new tenant</h2>
+                            <button onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 transition-colors cursor-pointer"><X size={18} /></button>
                         </div>
                         <form onSubmit={handleProvisionTenant} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Hospital Name</label>
-                                <input required type="text" value={newTenant.name} onChange={e => setNewTenant({...newTenant, name: e.target.value})} className="w-full bg-white border border-ink-200 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="e.g. Aga Khan Hospital" />
+                                <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Hospital Name</label>
+                                <input required type="text" value={newTenant.name} onChange={e => setNewTenant({...newTenant, name: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="e.g. Aga Khan Hospital" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Subdomain Route</label>
-                                    <input required type="text" value={newTenant.domain} onChange={e => setNewTenant({...newTenant, domain: e.target.value})} className="w-full bg-white border border-ink-200 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="e.g. agakhan.hms.com" />
+                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Subdomain Route</label>
+                                    <input required type="text" value={newTenant.domain} onChange={e => setNewTenant({...newTenant, domain: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="e.g. agakhan.hms.com" />
                                 </div>
                                 <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Database Name</label>
-                                    <input required type="text" value={newTenant.db_name} onChange={e => setNewTenant({...newTenant, db_name: e.target.value})} className="w-full bg-ink-50 border border-ink-200 rounded-lg px-4 py-2 text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none font-mono text-sm" placeholder="e.g. agakhan_db" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Bootstrap Admin Email</label>
-                                    <input required type="email" value={newTenant.admin_email} onChange={e => setNewTenant({...newTenant, admin_email: e.target.value})} className="w-full bg-white border border-ink-200 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="admin@agakhan.com" />
-                                </div>
-                                <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Admin Full Name</label>
-                                    <input required type="text" value={newTenant.admin_full_name} onChange={e => setNewTenant({...newTenant, admin_full_name: e.target.value})} className="w-full bg-white border border-ink-200 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="Jane Mwangi" />
+                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Database Name</label>
+                                    <input required type="text" value={newTenant.db_name} onChange={e => setNewTenant({...newTenant, db_name: e.target.value})} className="w-full bg-ink-50 dark:bg-ink-800/40 border border-ink-200 dark:border-ink-800 rounded-lg px-4 py-2 text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none font-mono text-sm" placeholder="e.g. agakhan_db" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Theme Color</label>
-                                    <select value={newTenant.theme_color} onChange={e => setNewTenant({...newTenant, theme_color: e.target.value})} className="w-full bg-white border border-ink-200 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all">
+                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Bootstrap Admin Email</label>
+                                    <input required type="email" value={newTenant.admin_email} onChange={e => setNewTenant({...newTenant, admin_email: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="admin@agakhan.com" />
+                                </div>
+                                <div>
+                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Admin Full Name</label>
+                                    <input required type="text" value={newTenant.admin_full_name} onChange={e => setNewTenant({...newTenant, admin_full_name: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="Jane Mwangi" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Theme Color</label>
+                                    <select value={newTenant.theme_color} onChange={e => setNewTenant({...newTenant, theme_color: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all">
                                         <option value="blue">Blue (Default)</option>
                                         <option value="emerald">Emerald</option>
                                         <option value="rose">Rose</option>
@@ -802,14 +802,14 @@ export default function TenantsManager() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 uppercase tracking-[0.14em] mb-1.5">Subscription Tier</label>
-                                    <select value={newTenant.is_premium} onChange={e => setNewTenant({...newTenant, is_premium: e.target.value === 'true'})} className="w-full bg-white border border-ink-200 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all">
+                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Subscription Tier</label>
+                                    <select value={newTenant.is_premium} onChange={e => setNewTenant({...newTenant, is_premium: e.target.value === 'true'})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all">
                                         <option value="false">Standard (Basic Modules)</option>
                                         <option value="true">Premium (All Modules)</option>
                                     </select>
                                 </div>
                             </div>
-                            <div className="mt-6 pt-5 border-t border-ink-200 flex justify-end gap-2">
+                            <div className="mt-6 pt-5 border-t border-ink-200 dark:border-ink-800 flex justify-end gap-2">
                                 <button type="button" onClick={() => setIsAddModalOpen(false)} className="btn-secondary cursor-pointer">Cancel</button>
                                 <button type="submit" disabled={isProvisioning} className="btn-primary disabled:opacity-60 disabled:cursor-not-allowed">{isProvisioning ? 'Provisioning…' : 'Deploy database instance'}</button>
                             </div>

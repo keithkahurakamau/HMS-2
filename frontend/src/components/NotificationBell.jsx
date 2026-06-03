@@ -125,12 +125,12 @@ export default function NotificationBell() {
                     <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between bg-ink-50/60 dark:bg-ink-950/40">
                         <div>
                             <h3 className="font-semibold text-ink-900 dark:text-white text-sm tracking-tight">Notifications</h3>
-                            <p className="text-xs text-ink-500 mt-0.5">{unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}</p>
+                            <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">{unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}</p>
                         </div>
                         {unreadCount > 0 && (
                             <button
                                 onClick={markAllRead}
-                                className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-brand-50 transition-colors"
+                                className="text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-brand-50 dark:hover:bg-brand-500/15 transition-colors"
                             >
                                 <CheckCheck size={14} /> Mark all read
                             </button>
@@ -139,7 +139,7 @@ export default function NotificationBell() {
 
                     <div className="max-h-96 overflow-y-auto custom-scrollbar">
                         {notifications.length === 0 ? (
-                            <div className="px-4 py-12 text-center text-ink-400 text-sm">
+                            <div className="px-4 py-12 text-center text-ink-400 dark:text-ink-500 text-sm">
                                 <Bell size={28} className="mx-auto mb-2 opacity-40" />
                                 No notifications yet.
                             </div>

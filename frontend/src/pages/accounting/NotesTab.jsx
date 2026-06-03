@@ -10,14 +10,14 @@ import {
 import { formatAmount, todayISO } from './format';
 
 const NOTE_STATUS_BADGE = {
-    draft:  'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-    posted: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    void:   'bg-ink-50 text-ink-500 ring-1 ring-ink-200',
+    draft:  'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20',
+    posted: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20',
+    void:   'bg-ink-50 text-ink-500 ring-1 ring-ink-200 dark:bg-ink-800/40 dark:text-ink-400 dark:ring-ink-800',
 };
 
 const TYPE_BADGE = {
-    debit:  'bg-sky-50 text-sky-700 ring-1 ring-sky-200',
-    credit: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200',
+    debit:  'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20',
+    credit: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-500/20',
 };
 
 export default function NotesTab() {
@@ -81,7 +81,7 @@ export default function NotesTab() {
 
             <DataCard loading={loading} empty={notes.length === 0} emptyMsg="No notes yet.">
                 <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
                         <tr>
                             <th className="text-left px-4 py-2 font-medium">Number</th>
                             <th className="text-left px-4 py-2 font-medium">Type</th>
@@ -92,9 +92,9 @@ export default function NotesTab() {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100">
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {notes.map(n => (
-                            <tr key={n.note_id} className="hover:bg-ink-50/40">
+                            <tr key={n.note_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
                                 <td className="px-4 py-2 font-mono text-xs">{n.note_number}</td>
                                 <td className="px-4 py-2">
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${TYPE_BADGE[n.note_type]}`}>
@@ -102,7 +102,7 @@ export default function NotesTab() {
                                     </span>
                                 </td>
                                 <td className="px-4 py-2">{n.note_date}</td>
-                                <td className="px-4 py-2 text-xs text-ink-600">
+                                <td className="px-4 py-2 text-xs text-ink-600 dark:text-ink-400">
                                     <div>Dr {accLabel(n.debit_account_id)}</div>
                                     <div>Cr {accLabel(n.credit_account_id)}</div>
                                 </td>

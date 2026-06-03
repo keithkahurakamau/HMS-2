@@ -10,8 +10,8 @@ export function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg, n
     return (
         <div className="flex items-start justify-between">
             <div>
-                <h3 className="text-lg font-semibold text-ink-900">{title}</h3>
-                {subtitle && <p className="text-sm text-ink-600 mt-1">{subtitle}</p>}
+                <h3 className="text-lg font-semibold text-ink-900 dark:text-white">{title}</h3>
+                {subtitle && <p className="text-sm text-ink-600 dark:text-ink-400 mt-1">{subtitle}</p>}
             </div>
             {onNew && (
                 <button onClick={onNew} disabled={disabled} title={disabled ? disabledMsg : undefined}
@@ -25,11 +25,11 @@ export function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg, n
 
 export function DataCard({ loading, empty, emptyMsg, children }) {
     return (
-        <div className="bg-white border border-ink-200/70 rounded-2xl shadow-soft overflow-hidden">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
             {loading ? (
-                <div className="p-6 text-sm text-ink-500">Loading...</div>
+                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
             ) : empty ? (
-                <div className="p-6 text-sm text-ink-500">{emptyMsg}</div>
+                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">{emptyMsg}</div>
             ) : children}
         </div>
     );
@@ -38,10 +38,10 @@ export function DataCard({ loading, empty, emptyMsg, children }) {
 export function ModalShell({ title, onClose, wide, children }) {
     return (
         <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={'bg-white rounded-2xl shadow-elevated w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
-                <div className="flex items-center justify-between p-4 border-b border-ink-100">
-                    <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
-                    <button onClick={onClose} className="text-ink-400 hover:text-ink-700">
+            <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
+                <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
+                    <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{title}</h3>
+                    <button onClick={onClose} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">
                         <X size={18} />
                     </button>
                 </div>
@@ -53,9 +53,9 @@ export function ModalShell({ title, onClose, wide, children }) {
 
 export function ModalActions({ onClose, onSubmit, saving, submitLabel = 'Save' }) {
     return (
-        <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-ink-100">
+        <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-ink-100 dark:border-ink-800">
             <button onClick={onClose}
-                    className="px-3 py-2 rounded-lg border border-ink-200 text-sm font-medium hover:bg-ink-50">
+                    className="px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50 dark:text-ink-200">
                 Cancel
             </button>
             <button onClick={onSubmit} disabled={saving}
@@ -69,7 +69,7 @@ export function ModalActions({ onClose, onSubmit, saving, submitLabel = 'Save' }
 export function Field({ label, children }) {
     return (
         <label className="block">
-            <span className="block text-xs font-medium text-ink-600 mb-1">{label}</span>
+            <span className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">{label}</span>
             {children}
         </label>
     );

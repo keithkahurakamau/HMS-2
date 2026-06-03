@@ -166,11 +166,11 @@ export default function RolesManager() {
     });
 
     return (
-        <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="flex-1 bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 dark:border-ink-800 flex items-center justify-between bg-slate-50 dark:bg-ink-800/40">
                 <div>
-                    <h2 className="text-sm font-bold text-slate-900">Roles & Permissions</h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white">Roles & Permissions</h2>
+                    <p className="text-xs text-slate-500 dark:text-ink-400 mt-0.5">
                         Built-in roles can have permissions edited but not be renamed or deleted. Create custom roles to expand the staff taxonomy.
                     </p>
                 </div>
@@ -183,14 +183,14 @@ export default function RolesManager() {
             </div>
 
             {loading ? (
-                <div className="flex-1 flex items-center justify-center text-slate-400">
+                <div className="flex-1 flex items-center justify-center text-slate-400 dark:text-ink-400">
                     <Activity className="animate-spin mr-2" /> Loading…
                 </div>
             ) : (
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
                     {/* Roles list */}
-                    <div className="border-r border-slate-100 overflow-y-auto custom-scrollbar">
-                        <ul className="divide-y divide-slate-100">
+                    <div className="border-r border-slate-100 dark:border-ink-800 overflow-y-auto custom-scrollbar">
+                        <ul className="divide-y divide-slate-100 dark:divide-ink-800">
                             {roles.map((r) => {
                                 const isActive = r.role_id === activeRoleId;
                                 return (
@@ -198,29 +198,29 @@ export default function RolesManager() {
                                         <button
                                             onClick={() => setActiveRoleId(r.role_id)}
                                             className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors ${
-                                                isActive ? 'bg-brand-50' : 'hover:bg-slate-50'
+                                                isActive ? 'bg-brand-50 dark:bg-brand-500/15' : 'hover:bg-slate-50 dark:hover:bg-ink-800/50'
                                             }`}
                                         >
-                                            <span className="shrink-0 size-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center mt-0.5">
+                                            <span className="shrink-0 size-9 rounded-xl bg-slate-100 dark:bg-ink-800/40 text-slate-600 dark:text-ink-400 flex items-center justify-center mt-0.5">
                                                 {r.is_system ? <Lock size={14} /> : <ShieldCheck size={14} />}
                                             </span>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <p className="text-sm font-bold text-slate-900 truncate">{r.name}</p>
+                                                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{r.name}</p>
                                                     {r.is_system && (
-                                                        <span className="text-2xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
+                                                        <span className="text-2xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200 dark:bg-ink-800/40 text-slate-600 dark:text-ink-400">
                                                             built-in
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-slate-500 mt-0.5">
+                                                <p className="text-xs text-slate-500 dark:text-ink-400 mt-0.5">
                                                     {r.user_count} user{r.user_count === 1 ? '' : 's'} · {r.permissions.length} permission{r.permissions.length === 1 ? '' : 's'}
                                                 </p>
                                             </div>
                                             {!r.is_system && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); deleteRole(r); }}
-                                                    className="p-1 text-slate-400 hover:text-red-600"
+                                                    className="p-1 text-slate-400 hover:text-red-600 dark:hover:text-red-300"
                                                     title="Delete custom role"
                                                 >
                                                     <Trash2 size={14} />
@@ -236,20 +236,20 @@ export default function RolesManager() {
                     {/* Permission editor */}
                     <div className="md:col-span-2 flex flex-col overflow-hidden">
                         {!activeRole ? (
-                            <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+                            <div className="flex-1 flex items-center justify-center text-slate-400 dark:text-ink-400 text-sm">
                                 Pick a role to edit its permissions.
                             </div>
                         ) : (
                             <>
-                                <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-4">
+                                <div className="px-5 py-3 border-b border-slate-100 dark:border-ink-800 flex items-center justify-between gap-4">
                                     <div className="min-w-0">
-                                        <h3 className="text-base font-bold text-slate-900 truncate">{activeRole.name}</h3>
+                                        <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">{activeRole.name}</h3>
                                         {activeRole.description && (
-                                            <p className="text-xs text-slate-500 mt-0.5 truncate">{activeRole.description}</p>
+                                            <p className="text-xs text-slate-500 dark:text-ink-400 mt-0.5 truncate">{activeRole.description}</p>
                                         )}
                                     </div>
                                     {activeRole.name === 'Admin' ? (
-                                        <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                                        <span className="text-xs font-bold text-slate-500 dark:text-ink-400 flex items-center gap-1">
                                             <Lock size={12} /> Locked — full access
                                         </span>
                                     ) : (
@@ -267,7 +267,7 @@ export default function RolesManager() {
                                 <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
                                     {orderedCategories.map((cat) => (
                                         <div key={cat}>
-                                            <h4 className="text-2xs font-bold uppercase tracking-wider text-slate-500 mb-2">{categoryLabel(cat)}</h4>
+                                            <h4 className="text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-ink-400 mb-2">{categoryLabel(cat)}</h4>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                 {groupedPerms[cat].map((p) => {
                                                     const checked = draftPerms.has(p.codename);
@@ -277,8 +277,8 @@ export default function RolesManager() {
                                                             key={p.codename}
                                                             className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                                                                 checked
-                                                                    ? 'border-brand-200 bg-brand-50'
-                                                                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                                                                    ? 'border-brand-200 dark:border-brand-500/30 bg-brand-50 dark:bg-brand-500/15'
+                                                                    : 'border-slate-200 dark:border-ink-800 bg-white dark:bg-ink-900 hover:bg-slate-50 dark:hover:bg-ink-800/50'
                                                             } ${locked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
                                                         >
                                                             <input
@@ -289,9 +289,9 @@ export default function RolesManager() {
                                                                 className="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                                                             />
                                                             <div className="min-w-0">
-                                                                <p className="text-xs font-bold text-slate-900 font-mono">{p.codename}</p>
+                                                                <p className="text-xs font-bold text-slate-900 dark:text-white font-mono">{p.codename}</p>
                                                                 {p.description && (
-                                                                    <p className="text-2xs text-slate-500 mt-0.5">{p.description}</p>
+                                                                    <p className="text-2xs text-slate-500 dark:text-ink-400 mt-0.5">{p.description}</p>
                                                                 )}
                                                             </div>
                                                         </label>
@@ -369,49 +369,49 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
-                <div className="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div className="relative w-full max-w-xl bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+                <div className="p-5 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-between items-center">
                     <div>
-                        <h2 className="text-lg font-bold text-slate-900">
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                             {isNew ? 'Create Custom Role' : `Rename ${role.name}`}
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-xs text-slate-500 dark:text-ink-400 mt-1">
                             {isNew
                                 ? 'Pick the permissions this role should grant. You can refine the set later.'
                                 : 'Use the editor on the right to change permissions.'}
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-ink-200">
                         <X size={20} />
                     </button>
                 </div>
 
                 <div className="p-5 overflow-y-auto space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Role Name</label>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Role Name</label>
                         <input
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g. Triage Officer"
-                            className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-slate-200 dark:border-ink-800 dark:bg-ink-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
                             disabled={role?.is_system}
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Description (optional)</label>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Description (optional)</label>
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             rows={2}
                             placeholder="What this role is for…"
-                            className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                            className="w-full px-4 py-2.5 border border-slate-200 dark:border-ink-800 dark:bg-ink-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
                         />
                     </div>
 
                     {isNew && (
                         <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-2">Initial Permissions</label>
-                            <div className="max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 rounded-lg p-3 space-y-3">
+                            <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-2">Initial Permissions</label>
+                            <div className="max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 dark:border-ink-800 rounded-lg p-3 space-y-3">
                                 {(() => {
                                     const grouped = permissions.reduce((acc, p) => {
                                         const cat = p.codename.split(':')[0];
@@ -428,7 +428,7 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
                                     });
                                     return cats.map((cat) => (
                                         <div key={cat}>
-                                            <h5 className="text-2xs font-bold uppercase tracking-wider text-slate-500 mb-1 px-1">
+                                            <h5 className="text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-ink-400 mb-1 px-1">
                                                 {categoryLabel(cat)}
                                             </h5>
                                             {grouped[cat].map((p) => {
@@ -437,7 +437,7 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
                                                     <label
                                                         key={p.codename}
                                                         className={`flex items-start gap-3 p-2 rounded cursor-pointer ${
-                                                            checked ? 'bg-brand-50' : 'hover:bg-slate-50'
+                                                            checked ? 'bg-brand-50 dark:bg-brand-500/15' : 'hover:bg-slate-50 dark:hover:bg-ink-800/50'
                                                         }`}
                                                     >
                                                         <input
@@ -447,9 +447,9 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
                                                             className="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                                                         />
                                                         <div className="min-w-0">
-                                                            <p className="text-xs font-bold text-slate-800 font-mono">{p.codename}</p>
+                                                            <p className="text-xs font-bold text-slate-800 dark:text-ink-200 font-mono">{p.codename}</p>
                                                             {p.description && (
-                                                                <p className="text-2xs text-slate-500 mt-0.5">{p.description}</p>
+                                                                <p className="text-2xs text-slate-500 dark:text-ink-400 mt-0.5">{p.description}</p>
                                                             )}
                                                         </div>
                                                     </label>
@@ -463,8 +463,8 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
                     )}
                 </div>
 
-                <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg">
+                <div className="p-4 border-t border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-end gap-3 shrink-0">
+                    <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-ink-400 hover:bg-slate-200 dark:hover:bg-ink-800/50 rounded-lg">
                         Cancel
                     </button>
                     <button

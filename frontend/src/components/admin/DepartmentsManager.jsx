@@ -45,15 +45,15 @@ export default function DepartmentsManager() {
     };
 
     return (
-        <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50">
+        <div className="flex-1 bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 dark:border-ink-800 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50 dark:bg-ink-800/40">
                 <div className="relative w-full max-w-md">
                     <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search departments..."
-                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-ink-800 dark:bg-ink-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                 </div>
                 <button
@@ -66,40 +66,40 @@ export default function DepartmentsManager() {
 
             <div className="flex-1 overflow-auto p-4">
                 {loading ? (
-                    <div className="text-center py-12 text-slate-400">
+                    <div className="text-center py-12 text-slate-400 dark:text-ink-400">
                         <Activity className="animate-spin mx-auto mb-2" /> Loading…
                     </div>
                 ) : filtered.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400">
+                    <div className="text-center py-12 text-slate-400 dark:text-ink-400">
                         <Building2 size={32} className="mx-auto mb-2 opacity-40" />
                         No departments yet. Create one — its members will share a private channel automatically.
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {filtered.map((d) => (
-                            <div key={d.department_id} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-soft transition-shadow">
+                            <div key={d.department_id} className="bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl p-4 hover:shadow-soft transition-shadow">
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <span className="shrink-0 size-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                                        <span className="shrink-0 size-10 rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-300 flex items-center justify-center">
                                             <Building2 size={18} />
                                         </span>
                                         <div className="min-w-0">
-                                            <h3 className="font-bold text-slate-900 truncate">{d.name}</h3>
-                                            <p className="text-xs text-slate-500">{d.member_count} member{d.member_count === 1 ? '' : 's'}</p>
+                                            <h3 className="font-bold text-slate-900 dark:text-white truncate">{d.name}</h3>
+                                            <p className="text-xs text-slate-500 dark:text-ink-400">{d.member_count} member{d.member_count === 1 ? '' : 's'}</p>
                                         </div>
                                     </div>
                                 </div>
                                 {d.description && (
-                                    <p className="text-xs text-slate-600 line-clamp-2 mb-3">{d.description}</p>
+                                    <p className="text-xs text-slate-600 dark:text-ink-400 line-clamp-2 mb-3">{d.description}</p>
                                 )}
                                 <div className="flex flex-wrap gap-1 mb-3">
                                     {d.members.slice(0, 4).map((m) => (
-                                        <span key={m.user_id} className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                                        <span key={m.user_id} className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-ink-800/40 text-slate-700 dark:text-ink-200">
                                             {m.full_name}
                                         </span>
                                     ))}
                                     {d.members.length > 4 && (
-                                        <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                                        <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-ink-800/40 text-slate-500 dark:text-ink-400">
                                             +{d.members.length - 4} more
                                         </span>
                                     )}
@@ -107,13 +107,13 @@ export default function DepartmentsManager() {
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setEditing(d)}
-                                        className="flex-1 text-xs font-bold px-3 py-1.5 rounded border border-slate-200 text-brand-600 hover:bg-brand-50 hover:border-brand-200 flex items-center justify-center gap-1"
+                                        className="flex-1 text-xs font-bold px-3 py-1.5 rounded border border-slate-200 dark:border-ink-800 text-brand-600 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-500/15 hover:border-brand-200 flex items-center justify-center gap-1"
                                     >
                                         <Edit3 size={12} /> Edit
                                     </button>
                                     <button
                                         onClick={() => remove(d)}
-                                        className="text-xs font-bold px-3 py-1.5 rounded border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 flex items-center justify-center gap-1"
+                                        className="text-xs font-bold px-3 py-1.5 rounded border border-slate-200 dark:border-ink-800 text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center gap-1"
                                     >
                                         <Trash2 size={12} /> Delete
                                     </button>
@@ -195,45 +195,45 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
-                <div className="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+                <div className="p-5 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-between items-center">
                     <div>
-                        <h2 className="text-lg font-bold text-slate-900">
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                             {isNew ? 'Create Department' : `Edit ${dept.name}`}
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-xs text-slate-500 dark:text-ink-400 mt-1">
                             Members get an auto-managed group chat with each other.
                         </p>
                     </div>
-                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer">
+                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/50 cursor-pointer">
                         <X size={20} aria-hidden="true" />
                     </button>
                 </div>
 
                 <div className="p-5 overflow-y-auto space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Name</label>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Name</label>
                         <input
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g. ICU Day Shift"
-                            className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-slate-200 dark:border-ink-800 dark:bg-ink-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Description</label>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Description</label>
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             rows={2}
                             placeholder="Why this department exists, who should be in it…"
-                            className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                            className="w-full px-4 py-2.5 border border-slate-200 dark:border-ink-800 dark:bg-ink-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
                         />
                     </div>
 
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <label className="text-xs font-bold text-slate-700">
+                            <label className="text-xs font-bold text-slate-700 dark:text-ink-200">
                                 Members ({memberIds.size})
                             </label>
                             <div className="relative w-56">
@@ -242,17 +242,17 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Filter staff..."
-                                    className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-md text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                                    className="w-full pl-8 pr-3 py-1.5 border border-slate-200 dark:border-ink-800 dark:bg-ink-900 dark:text-white rounded-md text-xs focus:ring-2 focus:ring-brand-500 outline-none"
                                 />
                             </div>
                         </div>
-                        <div className="max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 rounded-lg">
-                            <ul className="divide-y divide-slate-100">
+                        <div className="max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 dark:border-ink-800 rounded-lg">
+                            <ul className="divide-y divide-slate-100 dark:divide-ink-800">
                                 {filtered.map((u) => {
                                     const checked = memberIds.has(u.user_id);
                                     return (
                                         <li key={u.user_id}>
-                                            <label className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${checked ? 'bg-brand-50' : 'hover:bg-slate-50'}`}>
+                                            <label className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${checked ? 'bg-brand-50 dark:bg-brand-500/15' : 'hover:bg-slate-50 dark:hover:bg-ink-800/50'}`}>
                                                 <input
                                                     type="checkbox"
                                                     checked={checked}
@@ -260,10 +260,10 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
                                                     className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                                                 />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-semibold text-slate-900 truncate">{u.full_name}</p>
-                                                    <p className="text-xs text-slate-500 truncate">{u.role} · {u.email}</p>
+                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{u.full_name}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-ink-400 truncate">{u.role} · {u.email}</p>
                                                 </div>
-                                                {checked && <UserCheck size={16} className="text-brand-600" />}
+                                                {checked && <UserCheck size={16} className="text-brand-600 dark:text-brand-300" />}
                                             </label>
                                         </li>
                                     );
@@ -273,8 +273,8 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg">
+                <div className="p-4 border-t border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-end gap-3 shrink-0">
+                    <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-ink-400 hover:bg-slate-200 dark:hover:bg-ink-800/50 rounded-lg">
                         Cancel
                     </button>
                     <button

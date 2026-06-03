@@ -78,7 +78,7 @@ export default function Settings() {
                     <input type="checkbox"
                            checked={current === true || current === 'true'}
                            onChange={(e) => set(e.target.checked)} className="sr-only peer" />
-                    <span className="w-11 h-6 bg-ink-200 rounded-full peer peer-checked:bg-brand-500 transition relative after:absolute after:left-0.5 after:top-0.5 after:bg-white after:rounded-full after:w-5 after:h-5 after:transition peer-checked:after:translate-x-5" />
+                    <span className="w-11 h-6 bg-ink-200 dark:bg-ink-700 rounded-full peer peer-checked:bg-brand-500 transition relative after:absolute after:left-0.5 after:top-0.5 after:bg-white after:rounded-full after:w-5 after:h-5 after:transition peer-checked:after:translate-x-5" />
                 </label>
             );
         }
@@ -176,7 +176,7 @@ export default function Settings() {
                             </p>
                         </div>
                     </div>
-                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-brand-700 font-semibold text-sm group-hover:bg-ink-50 transition-colors">
+                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-ink-900 text-brand-700 dark:text-brand-300 font-semibold text-sm group-hover:bg-ink-50 dark:group-hover:bg-ink-800/50 transition-colors">
                         Open Studio <ArrowRight size={14} />
                     </span>
                 </div>
@@ -198,7 +198,7 @@ export default function Settings() {
                             const active = activeCategory === c.key;
                             return (
                                 <button key={c.key} onClick={() => setActiveCategory(c.key)}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${active ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-ink-600 hover:bg-ink-50'}`}>
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${active ? 'bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300 ring-1 ring-brand-200 dark:ring-brand-500/20' : 'text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800/50'}`}>
                                     <Icon size={15} />
                                     <span className="capitalize">{meta.label}</span>
                                     <span className="ml-auto text-2xs text-ink-400">{c.items.length}</span>
@@ -209,21 +209,21 @@ export default function Settings() {
 
                     {/* Setting list */}
                     <div data-tour="settings-list" className="col-span-12 md:col-span-9 card overflow-hidden">
-                        <div className="p-5 border-b border-ink-100 bg-ink-50/40">
-                            <h2 className="font-semibold text-ink-900">
+                        <div className="p-5 border-b border-ink-100 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/40">
+                            <h2 className="font-semibold text-ink-900 dark:text-white">
                                 {(CATEGORY_META[activeCategory]?.label || activeCategory)}
                             </h2>
-                            <p className="text-xs text-ink-500 mt-0.5">Each row is a key/value pair. Sensitive values are masked when read back.</p>
+                            <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Each row is a key/value pair. Sensitive values are masked when read back.</p>
                         </div>
-                        <ul className="divide-y divide-ink-100">
+                        <ul className="divide-y divide-ink-100 dark:divide-ink-800">
                             {itemsForActive.map(item => {
                                 const dirty = item.setting_id in drafts;
                                 return (
-                                    <li key={item.setting_id} className={`px-5 py-4 grid grid-cols-12 gap-3 items-center ${dirty ? 'bg-amber-50/40' : ''}`}>
+                                    <li key={item.setting_id} className={`px-5 py-4 grid grid-cols-12 gap-3 items-center ${dirty ? 'bg-amber-50/40 dark:bg-amber-500/10' : ''}`}>
                                         <div className="col-span-12 md:col-span-5">
-                                            <p className="text-sm font-medium text-ink-800">{item.label || item.key}</p>
-                                            <p className="text-xs text-ink-500 font-mono">{item.key}</p>
-                                            {item.description && <p className="text-xs text-ink-500 mt-1 leading-relaxed">{item.description}</p>}
+                                            <p className="text-sm font-medium text-ink-800 dark:text-ink-200">{item.label || item.key}</p>
+                                            <p className="text-xs text-ink-500 dark:text-ink-400 font-mono">{item.key}</p>
+                                            {item.description && <p className="text-xs text-ink-500 dark:text-ink-400 mt-1 leading-relaxed">{item.description}</p>}
                                         </div>
                                         <div className="col-span-12 md:col-span-6">{renderInput(item)}</div>
                                         <div className="col-span-12 md:col-span-1 text-right">
@@ -245,14 +245,14 @@ export default function Settings() {
             {showCustomForm && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setShowCustomForm(false)} />
-                    <div className="relative w-full max-w-lg bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
-                            <h2 className="text-lg font-semibold flex items-center gap-2"><Plus size={18} /> Add custom setting</h2>
-                            <button onClick={() => setShowCustomForm(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full cursor-pointer">
+                    <div className="relative w-full max-w-lg bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
+                            <h2 className="text-lg font-semibold dark:text-white flex items-center gap-2"><Plus size={18} /> Add custom setting</h2>
+                            <button onClick={() => setShowCustomForm(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full cursor-pointer">
                                 <X size={20} aria-hidden="true" />
                             </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-ink-50/60">
+                        <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-ink-50/60 dark:bg-ink-800/40">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="label">Category *</label>
@@ -293,7 +293,7 @@ export default function Settings() {
                                        onChange={e => setCustomDraft({ ...customDraft, value: e.target.value })} />
                             </div>
                         </div>
-                        <div className="p-4 border-t border-ink-100 bg-white flex justify-end gap-2 shrink-0">
+                        <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0">
                             <button onClick={() => setShowCustomForm(false)} className="btn-secondary">Cancel</button>
                             <button onClick={saveCustom} className="btn-primary"><Save size={15} /> Add setting</button>
                         </div>

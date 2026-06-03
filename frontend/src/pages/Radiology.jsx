@@ -146,13 +146,13 @@ export default function Radiology() {
                 subtitle="Acquire imaging requests, run studies, and publish reports."
             />
             <div data-tour="radio-tabs" className="card p-2 flex items-center justify-between shrink-0">
-                <div role="tablist" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
+                <div role="tablist" className="flex bg-ink-100/70 dark:bg-ink-800/40 p-1 rounded-xl w-full max-w-md">
                     <button role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-soft ring-1 ring-ink-200/70 dark:ring-ink-800' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'}`}>
                         <Radio size={16} className={activeTab === 'queue' ? 'text-brand-600' : 'text-ink-400'} /> Reading room
                     </button>
                     <button role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white text-ink-900 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 hover:text-ink-900'}`}>
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-soft ring-1 ring-ink-200/70 dark:ring-ink-800' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'}`}>
                         <FileDigit size={16} className={activeTab === 'catalog' ? 'text-accent-600' : 'text-ink-400'} /> Exam Catalog
                     </button>
                 </div>
@@ -162,17 +162,17 @@ export default function Radiology() {
                 <>
                     {/* Queue */}
                     <div data-tour="radio-queue" className="card shrink-0 flex flex-col z-20">
-                        <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl">
+                        <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 dark:bg-ink-800/40 hover:bg-brand-50/40 dark:hover:bg-ink-800/50 transition-colors rounded-t-2xl">
                             <div className="flex items-center gap-3">
                                 <Activity className="text-brand-600" size={18} />
-                                <h2 className="font-semibold text-ink-900 text-base tracking-tight">Pending imaging requests</h2>
+                                <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Pending imaging requests</h2>
                                 <span className="badge-brand">{queue.length} Requests</span>
                             </div>
-                            <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
+                            <span className="text-ink-500 dark:text-ink-400">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                         </button>
 
                         {isQueueOpen && (
-                            <div className="border-t border-ink-100 p-4 bg-white rounded-b-2xl">
+                            <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
                                 {isLoading ? (
                                     <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Syncing queue…</div>
                                 ) : queue.length === 0 ? (
@@ -183,13 +183,13 @@ export default function Radiology() {
                                             const active = activeRequest?.request_id === req.request_id;
                                             return (
                                                 <button key={req.request_id} type="button" onClick={() => handleSelect(req)}
-                                                        className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white border-ink-200 hover:border-brand-300 hover:-translate-y-0.5'}`}>
+                                                        className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 dark:bg-brand-500/10 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 hover:-translate-y-0.5'}`}>
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <h3 className="font-semibold text-sm text-ink-900 line-clamp-1">{req.exam_type}</h3>
+                                                        <h3 className="font-semibold text-sm text-ink-900 dark:text-white line-clamp-1">{req.exam_type}</h3>
                                                         {req.priority === 'STAT' && <span className="badge-danger text-2xs">STAT</span>}
                                                     </div>
-                                                    <div className="flex justify-between items-center text-xs text-ink-500 mb-2">
-                                                        <span className="font-medium text-ink-700 flex items-center gap-1"><User size={12} /> #{req.patient_id}</span>
+                                                    <div className="flex justify-between items-center text-xs text-ink-500 dark:text-ink-400 mb-2">
+                                                        <span className="font-medium text-ink-700 dark:text-ink-200 flex items-center gap-1"><User size={12} /> #{req.patient_id}</span>
                                                         <span className="font-mono text-2xs text-ink-400">#{req.request_id}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center text-xs">
@@ -208,24 +208,24 @@ export default function Radiology() {
                     {/* Workspace */}
                     <div className="flex-1 card overflow-hidden flex flex-col z-10 relative">
                         {!activeRequest ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40">
+                            <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40 dark:bg-ink-800/40">
                                 <Bone size={56} className="mb-4 text-ink-300" strokeWidth={1.5} />
-                                <h3 className="text-base font-semibold text-ink-600 mb-1">Radiology reading room</h3>
+                                <h3 className="text-base font-semibold text-ink-600 dark:text-ink-400 mb-1">Radiology reading room</h3>
                                 <p className="text-sm">Select a pending request to enter findings.</p>
                             </div>
                         ) : (
                             <>
-                                <div className="shrink-0 p-5 border-b border-ink-100 bg-white flex justify-between items-center z-10">
+                                <div className="shrink-0 p-5 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-between items-center z-10">
                                     <div className="flex gap-3 items-center flex-1 min-w-0">
-                                        <div className="size-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100">
+                                        <div className="size-11 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100 dark:ring-brand-500/20">
                                             <Bone size={20} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h1 className="text-lg font-semibold text-ink-900 tracking-tight truncate">{activeRequest.exam_type}</h1>
-                                            <p className="text-xs font-medium text-ink-500 truncate">
-                                                Patient ID: <span className="text-ink-700">{activeRequest.patient_id}</span> ·
-                                                Ordered by: <span className="text-ink-700">Dr. #{activeRequest.requested_by}</span>
-                                                {activeCatalog && <> · <span className="text-ink-700">{activeCatalog.modality}{activeCatalog.body_part ? ` · ${activeCatalog.body_part}` : ''}</span></>}
+                                            <h1 className="text-lg font-semibold text-ink-900 dark:text-white tracking-tight truncate">{activeRequest.exam_type}</h1>
+                                            <p className="text-xs font-medium text-ink-500 dark:text-ink-400 truncate">
+                                                Patient ID: <span className="text-ink-700 dark:text-ink-200">{activeRequest.patient_id}</span> ·
+                                                Ordered by: <span className="text-ink-700 dark:text-ink-200">Dr. #{activeRequest.requested_by}</span>
+                                                {activeCatalog && <> · <span className="text-ink-700 dark:text-ink-200">{activeCatalog.modality}{activeCatalog.body_part ? ` · ${activeCatalog.body_part}` : ''}</span></>}
                                             </p>
                                         </div>
                                         <button onClick={() => printRadiologyReport({
@@ -246,24 +246,24 @@ export default function Radiology() {
                                     </div>
                                 </div>
 
-                                <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 custom-scrollbar">
+                                <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
                                     {activeRequest.status === 'Pending' ? (
                                         <div className="card p-6 text-center py-12">
                                             <ImageIcon size={44} className="mx-auto text-ink-300 mb-4" />
-                                            <h3 className="text-base font-semibold text-ink-800 mb-1">Awaiting patient arrival</h3>
-                                            <p className="text-sm text-ink-500 mb-6 max-w-md mx-auto">Confirm when the patient arrives and imaging begins.</p>
+                                            <h3 className="text-base font-semibold text-ink-800 dark:text-ink-200 mb-1">Awaiting patient arrival</h3>
+                                            <p className="text-sm text-ink-500 dark:text-ink-400 mb-6 max-w-md mx-auto">Confirm when the patient arrives and imaging begins.</p>
 
                                             {activeCatalog?.requires_prep && (
-                                                <div className="max-w-md mx-auto bg-rose-50 ring-1 ring-rose-100 p-3 rounded-xl text-left mb-4">
-                                                    <p className="text-2xs font-semibold text-rose-700 uppercase tracking-[0.14em]">⚠ Patient prep required</p>
-                                                    <p className="text-sm text-rose-900 leading-relaxed mt-1">Verify fasting / hydration / clothing instructions for this exam.</p>
+                                                <div className="max-w-md mx-auto bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-100 dark:ring-rose-500/20 p-3 rounded-xl text-left mb-4">
+                                                    <p className="text-2xs font-semibold text-rose-700 dark:text-rose-300 uppercase tracking-[0.14em]">⚠ Patient prep required</p>
+                                                    <p className="text-sm text-rose-900 dark:text-rose-200 leading-relaxed mt-1">Verify fasting / hydration / clothing instructions for this exam.</p>
                                                 </div>
                                             )}
 
                                             {activeRequest.clinical_notes && (
-                                                <div className="max-w-md mx-auto bg-amber-50 ring-1 ring-amber-100 p-4 rounded-xl text-left mb-6">
-                                                    <p className="text-2xs font-semibold text-amber-700 uppercase mb-1 tracking-[0.14em]">Clinical notes / reason for exam</p>
-                                                    <p className="text-sm text-amber-900 leading-relaxed">{activeRequest.clinical_notes}</p>
+                                                <div className="max-w-md mx-auto bg-amber-50 dark:bg-amber-500/10 ring-1 ring-amber-100 dark:ring-amber-500/20 p-4 rounded-xl text-left mb-6">
+                                                    <p className="text-2xs font-semibold text-amber-700 dark:text-amber-300 uppercase mb-1 tracking-[0.14em]">Clinical notes / reason for exam</p>
+                                                    <p className="text-sm text-amber-900 dark:text-amber-200 leading-relaxed">{activeRequest.clinical_notes}</p>
                                                 </div>
                                             )}
 
@@ -277,16 +277,16 @@ export default function Radiology() {
                                     ) : (
                                         <>
                                             {activeRequest.clinical_notes && (
-                                                <div className="bg-amber-50 ring-1 ring-amber-100 p-4 rounded-xl">
-                                                    <p className="text-2xs font-semibold text-amber-700 uppercase mb-1 tracking-[0.14em] flex items-center gap-2">
+                                                <div className="bg-amber-50 dark:bg-amber-500/10 ring-1 ring-amber-100 dark:ring-amber-500/20 p-4 rounded-xl">
+                                                    <p className="text-2xs font-semibold text-amber-700 dark:text-amber-300 uppercase mb-1 tracking-[0.14em] flex items-center gap-2">
                                                         <FileSearch size={13} /> Clinical notes / indication
                                                     </p>
-                                                    <p className="text-sm text-amber-900 leading-relaxed">{activeRequest.clinical_notes}</p>
+                                                    <p className="text-sm text-amber-900 dark:text-amber-200 leading-relaxed">{activeRequest.clinical_notes}</p>
                                                 </div>
                                             )}
 
                                             <div data-tour="radio-report" className="card-flush p-5 sm:p-6 animate-fade-in">
-                                                <h3 className="section-eyebrow mb-5 border-b border-ink-100 pb-3 flex items-center gap-2">
+                                                <h3 className="section-eyebrow mb-5 border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2">
                                                     <FileText className="text-brand-600" size={16} /> Radiologist report
                                                 </h3>
                                                 <div className="space-y-4">
@@ -318,7 +318,7 @@ export default function Radiology() {
                                 </div>
 
                                 {activeRequest.status === 'In Progress' && (
-                                    <div className="p-4 border-t border-ink-100 bg-white flex justify-end gap-2 shrink-0 z-10">
+                                    <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0 z-10">
                                         <button onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Close</button>
                                         <button data-tour="radio-publish" onClick={handleRelease} className="btn-success">
                                             <Send size={16} /> Sign & publish report
@@ -333,13 +333,13 @@ export default function Radiology() {
 
             {activeTab === 'catalog' && (
                 <div className="flex-1 card flex flex-col overflow-hidden">
-                    <div className="p-5 border-b border-ink-100 bg-ink-50/40 flex justify-between items-center flex-wrap gap-3">
+                    <div className="p-5 border-b border-ink-100 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/40 flex justify-between items-center flex-wrap gap-3">
                         <div>
                             <span className="section-eyebrow">Admin</span>
-                            <h2 className="text-base font-semibold text-ink-900 mt-1 flex items-center gap-2 tracking-tight">
+                            <h2 className="text-base font-semibold text-ink-900 dark:text-white mt-1 flex items-center gap-2 tracking-tight">
                                 <Settings className="text-ink-400" size={18} /> Exam directory
                             </h2>
-                            <p className="text-sm text-ink-500 mt-1">Add or revise exams, default templates and pricing.</p>
+                            <p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Add or revise exams, default templates and pricing.</p>
                         </div>
                         <button data-tour="radio-new-exam" onClick={startCreate} className="btn-primary"><Plus size={16} /> New exam</button>
                     </div>
@@ -365,7 +365,7 @@ export default function Radiology() {
                                     <tr><td colSpan="8" className="text-center py-8 text-ink-500">No exams configured. Click "New exam" to add one.</td></tr>
                                 ) : catalog.map(row => (
                                     <tr key={row.catalog_id} className={!row.is_active ? 'opacity-50' : ''}>
-                                        <td className="font-semibold text-ink-900">{row.exam_name}</td>
+                                        <td className="font-semibold text-ink-900 dark:text-white">{row.exam_name}</td>
                                         <td>{row.modality}</td>
                                         <td>{row.body_part || '—'}</td>
                                         <td className="font-mono">{Number(row.base_price || 0).toFixed(2)}</td>
@@ -389,21 +389,21 @@ export default function Radiology() {
             {editorOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
-                    <div className="relative w-full max-w-2xl bg-white h-full shadow-elevated flex flex-col animate-slide-in-right">
-                        <div className="flex items-center justify-between p-5 border-b border-ink-100 shrink-0">
+                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                        <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
                                 <span className="section-eyebrow">{editing ? 'Edit exam' : 'New exam'}</span>
-                                <h2 className="text-xl font-semibold text-ink-900 mt-1 flex items-center gap-2">
+                                <h2 className="text-xl font-semibold text-ink-900 dark:text-white mt-1 flex items-center gap-2">
                                     <Bone size={20} className="text-brand-600" />
                                     {editing ? `Editing ${editing.exam_name}` : 'Configure a new exam'}
                                 </h2>
                             </div>
-                            <button onClick={() => setEditorOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
+                            <button onClick={() => setEditorOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-5 bg-ink-50/60 custom-scrollbar space-y-5">
+                        <div className="flex-1 overflow-y-auto p-5 bg-ink-50/60 dark:bg-ink-800/40 custom-scrollbar space-y-5">
                             <div className="card p-5 space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
@@ -471,7 +471,7 @@ export default function Radiology() {
                             </div>
                         </div>
 
-                        <div className="p-4 border-t border-ink-100 bg-white flex justify-end gap-2 shrink-0">
+                        <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0">
                             <button onClick={() => setEditorOpen(false)} className="btn-secondary">Cancel</button>
                             <button onClick={save} className="btn-primary"><Save size={15} /> Save</button>
                         </div>
