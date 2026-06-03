@@ -36,6 +36,13 @@ HEADERS = {"X-Tenant-ID": TENANT}
 @pytest.fixture(scope="module")
 def client():
     with httpx.Client(base_url=BASE, headers=HEADERS, follow_redirects=True) as c:
+        # Prime the double-submit CSRF token: a safe GET makes the server set the
+        # csrf_token cookie; echo it back as x-csrf-token on every request so
+        # state-changing calls pass the CSRF middleware.
+        c.get("/api/patients/")
+        token = c.cookies.get("csrf_token")
+        if token:
+            c.headers["x-csrf-token"] = token
         yield c
 
 
@@ -279,6 +286,29 @@ class TestPatientUpdate:
             assert r.status_code == 200, r.text
             assert r.json()["occupation"] == "QA Engineer"
             assert r.json()["town"] == "Nairobi"
+        finally:
+            _cleanup(client, receptionist_cookies, body["patient_id"])
+
+    def test_put_with_date_of_birth_serializes_audit(self, client, receptionist_cookies):
+        """Regression: a PUT carrying date_of_birth used to 500 because the audit
+        log's old/new payloads contained a datetime.date the JSONB serializer
+        couldn't encode. The real frontend always sends date_of_birth, so this
+        mirrors the production edit-patient payload."""
+        body = _register(client, receptionist_cookies)
+        try:
+            r = client.put(
+                f"/api/patients/{body['patient_id']}",
+                cookies=receptionist_cookies,
+                json={
+                    "date_of_birth": "2004-05-30",
+                    "surname": body["surname"],
+                    "other_names": "Edited Name",
+                    "town": "Pattaya",
+                },
+            )
+            assert r.status_code == 200, r.text
+            assert r.json()["other_names"] == "Edited Name"
+            assert str(r.json()["date_of_birth"]).startswith("2004-05-30")
         finally:
             _cleanup(client, receptionist_cookies, body["patient_id"])
 
