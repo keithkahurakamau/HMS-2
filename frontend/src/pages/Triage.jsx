@@ -30,7 +30,9 @@ export default function Triage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [vitals, setVitals] = useState(EMPTY_VITALS);
-    const [chiefComplaint, setChiefComplaint] = useState('');
+    // Chief complaint is a list — a patient can present with several.
+    const [complaints, setComplaints] = useState([]);
+    const [complaintInput, setComplaintInput] = useState('');
     const [triageNotes, setTriageNotes] = useState('');
     const [acuity, setAcuity] = useState(3);
 
@@ -64,10 +66,23 @@ export default function Triage() {
         setGlobalActivePatient(item);
         setIsQueueOpen(false);
         setVitals(EMPTY_VITALS);
-        setChiefComplaint('');
+        setComplaints([]);
+        setComplaintInput('');
         setTriageNotes('');
         setAcuity(item.acuity_level || 3);
     };
+
+    const addComplaint = () => {
+        const value = complaintInput.trim();
+        if (!value) return;
+        if (complaints.some((c) => c.toLowerCase() === value.toLowerCase())) {
+            setComplaintInput('');
+            return;
+        }
+        setComplaints((prev) => [...prev, value]);
+        setComplaintInput('');
+    };
+    const removeComplaint = (idx) => setComplaints((prev) => prev.filter((_, i) => i !== idx));
 
     const handleSubmit = async () => {
         if (!activePatient) {
@@ -77,7 +92,13 @@ export default function Triage() {
         // At least one vital or a chief complaint — otherwise there's nothing
         // to hand to the doctor and we'd just be advancing an empty record.
         const hasAnyVital = Object.values(vitals).some((v) => String(v).trim() !== '');
-        if (!hasAnyVital && !chiefComplaint.trim()) {
+        // Fold any text left unsubmitted in the input into the list so a nurse
+        // who typed but didn't press Enter doesn't lose it.
+        const pending = complaintInput.trim();
+        const allComplaints = pending && !complaints.some((c) => c.toLowerCase() === pending.toLowerCase())
+            ? [...complaints, pending]
+            : complaints;
+        if (!hasAnyVital && allComplaints.length === 0) {
             toast.error('Record at least one vital or the chief complaint.');
             return;
         }
@@ -97,7 +118,7 @@ export default function Triage() {
             calculated_bmi: bmi !== '--' ? parseFloat(bmi) : null,
             pain_score: vitals.pain !== '' ? parseInt(vitals.pain, 10) : null,
             blood_glucose: vitals.glucose ? parseFloat(vitals.glucose) : null,
-            chief_complaint: chiefComplaint || null,
+            chief_complaint: allComplaints.length ? allComplaints.join('; ') : null,
             acuity_level: acuity,
             triage_notes: triageNotes || null,
             disposition: 'Consultation',
@@ -219,8 +240,29 @@ export default function Triage() {
                             {/* Presenting complaint */}
                             <section data-tour="triage-complaint" className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="label">Chief complaint</label>
-                                    <textarea value={chiefComplaint} onChange={(e) => setChiefComplaint(e.target.value)} rows={3} placeholder="What brought the patient in today?" className="input" />
+                                    <label className="label">Chief complaint(s)</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={complaintInput}
+                                            onChange={(e) => setComplaintInput(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addComplaint(); } }}
+                                            placeholder="What brought the patient in? Press Enter to add"
+                                            className="input flex-1"
+                                        />
+                                        <button type="button" onClick={addComplaint} className="btn-secondary shrink-0 px-3">Add</button>
+                                    </div>
+                                    {complaints.length > 0 && (
+                                        <ol className="mt-3 space-y-1.5">
+                                            {complaints.map((c, idx) => (
+                                                <li key={idx} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
+                                                    <span className="font-mono text-2xs font-semibold text-ink-400 w-5 shrink-0">{idx + 1}.</span>
+                                                    <span className="flex-1 text-ink-800 dark:text-ink-200">{c}</span>
+                                                    <button type="button" onClick={() => removeComplaint(idx)} aria-label={`Remove complaint ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0">✕</button>
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="label">Triage notes</label>
