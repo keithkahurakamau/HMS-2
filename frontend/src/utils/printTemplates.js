@@ -106,15 +106,17 @@ export const printInvoice = (invoice) => {
 export const printPrescription = ({ patient, doctor, items = [], notes, recordId }) => {
   if (!patient) return;
 
-  const itemsHtml = items.length ? items.map((it) => `
+  const itemsHtml = items.length ? items.map((it, i) => `
     <tr>
+      <td style="text-align:center;color:#64748b;">${i + 1}</td>
       <td><b>${esc(it.drug_name || it.name || '')}</b></td>
+      <td>${orDash(it.formulation)}</td>
       <td>${orDash(it.dosage)}</td>
       <td>${orDash(it.frequency)}</td>
       <td>${orDash(it.duration)}</td>
       <td>${orDash(it.route || it.notes)}</td>
     </tr>
-  `).join('') : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No medications prescribed.</td></tr>`;
+  `).join('') : `<tr><td colspan="7" style="text-align:center;color:#94a3b8;">No medications prescribed.</td></tr>`;
 
   const body = `
     ${header({ docType: 'Prescription', docNumber: recordId ? `RX-${recordId}` : null })}
@@ -135,7 +137,9 @@ export const printPrescription = ({ patient, doctor, items = [], notes, recordId
     <table class="line-items">
       <thead>
         <tr>
+          <th>#</th>
           <th>Medication</th>
+          <th>Formulation</th>
           <th>Dosage</th>
           <th>Frequency</th>
           <th>Duration</th>
