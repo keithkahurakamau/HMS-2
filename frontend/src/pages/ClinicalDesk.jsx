@@ -5,7 +5,7 @@ import {
     Search, User, Activity, FileText, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable,
-    X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus,
+    X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus, Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
@@ -13,6 +13,15 @@ import { useActivePatient } from '../context/PatientContext';
 
 // Static ICD lookup list — module scope so it isn't rebuilt every render.
 const ICD_DATABASE = ["A09 - Infectious gastroenteritis", "E11.9 - Type 2 diabetes mellitus", "I10 - Essential hypertension", "B50.9 - Severe Malaria", "J03.90 - Acute tonsillitis", "R50.9 - Fever, unspecified"];
+
+// Prescription pick-lists — kept at module scope so the dropdowns are stable.
+const FORMULATIONS = ["Tablet", "Capsule", "Syrup", "Suspension", "Injection", "Cream / Ointment", "Drops", "Inhaler", "Suppository", "Other"];
+const FREQUENCIES = ["OD (once daily)", "BD (twice daily)", "TDS (three times daily)", "QDS (four times daily)", "PRN (as needed)", "STAT (immediately)", "Nocte (at night)"];
+const blankMed = () => ({ drug: '', formulation: 'Tablet', dosage: '', frequency: '', duration: '' });
+
+// Split a stored chief-complaint string back into discrete complaints. Newer
+// records join with "; "; older free-text ones become a single complaint.
+const splitComplaints = (s) => (s || '').split(/\s*;\s*|\n+/).map((c) => c.trim()).filter(Boolean);
 
 export default function ClinicalDesk() {
     const navigate = useNavigate();
@@ -26,7 +35,12 @@ export default function ClinicalDesk() {
 
     // --- FORM STATE ---
     const [vitals, setVitals] = useState({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
-    const [clinicalNotes, setClinicalNotes] = useState({ cc: '', hpi: '', objective: '', diagnosis: '', plan: '', internal_notes: '' });
+    const [clinicalNotes, setClinicalNotes] = useState({ hpi: '', objective: '', diagnosis: '', internal_notes: '' });
+    // Chief complaint is now a list — a patient can present with several.
+    const [complaints, setComplaints] = useState([]);
+    const [complaintInput, setComplaintInput] = useState('');
+    // Structured, numbered prescription rows routed to Pharmacy.
+    const [medications, setMedications] = useState([]);
     const [icdSearch, setIcdSearch] = useState('');
     const [showIcdDropdown, setShowIcdDropdown] = useState(false);
     const [chargeConsultation, setChargeConsultation] = useState(false);
@@ -139,7 +153,10 @@ export default function ClinicalDesk() {
         setIsQueueOpen(false);
         // Reset all forms for the new patient
         setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
-        setClinicalNotes({ cc: '', hpi: '', objective: '', diagnosis: '', plan: '', internal_notes: '' });
+        setClinicalNotes({ hpi: '', objective: '', diagnosis: '', internal_notes: '' });
+        setComplaints([]);
+        setComplaintInput('');
+        setMedications([]);
         setIcdSearch('');
         // Pre-fill from the nurse's triage so the doctor doesn't re-key vitals.
         // Fire-and-forget — a missing/absent triage just leaves the form blank.
@@ -173,7 +190,7 @@ export default function ClinicalDesk() {
                 spo2: t.spo2 ?? '',
             });
             if (t.chief_complaint) {
-                setClinicalNotes((prev) => ({ ...prev, cc: t.chief_complaint }));
+                setComplaints(splitComplaints(t.chief_complaint));
             }
             toast.success('Vitals pre-filled from triage.', { icon: '🩺' });
         } catch (err) {
@@ -187,6 +204,26 @@ export default function ClinicalDesk() {
         toast(`The ${moduleName} module is currently under development.`, { icon: '🚧' });
     };
 
+    // --- CHIEF COMPLAINT (multi-entry) ---
+    const addComplaint = () => {
+        const value = complaintInput.trim();
+        if (!value) return;
+        // Skip case-insensitive duplicates so the list stays clean.
+        if (complaints.some((c) => c.toLowerCase() === value.toLowerCase())) {
+            setComplaintInput('');
+            return;
+        }
+        setComplaints((prev) => [...prev, value]);
+        setComplaintInput('');
+    };
+    const removeComplaint = (idx) => setComplaints((prev) => prev.filter((_, i) => i !== idx));
+
+    // --- MEDICATIONS (structured, numbered) ---
+    const addMedication = () => setMedications((prev) => [...prev, blankMed()]);
+    const updateMedication = (idx, field, value) =>
+        setMedications((prev) => prev.map((m, i) => (i === idx ? { ...m, [field]: value } : m)));
+    const removeMedication = (idx) => setMedications((prev) => prev.filter((_, i) => i !== idx));
+
     // Per-target validation. Returns an error message or null. We branch on
     // targetStatus so a doctor doesn't accidentally:
     //   - finalize an empty encounter (no diagnosis / no chief complaint)
@@ -197,10 +234,10 @@ export default function ClinicalDesk() {
         if (!activePatient) return 'Select a patient from the queue first.';
         if (targetStatus === 'Draft') return null;                    // drafts are intentionally permissive
         const hasDx = (clinicalNotes.diagnosis || icdSearch || '').trim().length > 0;
-        const hasCc = (clinicalNotes.cc || '').trim().length > 0;
+        const hasCc = complaints.length > 0;
         if (targetStatus === 'Pharmacy') {
-            if (!(clinicalNotes.plan || '').trim()) {
-                return 'Add a prescription in the Medications field before forwarding to Pharmacy.';
+            if (!medications.some((m) => m.drug.trim())) {
+                return 'Add at least one medication (with a drug name) before forwarding to Pharmacy.';
             }
             if (!hasDx && !hasCc) {
                 return 'Record at least a chief complaint or diagnosis before forwarding to Pharmacy.';
@@ -249,13 +286,18 @@ export default function ClinicalDesk() {
             weight_kg: vitals.weight ? parseFloat(vitals.weight) : null,
             height_cm: vitals.height ? parseFloat(vitals.height) : null,
 
-            // Clinical Notes
-            chief_complaint: clinicalNotes.cc,
+            // Clinical Notes — multiple complaints persist as a single
+            // "; "-joined string (no schema change); splitComplaints() reverses it.
+            chief_complaint: complaints.join('; '),
             history_of_present_illness: clinicalNotes.hpi,
             physical_examination: clinicalNotes.objective,
             diagnosis: clinicalNotes.diagnosis || icdSearch,
             icd10_code: icdSearch,
-            treatment_plan: clinicalNotes.plan, // This is what the Pharmacy reads!
+            // Structured prescriptions serialise to JSON in treatment_plan —
+            // this is what the Pharmacy queue parses back into rows.
+            treatment_plan: medications.some((m) => m.drug.trim())
+                ? JSON.stringify(medications.filter((m) => m.drug.trim()))
+                : null,
             internal_notes: clinicalNotes.internal_notes
         };
 
@@ -495,7 +537,31 @@ export default function ClinicalDesk() {
                             {/* Clinical Documentation (SOAP) */}
                             <div className="card-flush p-5 border-l-4 border-l-ink-700 space-y-4">
                                 <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><FileText size={16} className="text-ink-600 dark:text-ink-400" /> Clinical documentation</h3>
-                                <div><label className="label">Chief complaint (CC)</label><input type="text" value={clinicalNotes.cc} onChange={(e) => setClinicalNotes({...clinicalNotes, cc: e.target.value})} className="input" placeholder="e.g. Severe headache for 3 days" /></div>
+                                <div>
+                                    <label className="label">Chief complaint(s) (CC)</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={complaintInput}
+                                            onChange={(e) => setComplaintInput(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addComplaint(); } }}
+                                            className="input flex-1"
+                                            placeholder="e.g. Severe headache for 3 days — press Enter to add"
+                                        />
+                                        <button type="button" onClick={addComplaint} className="btn-secondary shrink-0 px-3"><Plus size={15} /> Add</button>
+                                    </div>
+                                    {complaints.length > 0 && (
+                                        <ol className="mt-3 space-y-1.5">
+                                            {complaints.map((c, idx) => (
+                                                <li key={idx} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
+                                                    <span className="font-mono text-2xs font-semibold text-ink-400 w-5 shrink-0">{idx + 1}.</span>
+                                                    <span className="flex-1 text-ink-800 dark:text-ink-200">{c}</span>
+                                                    <button type="button" onClick={() => removeComplaint(idx)} aria-label={`Remove complaint ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0"><X size={14} /></button>
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    )}
+                                </div>
                                 <div><label className="label">History of present illness (HPI)</label><textarea rows="3" value={clinicalNotes.hpi} onChange={(e) => setClinicalNotes({...clinicalNotes, hpi: e.target.value})} className="input resize-none" placeholder="Narrative of the patient's symptoms…"></textarea></div>
                                 <div><label className="label">Physical examination (Objective)</label><textarea rows="3" value={clinicalNotes.objective} onChange={(e) => setClinicalNotes({...clinicalNotes, objective: e.target.value})} className="input resize-none" placeholder="Systematic findings…"></textarea></div>
                             </div>
@@ -514,30 +580,68 @@ export default function ClinicalDesk() {
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
-                                        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><TestTube size={13} /> Investigations</h4>
-                                        <div className="flex gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsLabModalOpen(true)}
-                                                className="btn-secondary flex-1 py-2 text-xs cursor-pointer"
-                                            >
-                                                <TestTube size={13} aria-hidden="true" /> Order Lab Tests
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsImagingModalOpen(true)}
-                                                className="btn-secondary flex-1 py-2 text-xs cursor-pointer"
-                                            >
-                                                <ImageIcon size={13} aria-hidden="true" /> Order Imaging
-                                            </button>
+                                <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
+                                    <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><TestTube size={13} /> Investigations</h4>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLabModalOpen(true)}
+                                            className="btn-secondary flex-1 py-2 text-xs cursor-pointer"
+                                        >
+                                            <TestTube size={13} aria-hidden="true" /> Order Lab Tests
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsImagingModalOpen(true)}
+                                            className="btn-secondary flex-1 py-2 text-xs cursor-pointer"
+                                        >
+                                            <ImageIcon size={13} aria-hidden="true" /> Order Imaging
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Medications — structured, numbered rows routed to Pharmacy */}
+                                <div data-tour="clinical-prescriptions" className="rounded-xl border border-accent-200 dark:border-accent-500/20 bg-accent-50/40 dark:bg-accent-500/10 p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-700 dark:text-accent-300 flex items-center gap-2"><Pill size={13} /> Medications (routed to Pharmacy)</h4>
+                                        <button type="button" onClick={addMedication} className="btn-secondary px-3 py-1.5 text-xs shrink-0"><Plus size={13} /> Add medication</button>
+                                    </div>
+                                    {medications.length === 0 ? (
+                                        <p className="text-xs text-ink-500 dark:text-ink-400 italic">No medications yet — click “Add medication” to start prescribing.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {medications.map((med, idx) => (
+                                                <div key={idx} className="rounded-lg border border-accent-200/70 dark:border-accent-500/20 bg-white dark:bg-ink-900 p-3">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="size-5 shrink-0 rounded-full bg-accent-100 dark:bg-accent-500/20 text-accent-700 dark:text-accent-300 text-2xs font-bold flex items-center justify-center">{idx + 1}</span>
+                                                        <input value={med.drug} onChange={(e) => updateMedication(idx, 'drug', e.target.value)} className="input flex-1 py-1.5" placeholder="Drug name (e.g. Amoxicillin)" />
+                                                        <button type="button" onClick={() => removeMedication(idx)} aria-label={`Remove medication ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0"><Trash2 size={15} /></button>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                        <div>
+                                                            <label className="label text-2xs">Formulation</label>
+                                                            <select value={med.formulation} onChange={(e) => updateMedication(idx, 'formulation', e.target.value)} className="input py-1.5 text-sm">
+                                                                {FORMULATIONS.map((f) => <option key={f} value={f}>{f}</option>)}
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="label text-2xs">Dosage</label>
+                                                            <input value={med.dosage} onChange={(e) => updateMedication(idx, 'dosage', e.target.value)} className="input py-1.5 text-sm" placeholder="500 mg" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="label text-2xs">Frequency</label>
+                                                            <input list="rx-frequencies" value={med.frequency} onChange={(e) => updateMedication(idx, 'frequency', e.target.value)} className="input py-1.5 text-sm" placeholder="TDS" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="label text-2xs">Duration</label>
+                                                            <input value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} className="input py-1.5 text-sm" placeholder="5 days" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <datalist id="rx-frequencies">{FREQUENCIES.map((f) => <option key={f} value={f} />)}</datalist>
                                         </div>
-                                    </div>
-                                    <div data-tour="clinical-prescriptions" className="rounded-xl border border-accent-200 dark:border-accent-500/20 bg-accent-50/40 dark:bg-accent-500/10 p-4">
-                                        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-700 dark:text-accent-300 mb-3 flex items-center gap-2"><Pill size={13} /> Medications (routed to Pharmacy)</h4>
-                                        <textarea rows="2" value={clinicalNotes.plan} onChange={(e) => setClinicalNotes({...clinicalNotes, plan: e.target.value})} className="input resize-none" placeholder="Enter prescription instructions to send to Pharmacy…"></textarea>
-                                    </div>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
