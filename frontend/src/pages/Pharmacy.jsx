@@ -364,8 +364,12 @@ export default function Pharmacy() {
                                         <div key={idx} className="card-flush p-5">
                                             <div className="flex justify-between items-start gap-4">
                                                 <div className="flex-1">
-                                                    <h4 className="font-semibold text-base text-ink-900 dark:text-ink-100 tracking-tight">{med.drug}</h4>
-                                                    <div className="flex gap-5 mt-3 text-sm text-ink-700 dark:text-ink-300">
+                                                    <h4 className="font-semibold text-base text-ink-900 dark:text-ink-100 tracking-tight flex items-center gap-2">
+                                                        <span className="size-6 shrink-0 rounded-full bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-300 text-xs font-bold flex items-center justify-center">{idx + 1}</span>
+                                                        {med.drug}
+                                                    </h4>
+                                                    <div className="flex flex-wrap gap-5 mt-3 text-sm text-ink-700 dark:text-ink-300">
+                                                        {med.formulation && <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Formulation</span>{med.formulation}</div>}
                                                         <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Dosage</span>{med.dosage}</div>
                                                         <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Freq</span>{med.frequency}</div>
                                                         <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Duration</span>{med.duration}</div>
@@ -384,7 +388,7 @@ export default function Pharmacy() {
                                         onClick={() => printPrescription({
                                             patient: { full_name: activeOrder.patient, outpatient_no: activeOrder.op_no, allergies: activeOrder.allergies },
                                             doctor:  { full_name: activeOrder.doctor, license_number: activeOrder.doctor_license },
-                                            items:   (activeOrder.prescriptions || []).map(p => ({ drug_name: p.drug, dosage: p.dosage, frequency: p.frequency, duration: p.duration, route: p.route || p.notes })),
+                                            items:   (activeOrder.prescriptions || []).map(p => ({ drug_name: p.drug, formulation: p.formulation, dosage: p.dosage, frequency: p.frequency, duration: p.duration, route: p.route || p.notes })),
                                             notes:   activeOrder.clinical_notes,
                                             recordId: activeOrder.id,
                                         })}

@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -173,7 +174,7 @@ def get_pending_prescriptions(db: Session = Depends(get_db)):
     formatted_prescriptions = []
     for r in pending_records:
         formatted_prescriptions.append({
-            "id": f"RX-{r.record_id}", 
+            "id": f"RX-{r.record_id}",
             "record_id": r.record_id,
             "patient_id": r.patient_id,
             "patient": f"{r.other_names} {r.surname}",
@@ -182,17 +183,54 @@ def get_pending_prescriptions(db: Session = Depends(get_db)):
             "time": r.created_at.strftime('%I:%M %p'),
             "priority": "Normal",
             "allergies": r.allergies,
-            "prescriptions": [
-                {
-                    "drug": r.treatment_plan or "See Doctor Notes",
-                    "dosage": "As prescribed",
-                    "frequency": "As prescribed",
-                    "duration": "As prescribed"
-                }
-            ]
+            "prescriptions": _parse_prescriptions(r.treatment_plan),
         })
 
     return formatted_prescriptions
+
+
+def _parse_prescriptions(treatment_plan):
+    """Normalise a record's treatment plan into a list of structured meds.
+
+    The Clinical Desk now serialises prescriptions as a JSON array of
+    structured rows ({drug, formulation, dosage, frequency, duration}).
+    Older records hold free text — we fall back to a single best-effort
+    entry so legacy prescriptions still render in the Pharmacy queue.
+    """
+    if not treatment_plan:
+        return [{
+            "drug": "See Doctor Notes", "formulation": "",
+            "dosage": "As prescribed", "frequency": "As prescribed", "duration": "As prescribed",
+        }]
+
+    try:
+        parsed = json.loads(treatment_plan)
+    except (ValueError, TypeError):
+        parsed = None
+
+    if isinstance(parsed, list):
+        meds = []
+        for m in parsed:
+            if not isinstance(m, dict):
+                continue
+            drug = (m.get("drug") or m.get("drug_name") or "").strip()
+            if not drug:
+                continue
+            meds.append({
+                "drug": drug,
+                "formulation": (m.get("formulation") or "").strip(),
+                "dosage": (m.get("dosage") or "").strip() or "—",
+                "frequency": (m.get("frequency") or "").strip() or "—",
+                "duration": (m.get("duration") or "").strip() or "—",
+            })
+        if meds:
+            return meds
+
+    # Legacy free-text plan
+    return [{
+        "drug": treatment_plan, "formulation": "",
+        "dosage": "As prescribed", "frequency": "As prescribed", "duration": "As prescribed",
+    }]
 
 
 # ==========================================
