@@ -273,6 +273,19 @@ export default function Patients() {
         setAgeDisplay(ageFromDobStr(formData.date_of_birth));
     }, [formData.date_of_birth]);
 
+    // Minors usually have no National ID — a Birth Certificate is the right
+    // document. When the patient resolves to under 18 and the operator hasn't
+    // already chosen a specific ID type, nudge the default to Birth
+    // Certificate. We only switch *away* from the untouched default, so every
+    // other ID type (Passport, Alien ID, …) stays selectable and a manual
+    // pick is never overridden.
+    useEffect(() => {
+        const age = parseInt(ageFromDobStr(formData.date_of_birth), 10);
+        if (!Number.isNaN(age) && age < 18 && formData.id_type === 'National ID') {
+            setFormData(f => ({ ...f, id_type: 'Birth Certificate' }));
+        }
+    }, [formData.date_of_birth]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const handleAgeChange = (e) => {
         const raw = e.target.value;
         setAgeDisplay(raw);
@@ -1503,7 +1516,24 @@ function EditPatientModal({ patient, onClose, onSaved }) {
     // toggle from the existing record so editing a patient who has one keeps it
     // visible, while a patient without one starts collapsed.
     const [editHasEmail, setEditHasEmail] = useState(Boolean(patient.email));
-    const handle = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+    const handle = (e) => {
+        const { name, value } = e.target;
+        setForm(f => {
+            const next = { ...f, [name]: value };
+            // Mirror the registration nudge: if a DOB edit resolves the patient
+            // to under 18 and the ID type is still the untouched "National ID"
+            // default, suggest "Birth Certificate". Only fires on an actual DOB
+            // edit (never on open), only switches away from the default, and
+            // leaves every other ID type a manual override.
+            if (name === 'date_of_birth') {
+                const age = ageFrom(value);
+                if (age !== null && age < 18 && f.id_type === 'National ID') {
+                    next.id_type = 'Birth Certificate';
+                }
+            }
+            return next;
+        });
+    };
 
     const submit = async (e) => {
         e.preventDefault();
