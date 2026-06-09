@@ -99,6 +99,9 @@ MASTER_DB_PATCHES: list[str] = [
         created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     """,
+    # H-1 — superadmin brute-force lockout (mirrors tenant User columns).
+    "ALTER TABLE superadmins ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;",
+    "ALTER TABLE superadmins ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;",
     """
     CREATE TABLE IF NOT EXISTS tenants (
         tenant_id        SERIAL PRIMARY KEY,

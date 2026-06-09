@@ -1,6 +1,10 @@
-from pydantic import SecretStr, field_validator
+import logging
+
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+
+_logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "MediFleet"
@@ -38,6 +42,12 @@ class Settings(BaseSettings):
     # Comma-separated CIDR allow-list (PAY-002). Empty disables IP check —
     # only acceptable in development; verify_payhero raises in production.
     PAYHERO_WEBHOOK_CIDRS: str = ""
+    # H-4: CIDRs of the proxies/load-balancers we sit behind (e.g. Render/LB
+    # egress). X-Forwarded-For is only trusted when the *immediate* peer is one
+    # of these — otherwise a direct caller could spoof an allow-listed source.
+    # Empty falls back to a safe heuristic: trust XFF only when the peer is a
+    # private/loopback address (i.e. we're clearly behind a platform LB).
+    PAYHERO_TRUSTED_PROXIES: str = ""
     PUBLIC_BASE_URL: str = ""                  # https://… used for callback URLs
 
     # ── Email / SMTP (EMAIL-001) ───────────────────────────────────────
@@ -215,6 +225,35 @@ class Settings(BaseSettings):
         accidental ``str(settings.SECRET_KEY)`` returns ``'**********'``.
         """
         return self.SECRET_KEY.get_secret_value()
+
+    @model_validator(mode="after")
+    def _enforce_production_cors(self):
+        """M-5: with allow_credentials=True a stray localhost/preview/wildcard
+        origin means credentialed cross-origin access. In production the origin
+        list must be a non-empty, closed set — fail boot otherwise (same
+        fail-fast posture as the SECRET_KEY/ENCRYPTION_KEY validators)."""
+        if (self.APP_ENV or "").lower() == "production":
+            origins = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+            if not origins:
+                raise ValueError("CORS_ORIGINS must be a non-empty closed list in production.")
+            unsafe = [o for o in origins if "*" in o or "localhost" in o or "127.0.0.1" in o]
+            if unsafe:
+                raise ValueError(
+                    f"production CORS_ORIGINS must not include wildcard or localhost: {unsafe}"
+                )
+            # L-2: warn (don't hard-fail) if SEED_SUPERADMIN_PASSWORD is still
+            # the shipped example/placeholder. This var only seeds the *first*
+            # superadmin via seed_superadmin.py; an already-bootstrapped
+            # platform has its real password in the DB, so failing boot here
+            # could needlessly take prod down. We log loudly instead and rely on
+            # the stored credential — rotate the example value when convenient.
+            if self.SEED_SUPERADMIN_PASSWORD in {"SuperAdmin@2026", "CHANGE_ME_set_a_strong_unique_password"}:
+                _logger.warning(
+                    "SECURITY: SEED_SUPERADMIN_PASSWORD is still the example/placeholder "
+                    "value in production — rotate it and ensure the live superadmin "
+                    "account does not use a guessable password."
+                )
+        return self
 
     @property
     def is_production(self) -> bool:

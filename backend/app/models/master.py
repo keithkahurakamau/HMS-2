@@ -63,4 +63,8 @@ class SuperAdmin(Base):
     full_name = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
+    # H-1: brute-force lockout, mirroring the tenant User model. The superadmin
+    # credential is the highest-value login on the platform.
+    failed_login_attempts = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

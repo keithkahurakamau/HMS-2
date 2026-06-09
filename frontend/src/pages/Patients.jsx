@@ -300,11 +300,27 @@ export default function Patients() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // ID number is optional (efficiency for the Kenyan market — minors and
+        // no-ID walk-ins are common). We never block on a missing ID; the
+        // operator gets an inline hint while filling the form and a warning
+        // toast on success so it isn't silently forgotten.
+        const hasIdNumber = !!formData.id_number?.trim();
+        const noIdWarning = !hasIdNumber && formData.id_type !== 'None';
+
+        // When ID Type is "None", never carry a stale typed number through.
+        const payload = formData.id_type === 'None'
+            ? { ...formData, id_number: '' }
+            : formData;
+
         setIsSubmitting(true);
         try {
-            const created = await apiClient.post('/patients/', formData);
+            const created = await apiClient.post('/patients/', payload);
             const newPatientId = created?.data?.patient_id ?? created?.data?.id;
             toast.success("Patient registered successfully & OP Number generated.");
+            if (noIdWarning) {
+                toast('Registered without an ID number — add it later when available.', { icon: '⚠️' });
+            }
 
             // KDPA Section 30 follow-up: if the receptionist captured a
             // Treatment consent on the form, record it now so the next
@@ -861,11 +877,28 @@ export default function Patients() {
                                                 <option>Passport</option>
                                                 <option>Birth Certificate</option>
                                                 <option>Alien ID</option>
+                                                <option>None</option>
                                             </select>
                                         </div>
                                         <div>
                                             <label htmlFor="reg-id-number" className="label">ID Number</label>
-                                            <input id="reg-id-number" type="text" name="id_number" value={formData.id_number} onChange={handleInputChange} className="input" />
+                                            <input
+                                                id="reg-id-number"
+                                                type="text"
+                                                name="id_number"
+                                                value={formData.id_number}
+                                                onChange={handleInputChange}
+                                                className="input"
+                                                disabled={formData.id_type === 'None'}
+                                                placeholder={formData.id_type === 'None' ? 'No ID on file' : ''}
+                                            />
+                                            {/* Kenya: many walk-in patients (minors, no-ID adults) have no
+                                                document. Don't block — just nudge, so it isn't forgotten. */}
+                                            {formData.id_type !== 'None' && !formData.id_number.trim() && (
+                                                <p className="helper text-amber-700">
+                                                    No ID number — you can still register; add it later, or set ID Type to “None”.
+                                                </p>
+                                            )}
                                         </div>
                                         <div>
                                             <label htmlFor="reg-nationality" className="label">Nationality</label>
@@ -1615,7 +1648,7 @@ function EditPatientModal({ patient, onClose, onSaved }) {
                         <div>
                             <label className="label">ID type</label>
                             <select name="id_type" value={form.id_type} onChange={handle} className="input">
-                                <option>National ID</option><option>Passport</option><option>Alien ID</option><option>Birth Certificate</option><option>Other</option>
+                                <option>National ID</option><option>Passport</option><option>Alien ID</option><option>Birth Certificate</option><option>None</option><option>Other</option>
                             </select>
                         </div>
                         <div className="md:col-span-2"><label className="label">ID number</label><input name="id_number" value={form.id_number} onChange={handle} className="input" /></div>

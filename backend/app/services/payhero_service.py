@@ -18,8 +18,8 @@ from __future__ import annotations
 import base64
 import logging
 import secrets
-from decimal import Decimal
-from typing import Optional
+from decimal import Decimal, InvalidOperation
+from typing import Any, Optional
 from urllib.parse import quote
 
 import requests
@@ -34,6 +34,33 @@ from app.utils.encryption import decrypt_data
 from app.utils.log_redact import safe_repr
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Webhook amount parsing (M-3) ──────────────────────────────────────────
+
+
+def parse_callback_amount(raw: Any) -> Decimal:
+    """Parse an amount from a (signed) webhook body, fail-loud on garbage.
+
+    A missing/blank field is a legitimate "no amount yet" frame → Decimal(0).
+    A *present* but non-numeric or negative value is tampering / corruption and
+    must NOT silently floor to zero and settle — raise so the caller can
+    quarantine the callback (M-3). ``Decimal(str(x))`` previously raised
+    ``InvalidOperation`` deep inside the background task where it was swallowed.
+    """
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return Decimal(0)
+    try:
+        amount = Decimal(str(raw))
+    except (InvalidOperation, ValueError, TypeError):
+        raise ValueError(f"non-numeric callback amount: {raw!r}")
+    # Decimal("NaN")/Decimal("Infinity") parse fine but must never reach
+    # settlement — NaN comparisons are all False so it would dodge the < 0 gate.
+    if not amount.is_finite():
+        raise ValueError(f"non-finite callback amount: {raw!r}")
+    if amount < 0:
+        raise ValueError(f"negative callback amount: {amount}")
+    return amount
 
 
 # ─── Config / auth ─────────────────────────────────────────────────────────

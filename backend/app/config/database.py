@@ -11,7 +11,9 @@ hundreds of tenants does not exhaust connection-pool memory. All engines apply
 DB pool sizing from settings, which is intended to sit behind PgBouncer in
 production. See `docs/DEPLOYMENT.md` for the production-ready PgBouncer recipe.
 """
+import logging
 import re
+import time
 from collections import OrderedDict
 from threading import Lock
 from sqlalchemy import create_engine, text
@@ -21,6 +23,8 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from fastapi import Request
 
 from app.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 # SECURITY (C-2): tenant_db_name originates from the client-supplied
 # ``X-Tenant-ID`` header and is interpolated directly into the DB connection
@@ -95,6 +99,69 @@ def get_master_db():
 # --- Tenant engine cache (LRU + thread-safe) --------------------------
 _tenant_engines_lock = Lock()
 tenant_engines: OrderedDict = OrderedDict()
+
+
+# --- Tenant registry validation (C-2) ---------------------------------
+# The X-Tenant-ID header (a db_name) is the multi-tenant trust boundary. The
+# identifier whitelist in get_tenant_engine stops injection, but a name that is
+# merely *well-formed and existing* — e.g. ``hms_master`` or another hospital's
+# db_name (publicly enumerable via GET /api/public/hospitals) — would otherwise
+# open an engine against a database the caller has no claim to on any route that
+# uses get_db without get_current_user. We require the name to be a registered,
+# active tenant in the master registry before opening any engine. Positive
+# results are cached briefly so this costs one master round-trip per tenant per
+# TTL rather than per request.
+_tenant_registry_cache: "OrderedDict[str, float]" = OrderedDict()
+_tenant_registry_lock = Lock()
+_TENANT_REGISTRY_TTL_SECONDS = 60.0
+
+
+def _is_registered_active_tenant(tenant_db_name: str) -> bool:
+    """True iff ``tenant_db_name`` is a known, active tenant in the master
+    registry. Fail-closed: a master-lookup error returns False rather than
+    silently admitting an unverified tenant identifier."""
+    now = time.monotonic()
+    with _tenant_registry_lock:
+        expiry = _tenant_registry_cache.get(tenant_db_name)
+        if expiry is not None and expiry > now:
+            _tenant_registry_cache.move_to_end(tenant_db_name)
+            return True
+
+    from app.models.master import Tenant
+
+    master = MasterSessionLocal()
+    try:
+        exists = (
+            master.query(Tenant.tenant_id)
+            .filter(Tenant.db_name == tenant_db_name, Tenant.is_active == True)  # noqa: E712
+            .first()
+            is not None
+        )
+    except Exception:  # noqa: BLE001 — fail closed on a registry lookup error
+        logger.exception("Tenant registry lookup failed for %r", tenant_db_name)
+        return False
+    finally:
+        master.close()
+
+    if exists:
+        with _tenant_registry_lock:
+            _tenant_registry_cache[tenant_db_name] = now + _TENANT_REGISTRY_TTL_SECONDS
+            _tenant_registry_cache.move_to_end(tenant_db_name)
+            # Bound the cache to the engine cache size — same order of magnitude
+            # as the number of distinct active tenants a node serves.
+            while len(_tenant_registry_cache) > max(settings.TENANT_ENGINE_CACHE_SIZE, 8):
+                _tenant_registry_cache.popitem(last=False)
+    return exists
+
+
+def invalidate_tenant_registry(tenant_db_name: str | None = None) -> None:
+    """Drop a cached registry entry (or all of them) — call after a tenant is
+    suspended/deleted so the change takes effect before the TTL lapses."""
+    with _tenant_registry_lock:
+        if tenant_db_name is None:
+            _tenant_registry_cache.clear()
+        else:
+            _tenant_registry_cache.pop(tenant_db_name, None)
 
 
 def _evict_engine_if_needed() -> None:
@@ -172,6 +239,17 @@ def get_db(request: Request = None):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid X-Tenant-ID.",
+        )
+
+    # SECURITY (C-2): the identifier is well-formed, but it must also name a
+    # real, active tenant — not hms_master or an arbitrary (enumerable) database
+    # on the same server. Validate against the master registry before yielding
+    # a session bound to it. 410 (not 400) so the frontend interceptor clears
+    # the stale stored tenant and bounces to the picker, same as a dropped DB.
+    if not _is_registered_active_tenant(tenant_db_name):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="tenant_not_found",
         )
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = SessionLocal()
