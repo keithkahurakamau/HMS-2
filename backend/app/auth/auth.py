@@ -470,12 +470,13 @@ async def forgot_password(
             recipient_name=getattr(user, "full_name", None),
         )
 
-        # Only surface the raw token inline when no email will actually go out
-        # AND we're not in production. AUTH-005: gate on APP_ENV (single source
-        # of truth), not MPESA_ENV — a prod deploy with sandbox Daraja
-        # previously leaked reset tokens.
+        # M-1: never return the reset token in the HTTP response body — even in
+        # dev a single APP_ENV slip (or a staging env that forgot to set
+        # APP_ENV=production) would leak live reset tokens to any caller. When no
+        # email goes out (dev/CI) we log it server-side so the flow stays
+        # testable, but only outside production.
         if not settings.EMAIL_ENABLED and not settings.is_production:
-            response["dev_token"] = raw_token
+            logger.warning("[dev] password reset token for %s: %s", user.email, raw_token)
 
     return response
 

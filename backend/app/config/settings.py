@@ -1,4 +1,4 @@
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
@@ -221,6 +221,31 @@ class Settings(BaseSettings):
         accidental ``str(settings.SECRET_KEY)`` returns ``'**********'``.
         """
         return self.SECRET_KEY.get_secret_value()
+
+    @model_validator(mode="after")
+    def _enforce_production_cors(self):
+        """M-5: with allow_credentials=True a stray localhost/preview/wildcard
+        origin means credentialed cross-origin access. In production the origin
+        list must be a non-empty, closed set — fail boot otherwise (same
+        fail-fast posture as the SECRET_KEY/ENCRYPTION_KEY validators)."""
+        if (self.APP_ENV or "").lower() == "production":
+            origins = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+            if not origins:
+                raise ValueError("CORS_ORIGINS must be a non-empty closed list in production.")
+            unsafe = [o for o in origins if "*" in o or "localhost" in o or "127.0.0.1" in o]
+            if unsafe:
+                raise ValueError(
+                    f"production CORS_ORIGINS must not include wildcard or localhost: {unsafe}"
+                )
+            # L-2: refuse the shipped example superadmin password in production —
+            # a copied-then-unedited .env must never boot a guessable
+            # platform-superadmin credential.
+            if self.SEED_SUPERADMIN_PASSWORD in {"SuperAdmin@2026", "CHANGE_ME_set_a_strong_unique_password"}:
+                raise ValueError(
+                    "SEED_SUPERADMIN_PASSWORD is still the example/placeholder value — "
+                    "set a strong, unique password before deploying to production."
+                )
+        return self
 
     @property
     def is_production(self) -> bool:
