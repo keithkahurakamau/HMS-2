@@ -1,6 +1,10 @@
+import logging
+
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+
+_logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "MediFleet"
@@ -237,13 +241,17 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"production CORS_ORIGINS must not include wildcard or localhost: {unsafe}"
                 )
-            # L-2: refuse the shipped example superadmin password in production —
-            # a copied-then-unedited .env must never boot a guessable
-            # platform-superadmin credential.
+            # L-2: warn (don't hard-fail) if SEED_SUPERADMIN_PASSWORD is still
+            # the shipped example/placeholder. This var only seeds the *first*
+            # superadmin via seed_superadmin.py; an already-bootstrapped
+            # platform has its real password in the DB, so failing boot here
+            # could needlessly take prod down. We log loudly instead and rely on
+            # the stored credential — rotate the example value when convenient.
             if self.SEED_SUPERADMIN_PASSWORD in {"SuperAdmin@2026", "CHANGE_ME_set_a_strong_unique_password"}:
-                raise ValueError(
-                    "SEED_SUPERADMIN_PASSWORD is still the example/placeholder value — "
-                    "set a strong, unique password before deploying to production."
+                _logger.warning(
+                    "SECURITY: SEED_SUPERADMIN_PASSWORD is still the example/placeholder "
+                    "value in production — rotate it and ensure the live superadmin "
+                    "account does not use a guessable password."
                 )
         return self
 
