@@ -40,22 +40,42 @@ def _parse_cidrs(raw: str) -> list[ipaddress._BaseNetwork]:
 
 
 _ALLOWED_NETS: list[ipaddress._BaseNetwork] = _parse_cidrs(settings.PAYHERO_WEBHOOK_CIDRS)
+_TRUSTED_PROXY_NETS: list[ipaddress._BaseNetwork] = _parse_cidrs(settings.PAYHERO_TRUSTED_PROXIES)
+
+
+def _peer_is_trusted_proxy(peer: ipaddress._BaseAddress) -> bool:
+    """Should we believe this peer's X-Forwarded-For header? (H-4)
+
+    Only if it is a configured trusted proxy. When none are configured we fall
+    back to "the peer is a private/loopback/link-local address" — the shape of
+    being behind a platform load-balancer (Render, etc.) on a private network.
+    A direct public caller fails this, so it can't spoof XFF to dodge the
+    allow-list.
+    """
+    if _TRUSTED_PROXY_NETS:
+        return any(peer in net for net in _TRUSTED_PROXY_NETS)
+    return peer.is_private or peer.is_loopback or peer.is_link_local
 
 
 def _client_ip(request: Request) -> ipaddress._BaseAddress | None:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        first = forwarded.split(",")[0].strip()
-        try:
-            return ipaddress.ip_address(first)
-        except ValueError:
-            pass
+    peer: ipaddress._BaseAddress | None = None
     if request.client and request.client.host:
         try:
-            return ipaddress.ip_address(request.client.host)
+            peer = ipaddress.ip_address(request.client.host)
         except ValueError:
-            return None
-    return None
+            peer = None
+
+    # H-4: trust X-Forwarded-For ONLY when the request reached us through a
+    # trusted proxy; otherwise the header is attacker-controlled.
+    if peer is not None and _peer_is_trusted_proxy(peer):
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            first = forwarded.split(",")[0].strip()
+            try:
+                return ipaddress.ip_address(first)
+            except ValueError:
+                pass
+    return peer
 
 
 def _signature_valid(raw_body: bytes, header_value: str | None, secret: str) -> bool:

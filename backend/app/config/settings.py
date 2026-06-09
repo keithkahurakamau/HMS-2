@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     # Comma-separated CIDR allow-list (PAY-002). Empty disables IP check —
     # only acceptable in development; verify_payhero raises in production.
     PAYHERO_WEBHOOK_CIDRS: str = ""
+    # H-4: CIDRs of the proxies/load-balancers we sit behind (e.g. Render/LB
+    # egress). X-Forwarded-For is only trusted when the *immediate* peer is one
+    # of these — otherwise a direct caller could spoof an allow-listed source.
+    # Empty falls back to a safe heuristic: trust XFF only when the peer is a
+    # private/loopback address (i.e. we're clearly behind a platform LB).
+    PAYHERO_TRUSTED_PROXIES: str = ""
     PUBLIC_BASE_URL: str = ""                  # https://… used for callback URLs
 
     # ── Email / SMTP (EMAIL-001) ───────────────────────────────────────
