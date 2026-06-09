@@ -52,6 +52,41 @@ def _cache_put(jti: str, value: dict) -> None:
         pass
 
 
+# H-2: per-tenant permission epoch. The per-jti cache above means a permission
+# revocation, role change, or user deactivation otherwise only takes effect when
+# the cached envelope expires (up to one access-token lifetime) — "revoke now"
+# didn't mean now, and a cache hit returned before the is_active check. We stamp
+# each envelope with the tenant's current epoch; any write that changes a user's
+# effective permissions / role / role-permissions / active state bumps the
+# epoch, so the next request sees a stale stamp, misses the cache, and re-runs
+# the live lookup (which re-checks is_active). Bumps/reads are best-effort: if
+# Redis is down the cache itself is disabled, so there is no staleness to fix.
+def _perm_epoch_key(tenant: str) -> str:
+    return f"permepoch:{tenant or '_'}"
+
+
+def _get_perm_epoch(tenant: str) -> int:
+    if not _perm_cache_client:
+        return 0
+    try:
+        raw = _perm_cache_client.get(_perm_epoch_key(tenant))
+        return int(raw) if raw else 0
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def bump_perm_epoch(tenant: str | None) -> None:
+    """Invalidate every cached permission envelope for a tenant. Call after any
+    write that changes a user's effective permissions, role, a role's
+    permissions, or active state (H-2)."""
+    if not _perm_cache_client or not tenant:
+        return
+    try:
+        _perm_cache_client.incr(_perm_epoch_key(tenant))
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def resolve_effective_permissions(db: Session, user: User) -> list[str]:
     """Compute the user's effective permission set.
 
@@ -176,7 +211,10 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
     # burst of authenticated requests doesn't reissue the 3-query lookup.
     jti = payload.get("jti")
     cached = _cache_get(jti) if jti else None
-    if cached is not None:
+    # H-2: only trust the cache while its epoch stamp still matches the tenant's
+    # current epoch. A revocation/deactivation bumps the epoch, forcing a fresh
+    # lookup (and thus a live is_active re-check) here.
+    if cached is not None and cached.get("_epoch") == _get_perm_epoch(token_tenant_id):
         return cached
 
     # Verify user exists and fetch live permissions. DB-001: joinedload the
@@ -205,6 +243,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
         "role": user.role.name if user.role else "UNKNOWN",
         "full_name": user.full_name,
         "permissions": permissions,
+        "_epoch": _get_perm_epoch(token_tenant_id),
     }
     if jti:
         _cache_put(jti, envelope)

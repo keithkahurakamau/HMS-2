@@ -12,7 +12,7 @@ from app.models.billing import Invoice
 from app.models.inventory import StockBatch, InventoryItem
 from app.models.audit import AuditLog
 from app.models.laboratory import LabTestCatalog
-from app.core.dependencies import get_current_user, RequirePermission
+from app.core.dependencies import get_current_user, RequirePermission, bump_perm_epoch
 from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Controls"])
@@ -169,6 +169,7 @@ def update_user_role(user_id: int, role_update: dict, request: Request, db: Sess
     
     log_audit(db=db, user_id=current_user["user_id"], action="UPDATE", entity_type="UserRole", entity_id=str(user.user_id), old_value={"role": old_role_name}, new_value={"role": new_role_name}, ip_address=request.client.host)
     db.commit()
+    bump_perm_epoch(request.headers.get("X-Tenant-ID"))  # H-2: effective perms changed
     return {"message": f"User {user.email} promoted to {new_role_name} successfully."}
 
 # ==========================================
@@ -260,11 +261,12 @@ def update_role_permissions(role_name: str, payload: dict, request: Request, db:
         db=db, user_id=current_user["user_id"], action="UPDATE", 
         entity_type="RolePermissions", entity_id=role_name, 
         old_value={"permissions": old_perms}, 
-        new_value={"permissions": [p.codename for p in valid_perms]}, 
+        new_value={"permissions": [p.codename for p in valid_perms]},
         ip_address=request.client.host
     )
 
     db.commit()
+    bump_perm_epoch(request.headers.get("X-Tenant-ID"))  # H-2: role perms changed
     return {"message": f"Permissions for {role_name} updated successfully."}
 
 # ==========================================
@@ -412,6 +414,7 @@ def update_role_permissions_by_id(role_id: int, payload: dict, request: Request,
         ip_address=request.client.host,
     )
     db.commit()
+    bump_perm_epoch(request.headers.get("X-Tenant-ID"))  # H-2: role perms changed
     return {"role_id": role.role_id, "name": role.name, "permissions": [p.codename for p in role.permissions]}
 
 
@@ -438,6 +441,7 @@ def delete_role(role_id: int, request: Request, db: Session = Depends(get_db), c
     )
     db.delete(role)
     db.commit()
+    bump_perm_epoch(request.headers.get("X-Tenant-ID"))  # H-2: role removed
     return {"deleted": True}
 
 
@@ -592,6 +596,7 @@ def set_user_permissions(
         ip_address=request.client.host,
     )
     db.commit()
+    bump_perm_epoch(request.headers.get("X-Tenant-ID"))  # H-2: user overrides changed
 
     # Return the recomputed effective set for the UI.
     effective = sorted((role_perms | grants_to_persist) - revokes_to_persist)

@@ -31,6 +31,7 @@ from app.models.payhero import PayHeroConfig, PayHeroTransaction
 from app.services.payhero_service import (
     check_payment_status,
     initiate_stk_push as payhero_stk_push,
+    parse_callback_amount,
     settle_invoice_match,
 )
 from app.utils.log_redact import safe_repr
@@ -57,6 +58,22 @@ def trigger_stk_push(
         raise HTTPException(status_code=404, detail="Invoice not found")
     if invoice.status == "Paid":
         raise HTTPException(status_code=400, detail="Invoice is already fully paid")
+
+    # M-2: never push an amount the invoice can't justify. The only amount the
+    # system validates against the invoice is here — the callback (C-1) trusts
+    # the initiated figure — so clamp to the outstanding balance server-side.
+    outstanding = Decimal(str(invoice.total_amount or 0)) - Decimal(str(invoice.amount_paid or 0))
+    requested = Decimal(str(payload.amount or 0))
+    if requested <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than zero.")
+    if outstanding <= 0:
+        raise HTTPException(status_code=400, detail="Invoice has no outstanding balance.")
+    if requested > outstanding:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Amount {requested} exceeds the invoice outstanding balance {outstanding}.",
+        )
+
     return payhero_stk_push(
         db,
         phone_number=payload.phone_number,
@@ -295,9 +312,22 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
         resp = payload.get("response") or payload
         external_ref = resp.get("ExternalReference") or resp.get("external_reference") or ""
         receipt_no = resp.get("MpesaReceiptNumber") or resp.get("receipt_number")
-        amount = Decimal(str(resp.get("Amount") or resp.get("amount") or 0))
         result_code = resp.get("ResultCode")
         result_desc = resp.get("ResultDesc") or resp.get("status") or ""
+
+        # M-3: a present-but-non-numeric Amount is corruption/tampering. Don't
+        # floor it to zero and carry on — quarantine the callback (leave the
+        # pending row untouched for manual reconciliation) and log loudly.
+        try:
+            amount = parse_callback_amount(
+                resp.get("Amount") if resp.get("Amount") is not None else resp.get("amount")
+            )
+        except ValueError as exc:
+            logger.error(
+                "Pay Hero callback amount rejected (quarantined) ref=%s receipt=%s: %s",
+                external_ref, receipt_no, exc,
+            )
+            return
 
         if not receipt_no and result_code not in (0, "0"):
             logger.info("Pay Hero callback failure or no-receipt: %s", safe_repr(resp))
@@ -348,6 +378,13 @@ def _apply_callback_async(payload: dict[str, Any], tenant_db: str) -> None:
                 db.commit()
             except IntegrityError:
                 db.rollback()
+            return
+
+        # M-4: a terminal Success is final. Don't let a later/replayed frame
+        # (e.g. a stale "Failed"/processing body reusing the external_reference)
+        # regress a settled payment or re-trigger settlement.
+        if txn.status == "Success":
+            db.commit()
             return
 
         txn.receipt_number = receipt_no

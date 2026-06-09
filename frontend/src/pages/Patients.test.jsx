@@ -23,12 +23,14 @@ vi.mock('../api/client', () => ({
 }));
 
 // react-hot-toast — assert success / error pathways without rendering toasts.
-vi.mock('react-hot-toast', () => ({
-    default: {
-        success: vi.fn(),
-        error:   vi.fn(),
-    },
-}));
+// The default export is callable (toast('msg', opts)) with .success/.error
+// attached, mirroring the real module.
+vi.mock('react-hot-toast', () => {
+    const toast = vi.fn();
+    toast.success = vi.fn();
+    toast.error = vi.fn();
+    return { default: toast };
+});
 
 // Print template — Patients.jsx imports `printPatientCard`. Keep it a no-op
 // so the JSDOM print surface (which would otherwise throw) stays quiet.
@@ -226,6 +228,65 @@ describe('<Patients /> — registration modal', () => {
                 expect.stringMatching(/patient registered successfully/i),
             );
         });
+    });
+
+    it('registers without an ID number and fires a non-blocking warning toast', async () => {
+        const user = userEvent.setup();
+        apiClient.get.mockImplementation(() => okList([]));
+        apiClient.post.mockResolvedValueOnce({ data: { patient_id: 100 } });
+
+        renderWithProviders(<Patients />);
+        await user.click(await screen.findByRole('button', { name: /register patient/i }));
+        await screen.findByRole('heading', { name: /patient registration/i });
+
+        await user.type(document.querySelector('input[name="surname"]'),     'Otieno');
+        await user.type(document.querySelector('input[name="other_names"]'), 'Baraka');
+        await user.type(document.getElementById('reg-dob'),                  '2000-01-01');
+        await user.type(document.querySelector('input[name="telephone_1"]'), '+254700000000');
+        // Deliberately leave ID number blank.
+
+        await user.click(screen.getByRole('button', { name: /register patient & generate outpatient number/i }));
+
+        await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
+        // POST still goes through — no blocking.
+        expect(apiClient.post.mock.calls[0][0]).toBe('/patients/');
+        // The no-ID warning toast fires (default callable form).
+        await waitFor(() => {
+            expect(toast).toHaveBeenCalledWith(
+                expect.stringMatching(/without an ID number/i),
+                expect.anything(),
+            );
+        });
+    });
+
+    it('clears the ID number when ID Type is "None"', async () => {
+        const user = userEvent.setup();
+        apiClient.get.mockImplementation(() => okList([]));
+        apiClient.post.mockResolvedValueOnce({ data: { patient_id: 101 } });
+
+        renderWithProviders(<Patients />);
+        await user.click(await screen.findByRole('button', { name: /register patient/i }));
+        await screen.findByRole('heading', { name: /patient registration/i });
+
+        await user.type(document.querySelector('input[name="surname"]'),     'Achieng');
+        await user.type(document.querySelector('input[name="other_names"]'), 'Mercy');
+        await user.type(document.getElementById('reg-dob'),                  '1995-06-06');
+        await user.type(document.querySelector('input[name="telephone_1"]'), '+254711111111');
+        // Type a number, then switch ID Type to None — it must not be carried.
+        await user.type(document.getElementById('reg-id-number'), '12345678');
+        await user.selectOptions(document.getElementById('reg-id-type'), 'None');
+
+        await user.click(screen.getByRole('button', { name: /register patient & generate outpatient number/i }));
+
+        await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
+        const payload = apiClient.post.mock.calls[0][1];
+        expect(payload.id_type).toBe('None');
+        expect(payload.id_number).toBe('');
+        // No "missing ID number" warning when None is explicitly chosen.
+        expect(toast).not.toHaveBeenCalledWith(
+            expect.stringMatching(/without an ID number/i),
+            expect.anything(),
+        );
     });
 
     it('does not call the API when the required surname is empty (HTML5 validation blocks submit)', async () => {

@@ -35,7 +35,7 @@ from app.config.settings import settings
 from app.core.circuit import CircuitBreakerOpen, payhero_breaker
 from app.models.master import Tenant
 from app.models.platform_payhero import PlatformPayHeroConfig, PlatformPayHeroTransaction
-from app.services.payhero_service import _format_msisdn
+from app.services.payhero_service import _format_msisdn, parse_callback_amount
 from app.utils.encryption import decrypt_data
 from app.utils.log_redact import safe_repr
 
@@ -196,6 +196,18 @@ def initiate_platform_stk_push(
 # ─── Callback settlement (master DB) ─────────────────────────────────────────
 
 
+def _tenant_id_from_plat_ref(external_ref: str) -> Optional[int]:
+    """Pull the tenant id out of a ``PLAT-<tenant_id>-<nonce>`` reference, or
+    None if it doesn't have that shape (H-3)."""
+    parts = (external_ref or "").split("-")
+    if len(parts) >= 3 and parts[0] == "PLAT":
+        try:
+            return int(parts[1])
+        except ValueError:
+            return None
+    return None
+
+
 def txn_snapshot(txn: PlatformPayHeroTransaction) -> dict[str, Any]:
     """Plain-value snapshot for the live superadmin feed (taken before the
     session closes)."""
@@ -222,12 +234,19 @@ def apply_platform_callback(master_db: Session, payload: dict[str, Any]) -> Opti
     resp = payload.get("response") or payload
     external_ref = resp.get("ExternalReference") or resp.get("external_reference") or ""
     receipt_no = resp.get("MpesaReceiptNumber") or resp.get("receipt_number")
-    amount = Decimal(str(resp.get("Amount") or resp.get("amount") or 0))
     result_code = resp.get("ResultCode")
     result_desc = resp.get("ResultDesc") or resp.get("status") or ""
 
     if not external_ref:
         logger.error("Platform callback with no external_reference: %s", safe_repr(resp))
+        return None
+
+    # M-3: a present-but-non-numeric Amount is corruption/tampering, not a
+    # zero payment — quarantine rather than floor-to-zero and mis-settle.
+    try:
+        amount = parse_callback_amount(resp.get("Amount") if resp.get("Amount") is not None else resp.get("amount"))
+    except ValueError as exc:
+        logger.error("Platform callback amount rejected for %s: %s", external_ref, exc)
         return None
 
     lock_id = int(hashlib.sha1((receipt_no or external_ref).encode()).hexdigest()[:15], 16)
@@ -252,12 +271,53 @@ def apply_platform_callback(master_db: Session, payload: dict[str, Any]) -> Opti
         logger.error("Platform callback for unknown external_reference=%s", external_ref)
         return None
 
+    # H-3: this is the operator's only money-receiving rail. The reference is
+    # PLAT-<tenant_id>-<nonce>; re-derive the tenant from it and confirm it
+    # matches the pending row, so a (validly-signed) callback that reuses or
+    # manipulates another tenant's reference shape can't settle here.
+    ref_tenant_id = _tenant_id_from_plat_ref(external_ref)
+    if ref_tenant_id is not None and txn.tenant_id is not None and ref_tenant_id != txn.tenant_id:
+        txn.status = "Tenant Mismatch"
+        txn.result_desc = (
+            f"reference tenant {ref_tenant_id} != pending tenant {txn.tenant_id}"
+        )[:255]
+        logger.warning(
+            "Platform callback tenant mismatch on %s: ref=%s pending=%s (refused)",
+            external_ref, ref_tenant_id, txn.tenant_id,
+        )
+        master_db.commit()
+        return None
+
+    # M-4: never transition out of a terminal Success. A settled charge must
+    # not be regressed to Failed (or re-settled) by a later/replayed frame.
+    if txn.status == "Success":
+        master_db.commit()
+        return None
+
+    # C-1: the pending row already stored the amount we pushed — that is the
+    # authoritative figure. A callback claiming MORE than we initiated is
+    # tampering; refuse to settle and never adopt the body amount.
+    initiated_amount = Decimal(str(txn.amount or 0))
     succeeded = result_code in (0, "0")
+    if succeeded and initiated_amount > 0 and amount > initiated_amount:
+        txn.status = "Amount Mismatch"
+        txn.result_desc = (
+            f"callback amount {amount} exceeds initiated {initiated_amount}"
+        )[:255]
+        logger.warning(
+            "Platform callback amount tampering on %s: initiated=%s callback=%s (refused)",
+            external_ref, initiated_amount, amount,
+        )
+        master_db.commit()
+        return None
+
     txn.status = "Success" if succeeded else "Failed"
     txn.result_desc = str(result_desc)[:255]
     if receipt_no:
         txn.receipt_number = receipt_no
-    if amount > 0:
+    # Keep the authoritative initiated amount; only adopt the callback figure
+    # for older/unmatched rows that never recorded one.
+    if initiated_amount <= 0 and amount > 0:
         txn.amount = amount
     if succeeded:
         from datetime import datetime, timezone

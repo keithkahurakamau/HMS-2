@@ -137,7 +137,9 @@ app.add_middleware(
         "Idempotency-Key",
         "X-Requested-With",
     ],
-    expose_headers=["X-Process-Time"],
+    # L-4: only expose the timing header outside production (it's a precise
+    # timing oracle against the otherwise time-equalized auth endpoints).
+    expose_headers=[] if settings.is_production else ["X-Process-Time"],
     max_age=600,
 )
 
@@ -147,7 +149,10 @@ async def process_time_middleware(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
+    # L-4: don't hand attackers a timing oracle in production. Keep it in
+    # dev/staging where it's a useful latency probe.
+    if not settings.is_production:
+        response.headers["X-Process-Time"] = str(process_time)
     return response
 
 # 6a. Security Headers Middleware
