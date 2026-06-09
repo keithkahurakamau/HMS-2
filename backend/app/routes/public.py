@@ -522,9 +522,11 @@ def get_patient_detail(
             session.rollback()
             logger.exception("H-5: failed to write superadmin patient-read audit (tenant=%s)", t.db_name)
 
+        # Log admin_id (not email) to stdout — the email/PII lives in the
+        # durable DB audit row above; keep it out of captured stdout logs.
         logger.info(
-            "SUPERADMIN patient read: admin=%s (%s) -> tenant=%s patient_id=%s",
-            admin.get("email"), admin.get("admin_id"), t.db_name, patient_id,
+            "SUPERADMIN patient read: admin_id=%s -> tenant=%s patient_id=%s",
+            admin.get("admin_id"), t.db_name, patient_id,
         )
         return out
     finally:

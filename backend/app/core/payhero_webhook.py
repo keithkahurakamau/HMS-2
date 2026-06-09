@@ -35,7 +35,9 @@ def _parse_cidrs(raw: str) -> list[ipaddress._BaseNetwork]:
         try:
             out.append(ipaddress.ip_network(chunk, strict=False))
         except ValueError:
-            logger.warning("Ignoring malformed PAYHERO_WEBHOOK_CIDRS entry: %r", chunk)
+            # Don't echo the raw config value back into logs — just flag that an
+            # entry was malformed so the operator knows to check the env var.
+            logger.warning("Ignoring a malformed CIDR allow-list entry (check PAYHERO_WEBHOOK_CIDRS / PAYHERO_TRUSTED_PROXIES)")
     return out
 
 
