@@ -6,9 +6,11 @@
 #   tokens, private keys). Fails the build on a positive hit.
 # - pip-audit: checks backend/requirements.txt against the PyPI
 #   vulnerability database.
-# - npm audit: checks frontend dependencies. Warn-only (audit
-#   noise from transitive deps would block every PR otherwise);
-#   bump severity to fail when the tree is clean.
+# - npm audit: checks frontend dependencies. Fails the job on high+
+#   severity findings (--audit-level=high exits non-zero).
+# - SAST: CodeQL runs via GitHub's *default* code-scanning setup (Settings ›
+#   Code security), not a workflow here — an advanced CodeQL workflow can't
+#   coexist with default setup (L-3 is satisfied by default setup).
 
 name: Security
 
@@ -46,9 +48,12 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
       - name: Audit backend/requirements.txt
+        # L-1: the ignore is scoped to this single advisory id (not a blanket
+        # package suppression), so any *new* jose CVE still fails the build.
         # PYSEC-2025-185 (python-jose): no fixed version published upstream as
-        # of 3.5.0. Revisit when the maintainer cuts a patch release, or when
-        # we migrate JWT handling to PyJWT.
+        # of 3.5.0; mitigated by pinning HS256 (core/security.py). TODO: migrate
+        # JWT handling to PyJWT (drops the ecdsa transitive dep) and remove this
+        # ignore entirely — tracked separately, it's a cross-cutting swap.
         run: pip-audit -r backend/requirements.txt --strict --ignore-vuln PYSEC-2025-185
 
   npm-audit:
@@ -65,4 +70,5 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Audit (high+ only)
+        # Fails the job on any high/critical finding in the dependency tree.
         run: npm audit --audit-level=high
