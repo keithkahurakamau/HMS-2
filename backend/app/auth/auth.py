@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
@@ -19,7 +21,10 @@ from app.core.security import (
 )
 from app.core.limiter import limiter
 from app.services.auth_emails import send_password_reset_email
+from app.utils.audit import log_audit
 from pydantic import BaseModel, EmailStr, field_validator
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
@@ -267,6 +272,24 @@ async def refresh(request: Request, response: Response, db: Session = Depends(ge
             RefreshToken.user_id == record.user_id,
             RefreshToken.revoked == False,  # noqa: E712
         ).update({"revoked": True})
+        # L-5: make the abuse visible. Previously reuse was handled silently
+        # (just a 401) — emit a security event + durable audit row so an
+        # operator can investigate a possibly-stolen token, not just guess.
+        client_ip = request.client.host if request.client else None
+        logger.warning(
+            "SECURITY: refresh-token reuse detected — user_id=%s jti=%s ip=%s — all sessions revoked",
+            record.user_id, jti, client_ip,
+        )
+        try:
+            log_audit(
+                db, record.user_id, "SECURITY", "RefreshToken", str(jti),
+                None,
+                {"event": "refresh_token_reuse", "action": "all_sessions_revoked",
+                 "user_agent": request.headers.get("user-agent")},
+                client_ip,
+            )
+        except Exception:  # noqa: BLE001 — never let audit logging block the revoke
+            logger.exception("L-5: failed to write refresh-reuse audit row")
         db.commit()
         _clear_session_cookies(response)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token reuse detected — all sessions revoked")

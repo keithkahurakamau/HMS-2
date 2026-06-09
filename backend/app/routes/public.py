@@ -729,6 +729,15 @@ def superadmin_update_user_account(
         role_name = session.query(Role.name).filter(Role.role_id == u.role_id).scalar()
         session.commit()
 
+        # H-2: a superadmin disabling an account must cut its cached access now,
+        # not at access-token expiry. The tenant epoch lives in the same Redis.
+        if payload.is_active is False:
+            try:
+                from app.core.dependencies import bump_perm_epoch
+                bump_perm_epoch(t.db_name)
+            except Exception:  # noqa: BLE001
+                pass
+
         logger.info(
             "SUPERADMIN account update: admin=%s (%s) -> tenant=%s user_id=%s email=%s actions=%s",
             admin.get("email"), admin.get("admin_id"), t.db_name, u.user_id, u.email, ",".join(actions),
@@ -748,13 +757,44 @@ class SuperAdminLogin(BaseModel):
 
 
 @router.post("/superadmin/login")
-def superadmin_login(payload: SuperAdminLogin, response: Response, db: Session = Depends(get_master_db)):
-    """Authenticates the MediFleet platform superadmin."""
+@limiter.limit("5/minute")
+def superadmin_login(request: Request, payload: SuperAdminLogin, response: Response, db: Session = Depends(get_master_db)):
+    """Authenticates the MediFleet platform superadmin.
+
+    H-1: the superadmin holds platform-wide power (provision/suspend tenants,
+    cross-tenant patient read, the money-receiving rail), so this is the
+    highest-value credential in the system. It now carries the same protection
+    as the tenant login: a 5/minute IP rate limit plus a 5-strike, 15-minute
+    account lockout — previously it had neither.
+    """
     admin = db.query(SuperAdmin).filter(SuperAdmin.email == payload.email).first()
-    if not admin or not verify_password(payload.password, admin.hashed_password):
+    if not admin:
         raise HTTPException(status_code=401, detail="Invalid superadmin credentials")
+
+    now = datetime.now(timezone.utc)
+    if admin.locked_until and admin.locked_until > now:
+        remaining = max(1, int((admin.locked_until - now).total_seconds() / 60))
+        raise HTTPException(
+            status_code=403,
+            detail=f"Account locked. Try again in {remaining} minute(s).",
+        )
+
+    if not verify_password(payload.password, admin.hashed_password):
+        admin.failed_login_attempts = (admin.failed_login_attempts or 0) + 1
+        if admin.failed_login_attempts >= 5:
+            admin.locked_until = now + timedelta(minutes=15)
+            logger.warning("SUPERADMIN login lockout: email=%s after %s strikes", admin.email, admin.failed_login_attempts)
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid superadmin credentials")
+
     if admin.is_active is False:
         raise HTTPException(status_code=403, detail="Superadmin account disabled")
+
+    # Success — clear any accumulated strikes / lockout.
+    if admin.failed_login_attempts or admin.locked_until:
+        admin.failed_login_attempts = 0
+        admin.locked_until = None
+        db.commit()
 
     # Platform sessions are short-lived by design — superadmin tokens carry the
     # power to provision/suspend tenants, so we cap the bearer at 20 minutes.

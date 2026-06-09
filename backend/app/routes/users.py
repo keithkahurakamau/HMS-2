@@ -8,7 +8,7 @@ from app.config.database import get_db
 from app.models.user import User
 from app.models.auth_tokens import PasswordResetToken
 from app.schemas.user import UserCreate, UserResponse
-from app.core.dependencies import get_current_user, RequirePermission, resolve_effective_permissions
+from app.core.dependencies import get_current_user, RequirePermission, resolve_effective_permissions, bump_perm_epoch
 from app.core.security import get_password_hash, generate_reset_token, hash_token
 from app.core.modules import (
     get_tenant_flags_cached,
@@ -165,4 +165,5 @@ def deactivate_user(user_id: int, request: Request, db: Session = Depends(get_db
     user.is_active = False
     log_audit(db, current_user["user_id"], "UPDATE", "User", str(user.user_id), {"is_active": True}, {"is_active": False}, request.client.host)
     db.commit()
+    bump_perm_epoch(request.headers.get("X-Tenant-ID"))  # H-2: cut cached access now
     return {"message": f"User {user.email} deactivated successfully"}
