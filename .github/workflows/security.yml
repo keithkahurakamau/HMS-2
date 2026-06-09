@@ -8,7 +8,9 @@
 #   vulnerability database.
 # - npm audit: checks frontend dependencies. Fails the job on high+
 #   severity findings (--audit-level=high exits non-zero).
-# - codeql: static analysis (SAST) for Python + JS/TS (L-3).
+# - SAST: CodeQL runs via GitHub's *default* code-scanning setup (Settings ›
+#   Code security), not a workflow here — an advanced CodeQL workflow can't
+#   coexist with default setup (L-3 is satisfied by default setup).
 
 name: Security
 
@@ -70,30 +72,3 @@ jobs:
       - name: Audit (high+ only)
         # Fails the job on any high/critical finding in the dependency tree.
         run: npm audit --audit-level=high
-
-  codeql:
-    name: CodeQL (SAST)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [python, javascript-typescript]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          language: ${{ matrix.language }}
-          queries: security-and-quality
-      # Python + JS/TS are interpreted — autobuild is effectively a no-op but
-      # keeps the step explicit if a build is ever needed.
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-      - name: Analyze
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
