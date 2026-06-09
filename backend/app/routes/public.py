@@ -11,7 +11,8 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import List, Optional, Dict, Any
 import re
 
-from app.config.database import get_master_db, get_tenant_engine
+from app.config.database import get_master_db, get_tenant_engine, invalidate_tenant_registry
+from app.utils.audit import log_audit
 from app.config.settings import settings
 from app.core.dependencies import require_superadmin
 from app.core.limiter import limiter
@@ -360,6 +361,13 @@ def update_tenant(tenant_id: int, payload: TenantUpdate, db: Session = Depends(g
             invalidate_tenant_flags_cache(tenant.db_name)
         except Exception:  # noqa: BLE001 — never fail the write on a cache miss
             pass
+    # C-2: a suspension (is_active flip) or rename must drop the cached
+    # registry verdict so get_db stops admitting the tenant before the TTL.
+    if tenant.db_name and ("is_active" in update or "db_name" in update):
+        try:
+            invalidate_tenant_registry(tenant.db_name)
+        except Exception:  # noqa: BLE001
+            pass
     return _serialize_tenant(tenant)
 
 
@@ -436,13 +444,35 @@ def list_patients_across_tenants(
     }
 
 
-@router.get("/superadmin/patients/{tenant_id}/{patient_id}", dependencies=[Depends(require_superadmin)])
+# Most-sensitive identifiers we do NOT blanket-reflect in the cross-tenant
+# superadmin read (H-5): the national ID is masked to its last 4 digits, and
+# password material can never appear in an API surface.
+_PATIENT_SENSITIVE_COLS = {"id_number"}
+_PATIENT_NEVER_COLS = {"hashed_password", "password", "portal_password_hash"}
+
+
+def _mask_tail(value: Any, keep: int = 4) -> Optional[str]:
+    s = str(value or "")
+    if not s:
+        return None
+    return ("•" * max(len(s) - keep, 0)) + s[-keep:]
+
+
+@router.get("/superadmin/patients/{tenant_id}/{patient_id}")
 def get_patient_detail(
     tenant_id: int,
     patient_id: int,
+    request: Request,
     master_db: Session = Depends(get_master_db),
+    admin: dict = Depends(require_superadmin),
 ):
-    """Returns a single patient's full profile (read-only)."""
+    """Returns a single patient's profile (read-only, cross-tenant superadmin).
+
+    H-5: this is a cross-tenant PHI read by a platform superadmin. Every access
+    is recorded in the tenant DB's immutable audit log (KDPA accountability),
+    and the most sensitive identifier (national ID) is masked rather than
+    blanket-reflected.
+    """
     t = master_db.query(Tenant).filter(Tenant.tenant_id == tenant_id, Tenant.is_active == True).first()
     if not t:
         raise HTTPException(status_code=404, detail="Tenant not found or inactive.")
@@ -455,17 +485,47 @@ def get_patient_detail(
         if not p:
             raise HTTPException(status_code=404, detail="Patient not found.")
 
-        # Hand back every column on Patient. Cross-tenant superadmin access
-        # is logged separately by the caller; this endpoint is read-only by
-        # design — no write paths exposed.
         out: Dict[str, Any] = {
             "tenant": _serialize_tenant(t, include_flags=False),
         }
         for col in p.__table__.columns.keys():
+            if col in _PATIENT_NEVER_COLS:
+                continue
             val = getattr(p, col, None)
+            if col in _PATIENT_SENSITIVE_COLS:
+                out[col] = _mask_tail(val)
+                continue
             if hasattr(val, "isoformat"):
                 val = val.isoformat()
             out[col] = val
+
+        # H-5: durable, per-access record in the tenant DB. The superadmin is
+        # not a tenant user, so user_id is NULL (AuditLog.user_id is nullable,
+        # ON DELETE SET NULL) and the platform identity rides in new_value.
+        try:
+            log_audit(
+                session,
+                user_id=None,
+                action="READ",
+                entity_type="Patient",
+                entity_id=str(patient_id),
+                new_value={
+                    "superadmin_access": True,
+                    "admin_id": admin.get("admin_id"),
+                    "admin_email": admin.get("email"),
+                    "access_reason": "superadmin cross-tenant patient detail",
+                },
+                ip_address=request.client.host if request.client else None,
+            )
+            session.commit()
+        except Exception:  # noqa: BLE001 — never fail the read on an audit hiccup
+            session.rollback()
+            logger.exception("H-5: failed to write superadmin patient-read audit (tenant=%s)", t.db_name)
+
+        logger.info(
+            "SUPERADMIN patient read: admin=%s (%s) -> tenant=%s patient_id=%s",
+            admin.get("email"), admin.get("admin_id"), t.db_name, patient_id,
+        )
         return out
     finally:
         session.close()
