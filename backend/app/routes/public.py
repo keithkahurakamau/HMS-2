@@ -522,10 +522,10 @@ def get_patient_detail(
             session.rollback()
             logger.exception("H-5: failed to write superadmin patient-read audit (tenant=%s)", t.db_name)
 
-        # The actor identity (admin_id + email) is recorded in the durable DB
-        # audit row above; the stdout line stays free of the auth principal so
-        # no caller identity leaks into captured logs.
-        logger.info("SUPERADMIN patient read -> tenant=%s patient_id=%s", t.db_name, patient_id)
+        # The access is recorded in the durable, access-controlled DB audit row
+        # above (actor + tenant + patient). We intentionally do NOT echo the
+        # patient id / tenant to stdout — keeping PHI-adjacent identifiers out
+        # of captured logs (SEC-003 ethos).
         return out
     finally:
         session.close()
