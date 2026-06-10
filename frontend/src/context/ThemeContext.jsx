@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, use, useEffect, useState, useCallback } from 'react';
 
 const ThemeContext = createContext(null);
 
@@ -84,7 +84,7 @@ export const ThemeProvider = ({ children }) => {
 };
 
 export const useTheme = () => {
-    const ctx = useContext(ThemeContext);
+    const ctx = use(ThemeContext);
     if (!ctx) throw new Error('useTheme must be used inside <ThemeProvider>');
     return ctx;
 };

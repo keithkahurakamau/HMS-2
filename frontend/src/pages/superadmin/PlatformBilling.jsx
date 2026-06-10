@@ -12,6 +12,9 @@ const TIER_PRICING = {
     Standard: 18500,
 };
 
+// Pure currency formatter — module scope so it isn't redefined every render.
+const KES = (n) => `KES ${(n || 0).toLocaleString('en-KE')}`;
+
 export default function PlatformBilling() {
     const [tenants, setTenants] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -65,8 +68,6 @@ export default function PlatformBilling() {
             setUpdatingId(null);
         }
     };
-
-    const KES = (n) => `KES ${(n || 0).toLocaleString('en-KE')}`;
 
     return (
         <div className="space-y-6 animate-fade-in">

@@ -329,6 +329,8 @@ function DistroBar({ segments }) {
     }
     return (
         <div>
+            {/* Composite CSS bar chart presented as one image; no native <img> fits. */}
+            {/* react-doctor-disable-next-line react-doctor/prefer-tag-over-role */}
             <div className="h-2.5 bg-ink-100 dark:bg-ink-800 rounded-full overflow-hidden flex" role="img" aria-label="Tenant composition">
                 {segments.map((s) => {
                     const pct = total > 0 ? (s.value / total) * 100 : 0;

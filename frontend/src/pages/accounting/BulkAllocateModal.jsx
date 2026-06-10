@@ -129,6 +129,7 @@ export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
                                     <td className="px-3 py-1.5 text-right font-mono">{formatAmount(it.remaining)}</td>
                                     <td className="px-2 py-1">
                                         <input type="number" step="0.01" min="0" max={it.remaining}
+                                               aria-label={`Allocation amount for ${it.patient_name || it.schedule_number}`}
                                                className="input text-right py-1 px-2 w-32"
                                                value={amounts[it.item_id] ?? ''}
                                                onChange={(e) => setAmount(it.item_id, e.target.value)} />
@@ -142,7 +143,7 @@ export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
 
             <div className="mt-3">
                 <Field label="Notes">
-                    <textarea className="input min-h-[50px]" value={notes}
+                    <textarea aria-label="Notes" className="input min-h-[50px]" value={notes}
                               onChange={(e) => dispatch({ type: 'setNotes', value: e.target.value })} />
                 </Field>
             </div>

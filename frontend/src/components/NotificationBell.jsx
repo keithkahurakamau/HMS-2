@@ -128,7 +128,7 @@ export default function NotificationBell() {
                             <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">{unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}</p>
                         </div>
                         {unreadCount > 0 && (
-                            <button
+                            <button type="button"
                                 onClick={markAllRead}
                                 className="text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-brand-50 dark:hover:bg-brand-500/15 transition-colors"
                             >
@@ -159,7 +159,7 @@ export default function NotificationBell() {
                                                     aria-hidden="true"
                                                 />
                                             )}
-                                            <button
+                                            <button type="button"
                                                 onClick={() => handleClick(n)}
                                                 className="w-full text-left px-4 py-3 hover:bg-ink-50/60 dark:hover:bg-ink-800/50 transition-colors flex gap-3"
                                             >
@@ -186,6 +186,8 @@ export default function NotificationBell() {
                                                 </div>
                                                 {!n.is_read && (
                                                     <span
+                                                        // Nested inside the row <button>; a native <button> here would be invalid (button-in-button). role="button" is the correct accessible pattern.
+                                                        // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
                                                         role="button"
                                                         tabIndex={0}
                                                         aria-label="Mark as read"

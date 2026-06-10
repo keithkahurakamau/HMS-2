@@ -31,6 +31,12 @@ const TEMPLATE_OPTIONS = [
     { key: 'minimal', label: 'Minimal', hint: 'No header, mono accent, dense layout' },
 ];
 
+const UNSAVED_BADGE = (
+    <span className="badge-warn">
+        <AlertTriangle size={11} /> Unsaved changes
+    </span>
+);
+
 export default function Branding() {
     const { branding, refresh, updateLocal } = useBranding();
     const [draft, setDraft] = useState({});
@@ -122,13 +128,9 @@ export default function Branding() {
                 icon={Palette}
                 title="Branding Studio"
                 subtitle="Customise your workspace identity. Uploads are stored in the platform DB for now and will transparently migrate to Cloudinary later."
-                meta={isDirty && (
-                    <span className="badge-warn">
-                        <AlertTriangle size={11} /> Unsaved changes
-                    </span>
-                )}
+                meta={isDirty && UNSAVED_BADGE}
                 actions={
-                    <button
+                    <button type="button"
                         data-tour="branding-save"
                         onClick={handleSave}
                         disabled={!isDirty || saving}
@@ -215,8 +217,8 @@ export default function Branding() {
                 >
                     <div className="space-y-4">
                         <div>
-                            <label className="label">Header text</label>
-                            <input
+                            <label htmlFor="brandi-header-text" className="label">Header text</label>
+                            <input id="brandi-header-text"
                                 className="input"
                                 value={draft.print_templates?.header_text || ''}
                                 onChange={(e) => setTemplate('header_text', e.target.value)}
@@ -224,8 +226,8 @@ export default function Branding() {
                             />
                         </div>
                         <div>
-                            <label className="label">Footer text</label>
-                            <input
+                            <label htmlFor="brandi-footer-text" className="label">Footer text</label>
+                            <input id="brandi-footer-text"
                                 className="input"
                                 value={draft.print_templates?.footer_text || ''}
                                 onChange={(e) => setTemplate('footer_text', e.target.value)}
@@ -233,7 +235,7 @@ export default function Branding() {
                             />
                         </div>
                         <div>
-                            <label className="label">Layout style</label>
+                            <span className="label block">Layout style</span>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 {TEMPLATE_OPTIONS.map((opt) => {
                                     const active = (draft.print_templates?.primary_template || 'modern') === opt.key;
@@ -376,6 +378,7 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
                 )}
                 <input
                     ref={inputRef}
+                    aria-label="Upload image file"
                     type="file"
                     accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
                     className="hidden"
@@ -401,7 +404,7 @@ function ColorField({ label, value, placeholder, onChange }) {
             />
             <div className="flex-1">
                 <label className="label">{label}</label>
-                <input
+                <input aria-label="{label}"
                     type="text"
                     className={`input ${!isValid ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/20' : ''}`}
                     value={value}

@@ -73,11 +73,11 @@ const apiErrorMessage = (err, fallback = 'Something went wrong') => {
     if (typeof detail === 'string') return detail;
     if (Array.isArray(detail)) {
         return detail
-            .map((d) => {
+            .flatMap((d) => {
                 const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : null;
-                return field ? `${field}: ${d.msg}` : d.msg;
+                const msg = field ? `${field}: ${d.msg}` : d.msg;
+                return msg ? [msg] : [];
             })
-            .filter(Boolean)
             .join('; ') || fallback;
     }
     return fallback;
@@ -140,6 +140,28 @@ const DEFAULT_FORM_STATE = {
 // KDPA Section 30 — treatment consent captured inline at registration.
 // Default given + Verbal (how walk-ins work); clinician can adjust.
 const DEFAULT_CONSENT_STATE = { given: true, method: 'Verbal' };
+
+// Pure helper hoisted to module scope (no component state).
+const ageFromDobStr = (dob) => {
+    if (!dob) return '';
+    const birth = new Date(dob);
+    if (Number.isNaN(birth.getTime())) return '';
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age -= 1;
+    return age >= 0 ? String(age) : '';
+};
+
+// Pure helper hoisted to module scope (no component state).
+const computeDobFromAge = (age) => {
+    const n = parseInt(age, 10);
+    if (Number.isNaN(n) || n < 0 || n > 130) return '';
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - n);
+    const pad = (v) => String(v).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 export default function Patients() {
     const [patients, setPatients] = useState([]);
@@ -243,26 +265,6 @@ export default function Patients() {
     // age sets DOB to "today minus N years" so the rest of the form can
     // proceed; a tooltip on the field reminds the operator to confirm the
     // exact date with the patient when known.
-    const computeDobFromAge = (age) => {
-        const n = parseInt(age, 10);
-        if (Number.isNaN(n) || n < 0 || n > 130) return '';
-        const d = new Date();
-        d.setFullYear(d.getFullYear() - n);
-        const pad = (v) => String(v).padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    };
-
-    const ageFromDobStr = (dob) => {
-        if (!dob) return '';
-        const birth = new Date(dob);
-        if (Number.isNaN(birth.getTime())) return '';
-        const now = new Date();
-        let age = now.getFullYear() - birth.getFullYear();
-        const m = now.getMonth() - birth.getMonth();
-        if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age -= 1;
-        return age >= 0 ? String(age) : '';
-    };
-
     // The form holds DOB as the source of truth. `ageDisplay` is a derived
     // string that lives next to it; editing either updates the other.
     const [ageDisplay, setAgeDisplay] = useState('');
@@ -794,7 +796,7 @@ export default function Patients() {
             {/* Slide-over Modal for Registration */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
 
                     <div className="relative w-full max-w-4xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-6 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shrink-0">
@@ -806,7 +808,7 @@ export default function Patients() {
                                 </h2>
                                 <p className="text-sm text-ink-500 mt-1">Complete the form to generate an Outpatient Number.</p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full transition-colors">
+                            <button type="button" onClick={() => setIsModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -844,6 +846,7 @@ export default function Patients() {
                                                 name="date_of_birth"
                                                 value={formData.date_of_birth}
                                                 onChange={handleInputChange}
+                                                // react-doctor-disable-next-line react-doctor/rendering-hydration-mismatch-time
                                                 max={new Date().toISOString().slice(0, 10)}
                                                 className="input"
                                             />
@@ -954,7 +957,7 @@ export default function Patients() {
                                                 <option value="available">Has an email address</option>
                                             </select>
                                             {regHasEmail && (
-                                                <input id="reg-email" type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="patient@example.com" className="input mt-2" />
+                                                <input aria-label="patient@example.com" id="reg-email" type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="patient@example.com" className="input mt-2" />
                                             )}
                                         </div>
                                         <div className="md:col-span-2">
@@ -1186,20 +1189,28 @@ const ACUITY_PRESETS = [
     { value: 5, label: 'Non-urgent', hint: 'Walk-in',            className: 'bg-ink-50 dark:bg-ink-900/40 text-ink-700 dark:text-ink-300 border-ink-200 dark:border-ink-800' },
 ];
 
+// Sentinel for "staff not yet loaded" — distinct from any real target.role
+// (including undefined) so the derived isLoading starts true.
+const STAFF_PENDING = Symbol('staff-pending');
+
 function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
     const [staff, setStaff] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    // isLoading is derived: true until the staff list we hold was loaded for the
+    // current target.role. Avoids setting a loading flag in the effect because a
+    // prop changed (no-adjust-state-on-prop-change).
+    const [loadedRole, setLoadedRole] = useState(STAFF_PENDING);
+    const isLoading = loadedRole !== target.role;
     const [selectedId, setSelectedId] = useState('');
     const [acuity, setAcuity] = useState(3);
     const [search, setSearch] = useState('');
 
     useEffect(() => {
         let cancelled = false;
-        setIsLoading(true);
-        apiClient.get('/patients/staff', { params: target.role ? { role: target.role } : {} })
+        const role = target.role;
+        apiClient.get('/patients/staff', { params: role ? { role } : {} })
             .then(res => { if (!cancelled) setStaff(res.data || []); })
             .catch(() => { if (!cancelled) setStaff([]); })
-            .finally(() => { if (!cancelled) setIsLoading(false); });
+            .finally(() => { if (!cancelled) setLoadedRole(role); });
         return () => { cancelled = true; };
     }, [target.role]);
 
@@ -1457,7 +1468,7 @@ function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport
         window.addEventListener('resize', onResize);
         document.addEventListener('keydown', onKey);
         document.addEventListener('mousedown', onDocClick);
-        document.addEventListener('touchstart', onDocClick);
+        document.addEventListener('touchstart', onDocClick, { passive: true });
         return () => {
             window.removeEventListener('scroll', onScroll, true);
             window.removeEventListener('resize', onResize);
@@ -1497,7 +1508,7 @@ function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport
             <button type="button" role="menuitem" onClick={() => onExport(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
                 <Download size={15} className="text-ink-500" aria-hidden="true" /> Export (KDPA S.26)
             </button>
-            <div className="border-t border-ink-100 dark:border-ink-800 my-1.5" role="separator" />
+            <div className="border-t border-ink-100 dark:border-ink-800 my-1.5" aria-hidden="true" />
             <button type="button" role="menuitem" onClick={() => onDeactivate(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer">
                 <UserMinus size={15} aria-hidden="true" /> Deactivate
             </button>
@@ -1600,14 +1611,14 @@ function EditPatientModal({ patient, onClose, onSaved }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
+            <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-3xl max-h-[90vh] flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div>
                         <h3 className="text-lg font-semibold text-ink-900 dark:text-ink-100">Edit patient</h3>
                         <p className="text-xs text-ink-500 mt-0.5 font-mono">{patient.outpatient_no}</p>
                     </div>
-                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full transition-colors">
+                    <button type="button" onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full transition-colors">
                         <X size={18} />
                     </button>
                 </div>
@@ -1615,52 +1626,52 @@ function EditPatientModal({ patient, onClose, onSaved }) {
                 <form id="editPatientForm" onSubmit={submit} className="p-5 space-y-5 overflow-y-auto">
                     {/* Demographics */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div><label className="label">Surname</label><input name="surname" value={form.surname} onChange={handle} className="input" required /></div>
-                        <div><label className="label">Other names</label><input name="other_names" value={form.other_names} onChange={handle} className="input" required /></div>
-                        <div><label className="label">Sex</label>
-                            <select name="sex" value={form.sex} onChange={handle} className="input">
+                        <div><label htmlFor="patien-surname" className="label">Surname</label><input id="patien-surname" name="surname" value={form.surname} onChange={handle} className="input" required /></div>
+                        <div><label htmlFor="patien-other-names" className="label">Other names</label><input id="patien-other-names" name="other_names" value={form.other_names} onChange={handle} className="input" required /></div>
+                        <div><label htmlFor="patien-other-names" className="label">Sex</label>
+                            <select id="patien-other-names" name="sex" value={form.sex} onChange={handle} className="input">
                                 <option>Male</option><option>Female</option><option>Other</option>
                             </select>
                         </div>
-                        <div><label className="label">Date of birth</label><input type="date" name="date_of_birth" value={form.date_of_birth} onChange={handle} className="input" /></div>
-                        <div><label className="label">Marital status</label>
-                            <select name="marital_status" value={form.marital_status} onChange={handle} className="input">
+                        <div><label htmlFor="patien-date-of-birth" className="label">Date of birth</label><input id="patien-date-of-birth" type="date" name="date_of_birth" value={form.date_of_birth} onChange={handle} className="input" /></div>
+                        <div><label htmlFor="patien-date-of-birth" className="label">Marital status</label>
+                            <select id="patien-date-of-birth" name="marital_status" value={form.marital_status} onChange={handle} className="input">
                                 <option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option><option>Other</option>
                             </select>
                         </div>
-                        <div><label className="label">Nationality</label><input name="nationality" value={form.nationality} onChange={handle} className="input" /></div>
+                        <div><label htmlFor="patien-nationality" className="label">Nationality</label><input id="patien-nationality" name="nationality" value={form.nationality} onChange={handle} className="input" /></div>
                     </div>
 
                     {/* Clinical */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                            <label className="label">Blood group</label>
-                            <select name="blood_group" value={form.blood_group} onChange={handle} className="input">
+                            <label htmlFor="patien-blood-group" className="label">Blood group</label>
+                            <select id="patien-blood-group" name="blood_group" value={form.blood_group} onChange={handle} className="input">
                                 {['Unknown','A+','A-','B+','B-','AB+','AB-','O+','O-'].map(g => <option key={g}>{g}</option>)}
                             </select>
                         </div>
-                        <div className="md:col-span-2"><label className="label">Allergies</label><input name="allergies" value={form.allergies} onChange={handle} className="input" placeholder="e.g., Penicillin, Peanuts" /></div>
-                        <div className="md:col-span-3"><label className="label">Chronic conditions</label><input name="chronic_conditions" value={form.chronic_conditions} onChange={handle} className="input" placeholder="e.g., Hypertension, Type 2 Diabetes" /></div>
+                        <div className="md:col-span-2"><label htmlFor="patien-allergies" className="label">Allergies</label><input id="patien-allergies" name="allergies" value={form.allergies} onChange={handle} className="input" placeholder="e.g., Penicillin, Peanuts" /></div>
+                        <div className="md:col-span-3"><label htmlFor="patien-chronic-conditions" className="label">Chronic conditions</label><input id="patien-chronic-conditions" name="chronic_conditions" value={form.chronic_conditions} onChange={handle} className="input" placeholder="e.g., Hypertension, Type 2 Diabetes" /></div>
                     </div>
 
                     {/* ID */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                            <label className="label">ID type</label>
-                            <select name="id_type" value={form.id_type} onChange={handle} className="input">
+                            <label htmlFor="patien-id-type" className="label">ID type</label>
+                            <select id="patien-id-type" name="id_type" value={form.id_type} onChange={handle} className="input">
                                 <option>National ID</option><option>Passport</option><option>Alien ID</option><option>Birth Certificate</option><option>None</option><option>Other</option>
                             </select>
                         </div>
-                        <div className="md:col-span-2"><label className="label">ID number</label><input name="id_number" value={form.id_number} onChange={handle} className="input" /></div>
+                        <div className="md:col-span-2"><label htmlFor="patien-id-number" className="label">ID number</label><input id="patien-id-number" name="id_number" value={form.id_number} onChange={handle} className="input" /></div>
                     </div>
 
                     {/* Contact */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div><label className="label">Phone 1</label><input name="telephone_1" value={form.telephone_1} onChange={handle} className="input" /></div>
-                        <div><label className="label">Phone 2</label><input name="telephone_2" value={form.telephone_2} onChange={handle} className="input" /></div>
+                        <div><label htmlFor="patien-phone-1" className="label">Phone 1</label><input id="patien-phone-1" name="telephone_1" value={form.telephone_1} onChange={handle} className="input" /></div>
+                        <div><label htmlFor="patien-phone-2" className="label">Phone 2</label><input id="patien-phone-2" name="telephone_2" value={form.telephone_2} onChange={handle} className="input" /></div>
                         <div className="md:col-span-2">
-                            <label className="label">Email</label>
-                            <select
+                            <label htmlFor="patien-phone-2" className="label">Email</label>
+                            <select id="patien-phone-2"
                                 value={editHasEmail ? 'available' : 'none'}
                                 onChange={(e) => {
                                     const has = e.target.value === 'available';
@@ -1673,25 +1684,25 @@ function EditPatientModal({ patient, onClose, onSaved }) {
                                 <option value="available">Has an email address</option>
                             </select>
                             {editHasEmail && (
-                                <input type="email" name="email" value={form.email} onChange={handle} placeholder="patient@example.com" className="input mt-2" />
+                                <input aria-label="patient@example.com" type="email" name="email" value={form.email} onChange={handle} placeholder="patient@example.com" className="input mt-2" />
                             )}
                         </div>
-                        <div><label className="label">Residence</label><input name="residence" value={form.residence} onChange={handle} className="input" /></div>
-                        <div><label className="label">Town</label><input name="town" value={form.town} onChange={handle} className="input" /></div>
+                        <div><label htmlFor="patien-residence" className="label">Residence</label><input id="patien-residence" name="residence" value={form.residence} onChange={handle} className="input" /></div>
+                        <div><label htmlFor="patien-town" className="label">Town</label><input id="patien-town" name="town" value={form.town} onChange={handle} className="input" /></div>
                     </div>
 
                     {/* Employment & NOK */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="md:col-span-3"><label className="label">Occupation</label><input name="occupation" value={form.occupation} onChange={handle} className="input" /></div>
-                        <div><label className="label">Next of kin</label><input name="nok_name" value={form.nok_name} onChange={handle} className="input" /></div>
-                        <div><label className="label">Relationship</label><input name="nok_relationship" value={form.nok_relationship} onChange={handle} className="input" /></div>
-                        <div><label className="label">NoK contact</label><input name="nok_contact" value={form.nok_contact} onChange={handle} className="input" /></div>
+                        <div className="md:col-span-3"><label htmlFor="patien-occupation" className="label">Occupation</label><input id="patien-occupation" name="occupation" value={form.occupation} onChange={handle} className="input" /></div>
+                        <div><label htmlFor="patien-next-of-kin" className="label">Next of kin</label><input id="patien-next-of-kin" name="nok_name" value={form.nok_name} onChange={handle} className="input" /></div>
+                        <div><label htmlFor="patien-relationship" className="label">Relationship</label><input id="patien-relationship" name="nok_relationship" value={form.nok_relationship} onChange={handle} className="input" /></div>
+                        <div><label htmlFor="patien-nok-contact" className="label">NoK contact</label><input id="patien-nok-contact" name="nok_contact" value={form.nok_contact} onChange={handle} className="input" /></div>
                     </div>
 
                     {/* Notes */}
                     <div>
-                        <label className="label">Front desk notes</label>
-                        <textarea name="notes" value={form.notes} onChange={handle} rows="2" className="input" />
+                        <label htmlFor="patien-nok-contact" className="label">Front desk notes</label>
+                        <textarea id="patien-nok-contact" name="notes" value={form.notes} onChange={handle} rows="2" className="input" />
                     </div>
                 </form>
 

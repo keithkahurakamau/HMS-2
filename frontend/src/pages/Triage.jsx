@@ -148,7 +148,7 @@ export default function Triage() {
 
             {/* Triage queue */}
             <div data-tour="triage-queue" className="card shrink-0 flex flex-col z-20">
-                <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 dark:bg-ink-800/40 hover:bg-brand-50/40 dark:hover:bg-ink-800/50 transition-colors rounded-t-2xl focus:outline-none">
+                <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 dark:bg-ink-800/40 hover:bg-brand-50/40 dark:hover:bg-ink-800/50 transition-colors rounded-t-2xl focus:outline-none">
                     <div className="flex items-center gap-3">
                         <Users className="text-brand-600" size={18} />
                         <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Awaiting Triage</h2>
@@ -225,24 +225,24 @@ export default function Triage() {
                                     <span className="text-xs text-ink-500 dark:text-ink-400">BMI: <span className="font-semibold text-ink-700 dark:text-ink-200">{calculateBMI()}</span></span>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3">
-                                    <div><label className="label">BP (mmHg)</label><input type="text" value={vitals.bp} onChange={(e) => setVitals({ ...vitals, bp: e.target.value })} placeholder="120/80" className="input" /></div>
-                                    <div><label className="label">HR (bpm)</label><input type="number" value={vitals.hr} onChange={(e) => setVitals({ ...vitals, hr: e.target.value })} placeholder="72" className="input" /></div>
-                                    <div><label className="label">Resp (bpm)</label><input type="number" value={vitals.rr} onChange={(e) => setVitals({ ...vitals, rr: e.target.value })} placeholder="16" className="input" /></div>
-                                    <div><label className="label">Temp (°C)</label><input type="number" step="0.1" value={vitals.temp} onChange={(e) => setVitals({ ...vitals, temp: e.target.value })} placeholder="37.2" className="input" /></div>
-                                    <div><label className="label">SpO₂ (%)</label><input type="number" value={vitals.spo2} onChange={(e) => setVitals({ ...vitals, spo2: e.target.value })} placeholder="98" className="input" /></div>
-                                    <div><label className="label">Weight (kg)</label><input type="number" value={vitals.weight} onChange={(e) => setVitals({ ...vitals, weight: e.target.value })} placeholder="70" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
-                                    <div><label className="label">Height (cm)</label><input type="number" value={vitals.height} onChange={(e) => setVitals({ ...vitals, height: e.target.value })} placeholder="175" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
-                                    <div><label className="label">Pain (0–10)</label><input type="number" min="0" max="10" value={vitals.pain} onChange={(e) => setVitals({ ...vitals, pain: e.target.value })} placeholder="0" className="input" /></div>
-                                    <div><label className="label">RBS (mmol/L)</label><input type="number" step="0.1" value={vitals.glucose} onChange={(e) => setVitals({ ...vitals, glucose: e.target.value })} placeholder="5.5" className="input" /></div>
+                                    <div><label htmlFor="triage-bp-mmhg" className="label">BP (mmHg)</label><input id="triage-bp-mmhg" type="text" value={vitals.bp} onChange={(e) => setVitals({ ...vitals, bp: e.target.value })} placeholder="120/80" className="input" /></div>
+                                    <div><label htmlFor="triage-hr-bpm" className="label">HR (bpm)</label><input id="triage-hr-bpm" type="number" value={vitals.hr} onChange={(e) => setVitals({ ...vitals, hr: e.target.value })} placeholder="72" className="input" /></div>
+                                    <div><label htmlFor="triage-resp-bpm" className="label">Resp (bpm)</label><input id="triage-resp-bpm" type="number" value={vitals.rr} onChange={(e) => setVitals({ ...vitals, rr: e.target.value })} placeholder="16" className="input" /></div>
+                                    <div><label htmlFor="triage-temp-c" className="label">Temp (°C)</label><input id="triage-temp-c" type="number" step="0.1" value={vitals.temp} onChange={(e) => setVitals({ ...vitals, temp: e.target.value })} placeholder="37.2" className="input" /></div>
+                                    <div><label htmlFor="triage-spo" className="label">SpO₂ (%)</label><input id="triage-spo" type="number" value={vitals.spo2} onChange={(e) => setVitals({ ...vitals, spo2: e.target.value })} placeholder="98" className="input" /></div>
+                                    <div><label htmlFor="triage-weight-kg" className="label">Weight (kg)</label><input id="triage-weight-kg" type="number" value={vitals.weight} onChange={(e) => setVitals({ ...vitals, weight: e.target.value })} placeholder="70" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
+                                    <div><label htmlFor="triage-height-cm" className="label">Height (cm)</label><input id="triage-height-cm" type="number" value={vitals.height} onChange={(e) => setVitals({ ...vitals, height: e.target.value })} placeholder="175" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
+                                    <div><label htmlFor="triage-pain-0-10" className="label">Pain (0–10)</label><input id="triage-pain-0-10" type="number" min="0" max="10" value={vitals.pain} onChange={(e) => setVitals({ ...vitals, pain: e.target.value })} placeholder="0" className="input" /></div>
+                                    <div><label htmlFor="triage-rbs-mmol-l" className="label">RBS (mmol/L)</label><input id="triage-rbs-mmol-l" type="number" step="0.1" value={vitals.glucose} onChange={(e) => setVitals({ ...vitals, glucose: e.target.value })} placeholder="5.5" className="input" /></div>
                                 </div>
                             </section>
 
                             {/* Presenting complaint */}
                             <section data-tour="triage-complaint" className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="label">Chief complaint(s)</label>
+                                    <label htmlFor="triage-chief-complaint-s" className="label">Chief complaint(s)</label>
                                     <div className="flex gap-2">
-                                        <input
+                                        <input id="triage-chief-complaint-s"
                                             type="text"
                                             value={complaintInput}
                                             onChange={(e) => setComplaintInput(e.target.value)}
@@ -255,7 +255,7 @@ export default function Triage() {
                                     {complaints.length > 0 && (
                                         <ol className="mt-3 space-y-1.5">
                                             {complaints.map((c, idx) => (
-                                                <li key={idx} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
+                                                <li key={c} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
                                                     <span className="font-mono text-2xs font-semibold text-ink-400 w-5 shrink-0">{idx + 1}.</span>
                                                     <span className="flex-1 text-ink-800 dark:text-ink-200">{c}</span>
                                                     <button type="button" onClick={() => removeComplaint(idx)} aria-label={`Remove complaint ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0">✕</button>
@@ -265,8 +265,8 @@ export default function Triage() {
                                     )}
                                 </div>
                                 <div>
-                                    <label className="label">Triage notes</label>
-                                    <textarea value={triageNotes} onChange={(e) => setTriageNotes(e.target.value)} rows={3} placeholder="Observations, mobility, anything the doctor should know." className="input" />
+                                    <label htmlFor="triage-triage-notes" className="label">Triage notes</label>
+                                    <textarea id="triage-triage-notes" value={triageNotes} onChange={(e) => setTriageNotes(e.target.value)} rows={3} placeholder="Observations, mobility, anything the doctor should know." className="input" />
                                 </div>
                             </section>
 
@@ -293,7 +293,7 @@ export default function Triage() {
                             <p className="text-xs text-ink-500 dark:text-ink-400 flex items-center gap-1.5">
                                 <Stethoscope size={13} /> On save, the patient is routed to the doctor's Consultation queue.
                             </p>
-                            <button data-tour="triage-save" onClick={handleSubmit} disabled={isSubmitting} className="btn-primary">
+                            <button type="button" data-tour="triage-save" onClick={handleSubmit} disabled={isSubmitting} className="btn-primary">
                                 {isSubmitting ? <Activity size={15} className="animate-spin" /> : <Save size={15} />}
                                 Save &amp; send to doctor <ArrowRight size={15} />
                             </button>

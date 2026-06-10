@@ -184,7 +184,7 @@ export default function RolesManager() {
                         Built-in roles can have permissions edited but not be renamed or deleted. Create custom roles to expand the staff taxonomy.
                     </p>
                 </div>
-                <button
+                <button type="button"
                     onClick={() => setEditing('new')}
                     className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 shadow-sm"
                 >
@@ -205,9 +205,12 @@ export default function RolesManager() {
                                 const isActive = r.role_id === activeRoleId;
                                 return (
                                     <li key={r.role_id}>
-                                        <button
+                                        {/* Clickable row containing a Delete button — a native <button> can't nest another, so role="button" is the correct pattern here. */}
+                                        {/* react-doctor-disable-next-line react-doctor/prefer-tag-over-role */}
+                                        <div role="button" tabIndex={0}
                                             onClick={() => setActiveRoleId(r.role_id)}
-                                            className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors ${
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveRoleId(r.role_id); } }}
+                                            className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors cursor-pointer ${
                                                 isActive ? 'bg-brand-50 dark:bg-brand-500/15' : 'hover:bg-slate-50 dark:hover:bg-ink-800/50'
                                             }`}
                                         >
@@ -228,7 +231,7 @@ export default function RolesManager() {
                                                 </p>
                                             </div>
                                             {!r.is_system && (
-                                                <button
+                                                <button type="button"
                                                     onClick={(e) => { e.stopPropagation(); deleteRole(r); }}
                                                     className="p-1 text-slate-400 hover:text-red-600 dark:hover:text-red-300"
                                                     title="Delete custom role"
@@ -236,7 +239,7 @@ export default function RolesManager() {
                                                     <Trash2 size={14} />
                                                 </button>
                                             )}
-                                        </button>
+                                        </div>
                                     </li>
                                 );
                             })}
@@ -263,7 +266,7 @@ export default function RolesManager() {
                                             <Lock size={12} /> Locked — full access
                                         </span>
                                     ) : (
-                                        <button
+                                        <button type="button"
                                             onClick={savePerms}
                                             disabled={!dirty || savingPerms}
                                             className="px-4 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg hover:bg-brand-700 disabled:opacity-40 flex items-center gap-2"
@@ -378,7 +381,7 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <button type="button" aria-label="Close" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative w-full max-w-xl bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
                 <div className="p-5 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-between items-center">
                     <div>
@@ -391,15 +394,15 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
                                 : 'Use the editor on the right to change permissions.'}
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-ink-200">
+                    <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-ink-200">
                         <X size={20} />
                     </button>
                 </div>
 
                 <div className="p-5 overflow-y-auto space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Role Name</label>
-                        <input
+                        <label htmlFor="rolesm-role-name" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Role Name</label>
+                        <input id="rolesm-role-name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g. Triage Officer"
@@ -408,8 +411,8 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Description (optional)</label>
-                        <textarea
+                        <label htmlFor="rolesm-description-optional" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Description (optional)</label>
+                        <textarea id="rolesm-description-optional"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             rows={2}
@@ -420,7 +423,7 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
 
                     {isNew && (
                         <div>
-                            <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-2">Initial Permissions</label>
+                            <span className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-2">Initial Permissions</span>
                             <div className="max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 dark:border-ink-800 rounded-lg p-3 space-y-3">
                                 {(() => {
                                     const grouped = permissions.reduce((acc, p) => {
@@ -474,10 +477,10 @@ function RoleEditor({ role, permissions, onClose, onSaved }) {
                 </div>
 
                 <div className="p-4 border-t border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-end gap-3 shrink-0">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-ink-400 hover:bg-slate-200 dark:hover:bg-ink-800/50 rounded-lg">
+                    <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-ink-400 hover:bg-slate-200 dark:hover:bg-ink-800/50 rounded-lg">
                         Cancel
                     </button>
-                    <button
+                    <button type="button"
                         onClick={save}
                         disabled={busy}
                         className="px-6 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-brand-700 disabled:opacity-50"

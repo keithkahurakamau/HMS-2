@@ -161,7 +161,7 @@ export default function AdminDashboard() {
                     ].map(({ key, label, icon: Icon }) => {
                         const isActive = activeTab === key;
                         return (
-                            <button
+                            <button type="button"
                                 key={key}
                                 role="tab"
                                 aria-selected={isActive}
@@ -235,13 +235,13 @@ export default function AdminDashboard() {
                     <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50">
                         <div className="relative w-full max-w-md">
                             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input 
+                            <input aria-label="Search staff by name or email..." 
                                 type="text" placeholder="Search staff by name or email..." 
                                 value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm transition-all" 
                             />
                         </div>
-                        <button data-tour="admin-provision" onClick={() => setIsStaffModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 shadow-sm transition-colors">
+                        <button type="button" data-tour="admin-provision" onClick={() => setIsStaffModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 shadow-sm transition-colors">
                             <UserPlus size={18} /> Provision New Account
                         </button>
                     </div>
@@ -288,13 +288,13 @@ export default function AdminDashboard() {
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                                    <button
+                                                    <button type="button"
                                                         onClick={() => openEditRoleModal(user)}
                                                         className="text-xs font-bold px-3 py-1.5 rounded border border-slate-200 text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-colors flex items-center gap-1"
                                                     >
                                                         <Edit size={12}/> Edit Role
                                                     </button>
-                                                    <button
+                                                    <button type="button"
                                                         data-tour="admin-perms"
                                                         onClick={() => setPermsEditorUser(user)}
                                                         disabled={user.role === 'Admin'}
@@ -303,7 +303,7 @@ export default function AdminDashboard() {
                                                     >
                                                         <KeyRound size={12}/> Permissions
                                                     </button>
-                                                    <button 
+                                                    <button type="button" 
                                                         onClick={() => handleToggleAccountStatus(user.user_id, user.is_active)}
                                                         disabled={isCurrentUser}
                                                         className={`text-xs font-bold px-3 py-1.5 rounded border transition-colors ${
@@ -339,13 +339,13 @@ export default function AdminDashboard() {
                     <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50">
                         <div className="relative w-full max-w-md">
                             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input 
+                            <input aria-label="Search services by name or category..." 
                                 type="text" placeholder="Search services by name or category..." 
                                 value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm transition-all" 
                             />
                         </div>
-                        <button onClick={() => openPricingModal()} className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm transition-colors">
+                        <button type="button" onClick={() => openPricingModal()} className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm transition-colors">
                             <PlusCircle size={18} /> Add Service Package
                         </button>
                     </div>
@@ -382,7 +382,7 @@ export default function AdminDashboard() {
                                                 KES {parseFloat(item.base_price).toLocaleString()}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <button 
+                                                <button type="button" 
                                                     onClick={() => openPricingModal(item)}
                                                     className="text-xs font-bold px-3 py-1.5 rounded border border-slate-200 text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-colors flex items-center gap-1 ml-auto"
                                                 >
@@ -445,24 +445,24 @@ export default function AdminDashboard() {
             {/* --- ADD STAFF MODAL --- */}
             {isStaffModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsStaffModalOpen(false)}></div>
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsStaffModalOpen(false)} />
                     <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-2xl flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-slate-100 bg-slate-900 text-white shrink-0 flex justify-between items-center">
                             <div>
                                 <h2 className="text-xl font-bold flex items-center gap-2"><UserPlus size={24} className="text-brand-400" /> Provision Account</h2>
                                 <p className="text-sm text-slate-400 mt-1">Create a new staff identity & assign RBAC roles.</p>
                             </div>
-                            <button onClick={() => setIsStaffModalOpen(false)} aria-label="Close" className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 cursor-pointer"><X size={20} aria-hidden="true" /></button>
+                            <button type="button" onClick={() => setIsStaffModalOpen(false)} aria-label="Close" className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
                             <form id="staffForm" onSubmit={handleRegisterStaff} className="space-y-4">
-                                <div><label className="block text-xs font-bold text-slate-700 mb-1.5">Full Name</label><input required type="text" value={staffForm.full_name} onChange={e => setStaffForm({...staffForm, full_name: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
-                                <div><label className="block text-xs font-bold text-slate-700 mb-1.5">Email Address (Login ID)</label><input required type="email" value={staffForm.email} onChange={e => setStaffForm({...staffForm, email: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
-                                <div><label className="block text-xs font-bold text-slate-700 mb-1.5">Temporary Password</label><PasswordInput required value={staffForm.password} onChange={e => setStaffForm({...staffForm, password: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
+                                <div><label htmlFor="admind-full-name" className="block text-xs font-bold text-slate-700 mb-1.5">Full Name</label><input id="admind-full-name" required type="text" value={staffForm.full_name} onChange={e => setStaffForm({...staffForm, full_name: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
+                                <div><label htmlFor="admind-email-address-login-id" className="block text-xs font-bold text-slate-700 mb-1.5">Email Address (Login ID)</label><input id="admind-email-address-login-id" required type="email" value={staffForm.email} onChange={e => setStaffForm({...staffForm, email: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
+                                <div><label htmlFor="admind-email-address-login-id" className="block text-xs font-bold text-slate-700 mb-1.5">Temporary Password</label><PasswordInput required value={staffForm.password} onChange={e => setStaffForm({...staffForm, password: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" /></div>
                                 <hr className="my-6 border-slate-200" />
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">System Role (RBAC)</label>
-                                    <select required value={staffForm.role} onChange={e => setStaffForm({...staffForm, role: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-brand-700 focus:ring-2 focus:ring-brand-500 outline-none">
+                                    <label htmlFor="admind-email-address-login-id" className="block text-xs font-bold text-slate-700 mb-1.5">System Role (RBAC)</label>
+                                    <select id="admind-email-address-login-id" required value={staffForm.role} onChange={e => setStaffForm({...staffForm, role: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-brand-700 focus:ring-2 focus:ring-brand-500 outline-none">
                                         {roles.map(r => <option key={r} value={r}>{r}</option>)}
                                     </select>
                                 </div>
@@ -480,24 +480,24 @@ export default function AdminDashboard() {
             {/* --- PRICING & CATALOG MODAL --- */}
             {isPricingModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsPricingModalOpen(false)}></div>
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsPricingModalOpen(false)} />
                     <div className="relative w-full max-w-md bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
                         <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">{pricingForm.catalog_id ? "Edit Service Package" : "Create Service Package"}</h2>
                                 <p className="text-xs text-slate-500 mt-1">Configure pricing for Billing module.</p>
                             </div>
-                            <button onClick={() => setIsPricingModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800 cursor-pointer"><X size={20} aria-hidden="true" /></button>
+                            <button type="button" onClick={() => setIsPricingModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
                         <div className="p-6">
                             <form id="pricingForm" onSubmit={handleSavePricing} className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Service / Test Name <span className="text-red-500">*</span></label>
-                                    <input required type="text" value={pricingForm.test_name} onChange={e => setPricingForm({ ...pricingForm, test_name: e.target.value })} placeholder="e.g. Initial Consultation" className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                                    <label htmlFor="admind-service-test-name" className="block text-xs font-bold text-slate-700 mb-1.5">Service / Test Name <span className="text-red-500">*</span></label>
+                                    <input id="admind-service-test-name" required type="text" value={pricingForm.test_name} onChange={e => setPricingForm({ ...pricingForm, test_name: e.target.value })} placeholder="e.g. Initial Consultation" className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Category <span className="text-red-500">*</span></label>
-                                    <select required value={pricingForm.category} onChange={e => setPricingForm({ ...pricingForm, category: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900">
+                                    <label htmlFor="admind-category" className="block text-xs font-bold text-slate-700 mb-1.5">Category <span className="text-red-500">*</span></label>
+                                    <select id="admind-category" required value={pricingForm.category} onChange={e => setPricingForm({ ...pricingForm, category: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900">
                                         <option>Consultation</option>
                                         <option>Laboratory</option>
                                         <option>Radiology</option>
@@ -506,17 +506,17 @@ export default function AdminDashboard() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Description / Use Case</label>
-                                    <textarea value={pricingForm.description} onChange={e => setPricingForm({ ...pricingForm, description: e.target.value })} rows="2" placeholder="Describe the purpose of this package..." className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"></textarea>
+                                    <label htmlFor="admind-description-use-case" className="block text-xs font-bold text-slate-700 mb-1.5">Description / Use Case</label>
+                                    <textarea id="admind-description-use-case" value={pricingForm.description} onChange={e => setPricingForm({ ...pricingForm, description: e.target.value })} rows="2" placeholder="Describe the purpose of this package..." className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"></textarea>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Base Price (KES) <span className="text-red-500">*</span></label>
-                                    <input required type="number" min="0" step="0.01" value={pricingForm.base_price} onChange={e => setPricingForm({ ...pricingForm, base_price: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-black text-green-700 focus:ring-2 focus:ring-brand-500 outline-none" />
+                                    <label htmlFor="admind-base-price-kes" className="block text-xs font-bold text-slate-700 mb-1.5">Base Price (KES) <span className="text-red-500">*</span></label>
+                                    <input id="admind-base-price-kes" required type="number" min="0" step="0.01" value={pricingForm.base_price} onChange={e => setPricingForm({ ...pricingForm, base_price: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-black text-green-700 focus:ring-2 focus:ring-brand-500 outline-none" />
                                 </div>
                             </form>
                         </div>
                         <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                            <button onClick={() => setIsPricingModalOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
+                            <button type="button" onClick={() => setIsPricingModalOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
                             <button type="submit" form="pricingForm" disabled={isSubmitting} className="px-6 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-brand-700 disabled:opacity-50 transition-colors flex items-center gap-2">
                                 {isSubmitting ? <Activity className="animate-spin" size={16}/> : <Save size={16}/>}
                                 Save Package
@@ -529,27 +529,27 @@ export default function AdminDashboard() {
             {/* --- EDIT ROLE MODAL --- */}
             {isEditRoleModalOpen && selectedUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsEditRoleModalOpen(false)}></div>
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsEditRoleModalOpen(false)} />
                     <div className="relative w-full max-w-sm bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
                         <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">Edit RBAC Access</h2>
                                 <p className="text-xs text-slate-500 mt-1">Modifying roles for {selectedUser.full_name}</p>
                             </div>
-                            <button onClick={() => setIsEditRoleModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800 cursor-pointer"><X size={20} aria-hidden="true" /></button>
+                            <button type="button" onClick={() => setIsEditRoleModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
                         <div className="p-6">
                             <form id="editRoleForm" onSubmit={handleUpdateRole} className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">New Security Role</label>
-                                    <select required value={roleEditForm.role} onChange={e => setRoleEditForm({ role: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-brand-700 focus:ring-2 focus:ring-brand-500 outline-none">
+                                    <label htmlFor="admind-new-security-role" className="block text-xs font-bold text-slate-700 mb-1.5">New Security Role</label>
+                                    <select id="admind-new-security-role" required value={roleEditForm.role} onChange={e => setRoleEditForm({ role: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-brand-700 focus:ring-2 focus:ring-brand-500 outline-none">
                                         {roles.map(r => <option key={r} value={r}>{r}</option>)}
                                     </select>
                                 </div>
                             </form>
                         </div>
                         <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                            <button onClick={() => setIsEditRoleModalOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
+                            <button type="button" onClick={() => setIsEditRoleModalOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
                             <button type="submit" form="editRoleForm" disabled={isSubmitting} className="px-6 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-brand-700 disabled:opacity-50 transition-colors flex items-center gap-2">
                                 {isSubmitting ? <Activity className="animate-spin" size={16}/> : <ShieldCheck size={16}/>}
                                 Update Access

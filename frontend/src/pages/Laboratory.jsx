@@ -31,6 +31,16 @@ const EMPTY_PARAMETER = {
     choices: '', ref_low: '', ref_high: '', sort_order: 0, is_active: true,
 };
 
+// Pure result-flagging helper — hoisted to module scope.
+const flagFor = (val, low, high) => {
+    if (val === '' || val == null) return null;
+    const n = parseFloat(val);
+    if (isNaN(n)) return null;
+    if (low != null && n < low) return <span className="badge-info">Low</span>;
+    if (high != null && n > high) return <span className="badge-danger">High</span>;
+    return <span className="badge-success">Normal</span>;
+};
+
 export default function Laboratory() {
     const [activeTab, setActiveTab] = useState('queue');
     const [isQueueOpen, setIsQueueOpen] = useState(true);
@@ -180,15 +190,6 @@ export default function Laboratory() {
         }
     };
 
-    const flagFor = (val, low, high) => {
-        if (val === '' || val == null) return null;
-        const n = parseFloat(val);
-        if (isNaN(n)) return null;
-        if (low != null && n < low) return <span className="badge-info">Low</span>;
-        if (high != null && n > high) return <span className="badge-danger">High</span>;
-        return <span className="badge-success">Normal</span>;
-    };
-
     /* ─── Catalog editor ─────────────────────────────────────────────────── */
 
     const startEdit = (row) => {
@@ -197,7 +198,7 @@ export default function Laboratory() {
             ...EMPTY_CATALOG_FORM,
             ...row,
             base_price: Number(row.base_price || 0),
-            parameters: (row.parameters || []).map(p => ({ ...p })),
+            parameters: (row.parameters || []).map(p => ({ ...p, _uid: crypto.randomUUID() })),
         });
         setEditorOpen(true);
     };
@@ -208,7 +209,7 @@ export default function Laboratory() {
         setEditorOpen(true);
     };
 
-    const addParamRow = () => setCatalogForm(f => ({ ...f, parameters: [...f.parameters, { ...EMPTY_PARAMETER }] }));
+    const addParamRow = () => setCatalogForm(f => ({ ...f, parameters: [...f.parameters, { ...EMPTY_PARAMETER, _uid: crypto.randomUUID() }] }));
     const removeParamRow = (idx) => setCatalogForm(f => ({ ...f, parameters: f.parameters.filter((_, i) => i !== idx) }));
     const setParamField = (idx, field, val) =>
         setCatalogForm(f => ({
@@ -221,7 +222,7 @@ export default function Laboratory() {
             ...catalogForm,
             base_price: parseFloat(catalogForm.base_price) || 0,
             turnaround_hours: parseInt(catalogForm.turnaround_hours) || 24,
-            parameters: catalogForm.parameters.map(p => ({
+            parameters: catalogForm.parameters.map(({ _uid, ...p }) => ({
                 ...p,
                 ref_low: p.ref_low === '' ? null : parseFloat(p.ref_low),
                 ref_high: p.ref_high === '' ? null : parseFloat(p.ref_high),
@@ -233,13 +234,11 @@ export default function Laboratory() {
                 const { parameters, ...patch } = body;
                 await apiClient.patch(`/laboratory/catalog/${editing.catalog_id}`, patch);
                 // Sync parameters: add new ones, update existing
-                for (const p of parameters) {
-                    if (p.parameter_id) {
-                        await apiClient.patch(`/laboratory/parameters/${p.parameter_id}`, p);
-                    } else {
-                        await apiClient.post(`/laboratory/catalog/${editing.catalog_id}/parameters`, p);
-                    }
-                }
+                await Promise.all(parameters.map((p) =>
+                    p.parameter_id
+                        ? apiClient.patch(`/laboratory/parameters/${p.parameter_id}`, p)
+                        : apiClient.post(`/laboratory/catalog/${editing.catalog_id}/parameters`, p)
+                ));
                 toast.success('Test catalog entry updated.');
             } else {
                 await apiClient.post('/laboratory/catalog', body);
@@ -277,11 +276,11 @@ export default function Laboratory() {
             {/* Tabs */}
             <div data-tour="lab-tabs" className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" aria-label="Laboratory mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
-                    <button role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
+                    <button type="button" role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
                             className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <Microscope size={16} className={activeTab === 'queue' ? 'text-brand-600' : 'text-ink-400'} /> Lab Operations
                     </button>
-                    <button role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')}
+                    <button type="button" role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')}
                             className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <FileDigit size={16} className={activeTab === 'catalog' ? 'text-accent-600' : 'text-ink-400'} /> Test Catalog
                     </button>
@@ -292,7 +291,7 @@ export default function Laboratory() {
             {activeTab === 'queue' && (
                 <>
                     <div data-tour="lab-queue" className="card shrink-0 flex flex-col z-20">
-                        <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
+                        <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
                             <div className="flex items-center gap-3">
                                 <TestTube className="text-brand-600" size={18} />
                                 <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Pending lab orders</h2>
@@ -360,7 +359,7 @@ export default function Laboratory() {
                                             </p>
                                         </div>
                                         {(activeTest.status === 'Completed' || activeTest.result_summary) && (
-                                            <button onClick={() => printLabReport({
+                                            <button type="button" onClick={() => printLabReport({
                                                 patient: { full_name: activeTest.patient, outpatient_no: activeTest.op_no },
                                                 test: activeTest,
                                                 performedBy: { full_name: activeTest.performed_by_name },
@@ -384,13 +383,13 @@ export default function Laboratory() {
                                                 the labelling step entirely if your workflow doesn't need it.
                                             </p>
                                             <div className="flex flex-wrap justify-center gap-3">
-                                                <button onClick={handleRejectSample} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
+                                                <button type="button" onClick={handleRejectSample} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
                                                     <XCircle size={16} /> Reject / no-show
                                                 </button>
-                                                <button onClick={handleSkipBarcode} className="btn-secondary">
+                                                <button type="button" onClick={handleSkipBarcode} className="btn-secondary">
                                                     Skip barcode
                                                 </button>
-                                                <button onClick={handleCollectSpecimen} className="btn-primary">
+                                                <button type="button" onClick={handleCollectSpecimen} className="btn-primary">
                                                     <Printer size={16} /> Print barcode &amp; receive
                                                 </button>
                                             </div>
@@ -424,6 +423,7 @@ export default function Laboratory() {
                                                                         </select>
                                                                     ) : (
                                                                         <input type={param.value_type === 'number' ? 'number' : 'text'} step="any"
+                                                                               aria-label={param.name}
                                                                                value={results[param.key] || ''}
                                                                                onChange={(e) => setResults({ ...results, [param.key]: e.target.value })}
                                                                                className="input" />
@@ -443,8 +443,8 @@ export default function Laboratory() {
                                                     </div>
                                                 ) : (
                                                     <div>
-                                                        <label className="label">Qualitative result / impression</label>
-                                                        <textarea rows="4" value={results.qualitative || ''}
+                                                        <label htmlFor="labora-qualitative-result-impression" className="label">Qualitative result / impression</label>
+                                                        <textarea id="labora-qualitative-result-impression" rows="4" value={results.qualitative || ''}
                                                                   onChange={(e) => setResults({ qualitative: e.target.value })}
                                                                   className="input resize-none"
                                                                   placeholder="Enter findings… (no discrete parameters configured for this test — edit the catalog to add them)" />
@@ -452,8 +452,8 @@ export default function Laboratory() {
                                                 )}
 
                                                 <div className="mt-4">
-                                                    <label className="label">Technician notes (optional)</label>
-                                                    <input type="text" value={techNotes} onChange={(e) => setTechNotes(e.target.value)} className="input" placeholder="Methodology notes…" />
+                                                    <label htmlFor="labora-technician-notes-optional" className="label">Technician notes (optional)</label>
+                                                    <input id="labora-technician-notes-optional" type="text" value={techNotes} onChange={(e) => setTechNotes(e.target.value)} className="input" placeholder="Methodology notes…" />
                                                 </div>
                                             </div>
 
@@ -475,10 +475,10 @@ export default function Laboratory() {
                                                     {selectedBatchId && labInventory.find(i => i.batch_id === parseInt(selectedBatchId))?.is_reusable ? (
                                                         <span className="badge-success flex items-center gap-1 px-3"><RefreshCcw size={12} /> Reusable — no qty</span>
                                                     ) : (
-                                                        <input type="number" min="1" placeholder="Qty" value={consumeQty}
+                                                        <input aria-label="Qty" type="number" min="1" placeholder="Qty" value={consumeQty}
                                                                onChange={(e) => setConsumeQty(e.target.value)} className="input w-24" />
                                                     )}
-                                                    <button onClick={addConsumedItem} className="btn bg-ink-800 text-white hover:bg-ink-900">
+                                                    <button type="button" onClick={addConsumedItem} className="btn bg-ink-800 text-white hover:bg-ink-900">
                                                         <Plus size={15} /> Add
                                                     </button>
                                                 </div>
@@ -490,7 +490,7 @@ export default function Laboratory() {
                                                                 <tr>
                                                                     <th>Item &amp; batch</th>
                                                                     <th>Used</th>
-                                                                    <th></th>
+                                                                    <th aria-label="Actions"></th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -504,7 +504,7 @@ export default function Laboratory() {
                                                                             {item.is_reusable ? '1 use (no deduct)' : `${item.quantity} ${item.unit}`}
                                                                         </td>
                                                                         <td className="text-right">
-                                                                            <button onClick={() => removeConsumedItem(item.batch_id)} aria-label="Remove"
+                                                                            <button type="button" onClick={() => removeConsumedItem(item.batch_id)} aria-label="Remove"
                                                                                     className="text-ink-400 hover:text-rose-600"><Trash2 size={15} /></button>
                                                                         </td>
                                                                     </tr>
@@ -523,10 +523,10 @@ export default function Laboratory() {
                                 {/* Footer */}
                                 {activeTest.status !== 'Pending Collection' && (
                                     <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0 z-10">
-                                        <button onClick={handleRejectSample} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
+                                        <button type="button" onClick={handleRejectSample} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
                                             <XCircle size={16} /> Reject sample
                                         </button>
-                                        <button onClick={handleReleaseResults} className="btn-success">
+                                        <button type="button" onClick={handleReleaseResults} className="btn-success">
                                             <Send size={16} /> Verify, release &amp; reconcile stock
                                         </button>
                                     </div>
@@ -548,7 +548,7 @@ export default function Laboratory() {
                             </h2>
                             <p className="text-sm text-ink-500 mt-1">Add or revise tests, parameters, reference ranges and pricing.</p>
                         </div>
-                        <button data-tour="lab-new-test" onClick={startCreate} className="btn-primary">
+                        <button type="button" data-tour="lab-new-test" onClick={startCreate} className="btn-primary">
                             <Plus size={16} /> New test
                         </button>
                     </div>
@@ -585,9 +585,9 @@ export default function Laboratory() {
                                         <td>{test.requires_barcode ? <span className="badge-warn text-2xs">Required</span> : <span className="badge-neutral text-2xs">Optional</span>}</td>
                                         <td>{test.is_active ? <span className="badge-success text-2xs">Active</span> : <span className="badge-neutral text-2xs">Inactive</span>}</td>
                                         <td className="text-right">
-                                            <button onClick={() => startEdit(test)} className="text-brand-600 hover:text-brand-800 p-1.5" aria-label="Edit"><Pencil size={15} /></button>
+                                            <button type="button" onClick={() => startEdit(test)} className="text-brand-600 hover:text-brand-800 p-1.5" aria-label="Edit"><Pencil size={15} /></button>
                                             {test.is_active && (
-                                                <button onClick={() => deactivateCatalog(test)} className="text-rose-600 hover:text-rose-800 p-1.5 ml-1" aria-label="Deactivate"><Trash2 size={15} /></button>
+                                                <button type="button" onClick={() => deactivateCatalog(test)} className="text-rose-600 hover:text-rose-800 p-1.5 ml-1" aria-label="Deactivate"><Trash2 size={15} /></button>
                                             )}
                                         </td>
                                     </tr>
@@ -601,7 +601,7 @@ export default function Laboratory() {
             {/* ─────────────── Catalog editor drawer ─────────────── */}
             {editorOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
                     <div className="relative w-full max-w-3xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shrink-0">
                             <div>
@@ -611,7 +611,7 @@ export default function Laboratory() {
                                     {editing ? `Editing ${editing.test_name}` : 'Configure a new lab test'}
                                 </h2>
                             </div>
-                            <button onClick={() => setEditorOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full">
+                            <button type="button" onClick={() => setEditorOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
@@ -620,29 +620,29 @@ export default function Laboratory() {
                             <div className="card p-5 space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="label">Test name *</label>
-                                        <input className="input" value={catalogForm.test_name}
+                                        <label htmlFor="labora-test-name" className="label">Test name *</label>
+                                        <input id="labora-test-name" className="input" value={catalogForm.test_name}
                                                onChange={e => setCatalogForm({ ...catalogForm, test_name: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="label">Category *</label>
-                                        <input className="input" value={catalogForm.category}
+                                        <label htmlFor="labora-category" className="label">Category *</label>
+                                        <input id="labora-category" className="input" value={catalogForm.category}
                                                onChange={e => setCatalogForm({ ...catalogForm, category: e.target.value })}
                                                placeholder="Hematology, Biochemistry…" />
                                     </div>
                                     <div>
-                                        <label className="label">Default specimen</label>
-                                        <input className="input" value={catalogForm.default_specimen_type}
+                                        <label htmlFor="labora-default-specimen" className="label">Default specimen</label>
+                                        <input id="labora-default-specimen" className="input" value={catalogForm.default_specimen_type}
                                                onChange={e => setCatalogForm({ ...catalogForm, default_specimen_type: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="label">Base price</label>
-                                        <input type="number" min="0" step="0.01" className="input" value={catalogForm.base_price}
+                                        <label htmlFor="labora-base-price" className="label">Base price</label>
+                                        <input id="labora-base-price" type="number" min="0" step="0.01" className="input" value={catalogForm.base_price}
                                                onChange={e => setCatalogForm({ ...catalogForm, base_price: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="label">Turnaround (hours)</label>
-                                        <input type="number" min="0" className="input" value={catalogForm.turnaround_hours}
+                                        <label htmlFor="labora-turnaround-hours" className="label">Turnaround (hours)</label>
+                                        <input id="labora-turnaround-hours" type="number" min="0" className="input" value={catalogForm.turnaround_hours}
                                                onChange={e => setCatalogForm({ ...catalogForm, turnaround_hours: e.target.value })} />
                                     </div>
                                     <div className="flex items-center gap-6 mt-6 md:mt-7">
@@ -659,8 +659,8 @@ export default function Laboratory() {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="label">Description</label>
-                                    <textarea rows="2" className="input resize-none" value={catalogForm.description || ''}
+                                    <label htmlFor="labora-description" className="label">Description</label>
+                                    <textarea id="labora-description" rows="2" className="input resize-none" value={catalogForm.description || ''}
                                               onChange={e => setCatalogForm({ ...catalogForm, description: e.target.value })} />
                                 </div>
                             </div>
@@ -668,19 +668,19 @@ export default function Laboratory() {
                             <div className="card p-5">
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="font-semibold text-ink-900 dark:text-ink-100">Result parameters</h3>
-                                    <button onClick={addParamRow} className="btn-secondary"><Plus size={14} /> Add parameter</button>
+                                    <button type="button" onClick={addParamRow} className="btn-secondary"><Plus size={14} /> Add parameter</button>
                                 </div>
                                 {catalogForm.parameters.length === 0 ? (
                                     <p className="text-xs text-ink-500 italic">No parameters yet. Without any, the lab tech enters a single free-text result.</p>
                                 ) : (
                                     <div className="space-y-2">
                                         {catalogForm.parameters.map((p, idx) => (
-                                            <div key={idx} className="grid grid-cols-12 gap-2 items-start border-b border-ink-100 dark:border-ink-800 pb-2">
-                                                <input className="input col-span-2" placeholder="key" value={p.key}
+                                            <div key={p._uid} className="grid grid-cols-12 gap-2 items-start border-b border-ink-100 dark:border-ink-800 pb-2">
+                                                <input aria-label="key" className="input col-span-2" placeholder="key" value={p.key}
                                                        onChange={e => setParamField(idx, 'key', e.target.value)} />
-                                                <input className="input col-span-3" placeholder="Display name" value={p.name}
+                                                <input aria-label="Display name" className="input col-span-3" placeholder="Display name" value={p.name}
                                                        onChange={e => setParamField(idx, 'name', e.target.value)} />
-                                                <input className="input col-span-1" placeholder="Unit" value={p.unit || ''}
+                                                <input aria-label="Unit" className="input col-span-1" placeholder="Unit" value={p.unit || ''}
                                                        onChange={e => setParamField(idx, 'unit', e.target.value)} />
                                                 <select className="input col-span-2" value={p.value_type}
                                                         onChange={e => setParamField(idx, 'value_type', e.target.value)}>
@@ -688,15 +688,15 @@ export default function Laboratory() {
                                                     <option value="text">text</option>
                                                     <option value="choice">choice</option>
                                                 </select>
-                                                <input className="input col-span-1" placeholder="min" value={p.ref_low ?? ''}
+                                                <input aria-label="min" className="input col-span-1" placeholder="min" value={p.ref_low ?? ''}
                                                        onChange={e => setParamField(idx, 'ref_low', e.target.value)} />
-                                                <input className="input col-span-1" placeholder="max" value={p.ref_high ?? ''}
+                                                <input aria-label="max" className="input col-span-1" placeholder="max" value={p.ref_high ?? ''}
                                                        onChange={e => setParamField(idx, 'ref_high', e.target.value)} />
-                                                <button onClick={() => removeParamRow(idx)} className="col-span-2 btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
+                                                <button type="button" onClick={() => removeParamRow(idx)} className="col-span-2 btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
                                                     <Trash2 size={14} /> Remove
                                                 </button>
                                                 {p.value_type === 'choice' && (
-                                                    <input className="input col-span-12" placeholder="comma-separated choices (e.g. Positive, Negative, Inconclusive)"
+                                                    <input aria-label="comma-separated choices (e.g. Positive, Negative, Inconclusive)" className="input col-span-12" placeholder="comma-separated choices (e.g. Positive, Negative, Inconclusive)"
                                                            value={p.choices || ''} onChange={e => setParamField(idx, 'choices', e.target.value)} />
                                                 )}
                                             </div>
@@ -707,8 +707,8 @@ export default function Laboratory() {
                         </div>
 
                         <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0">
-                            <button onClick={() => setEditorOpen(false)} className="btn-secondary">Cancel</button>
-                            <button onClick={saveCatalog} className="btn-primary"><Save size={15} /> Save</button>
+                            <button type="button" onClick={() => setEditorOpen(false)} className="btn-secondary">Cancel</button>
+                            <button type="button" onClick={saveCatalog} className="btn-primary"><Save size={15} /> Save</button>
                         </div>
                     </div>
                 </div>

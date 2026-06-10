@@ -15,6 +15,12 @@ import PageHeader from '../../components/PageHeader';
 /*  active tenant DB in its own session.                                      */
 /* ────────────────────────────────────────────────────────────────────────── */
 
+const READONLY_BADGE = (
+    <span className="badge-success inline-flex items-center gap-1.5">
+        <ShieldCheck size={11} aria-hidden="true" /> Read-only
+    </span>
+);
+
 export default function SuperAdminPatients() {
     const [patients, setPatients] = useState([]);
     const [tenants, setTenants] = useState([]);
@@ -91,11 +97,7 @@ export default function SuperAdminPatients() {
                 title="Patients — cross-tenant"
                 subtitle="Read-only browser across every active tenant database."
                 tone="brand"
-                meta={
-                    <span className="badge-success inline-flex items-center gap-1.5">
-                        <ShieldCheck size={11} aria-hidden="true" /> Read-only
-                    </span>
-                }
+                meta={READONLY_BADGE}
                 actions={
                     <button
                         type="button"
@@ -145,8 +147,8 @@ export default function SuperAdminPatients() {
                     <div>
                         <p className="font-semibold uppercase tracking-[0.14em] text-2xs text-rose-700 dark:text-rose-300">Partial results</p>
                         <ul className="mt-1 space-y-0.5">
-                            {errors.map((e, i) => (
-                                <li key={i} className="font-mono"><span className="text-rose-900 dark:text-rose-200">{e.tenant_db}</span> · {e.error}</li>
+                            {errors.map((e) => (
+                                <li key={`${e.tenant_db}-${e.error}`} className="font-mono"><span className="text-rose-900 dark:text-rose-200">{e.tenant_db}</span> · {e.error}</li>
                             ))}
                         </ul>
                     </div>

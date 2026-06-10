@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, use, useEffect, useMemo } from 'react';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 
@@ -90,11 +90,16 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const value = useMemo(
+        () => ({ user, login, logout, loading, mustChangePassword, pendingEmail, pendingPassword, clearMustChange }),
+        [user, loading, mustChangePassword, pendingEmail, pendingPassword],
+    );
+
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading, mustChangePassword, pendingEmail, pendingPassword, clearMustChange }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => use(AuthContext);
