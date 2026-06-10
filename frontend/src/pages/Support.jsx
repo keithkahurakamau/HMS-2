@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
@@ -56,18 +56,41 @@ const STATUS_META = {
 const CATEGORIES = ['Billing', 'Bug', 'Feature', 'Account', 'Onboarding', 'Other'];
 const PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'];
 
+// New-ticket composer: modal visibility + draft fields + submit flag.
+const blankTicket = { subject: '', body: '', category: 'Other', priority: 'Normal' };
+const initialCompose = { isNewOpen: false, draft: blankTicket, submitting: false };
+function composeReducer(state, action) {
+    switch (action.type) {
+        case 'open':       return { ...state, isNewOpen: true, ...(action.draft ? { draft: action.draft } : {}) };
+        case 'close':      return { ...state, isNewOpen: false };
+        case 'setField':   return { ...state, draft: { ...state.draft, [action.field]: action.value } };
+        case 'reset':      return { ...state, draft: blankTicket };
+        case 'submitting': return { ...state, submitting: action.value };
+        default:           return state;
+    }
+}
+
+// Reply box on the active ticket: the text + the send-in-flight flag.
+const initialReplyBox = { reply: '', sendingReply: false };
+function replyReducer(state, action) {
+    switch (action.type) {
+        case 'setReply': return { ...state, reply: action.value };
+        case 'sending':  return { ...state, sendingReply: action.value };
+        default:         return state;
+    }
+}
+
 export default function Support() {
     const [tickets, setTickets] = useState([]);
     const [activeTicket, setActiveTicket] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('');
 
-    const [isNewOpen, setIsNewOpen] = useState(false);
-    const [draft, setDraft] = useState({ subject: '', body: '', category: 'Other', priority: 'Normal' });
-    const [submitting, setSubmitting] = useState(false);
+    const [compose, dispatchCompose] = useReducer(composeReducer, initialCompose);
+    const { isNewOpen, draft, submitting } = compose;
 
-    const [reply, setReply] = useState('');
-    const [sendingReply, setSendingReply] = useState(false);
+    const [replyBox, dispatchReply] = useReducer(replyReducer, initialReplyBox);
+    const { reply, sendingReply } = replyBox;
 
     useEffect(() => { fetchTickets(); }, []);  // initial load — filter is client-side now
 
@@ -80,13 +103,15 @@ export default function Support() {
     useEffect(() => {
         const prefill = location.state?.prefill;
         if (!prefill) return;
-        setDraft({
-            subject:  prefill.subject  || '',
-            body:     prefill.body     || '',
-            category: prefill.category || 'Account',
-            priority: prefill.priority || 'Normal',
+        dispatchCompose({
+            type: 'open',
+            draft: {
+                subject:  prefill.subject  || '',
+                body:     prefill.body     || '',
+                category: prefill.category || 'Account',
+                priority: prefill.priority || 'Normal',
+            },
         });
-        setIsNewOpen(true);
         // Strip the state so a back-forward navigation doesn't re-open the
         // composer with stale prefill data.
         navigate(location.pathname, { replace: true, state: null });
@@ -118,33 +143,33 @@ export default function Support() {
     const submitNew = async (e) => {
         e.preventDefault();
         if (!draft.subject.trim() || !draft.body.trim()) return toast.error('Subject and details are required.');
-        setSubmitting(true);
+        dispatchCompose({ type: 'submitting', value: true });
         try {
             const res = await apiClient.post('/support/', draft);
             toast.success('Ticket raised — the MediFleet team will respond shortly.');
-            setIsNewOpen(false);
-            setDraft({ subject: '', body: '', category: 'Other', priority: 'Normal' });
+            dispatchCompose({ type: 'close' });
+            dispatchCompose({ type: 'reset' });
             await fetchTickets();
             setActiveTicket(res.data);
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Could not raise ticket.');
         } finally {
-            setSubmitting(false);
+            dispatchCompose({ type: 'submitting', value: false });
         }
     };
 
     const sendReply = async () => {
         if (!reply.trim() || !activeTicket) return;
-        setSendingReply(true);
+        dispatchReply({ type: 'sending', value: true });
         try {
             const res = await apiClient.post(`/support/${activeTicket.ticket_id}/reply`, { body: reply });
             setActiveTicket(res.data);
-            setReply('');
+            dispatchReply({ type: 'setReply', value: '' });
             fetchTickets();
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Failed to send reply.');
         } finally {
-            setSendingReply(false);
+            dispatchReply({ type: 'sending', value: false });
         }
     };
 
@@ -192,7 +217,7 @@ export default function Support() {
                 actions={
                     <>
                         <button onClick={fetchTickets} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
-                        <button data-tour="support-new" onClick={() => setIsNewOpen(true)} className="btn-primary cursor-pointer"><Plus size={15} /> New ticket</button>
+                        <button data-tour="support-new" onClick={() => dispatchCompose({ type: 'open' })} className="btn-primary cursor-pointer"><Plus size={15} /> New ticket</button>
                     </>
                 }
             />
@@ -358,7 +383,7 @@ export default function Support() {
                             {activeTicket.status !== 'Closed' && (
                                 <div data-tour="support-reply" className="p-3 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex gap-2">
                                     <textarea rows="2" className="input flex-1 resize-none" placeholder="Reply to MediFleet support…"
-                                              value={reply} onChange={e => setReply(e.target.value)} />
+                                              value={reply} onChange={e => dispatchReply({ type: 'setReply', value: e.target.value })} />
                                     <button onClick={sendReply} disabled={sendingReply || !reply.trim()} className="btn-primary self-end disabled:opacity-50">
                                         {sendingReply ? <Activity size={16} className="animate-spin" /> : <Send size={16} />}
                                     </button>
@@ -372,11 +397,11 @@ export default function Support() {
             {/* New ticket modal */}
             {isNewOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsNewOpen(false)} />
+                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => dispatchCompose({ type: 'close' })} />
                     <div className="relative w-full max-w-xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="flex justify-between items-center p-5 border-b border-ink-100 dark:border-ink-800">
                             <h2 className="text-xl font-semibold flex items-center gap-2 dark:text-white"><LifeBuoy size={20} className="text-brand-600" /> Raise a ticket</h2>
-                            <button onClick={() => setIsNewOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
+                            <button onClick={() => dispatchCompose({ type: 'close' })} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
@@ -384,21 +409,21 @@ export default function Support() {
                             <div>
                                 <label className="label">Subject *</label>
                                 <input required className="input" value={draft.subject} maxLength="200"
-                                       onChange={e => setDraft({ ...draft, subject: e.target.value })}
+                                       onChange={e => dispatchCompose({ type: 'setField', field: 'subject', value: e.target.value })}
                                        placeholder="Short summary of the issue" />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="label">Category</label>
                                     <select className="input" value={draft.category}
-                                            onChange={e => setDraft({ ...draft, category: e.target.value })}>
+                                            onChange={e => dispatchCompose({ type: 'setField', field: 'category', value: e.target.value })}>
                                         {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="label">Priority</label>
                                     <select className="input" value={draft.priority}
-                                            onChange={e => setDraft({ ...draft, priority: e.target.value })}>
+                                            onChange={e => dispatchCompose({ type: 'setField', field: 'priority', value: e.target.value })}>
                                         {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                                     </select>
                                 </div>
@@ -406,11 +431,11 @@ export default function Support() {
                             <div>
                                 <label className="label">What's going on? *</label>
                                 <textarea required rows="8" className="input resize-none" value={draft.body}
-                                          onChange={e => setDraft({ ...draft, body: e.target.value })}
+                                          onChange={e => dispatchCompose({ type: 'setField', field: 'body', value: e.target.value })}
                                           placeholder="Describe the issue, what you expected, and what happened. Include steps, screenshots URLs, or error messages." />
                             </div>
                             <div className="flex justify-end gap-2 pt-3 border-t border-ink-100 dark:border-ink-800">
-                                <button type="button" onClick={() => setIsNewOpen(false)} className="btn-secondary">Cancel</button>
+                                <button type="button" onClick={() => dispatchCompose({ type: 'close' })} className="btn-secondary">Cancel</button>
                                 <button type="submit" disabled={submitting} className="btn-primary">
                                     {submitting ? <Activity size={15} className="animate-spin" /> : <Send size={15} />} Submit
                                 </button>

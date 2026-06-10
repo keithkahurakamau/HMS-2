@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import {
@@ -29,22 +29,44 @@ function StatusBadge({ user }) {
     return <span className="badge-success inline-flex items-center gap-1"><UserCheck size={11} aria-hidden="true" /> Active</span>;
 }
 
+// Cross-tenant user list + the tenant picker + per-tenant load errors + loading
+// flag are loaded together, so they share one reducer.
+const initialData = { users: [], tenants: [], errors: [], isLoading: true };
+function dataReducer(state, action) {
+    switch (action.type) {
+        case 'setTenants': return { ...state, tenants: action.value };
+        case 'loading':    return { ...state, isLoading: true };
+        case 'loaded':     return { ...state, users: action.users, errors: action.errors };
+        case 'done':       return { ...state, isLoading: false };
+        default:           return state;
+    }
+}
+
+// The one-time temp-password result modal: the issued result + its copied flag.
+const initialTempPwd = { tempResult: null, copied: false };
+function tempPwdReducer(state, action) {
+    switch (action.type) {
+        case 'show':      return { tempResult: action.result, copied: false };
+        case 'clear':     return { tempResult: null, copied: false };
+        case 'setCopied': return { ...state, copied: action.value };
+        default:          return state;
+    }
+}
+
 export default function UsersManager() {
-    const [users, setUsers] = useState([]);
-    const [tenants, setTenants] = useState([]);
-    const [errors, setErrors] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [data, dispatchData] = useReducer(dataReducer, initialData);
+    const { users, tenants, errors, isLoading } = data;
     const [search, setSearch] = useState('');
     const [tenantFilter, setTenantFilter] = useState('');
     const [busyKey, setBusyKey] = useState(null);     // user currently being acted on
-    const [tempResult, setTempResult] = useState(null); // { user, temporary_password }
-    const [copied, setCopied] = useState(false);
+    const [tempPwd, dispatchTemp] = useReducer(tempPwdReducer, initialTempPwd);
+    const { tempResult, copied } = tempPwd;
 
     useEffect(() => {
         (async () => {
             try {
                 const res = await apiClient.get('/public/hospitals?include_inactive=false');
-                setTenants(res.data || []);
+                dispatchData({ type: 'setTenants', value: res.data || [] });
             } catch {
                 // non-fatal — picker just stays empty
             }
@@ -58,19 +80,18 @@ export default function UsersManager() {
     }, [search, tenantFilter]);
 
     const fetchUsers = async () => {
-        setIsLoading(true);
+        dispatchData({ type: 'loading' });
         try {
             const params = new URLSearchParams();
             if (search) params.set('search', search);
             if (tenantFilter) params.set('tenant_id', tenantFilter);
             params.set('limit_per_tenant', '200');
             const res = await apiClient.get(`/public/superadmin/users?${params.toString()}`);
-            setUsers(res.data.users || []);
-            setErrors(res.data.errors || []);
+            dispatchData({ type: 'loaded', users: res.data.users || [], errors: res.data.errors || [] });
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Failed to load users.');
         } finally {
-            setIsLoading(false);
+            dispatchData({ type: 'done' });
         }
     };
 
@@ -81,8 +102,7 @@ export default function UsersManager() {
         setBusyKey(keyOf(u));
         try {
             const res = await apiClient.post(`/public/superadmin/users/${u.tenant_id}/${u.user_id}/reset-password`, {});
-            setTempResult({ user: u, temporary_password: res.data.temporary_password });
-            setCopied(false);
+            dispatchTemp({ type: 'show', result: { user: u, temporary_password: res.data.temporary_password } });
             toast.success('Temporary password issued.');
             fetchUsers();
         } catch (e) {
@@ -114,8 +134,8 @@ export default function UsersManager() {
     const copyTemp = async () => {
         try {
             await navigator.clipboard.writeText(tempResult.temporary_password);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            dispatchTemp({ type: 'setCopied', value: true });
+            setTimeout(() => dispatchTemp({ type: 'setCopied', value: false }), 2000);
         } catch {
             toast.error('Copy failed — select and copy manually.');
         }
@@ -315,14 +335,14 @@ export default function UsersManager() {
             {/* One-time temp-password reveal modal */}
             {tempResult && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="temp-pw-title">
-                    <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setTempResult(null)} aria-hidden="true" />
+                    <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => dispatchTemp({ type: 'clear' })} aria-hidden="true" />
                     <div className="relative w-full max-w-md bg-white dark:bg-ink-900 rounded-2xl shadow-elevated border border-ink-200 dark:border-ink-800 p-6 animate-slide-up">
                         <div className="flex items-start justify-between gap-3 mb-4">
                             <div className="flex items-center gap-2">
                                 <span className="inline-flex items-center justify-center size-9 rounded-xl bg-accent-100 text-accent-700 dark:bg-accent-500/10 dark:text-accent-300"><KeyRound size={18} aria-hidden="true" /></span>
                                 <h2 id="temp-pw-title" className="text-base font-semibold text-ink-900 dark:text-white">Temporary password</h2>
                             </div>
-                            <button type="button" onClick={() => setTempResult(null)} aria-label="Close"
+                            <button type="button" onClick={() => dispatchTemp({ type: 'clear' })} aria-label="Close"
                                 className="p-2 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-lg cursor-pointer">
                                 <X size={18} aria-hidden="true" />
                             </button>
@@ -341,7 +361,7 @@ export default function UsersManager() {
                         <div className="mt-4 bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-200 rounded-xl p-3 text-2xs flex items-start gap-2">
                             <ShieldAlert size={13} className="shrink-0 mt-0.5" aria-hidden="true" /> Don’t send this over an insecure channel. It won’t be shown again.
                         </div>
-                        <button type="button" onClick={() => setTempResult(null)} className="btn-primary w-full mt-5">Done</button>
+                        <button type="button" onClick={() => dispatchTemp({ type: 'clear' })} className="btn-primary w-full mt-5">Done</button>
                     </div>
                 </div>
             )}

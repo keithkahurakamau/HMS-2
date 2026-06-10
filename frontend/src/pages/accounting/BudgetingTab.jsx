@@ -1,6 +1,6 @@
 /* Budgeting — create budgets, edit per-account/period amounts on a grid,
  * and compare against posted actuals. Backed by /api/accounting/budgets. */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useReducer, useRef, useState } from 'react';
 import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import { Target, BarChart3, Pencil } from 'lucide-react';
@@ -130,26 +130,40 @@ function BudgetModal({ onClose, onSaved }) {
     );
 }
 
+// The loaded budget + its reference data (accounts, periods) + loading flag are
+// one logical unit, fetched together by load().
+const initialBudgetDetail = { budget: null, accounts: [], periods: [], loading: true };
+function budgetDetailReducer(state, action) {
+    switch (action.type) {
+        case 'start':     return { ...state, loading: true };
+        case 'setBudget': return { ...state, budget: action.value };
+        case 'setRefData': return { ...state, accounts: action.accounts, periods: action.periods };
+        case 'done':      return { ...state, loading: false };
+        default:          return state;
+    }
+}
+
 function BudgetDetail({ budgetId, onBack }) {
     const [view, setView] = useState('plan'); // plan | actual
-    const [budget, setBudget] = useState(null);
-    const [accounts, setAccounts] = useState([]);
-    const [periods, setPeriods] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [detail, dispatch] = useReducer(budgetDetailReducer, initialBudgetDetail);
+    const { budget, accounts, periods, loading } = detail;
 
     const load = async () => {
-        setLoading(true);
+        dispatch({ type: 'start' });
         try {
             const b = await apiClient.get(`/accounting/budgets/${budgetId}`);
-            setBudget(b.data);
+            dispatch({ type: 'setBudget', value: b.data });
             const [acc, per] = await Promise.all([
                 apiClient.get('/accounting/accounts?include_inactive=false'),
                 apiClient.get(`/accounting/fiscal-periods?year=${b.data.fiscal_year}`),
             ]);
-            setAccounts((acc.data || []).filter(a => a.is_postable));
-            setPeriods((per.data || []).sort((x, y) => x.month - y.month));
+            dispatch({
+                type: 'setRefData',
+                accounts: (acc.data || []).filter(a => a.is_postable),
+                periods: (per.data || []).sort((x, y) => x.month - y.month),
+            });
         } catch { toast.error('Could not load budget.'); }
-        finally { setLoading(false); }
+        finally { dispatch({ type: 'done' }); }
     };
     useEffect(() => { load(); }, [budgetId]);
 

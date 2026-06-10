@@ -1,29 +1,42 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useReducer, useState, useCallback } from 'react';
 import { Building2, Plus, Search, Trash2, Edit3, X, UserCheck, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
 
+// Departments + staff list + loading flag are loaded together by fetchAll.
+const initialDepts = { departments: [], staff: [], loading: true };
+function deptsReducer(state, action) {
+    switch (action.type) {
+        case 'start':  return { ...state, loading: true };
+        case 'loaded': return { ...state, departments: action.departments, staff: action.staff };
+        case 'done':   return { ...state, loading: false };
+        default:       return state;
+    }
+}
+
 export default function DepartmentsManager() {
-    const [departments, setDepartments] = useState([]);
-    const [staff, setStaff] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [data, dispatch] = useReducer(deptsReducer, initialDepts);
+    const { departments, staff, loading } = data;
 
     const [editing, setEditing] = useState(null); // null | 'new' | dept object
     const [search, setSearch] = useState('');
 
     const fetchAll = useCallback(async () => {
-        setLoading(true);
+        dispatch({ type: 'start' });
         try {
             const [dRes, sRes] = await Promise.all([
                 apiClient.get('/messaging/departments'),
                 apiClient.get('/admin/users'),
             ]);
-            setDepartments(dRes.data || []);
-            setStaff((sRes.data || []).filter((u) => u.is_active));
+            dispatch({
+                type: 'loaded',
+                departments: dRes.data || [],
+                staff: (sRes.data || []).filter((u) => u.is_active),
+            });
         } catch {
             toast.error('Could not load departments.');
         } finally {
-            setLoading(false);
+            dispatch({ type: 'done' });
         }
     }, []);
 
@@ -137,21 +150,33 @@ export default function DepartmentsManager() {
 }
 
 
+// The editable department form (name + description + member set) is one unit.
+const initDeptForm = (dept) => ({
+    name: dept?.name || '',
+    description: dept?.description || '',
+    memberIds: new Set((dept?.members || []).map((m) => m.user_id)),
+});
+function deptFormReducer(state, action) {
+    switch (action.type) {
+        case 'setName':        return { ...state, name: action.value };
+        case 'setDescription': return { ...state, description: action.value };
+        case 'toggleMember': {
+            const next = new Set(state.memberIds);
+            if (next.has(action.uid)) next.delete(action.uid); else next.add(action.uid);
+            return { ...state, memberIds: next };
+        }
+        default: return state;
+    }
+}
+
 function DepartmentEditor({ dept, staff, onClose, onSaved }) {
     const isNew = !dept;
-    const [name, setName] = useState(dept?.name || '');
-    const [description, setDescription] = useState(dept?.description || '');
-    const [memberIds, setMemberIds] = useState(new Set((dept?.members || []).map((m) => m.user_id)));
+    const [form, dispatch] = useReducer(deptFormReducer, dept, initDeptForm);
+    const { name, description, memberIds } = form;
     const [search, setSearch] = useState('');
     const [busy, setBusy] = useState(false);
 
-    const toggle = (uid) => {
-        setMemberIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(uid)) next.delete(uid); else next.add(uid);
-            return next;
-        });
-    };
+    const toggle = (uid) => dispatch({ type: 'toggleMember', uid });
 
     const save = async () => {
         if (!name.trim()) { toast.error('Department needs a name.'); return; }
@@ -215,7 +240,7 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
                         <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Name</label>
                         <input
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={(e) => dispatch({ type: 'setName', value: e.target.value })}
                             placeholder="e.g. ICU Day Shift"
                             className="w-full px-4 py-2.5 border border-slate-200 dark:border-ink-800 dark:bg-ink-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
                         />
@@ -224,7 +249,7 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
                         <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Description</label>
                         <textarea
                             value={description}
-                            onChange={(e) => setDescription(e.target.value)}
+                            onChange={(e) => dispatch({ type: 'setDescription', value: e.target.value })}
                             rows={2}
                             placeholder="Why this department exists, who should be in it…"
                             className="w-full px-4 py-2.5 border border-slate-200 dark:border-ink-800 dark:bg-ink-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"

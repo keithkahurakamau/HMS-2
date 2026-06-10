@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import { apiClient } from '../api/client';
 import {
     Settings as SettingsIcon, Building2, Clock, Wallet, TestTube, Radio,
@@ -28,26 +28,47 @@ const CATEGORY_META = {
     privacy: { label: 'Privacy & compliance', icon: Shield, accent: 'rose' },
 };
 
+// The settings catalogue + its loading flag are one logical unit.
+const initialLoad = { categories: [], isLoading: true };
+function loadReducer(state, action) {
+    switch (action.type) {
+        case 'loading':       return { ...state, isLoading: true };
+        case 'setCategories': return { ...state, categories: action.value };
+        case 'done':          return { ...state, isLoading: false };
+        default:              return state;
+    }
+}
+
+// The "add a custom setting" modal: its visibility + the draft fields.
+const blankCustom = { category: '', key: '', label: '', description: '', data_type: 'string', value: '' };
+const initialCustomForm = { show: false, draft: blankCustom };
+function customFormReducer(state, action) {
+    switch (action.type) {
+        case 'open':     return { ...state, show: true };
+        case 'close':    return { ...state, show: false };
+        case 'setField': return { ...state, draft: { ...state.draft, [action.field]: action.value } };
+        case 'reset':    return { show: false, draft: blankCustom };
+        default:         return state;
+    }
+}
+
 export default function Settings() {
     const { restartAll } = useJourney();
-    const [categories, setCategories] = useState([]);
+    const [load, dispatchLoad] = useReducer(loadReducer, initialLoad);
+    const { categories, isLoading } = load;
     const [drafts, setDrafts] = useState({});       // {setting_id: new value}
     const [saving, setSaving] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
     const [activeCategory, setActiveCategory] = useState(null);
-    const [showCustomForm, setShowCustomForm] = useState(false);
-    const [customDraft, setCustomDraft] = useState({
-        category: '', key: '', label: '', description: '',
-        data_type: 'string', value: '',
-    });
+    const [customForm, dispatchCustom] = useReducer(customFormReducer, initialCustomForm);
+    const { show: showCustomForm, draft: customDraft } = customForm;
 
     useEffect(() => { fetchSettings(); }, []);
 
     const fetchSettings = async () => {
-        setIsLoading(true);
+        dispatchLoad({ type: 'loading' });
         try {
             const res = await apiClient.get('/settings/');
-            setCategories(res.data.categories || []);
+            dispatchLoad({ type: 'setCategories', value: res.data.categories || [] });
             if (!activeCategory && (res.data.categories || []).length > 0) {
                 setActiveCategory(res.data.categories[0].key);
             }
@@ -55,7 +76,7 @@ export default function Settings() {
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Failed to load settings.');
         } finally {
-            setIsLoading(false);
+            dispatchLoad({ type: 'done' });
         }
     };
 
@@ -99,9 +120,10 @@ export default function Settings() {
             toast('Nothing to save', { icon: 'ℹ️' });
             return;
         }
-        const updates = allItems
-            .filter(i => i.setting_id in drafts)
-            .map(i => ({ category: i._cat, key: i.key, value: drafts[i.setting_id], data_type: i.data_type }));
+        const updates = allItems.flatMap(i =>
+            i.setting_id in drafts
+                ? [{ category: i._cat, key: i.key, value: drafts[i.setting_id], data_type: i.data_type }]
+                : []);
 
         setSaving(true);
         try {
@@ -122,8 +144,7 @@ export default function Settings() {
         try {
             await apiClient.put('/settings/', customDraft);
             toast.success('Custom setting added.');
-            setShowCustomForm(false);
-            setCustomDraft({ category: '', key: '', label: '', description: '', data_type: 'string', value: '' });
+            dispatchCustom({ type: 'reset' });
             await fetchSettings();
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Failed to add setting.');
@@ -149,7 +170,7 @@ export default function Settings() {
                             <Sparkles size={15} /> Replay tours
                         </button>
                         <button onClick={fetchSettings} className="btn-secondary cursor-pointer"><RefreshCcw size={15} /> Refresh</button>
-                        <button data-tour="settings-custom" onClick={() => setShowCustomForm(true)} className="btn-secondary cursor-pointer"><Plus size={15} /> Custom setting</button>
+                        <button data-tour="settings-custom" onClick={() => dispatchCustom({ type: 'open' })} className="btn-secondary cursor-pointer"><Plus size={15} /> Custom setting</button>
                         <button data-tour="settings-save" onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50 cursor-pointer">
                             {saving ? <Activity size={15} className="animate-spin" /> : <Save size={15} />} Save changes ({dirtyIds.length})
                         </button>
@@ -244,11 +265,11 @@ export default function Settings() {
 
             {showCustomForm && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setShowCustomForm(false)} />
+                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => dispatchCustom({ type: 'close' })} />
                     <div className="relative w-full max-w-lg bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <h2 className="text-lg font-semibold dark:text-white flex items-center gap-2"><Plus size={18} /> Add custom setting</h2>
-                            <button onClick={() => setShowCustomForm(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full cursor-pointer">
+                            <button onClick={() => dispatchCustom({ type: 'close' })} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full cursor-pointer">
                                 <X size={20} aria-hidden="true" />
                             </button>
                         </div>
@@ -257,30 +278,30 @@ export default function Settings() {
                                 <div>
                                     <label className="label">Category *</label>
                                     <input className="input" value={customDraft.category}
-                                           onChange={e => setCustomDraft({ ...customDraft, category: e.target.value })}
+                                           onChange={e => dispatchCustom({ type: 'setField', field: 'category', value: e.target.value })}
                                            placeholder="e.g. integrations" />
                                 </div>
                                 <div>
                                     <label className="label">Key *</label>
                                     <input className="input" value={customDraft.key}
-                                           onChange={e => setCustomDraft({ ...customDraft, key: e.target.value })}
+                                           onChange={e => dispatchCustom({ type: 'setField', field: 'key', value: e.target.value })}
                                            placeholder="e.g. slack_webhook" />
                                 </div>
                             </div>
                             <div>
                                 <label className="label">Display label</label>
                                 <input className="input" value={customDraft.label}
-                                       onChange={e => setCustomDraft({ ...customDraft, label: e.target.value })} />
+                                       onChange={e => dispatchCustom({ type: 'setField', field: 'label', value: e.target.value })} />
                             </div>
                             <div>
                                 <label className="label">Description</label>
                                 <textarea rows="2" className="input resize-none" value={customDraft.description}
-                                          onChange={e => setCustomDraft({ ...customDraft, description: e.target.value })} />
+                                          onChange={e => dispatchCustom({ type: 'setField', field: 'description', value: e.target.value })} />
                             </div>
                             <div>
                                 <label className="label">Type</label>
                                 <select className="input" value={customDraft.data_type}
-                                        onChange={e => setCustomDraft({ ...customDraft, data_type: e.target.value })}>
+                                        onChange={e => dispatchCustom({ type: 'setField', field: 'data_type', value: e.target.value })}>
                                     <option value="string">string</option>
                                     <option value="number">number</option>
                                     <option value="boolean">boolean</option>
@@ -290,11 +311,11 @@ export default function Settings() {
                             <div>
                                 <label className="label">Initial value</label>
                                 <input className="input" value={customDraft.value}
-                                       onChange={e => setCustomDraft({ ...customDraft, value: e.target.value })} />
+                                       onChange={e => dispatchCustom({ type: 'setField', field: 'value', value: e.target.value })} />
                             </div>
                         </div>
                         <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0">
-                            <button onClick={() => setShowCustomForm(false)} className="btn-secondary">Cancel</button>
+                            <button onClick={() => dispatchCustom({ type: 'close' })} className="btn-secondary">Cancel</button>
                             <button onClick={saveCustom} className="btn-primary"><Save size={15} /> Add setting</button>
                         </div>
                     </div>

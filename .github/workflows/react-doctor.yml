@@ -1,0 +1,62 @@
+# React Doctor — scans every PR for React health regressions (security,
+# performance, correctness, accessibility, architecture).
+#
+# This is a RATCHET, not a backlog gate. It runs with `--diff`, so it only
+# inspects the files a PR actually changes — the ~990 pre-existing findings in
+# the codebase do NOT block merges. The goal is to stop NEW issues from landing
+# while the existing ones are paid down incrementally.
+#
+# `--blocking error` fails the check only on error-severity findings for now.
+# Once the warning backlog is down, tighten the gate by switching to
+# `--blocking warning`. Until then warnings are printed (advisory) but green.
+#
+# Used in production CI by teams at PayPal, Rippling, and Alibaba.
+# Setup guide: https://react.doctor/ci
+
+name: React Doctor
+
+on:
+  pull_request:
+    branches: [development, beta, main]
+
+concurrency:
+  group: react-doctor-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only: the job checks out code and scans it, nothing else.
+permissions:
+  contents: read
+
+jobs:
+  react-doctor:
+    name: react-doctor (changed files)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so --diff can compute the merge-base against the
+          # PR's target branch.
+          fetch-depth: 0
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Scan changed files
+        run: >-
+          npx -y react-doctor@latest
+          --diff origin/${{ github.base_ref }}
+          --blocking error
+          --verbose
+          --no-telemetry
