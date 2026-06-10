@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useReducer, useRef, useState, useCallback } from 'react';
 import {
     MessageSquare, Search, Send, Plus, Users, Building2, User as UserIcon,
     Hash, X, Activity,
@@ -43,16 +43,28 @@ function isValidWsEvent(raw) {
     return true;
 }
 
+// The active-thread view — loaded messages, the compose draft, and the
+// send-in-flight flag — moves together, so it lives in one reducer.
+const initialThread = { messages: [], draft: '', sending: false };
+function threadReducer(state, action) {
+    switch (action.type) {
+        case 'setMessages':   return { ...state, messages: action.value };
+        case 'appendMessage': return { ...state, messages: [...state.messages, action.message] };
+        case 'setDraft':      return { ...state, draft: action.value };
+        case 'setSending':    return { ...state, sending: action.value };
+        default:              return state;
+    }
+}
+
 export default function Messages() {
     const { user } = useAuth();
     const me = user?.user_id;
 
     const [conversations, setConversations] = useState([]);
     const [activeId, setActiveId] = useState(null);
-    const [messages, setMessages] = useState([]);
-    const [draft, setDraft] = useState('');
     const [loadingList, setLoadingList] = useState(true);
-    const [sending, setSending] = useState(false);
+    const [thread, dispatchThread] = useReducer(threadReducer, initialThread);
+    const { messages, draft, sending } = thread;
 
     const [picker, setPicker] = useState(null); // 'direct' | 'group' | null
     const messagesEndRef = useRef(null);
@@ -74,7 +86,7 @@ export default function Messages() {
         if (!id) return;
         try {
             const res = await apiClient.get(`/messaging/conversations/${id}/messages`);
-            setMessages(res.data || []);
+            dispatchThread({ type: 'setMessages', value: res.data || [] });
             // Mark as read after the panel renders the messages.
             await apiClient.post(`/messaging/conversations/${id}/read`).catch(() => {});
             // Optimistically zero the badge for this conversation.
@@ -117,7 +129,7 @@ export default function Messages() {
                     created_at: evt.message.created_at,
                 };
                 if (cid === activeId) {
-                    setMessages((prev) => [...prev, safeMsg]);
+                    dispatchThread({ type: 'appendMessage', message: safeMsg });
                     apiClient.post(`/messaging/conversations/${cid}/read`).catch(() => {});
                 }
                 fetchConversations();
@@ -143,19 +155,19 @@ export default function Messages() {
         e?.preventDefault?.();
         const body = draft.trim();
         if (!body || !activeId || sending) return;
-        setSending(true);
+        dispatchThread({ type: 'setSending', value: true });
         try {
             const res = await apiClient.post(
                 `/messaging/conversations/${activeId}/messages`,
                 { body }
             );
-            setMessages((prev) => [...prev, res.data]);
-            setDraft('');
+            dispatchThread({ type: 'appendMessage', message: res.data });
+            dispatchThread({ type: 'setDraft', value: '' });
             fetchConversations();
         } catch (err) {
             toast.error(err.response?.data?.detail || 'Could not send.');
         } finally {
-            setSending(false);
+            dispatchThread({ type: 'setSending', value: false });
         }
     };
 
@@ -335,7 +347,7 @@ export default function Messages() {
                         >
                             <input
                                 value={draft}
-                                onChange={(e) => setDraft(e.target.value)}
+                                onChange={(e) => dispatchThread({ type: 'setDraft', value: e.target.value })}
                                 placeholder="Type a message…"
                                 className="flex-1 px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-ink-800 text-sm text-ink-900 dark:text-white placeholder-ink-400 border border-transparent focus:border-brand-300 focus:bg-white dark:focus:bg-ink-900 outline-none transition-colors"
                                 maxLength={4000}
@@ -370,11 +382,31 @@ export default function Messages() {
 }
 
 
+// The conversation being composed (picked members + optional group title) is
+// one logical unit.
+const initialNewConv = { selected: [], title: '' };
+function newConvReducer(state, action) {
+    switch (action.type) {
+        case 'replaceSelected': return { ...state, selected: action.value };
+        case 'toggleSelected': {
+            const exists = state.selected.find((p) => p.user_id === action.user.user_id);
+            return {
+                ...state,
+                selected: exists
+                    ? state.selected.filter((p) => p.user_id !== action.user.user_id)
+                    : [...state.selected, action.user],
+            };
+        }
+        case 'setTitle': return { ...state, title: action.value };
+        default:         return state;
+    }
+}
+
 function NewConversationModal({ kind, onClose, onCreated }) {
     const [search, setSearch] = useState('');
     const [staff, setStaff] = useState([]);
-    const [selected, setSelected] = useState([]);
-    const [title, setTitle] = useState('');
+    const [convForm, dispatch] = useReducer(newConvReducer, initialNewConv);
+    const { selected, title } = convForm;
     const [busy, setBusy] = useState(false);
 
     useEffect(() => {
@@ -392,13 +424,9 @@ function NewConversationModal({ kind, onClose, onCreated }) {
 
     const toggle = (u) => {
         if (kind === 'direct') {
-            setSelected([u]);
+            dispatch({ type: 'replaceSelected', value: [u] });
         } else {
-            setSelected((prev) =>
-                prev.find((p) => p.user_id === u.user_id)
-                    ? prev.filter((p) => p.user_id !== u.user_id)
-                    : [...prev, u]
-            );
+            dispatch({ type: 'toggleSelected', user: u });
         }
     };
 
@@ -449,7 +477,7 @@ function NewConversationModal({ kind, onClose, onCreated }) {
                     {kind === 'group' && (
                         <input
                             value={title}
-                            onChange={(e) => setTitle(e.target.value)}
+                            onChange={(e) => dispatch({ type: 'setTitle', value: e.target.value })}
                             placeholder="Group name (e.g. Cardiology Sync)"
                             className="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-ink-800 text-sm border border-transparent focus:border-brand-300 outline-none"
                             maxLength={255}

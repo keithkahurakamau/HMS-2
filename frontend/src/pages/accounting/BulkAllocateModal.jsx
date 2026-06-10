@@ -1,18 +1,33 @@
 /* Bulk-allocate one client deposit across many claim-schedule items in a
  * single all-or-nothing transaction. Backed by
  * POST /api/accounting/debtors/deposits/{id}/allocate-bulk. */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import { ModalShell, ModalActions, Field } from './ui';
 import { formatAmount } from './format';
 
+// The editable form is one logical unit (per-item amounts + a notes field),
+// so it lives in a single reducer rather than separate useState slices — one
+// dispatch = one render, and the transitions are testable in isolation.
+const initialForm = { amounts: {}, notes: '' }; // amounts: item_id → string
+function formReducer(state, action) {
+    switch (action.type) {
+        case 'setAmount':
+            return { ...state, amounts: { ...state.amounts, [action.id]: action.value } };
+        case 'setNotes':
+            return { ...state, notes: action.value };
+        default:
+            return state;
+    }
+}
+
 export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
     const available = Number(deposit.amount) - Number(deposit.amount_applied || 0);
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [amounts, setAmounts] = useState({}); // item_id → string
-    const [notes, setNotes] = useState('');
+    const [form, dispatch] = useReducer(formReducer, initialForm);
+    const { amounts, notes } = form;
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -45,19 +60,21 @@ export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
     );
     const remainingDeposit = available - total;
 
-    const setAmount = (id, val) => setAmounts(prev => ({ ...prev, [id]: val }));
+    const setAmount = (id, val) => dispatch({ type: 'setAmount', id, value: val });
 
     const submit = async () => {
-        const allocations = Object.entries(amounts)
-            .filter(([, v]) => Number(v) > 0)
-            .map(([id, v]) => ({ item_id: Number(id), amount: Number(v) }));
+        const allocations = Object.entries(amounts).reduce((acc, [id, v]) => {
+            if (Number(v) > 0) acc.push({ item_id: Number(id), amount: Number(v) });
+            return acc;
+        }, []);
         if (allocations.length === 0) { toast.error('Enter at least one allocation.'); return; }
         if (total > available + 1e-9) {
             toast.error(`Allocations exceed available ${formatAmount(available)}.`); return;
         }
         // Per-item over-allocation guard (server enforces too).
+        const byItemId = new Map(items.map(i => [i.item_id, i]));
         for (const a of allocations) {
-            const item = items.find(i => i.item_id === a.item_id);
+            const item = byItemId.get(a.item_id);
             if (item && a.amount > item.remaining + 1e-9) {
                 toast.error(`Item ${item.schedule_number} #${item.item_id}: max ${formatAmount(item.remaining)}.`);
                 return;
@@ -126,7 +143,7 @@ export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
             <div className="mt-3">
                 <Field label="Notes">
                     <textarea className="input min-h-[50px]" value={notes}
-                              onChange={(e) => setNotes(e.target.value)} />
+                              onChange={(e) => dispatch({ type: 'setNotes', value: e.target.value })} />
                 </Field>
             </div>
             <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Allocate" />
