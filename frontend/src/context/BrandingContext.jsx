@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, use, useEffect, useState, useCallback, useMemo } from 'react';
 import { apiClient } from '../api/client';
 
 /**
@@ -133,4 +133,4 @@ export function BrandingProvider({ children }) {
     return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;
 }
 
-export const useBranding = () => useContext(BrandingContext);
+export const useBranding = () => use(BrandingContext);

@@ -154,10 +154,10 @@ export default function Appointments() {
                 subtitle="Schedule, confirm, and manage clinic appointments."
                 actions={
                     <>
-                        <button data-tour="appt-refresh" onClick={fetchAppointments} className="btn-secondary cursor-pointer" aria-label="Reload appointments">
+                        <button type="button" data-tour="appt-refresh" onClick={fetchAppointments} className="btn-secondary cursor-pointer" aria-label="Reload appointments">
                             <RefreshCw size={15} /> Refresh
                         </button>
-                        <button data-tour="appt-new" onClick={() => setIsFormOpen(true)} className="btn-primary cursor-pointer">
+                        <button type="button" data-tour="appt-new" onClick={() => setIsFormOpen(true)} className="btn-primary cursor-pointer">
                             <Plus size={15} /> New appointment
                         </button>
                     </>
@@ -235,17 +235,17 @@ export default function Appointments() {
                                             {appt.status !== 'Completed' && appt.status !== 'Cancelled' && (
                                                 <div data-tour="appt-actions" className="flex flex-wrap gap-1.5 mt-3">
                                                     {appt.status === 'Scheduled' && (
-                                                        <button onClick={() => updateStatus(appt.appointment_id, 'Confirmed')} className="text-xs font-semibold px-2.5 py-1 bg-accent-50 dark:bg-accent-500/10 text-accent-700 dark:text-accent-300 rounded-lg ring-1 ring-accent-100 dark:ring-accent-500/20 hover:bg-accent-100 dark:hover:bg-accent-500/20 transition-colors">
+                                                        <button type="button" onClick={() => updateStatus(appt.appointment_id, 'Confirmed')} className="text-xs font-semibold px-2.5 py-1 bg-accent-50 dark:bg-accent-500/10 text-accent-700 dark:text-accent-300 rounded-lg ring-1 ring-accent-100 dark:ring-accent-500/20 hover:bg-accent-100 dark:hover:bg-accent-500/20 transition-colors">
                                                             <CheckCircle2 size={12} className="inline mr-1" /> Confirm
                                                         </button>
                                                     )}
-                                                    <button onClick={() => updateStatus(appt.appointment_id, 'Completed')} className="text-xs font-semibold px-2.5 py-1 bg-ink-100 dark:bg-ink-800/40 text-ink-700 dark:text-ink-200 rounded-lg ring-1 ring-ink-200 dark:ring-ink-800 hover:bg-ink-200 dark:hover:bg-ink-800/50 transition-colors">
+                                                    <button type="button" onClick={() => updateStatus(appt.appointment_id, 'Completed')} className="text-xs font-semibold px-2.5 py-1 bg-ink-100 dark:bg-ink-800/40 text-ink-700 dark:text-ink-200 rounded-lg ring-1 ring-ink-200 dark:ring-ink-800 hover:bg-ink-200 dark:hover:bg-ink-800/50 transition-colors">
                                                         Mark completed
                                                     </button>
-                                                    <button onClick={() => updateStatus(appt.appointment_id, 'No-Show')} className="text-xs font-semibold px-2.5 py-1 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-lg ring-1 ring-amber-100 dark:ring-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors">
+                                                    <button type="button" onClick={() => updateStatus(appt.appointment_id, 'No-Show')} className="text-xs font-semibold px-2.5 py-1 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-lg ring-1 ring-amber-100 dark:ring-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors">
                                                         No-show
                                                     </button>
-                                                    <button onClick={() => cancel(appt.appointment_id)} className="text-xs font-semibold px-2.5 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 rounded-lg ring-1 ring-rose-100 dark:ring-rose-500/20 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
+                                                    <button type="button" onClick={() => cancel(appt.appointment_id)} className="text-xs font-semibold px-2.5 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 rounded-lg ring-1 ring-rose-100 dark:ring-rose-500/20 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
                                                         <XCircle size={12} className="inline mr-1" /> Cancel
                                                     </button>
                                                 </div>
@@ -266,7 +266,7 @@ export default function Appointments() {
                             <h2 className="font-semibold text-ink-900 dark:text-white flex items-center gap-2 tracking-tight">
                                 <CalendarDays size={18} className="text-brand-600" /> New appointment
                             </h2>
-                            <button onClick={() => setIsFormOpen(false)} aria-label="Close dialog" className="p-2 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition-colors">
+                            <button type="button" onClick={() => setIsFormOpen(false)} aria-label="Close dialog" className="p-2 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition-colors">
                                 <X size={18} />
                             </button>
                         </div>
@@ -291,6 +291,7 @@ export default function Appointments() {
                             </div>
                             <div>
                                 <label htmlFor="appt-datetime" className="label">Date &amp; time</label>
+                                {/* react-doctor-disable-next-line react-doctor/rendering-hydration-mismatch-time */}
                                 <input id="appt-datetime" type="datetime-local" required value={form.appointment_date} onChange={(e) => setForm({ ...form, appointment_date: e.target.value })} className="input" min={new Date().toISOString().slice(0, 16)} />
                             </div>
                             <div>

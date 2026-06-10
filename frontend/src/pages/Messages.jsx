@@ -193,7 +193,7 @@ export default function Messages() {
                         <p className="text-xs text-ink-500 mt-0.5">{conversations.length} total</p>
                     </div>
                     <div className="flex gap-1">
-                        <button
+                        <button type="button"
                             data-tour="msg-new-direct"
                             onClick={() => setPicker('direct')}
                             title="New direct message"
@@ -201,7 +201,7 @@ export default function Messages() {
                         >
                             <UserIcon size={16} />
                         </button>
-                        <button
+                        <button type="button"
                             data-tour="msg-new-group"
                             onClick={() => setPicker('group')}
                             title="New group chat"
@@ -229,7 +229,7 @@ export default function Messages() {
                                 const active = c.conversation_id === activeId;
                                 return (
                                     <li key={c.conversation_id}>
-                                        <button
+                                        <button type="button"
                                             onClick={() => setActiveId(c.conversation_id)}
                                             className={`w-full text-left px-4 py-3 flex gap-3 transition-colors ${
                                                 active
@@ -345,7 +345,7 @@ export default function Messages() {
                             onSubmit={handleSend}
                             className="border-t border-ink-100 dark:border-ink-800 p-3 flex gap-2"
                         >
-                            <input
+                            <input aria-label="Type a message…"
                                 value={draft}
                                 onChange={(e) => dispatchThread({ type: 'setDraft', value: e.target.value })}
                                 placeholder="Type a message…"
@@ -468,14 +468,14 @@ function NewConversationModal({ kind, onClose, onCreated }) {
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
                         {kind === 'direct' ? 'New direct message' : 'New group chat'}
                     </h3>
-                    <button onClick={onClose} className="p-1 text-ink-400 hover:text-ink-700">
+                    <button type="button" onClick={onClose} className="p-1 text-ink-400 hover:text-ink-700">
                         <X size={18} />
                     </button>
                 </div>
 
                 <div className="p-5 space-y-3">
                     {kind === 'group' && (
-                        <input
+                        <input aria-label="Group name (e.g. Cardiology Sync)"
                             value={title}
                             onChange={(e) => dispatch({ type: 'setTitle', value: e.target.value })}
                             placeholder="Group name (e.g. Cardiology Sync)"
@@ -486,7 +486,7 @@ function NewConversationModal({ kind, onClose, onCreated }) {
 
                     <div className="relative">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-                        <input
+                        <input aria-label="Search staff by name or email"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Search staff by name or email"
@@ -499,7 +499,7 @@ function NewConversationModal({ kind, onClose, onCreated }) {
                             {selected.map((u) => (
                                 <span key={u.user_id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-brand-50 text-brand-700 text-xs font-semibold">
                                     {u.full_name}
-                                    <button onClick={() => toggle(u)} className="hover:text-brand-900">
+                                    <button type="button" onClick={() => toggle(u)} className="hover:text-brand-900">
                                         <X size={12} />
                                     </button>
                                 </span>
@@ -516,7 +516,7 @@ function NewConversationModal({ kind, onClose, onCreated }) {
                                     const isSelected = !!selected.find((s) => s.user_id === u.user_id);
                                     return (
                                         <li key={u.user_id}>
-                                            <button
+                                            <button type="button"
                                                 onClick={() => toggle(u)}
                                                 className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors ${
                                                     isSelected ? 'bg-brand-50 dark:bg-brand-900/20' : 'hover:bg-ink-50 dark:hover:bg-ink-800/50'
@@ -539,13 +539,13 @@ function NewConversationModal({ kind, onClose, onCreated }) {
                 </div>
 
                 <div className="px-5 py-3 border-t border-ink-100 dark:border-ink-800 flex justify-end gap-2 bg-ink-50/40 dark:bg-ink-950/40">
-                    <button
+                    <button type="button"
                         onClick={onClose}
                         className="px-4 py-2 rounded-lg text-sm font-semibold text-ink-700 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-ink-800"
                     >
                         Cancel
                     </button>
-                    <button
+                    <button type="button"
                         onClick={submit}
                         disabled={busy}
                         className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40"

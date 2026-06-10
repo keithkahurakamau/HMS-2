@@ -156,7 +156,7 @@ export default function Wards() {
                 title="Ward & Bed Management"
                 subtitle="Monitor hospital capacity, manage admissions, and track clinical inventory."
                 actions={
-                    <button data-tour="ward-admit" onClick={() => setIsAdmitModalOpen(true)} className="btn-primary cursor-pointer">
+                    <button type="button" data-tour="ward-admit" onClick={() => setIsAdmitModalOpen(true)} className="btn-primary cursor-pointer">
                         <UserPlus size={16} /> Admit patient
                     </button>
                 }
@@ -255,7 +255,7 @@ export default function Wards() {
             {/* ADMISSION MODAL */}
             {isAdmitModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsAdmitModalOpen(false)}></div>
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsAdmitModalOpen(false)} />
                     <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-brand-600 to-brand-700 text-white shrink-0">
                             <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-200">New admission</span>
@@ -267,8 +267,8 @@ export default function Wards() {
                             <form id="admitForm" onSubmit={handleAdmit}>
                                 <div className="card p-5 space-y-4">
                                     <div>
-                                        <label className="label">Select patient</label>
-                                        <select required value={admitForm.patient_id} onChange={(e) => setAdmitForm({...admitForm, patient_id: e.target.value})} className="input">
+                                        <label htmlFor="wards-select-patient" className="label">Select patient</label>
+                                        <select id="wards-select-patient" required value={admitForm.patient_id} onChange={(e) => setAdmitForm({...admitForm, patient_id: e.target.value})} className="input">
                                             <option value="">Choose a registered patient…</option>
                                             {patients.map(p => (
                                                 <option key={p.patient_id} value={p.patient_id}>
@@ -278,8 +278,8 @@ export default function Wards() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="label">Select available bed</label>
-                                        <select required value={admitForm.bed_id} onChange={(e) => setAdmitForm({...admitForm, bed_id: e.target.value})} className="input">
+                                        <label htmlFor="wards-select-available-bed" className="label">Select available bed</label>
+                                        <select id="wards-select-available-bed" required value={admitForm.bed_id} onChange={(e) => setAdmitForm({...admitForm, bed_id: e.target.value})} className="input">
                                             <option value="">Assign a bed…</option>
                                             {wards.map(ward => (
                                                 <optgroup key={ward.id} label={ward.name}>
@@ -291,8 +291,8 @@ export default function Wards() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="label">Primary diagnosis (reason for admission)</label>
-                                        <input required type="text" value={admitForm.diagnosis} onChange={(e) => setAdmitForm({...admitForm, diagnosis: e.target.value})} className="input" placeholder="e.g. Severe Malaria" />
+                                        <label htmlFor="wards-primary-diagnosis-reason-for-admission" className="label">Primary diagnosis (reason for admission)</label>
+                                        <input id="wards-primary-diagnosis-reason-for-admission" required type="text" value={admitForm.diagnosis} onChange={(e) => setAdmitForm({...admitForm, diagnosis: e.target.value})} className="input" placeholder="e.g. Severe Malaria" />
                                     </div>
                                 </div>
                             </form>
@@ -309,7 +309,7 @@ export default function Wards() {
             {/* SLIDE-OVER: INPATIENT CHART & AUDIT INVENTORY */}
             {activeBed && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setActiveBed(null)}></div>
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setActiveBed(null)} />
                     <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
 
                         <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-blue-600 to-blue-700 text-white shrink-0">
@@ -319,7 +319,7 @@ export default function Wards() {
                                     <h2 className="text-xl font-semibold mt-1 tracking-tight">{activeBed.patient}</h2>
                                     <p className="text-sm text-blue-100/90 mt-1 font-medium">{activeBed.wardName} &middot; Bed {activeBed.number}</p>
                                 </div>
-                                <button onClick={() => {setActiveBed(null); setCart([]);}} aria-label="Close" className="text-blue-100 hover:text-white p-2 hover:bg-white/10 rounded-lg"><X size={18}/></button>
+                                <button type="button" onClick={() => {setActiveBed(null); setCart([]);}} aria-label="Close" className="text-blue-100 hover:text-white p-2 hover:bg-white/10 rounded-lg"><X size={18}/></button>
                             </div>
                         </div>
 
@@ -339,8 +339,8 @@ export default function Wards() {
                                             </option>
                                         ))}
                                     </select>
-                                    <input type="number" min="1" placeholder="Qty" value={consumeQty} onChange={(e) => setConsumeQty(e.target.value)} className="input w-20" />
-                                    <button onClick={handleAddToCart} className="btn bg-ink-100 text-ink-800 hover:bg-ink-200">
+                                    <input aria-label="Qty" type="number" min="1" placeholder="Qty" value={consumeQty} onChange={(e) => setConsumeQty(e.target.value)} className="input w-20" />
+                                    <button type="button" onClick={handleAddToCart} className="btn bg-ink-100 text-ink-800 hover:bg-ink-200">
                                         <Plus size={15} /> Add
                                     </button>
                                 </div>
@@ -352,7 +352,7 @@ export default function Wards() {
                                                 <tr>
                                                     <th>Item to administer</th>
                                                     <th>Qty</th>
-                                                    <th></th>
+                                                    <th aria-label="Actions"></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -361,7 +361,7 @@ export default function Wards() {
                                                         <td className="font-medium">{item.name} <span className="text-2xs text-ink-400 block">{item.batch_number}</span></td>
                                                         <td className="font-semibold">{item.qty}</td>
                                                         <td className="text-right">
-                                                            <button onClick={() => setCart(cart.filter(c => c.batch_id !== item.batch_id))} aria-label="Remove" className="text-ink-400 hover:text-rose-600"><Trash2 size={15}/></button>
+                                                            <button type="button" onClick={() => setCart(cart.filter(c => c.batch_id !== item.batch_id))} aria-label="Remove" className="text-ink-400 hover:text-rose-600"><Trash2 size={15}/></button>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -370,7 +370,7 @@ export default function Wards() {
                                     </div>
                                 )}
 
-                                <button onClick={handleConsumeStock} disabled={cart.length === 0 || isConsuming} className="btn-success w-full">
+                                <button type="button" onClick={handleConsumeStock} disabled={cart.length === 0 || isConsuming} className="btn-success w-full">
                                     <CheckCircle2 size={16} /> {isConsuming ? 'Processing…' : 'Administer & log to audit trail'}
                                 </button>
                             </div>
@@ -379,19 +379,20 @@ export default function Wards() {
                                 <h3 className="section-eyebrow mb-4 border-b border-ink-100 pb-3">Clinical log</h3>
                                 <textarea
                                     rows="3"
+                                    aria-label="Clinical log"
                                     value={clinicalNote}
                                     onChange={(e) => setClinicalNote(e.target.value)}
                                     className="input resize-none mb-3"
                                     placeholder="Append observation parameters… (e.g. vitals, medication response, mood)"
                                 />
-                                <button onClick={handleSaveClinicalNote} disabled={isSavingNote || !clinicalNote.trim()} className="btn bg-ink-800 text-white hover:bg-ink-900 w-full disabled:opacity-50 disabled:cursor-not-allowed">
+                                <button type="button" onClick={handleSaveClinicalNote} disabled={isSavingNote || !clinicalNote.trim()} className="btn bg-ink-800 text-white hover:bg-ink-900 w-full disabled:opacity-50 disabled:cursor-not-allowed">
                                     {isSavingNote ? 'Saving…' : 'Commit observation'}
                                 </button>
                             </div>
                         </div>
 
                         <div className="p-5 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shrink-0 space-y-2">
-                            <button
+                            <button type="button"
                                 onClick={() => printAdmissionSlip({
                                     patient: { full_name: activeBed.patient, outpatient_no: activeBed.op_no, inpatient_no: activeBed.inpatient_no, age: activeBed.age, sex: activeBed.sex, blood_group: activeBed.blood_group },
                                     admission: {
@@ -408,7 +409,7 @@ export default function Wards() {
                             >
                                 <Printer size={15} /> Print admission slip
                             </button>
-                            <button onClick={handleDischarge} className="btn-danger w-full bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 shadow-none">
+                            <button type="button" onClick={handleDischarge} className="btn-danger w-full bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 shadow-none">
                                 <LogOut size={16} /> Execute discharge protocol
                             </button>
                         </div>

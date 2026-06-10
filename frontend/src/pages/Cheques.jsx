@@ -241,8 +241,8 @@ export default function Cheques() {
                 subtitle="Track every cheque from receipt through clearance — including bounces."
                 actions={
                     <>
-                        <button onClick={fetchAll} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
-                        <button onClick={openNewModal} data-tour="cheque-new" className="btn-primary cursor-pointer">
+                        <button type="button" onClick={fetchAll} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
+                        <button type="button" onClick={openNewModal} data-tour="cheque-new" className="btn-primary cursor-pointer">
                             <Plus size={15} /> {direction === 'incoming' ? 'Record cheque' : 'Issue cheque'}
                         </button>
                     </>
@@ -308,6 +308,7 @@ export default function Cheques() {
                 <div data-tour="cheque-search" className="relative flex-1 min-w-[16rem]">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                     <input type="text"
+                           aria-label="Search cheques"
                            placeholder={direction === 'incoming' ? 'Cheque #, drawer, bank…' : 'Cheque #, payee, bank…'}
                            value={search} onChange={e => setSearch(e.target.value)}
                            className="input pl-9" />
@@ -377,21 +378,21 @@ export default function Cheques() {
                                         </td>
                                         <td><span className={meta.badge}>{c.status}</span></td>
                                         <td data-tour="cheque-row-actions" className="text-right">
-                                            <button onClick={() => setActive(c)} className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded" aria-label="View">
+                                            <button type="button" onClick={() => setActive(c)} className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded" aria-label="View">
                                                 <Eye size={15} />
                                             </button>
                                             {/* Incoming actions */}
                                             {c.direction === 'incoming' && c.status === 'Received' && (
-                                                <button onClick={() => openAction(c, 'deposit')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20">
+                                                <button type="button" onClick={() => openAction(c, 'deposit')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20">
                                                     Deposit
                                                 </button>
                                             )}
                                             {c.direction === 'incoming' && c.status === 'Deposited' && (
                                                 <>
-                                                    <button onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20">
+                                                    <button type="button" onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20">
                                                         Clear
                                                     </button>
-                                                    <button onClick={() => openAction(c, 'bounce')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-rose-700 bg-rose-50 hover:bg-rose-100 dark:text-rose-300 dark:bg-rose-500/10 dark:hover:bg-rose-500/20">
+                                                    <button type="button" onClick={() => openAction(c, 'bounce')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-rose-700 bg-rose-50 hover:bg-rose-100 dark:text-rose-300 dark:bg-rose-500/10 dark:hover:bg-rose-500/20">
                                                         Bounce
                                                     </button>
                                                 </>
@@ -399,23 +400,23 @@ export default function Cheques() {
                                             {/* Outgoing actions */}
                                             {c.direction === 'outgoing' && c.status === 'Issued' && (
                                                 <>
-                                                    <button onClick={() => openAction(c, 'dispatch')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20">
+                                                    <button type="button" onClick={() => openAction(c, 'dispatch')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20">
                                                         Dispatch
                                                     </button>
-                                                    <button onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100 dark:text-orange-300 dark:bg-orange-500/10 dark:hover:bg-orange-500/20">
+                                                    <button type="button" onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100 dark:text-orange-300 dark:bg-orange-500/10 dark:hover:bg-orange-500/20">
                                                         Stop
                                                     </button>
                                                 </>
                                             )}
                                             {c.direction === 'outgoing' && c.status === 'Dispatched' && (
                                                 <>
-                                                    <button onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20">
+                                                    <button type="button" onClick={() => openAction(c, 'clear')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20">
                                                         Clear
                                                     </button>
-                                                    <button onClick={() => openAction(c, 'return')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-rose-700 bg-rose-50 hover:bg-rose-100 dark:text-rose-300 dark:bg-rose-500/10 dark:hover:bg-rose-500/20">
+                                                    <button type="button" onClick={() => openAction(c, 'return')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-rose-700 bg-rose-50 hover:bg-rose-100 dark:text-rose-300 dark:bg-rose-500/10 dark:hover:bg-rose-500/20">
                                                         Return
                                                     </button>
-                                                    <button onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100 dark:text-orange-300 dark:bg-orange-500/10 dark:hover:bg-orange-500/20">
+                                                    <button type="button" onClick={() => openAction(c, 'stop')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-orange-700 bg-orange-50 hover:bg-orange-100 dark:text-orange-300 dark:bg-orange-500/10 dark:hover:bg-orange-500/20">
                                                         Stop
                                                     </button>
                                                 </>
@@ -423,7 +424,7 @@ export default function Cheques() {
                                             {/* Cancel available in any non-terminal state */}
                                             {(c.direction === 'incoming' && ['Received', 'Deposited'].includes(c.status)
                                               || c.direction === 'outgoing' && ['Issued', 'Dispatched'].includes(c.status)) && (
-                                                <button onClick={() => openAction(c, 'cancel')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-ink-600 bg-ink-100 hover:bg-ink-200 dark:text-ink-300 dark:bg-ink-800/40 dark:hover:bg-ink-800/60">
+                                                <button type="button" onClick={() => openAction(c, 'cancel')} className="ml-1 text-xs font-semibold px-2 py-1 rounded text-ink-600 bg-ink-100 hover:bg-ink-200 dark:text-ink-300 dark:bg-ink-800/40 dark:hover:bg-ink-800/60">
                                                     Cancel
                                                 </button>
                                             )}
@@ -439,7 +440,7 @@ export default function Cheques() {
             {/* ── New cheque modal ── */}
             {isNewOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsNewOpen(false)} />
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsNewOpen(false)} />
                     <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
@@ -449,7 +450,7 @@ export default function Cheques() {
                                     {newDraft.direction === 'incoming' ? 'Record received cheque' : 'Issue new cheque'}
                                 </h2>
                             </div>
-                            <button onClick={() => setIsNewOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full">
+                            <button type="button" onClick={() => setIsNewOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
@@ -481,13 +482,13 @@ export default function Cheques() {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="label">Cheque number *</label>
-                                    <input required className="input" value={newDraft.cheque_number}
+                                    <label htmlFor="cheque-cheque-number" className="label">Cheque number *</label>
+                                    <input id="cheque-cheque-number" required className="input" value={newDraft.cheque_number}
                                            onChange={e => setNewDraft({ ...newDraft, cheque_number: e.target.value })} />
                                 </div>
                                 <div>
-                                    <label className="label">Date on cheque</label>
-                                    <input type="date" className="input" value={newDraft.date_on_cheque}
+                                    <label htmlFor="cheque-date-on-cheque" className="label">Date on cheque</label>
+                                    <input id="cheque-date-on-cheque" type="date" className="input" value={newDraft.date_on_cheque}
                                            onChange={e => setNewDraft({ ...newDraft, date_on_cheque: e.target.value })} />
                                 </div>
 
@@ -495,14 +496,14 @@ export default function Cheques() {
                                 {newDraft.direction === 'incoming' ? (
                                     <>
                                         <div className="col-span-2">
-                                            <label className="label">Drawer name *</label>
-                                            <input required className="input" value={newDraft.drawer_name}
+                                            <label htmlFor="cheque-drawer-name" className="label">Drawer name *</label>
+                                            <input id="cheque-drawer-name" required className="input" value={newDraft.drawer_name}
                                                    onChange={e => setNewDraft({ ...newDraft, drawer_name: e.target.value })}
                                                    placeholder="e.g. Jubilee Insurance Ltd" />
                                         </div>
                                         <div>
-                                            <label className="label">Drawer type *</label>
-                                            <select className="input" value={newDraft.drawer_type}
+                                            <label htmlFor="cheque-drawer-type" className="label">Drawer type *</label>
+                                            <select id="cheque-drawer-type" className="input" value={newDraft.drawer_type}
                                                     onChange={e => setNewDraft({ ...newDraft, drawer_type: e.target.value })}>
                                                 {DRAWER_TYPES.map(d => <option key={d}>{d}</option>)}
                                             </select>
@@ -511,14 +512,14 @@ export default function Cheques() {
                                 ) : (
                                     <>
                                         <div className="col-span-2">
-                                            <label className="label">Payee name *</label>
-                                            <input required className="input" value={newDraft.payee_name}
+                                            <label htmlFor="cheque-payee-name" className="label">Payee name *</label>
+                                            <input id="cheque-payee-name" required className="input" value={newDraft.payee_name}
                                                    onChange={e => setNewDraft({ ...newDraft, payee_name: e.target.value })}
                                                    placeholder="e.g. Acme Medical Supplies Ltd" />
                                         </div>
                                         <div>
-                                            <label className="label">Payee type *</label>
-                                            <select className="input" value={newDraft.payee_type}
+                                            <label htmlFor="cheque-payee-type" className="label">Payee type *</label>
+                                            <select id="cheque-payee-type" className="input" value={newDraft.payee_type}
                                                     onChange={e => setNewDraft({ ...newDraft, payee_type: e.target.value })}>
                                                 {PAYEE_TYPES.map(d => <option key={d}>{d}</option>)}
                                             </select>
@@ -527,24 +528,24 @@ export default function Cheques() {
                                 )}
 
                                 <div>
-                                    <label className="label">Amount *</label>
-                                    <input required type="number" min="0.01" step="0.01" className="input" value={newDraft.amount}
+                                    <label htmlFor="cheque-amount" className="label">Amount *</label>
+                                    <input id="cheque-amount" required type="number" min="0.01" step="0.01" className="input" value={newDraft.amount}
                                            onChange={e => setNewDraft({ ...newDraft, amount: e.target.value })} />
                                 </div>
                                 <div>
-                                    <label className="label">Bank name *</label>
-                                    <input required className="input" value={newDraft.bank_name}
+                                    <label htmlFor="cheque-bank-name" className="label">Bank name *</label>
+                                    <input id="cheque-bank-name" required className="input" value={newDraft.bank_name}
                                            onChange={e => setNewDraft({ ...newDraft, bank_name: e.target.value })}
                                            placeholder={newDraft.direction === 'incoming' ? "Drawer's bank" : 'Our bank (drawn-on)'} />
                                 </div>
                                 <div>
-                                    <label className="label">Branch</label>
-                                    <input className="input" value={newDraft.bank_branch}
+                                    <label htmlFor="cheque-branch" className="label">Branch</label>
+                                    <input id="cheque-branch" className="input" value={newDraft.bank_branch}
                                            onChange={e => setNewDraft({ ...newDraft, bank_branch: e.target.value })} />
                                 </div>
                                 <div>
-                                    <label className="label">Currency</label>
-                                    <input className="input uppercase" maxLength="3" value={newDraft.currency}
+                                    <label htmlFor="cheque-currency" className="label">Currency</label>
+                                    <input id="cheque-currency" className="input uppercase" maxLength="3" value={newDraft.currency}
                                            onChange={e => setNewDraft({ ...newDraft, currency: e.target.value.toUpperCase() })} />
                                 </div>
 
@@ -552,13 +553,13 @@ export default function Cheques() {
                                 {newDraft.direction === 'incoming' && (
                                     <>
                                         <div>
-                                            <label className="label">Linked invoice ID (optional)</label>
-                                            <input type="number" className="input" value={newDraft.invoice_id}
+                                            <label htmlFor="cheque-linked-invoice-id-optional" className="label">Linked invoice ID (optional)</label>
+                                            <input id="cheque-linked-invoice-id-optional" type="number" className="input" value={newDraft.invoice_id}
                                                    onChange={e => setNewDraft({ ...newDraft, invoice_id: e.target.value })} />
                                         </div>
                                         <div>
-                                            <label className="label">Linked patient ID (optional)</label>
-                                            <input type="number" className="input" value={newDraft.patient_id}
+                                            <label htmlFor="cheque-linked-patient-id-optional" className="label">Linked patient ID (optional)</label>
+                                            <input id="cheque-linked-patient-id-optional" type="number" className="input" value={newDraft.patient_id}
                                                    onChange={e => setNewDraft({ ...newDraft, patient_id: e.target.value })} />
                                         </div>
                                     </>
@@ -566,15 +567,15 @@ export default function Cheques() {
                                 {/* Outgoing-only: date issued */}
                                 {newDraft.direction === 'outgoing' && (
                                     <div className="col-span-2">
-                                        <label className="label">Date issued (defaults to today)</label>
-                                        <input type="date" className="input" value={newDraft.date_issued}
+                                        <label htmlFor="cheque-date-issued-defaults-to-today" className="label">Date issued (defaults to today)</label>
+                                        <input id="cheque-date-issued-defaults-to-today" type="date" className="input" value={newDraft.date_issued}
                                                onChange={e => setNewDraft({ ...newDraft, date_issued: e.target.value })} />
                                     </div>
                                 )}
 
                                 <div className="col-span-2">
-                                    <label className="label">Notes</label>
-                                    <textarea rows="3" className="input resize-none" value={newDraft.notes}
+                                    <label htmlFor="cheque-notes" className="label">Notes</label>
+                                    <textarea id="cheque-notes" rows="3" className="input resize-none" value={newDraft.notes}
                                               onChange={e => setNewDraft({ ...newDraft, notes: e.target.value })} />
                                 </div>
                             </div>
@@ -593,7 +594,7 @@ export default function Cheques() {
             {/* ── Detail drawer ── */}
             {active && !actionPanel && (
                 <div className="fixed inset-0 z-40 flex justify-end pointer-events-none">
-                    <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setActive(null)} />
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setActive(null)} />
                     <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right pointer-events-auto">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
@@ -601,7 +602,7 @@ export default function Cheques() {
                                 <h2 className="text-lg font-semibold mt-1 dark:text-white">#{active.cheque_number}</h2>
                                 <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">{active.drawer_name}</p>
                             </div>
-                            <button onClick={() => setActive(null)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full">
+                            <button type="button" onClick={() => setActive(null)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full">
                                 <X size={18} />
                             </button>
                         </div>
@@ -636,14 +637,14 @@ export default function Cheques() {
                         {actionPanel === 'deposit' && (
                             <div className="space-y-3">
                                 <div>
-                                    <label className="label">Deposit account *</label>
-                                    <input className="input" value={actionDraft.deposit_account || ''}
+                                    <label htmlFor="cheque-deposit-account" className="label">Deposit account *</label>
+                                    <input id="cheque-deposit-account" className="input" value={actionDraft.deposit_account || ''}
                                            onChange={e => setActionDraft({ ...actionDraft, deposit_account: e.target.value })}
                                            placeholder="e.g. KCB 1234567890" />
                                 </div>
                                 <div>
-                                    <label className="label">Deposit date</label>
-                                    <input type="date" className="input" value={actionDraft.deposit_date || ''}
+                                    <label htmlFor="cheque-deposit-date" className="label">Deposit date</label>
+                                    <input id="cheque-deposit-date" type="date" className="input" value={actionDraft.deposit_date || ''}
                                            onChange={e => setActionDraft({ ...actionDraft, deposit_date: e.target.value })} />
                                 </div>
                             </div>
@@ -652,24 +653,24 @@ export default function Cheques() {
                             <div className="space-y-3">
                                 <p className="text-sm text-ink-600 dark:text-ink-400">Marking this cheque as cleared posts a <span className="font-semibold">Payment</span> against the linked invoice (if any). This action cannot be undone.</p>
                                 <div>
-                                    <label className="label">Clearance date</label>
-                                    <input type="date" className="input" value={actionDraft.clearance_date || ''}
+                                    <label htmlFor="cheque-clearance-date" className="label">Clearance date</label>
+                                    <input id="cheque-clearance-date" type="date" className="input" value={actionDraft.clearance_date || ''}
                                            onChange={e => setActionDraft({ ...actionDraft, clearance_date: e.target.value })} />
                                 </div>
                             </div>
                         )}
                         {(actionPanel === 'bounce' || actionPanel === 'cancel') && (
                             <div>
-                                <label className="label">Reason *</label>
-                                <textarea rows="3" className="input resize-none" value={actionDraft.reason || ''}
+                                <label htmlFor="cheque-reason" className="label">Reason *</label>
+                                <textarea id="cheque-reason" rows="3" className="input resize-none" value={actionDraft.reason || ''}
                                           onChange={e => setActionDraft({ ...actionDraft, reason: e.target.value })}
                                           placeholder={actionPanel === 'bounce' ? 'e.g. Insufficient funds, signature mismatch…' : 'e.g. Issued in error, wrong amount…'} />
                             </div>
                         )}
 
                         <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-ink-100 dark:border-ink-800">
-                            <button onClick={() => { setActionPanel(null); }} className="btn-secondary">Cancel</button>
-                            <button onClick={submitAction} className={actionPanel === 'bounce' || actionPanel === 'cancel' ? 'btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-500/30 dark:hover:bg-rose-500/10' : 'btn-primary'}>
+                            <button type="button" onClick={() => { setActionPanel(null); }} className="btn-secondary">Cancel</button>
+                            <button type="button" onClick={submitAction} className={actionPanel === 'bounce' || actionPanel === 'cancel' ? 'btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-500/30 dark:hover:bg-rose-500/10' : 'btn-primary'}>
                                 Confirm {actionPanel}
                             </button>
                         </div>

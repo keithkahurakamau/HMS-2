@@ -113,7 +113,9 @@ export default function MainLayout() {
     return (
         <div className="flex h-screen bg-ink-50 dark:bg-ink-950 font-sans overflow-hidden">
             {isMobileMenuOpen && (
-                <div
+                <button
+                    type="button"
+                    aria-label="Close menu"
                     className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm z-40 md:hidden animate-fade-in"
                     onClick={() => setIsMobileMenuOpen(false)}
                 />
@@ -139,7 +141,7 @@ export default function MainLayout() {
                             tone="mono-light"
                         />
                     </div>
-                    <button
+                    <button type="button"
                         className="md:hidden text-ink-400 hover:text-white"
                         onClick={() => setIsMobileMenuOpen(false)}
                         aria-label="Close menu"
@@ -191,7 +193,7 @@ export default function MainLayout() {
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 <header className="relative h-16 bg-white/80 dark:bg-ink-900/70 backdrop-blur-md border-b border-ink-200/70 dark:border-ink-800 flex items-center justify-between px-4 sm:px-6 shrink-0 z-40">
                     <div className="flex items-center gap-3 min-w-0">
-                        <button
+                        <button type="button"
                             className="md:hidden p-2 -ml-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-ink-800 transition-colors"
                             onClick={() => setIsMobileMenuOpen(true)}
                             aria-label="Open navigation menu"
@@ -229,7 +231,7 @@ export default function MainLayout() {
                         <div data-tour="topbar-notifications"><NotificationBell /></div>
                         <ThemeToggle compact />
                         <div className="hidden sm:block w-px h-6 bg-ink-200 dark:bg-ink-800" />
-                        <button
+                        <button type="button"
                             data-tour="topbar-signout"
                             onClick={logout}
                             aria-label="Sign out"

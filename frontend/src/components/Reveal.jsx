@@ -24,13 +24,16 @@ export default function Reveal({
     ...rest
 }) {
     const ref = useRef(null);
-    const [shown, setShown] = useState(false);
+    // Honour reduced-motion at mount by deriving the initial state, rather than
+    // flipping `shown` from inside the effect when a prop changes. If the user
+    // prefers reduced motion the content is simply shown straight away.
+    const prefersReducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const [shown, setShown] = useState(prefersReducedMotion);
 
     useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (reduce) { setShown(true); return; }
-
+        if (prefersReducedMotion) return; // already shown — nothing to observe
         const el = ref.current;
         if (!el) return;
         const io = new IntersectionObserver((entries) => {
@@ -43,7 +46,7 @@ export default function Reveal({
         }, { threshold, rootMargin: '0px 0px -8% 0px' });
         io.observe(el);
         return () => io.disconnect();
-    }, [threshold]);
+    }, [threshold, prefersReducedMotion]);
 
     return (
         <Tag

@@ -51,14 +51,14 @@ export default function BudgetingTab() {
                             <th className="text-left px-4 py-2 font-medium">Fiscal year</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
                             <th className="text-left px-4 py-2 font-medium">Notes</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {budgets.map(b => (
                             <tr key={b.budget_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
                                 <td className="px-4 py-2 font-medium">
-                                    <button onClick={() => setSelectedId(b.budget_id)} className="hover:underline">
+                                    <button type="button" onClick={() => setSelectedId(b.budget_id)} className="hover:underline">
                                         {b.name}
                                     </button>
                                 </td>
@@ -70,7 +70,7 @@ export default function BudgetingTab() {
                                 </td>
                                 <td className="px-4 py-2 text-ink-500 dark:text-ink-400 truncate max-w-xs">{b.notes || '—'}</td>
                                 <td className="px-4 py-2 text-right">
-                                    <button onClick={() => setSelectedId(b.budget_id)}
+                                    <button type="button" onClick={() => setSelectedId(b.budget_id)}
                                             className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
                                         <Pencil size={12} /> Open
                                     </button>
@@ -112,16 +112,16 @@ function BudgetModal({ onClose, onSaved }) {
         <ModalShell title="New budget" onClose={onClose}>
             <div className="space-y-3">
                 <Field label="Name *">
-                    <input className="input" value={form.name}
+                    <input aria-label="Name *" className="input" value={form.name}
                            onChange={(e) => setForm({ ...form, name: e.target.value })}
                            placeholder="e.g. Operating Budget 2026" />
                 </Field>
                 <Field label="Fiscal year *">
-                    <input type="number" className="input" value={form.fiscal_year}
+                    <input aria-label="Fiscal year *" type="number" className="input" value={form.fiscal_year}
                            onChange={(e) => setForm({ ...form, fiscal_year: e.target.value })} />
                 </Field>
                 <Field label="Notes">
-                    <textarea className="input min-h-[60px]" value={form.notes}
+                    <textarea aria-label="Notes" className="input min-h-[60px]" value={form.notes}
                               onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                 </Field>
             </div>
@@ -179,18 +179,18 @@ function BudgetDetail({ budgetId, onBack }) {
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <button onClick={onBack} className="text-xs text-brand-700 hover:underline">← All budgets</button>
+                    <button type="button" onClick={onBack} className="text-xs text-brand-700 hover:underline">← All budgets</button>
                     <h3 className="text-lg font-semibold text-ink-900 dark:text-white mt-1">
                         {budget?.name} <span className="text-ink-400 font-normal">· {budget?.fiscal_year}</span>
                     </h3>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={() => setView('plan')}
+                    <button type="button" onClick={() => setView('plan')}
                             className={'inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium ' +
                                 (view === 'plan' ? 'bg-brand-600 text-white' : 'border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800/50')}>
                         <Target size={14} /> Plan
                     </button>
-                    <button onClick={() => setView('actual')}
+                    <button type="button" onClick={() => setView('actual')}
                             className={'inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium ' +
                                 (view === 'actual' ? 'bg-brand-600 text-white' : 'border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800/50')}>
                         <BarChart3 size={14} /> Budget vs Actual
@@ -203,12 +203,12 @@ function BudgetDetail({ budgetId, onBack }) {
             ) : periods.length === 0 ? (
                 <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 text-sm text-ink-600 dark:text-ink-400">
                     No fiscal periods exist for {budget.fiscal_year} yet.
-                    <button onClick={seedYear} className="ml-2 text-brand-700 hover:underline font-medium">
+                    <button type="button" onClick={seedYear} className="ml-2 text-brand-700 hover:underline font-medium">
                         Create the 12 monthly periods
                     </button>
                 </div>
             ) : view === 'plan' ? (
-                <BudgetGrid budget={budget} accounts={accounts} periods={periods} />
+                <BudgetGrid key={budget.budget_id} budget={budget} accounts={accounts} periods={periods} />
             ) : (
                 <VsActualView budgetId={budgetId} periods={periods} />
             )}
@@ -220,16 +220,19 @@ function BudgetGrid({ budget, accounts, periods }) {
     // values keyed `${account_id}:${period_id}` → string amount.
     // Lazy initializer: a fresh object once at mount (not rebuilt every render,
     // and not a shared module-scope singleton that could be mutated across instances).
-    const [values, setValues] = useState(() => ({}));
-    const dirty = useRef(new Set());
-    const timer = useRef(null);
-    const [savedAt, setSavedAt] = useState(null);
-
-    useEffect(() => {
+    // Seeded once from the budget at mount via a lazy initializer. The parent
+    // renders us with key={budget.budget_id}, so selecting a different budget
+    // remounts this grid and re-seeds from the new lines — instead of an effect
+    // resetting state when the budget prop changes (no-adjust-state-on-prop-change).
+    const [values, setValues] = useState(() => {
         const v = {};
         for (const l of budget.lines || []) v[`${l.account_id}:${l.period_id}`] = String(l.amount);
-        setValues(v);
-    }, [budget]);
+        return v;
+    });
+    const dirty = useRef(null);
+    if (dirty.current === null) dirty.current = new Set();
+    const timer = useRef(null);
+    const [savedAt, setSavedAt] = useState(null);
 
     const flush = async () => {
         if (dirty.current.size === 0) return;
@@ -296,6 +299,7 @@ function BudgetGrid({ budget, accounts, periods }) {
                                     return (
                                         <td key={p.period_id} className="px-1 py-1">
                                             <input type="number" step="0.01" min="0"
+                                                   aria-label={`Budget for ${a.name}, ${MONTHS[p.month - 1]}`}
                                                    className="input text-right py-1 px-2 w-[90px]"
                                                    value={values[key] ?? ''}
                                                    onChange={(e) => onCellChange(a.account_id, p.period_id, e.target.value)} />
@@ -389,7 +393,7 @@ function VsActualView({ budgetId, periods }) {
                                     (Number(data.totals.variance) < 0 ? 'text-rose-600' : 'text-emerald-700')}>
                                     {formatAmount(data.totals.variance)}
                                 </td>
-                                <td></td>
+                                <td aria-label="Actions"></td>
                             </tr>
                         </tfoot>
                     </table>

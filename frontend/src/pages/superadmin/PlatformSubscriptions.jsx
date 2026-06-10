@@ -167,7 +167,7 @@ export default function PlatformSubscriptions() {
 
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Your shortcode (PayBill / Till)">
-                            <input className="input" value={form.shortcode} onChange={set('shortcode')} placeholder="MediFleet PayBill / Till" />
+                            <input aria-label="Your shortcode (PayBill / Till)" className="input" value={form.shortcode} onChange={set('shortcode')} placeholder="MediFleet PayBill / Till" />
                         </Field>
                         <Field label="Shortcode type">
                             <select className="input" value={form.shortcode_type} onChange={set('shortcode_type')}>
@@ -179,7 +179,7 @@ export default function PlatformSubscriptions() {
 
                     <SectionHead icon={Link2} title="Pay Hero credentials" />
                     <Field label="Channel id">
-                        <input className="input" value={form.payhero_channel_id} onChange={set('payhero_channel_id')} placeholder="from your Pay Hero dashboard" />
+                        <input aria-label="Channel id" className="input" value={form.payhero_channel_id} onChange={set('payhero_channel_id')} placeholder="from your Pay Hero dashboard" />
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="API username">
@@ -208,21 +208,21 @@ export default function PlatformSubscriptions() {
                             </select>
                         </Field>
                         <Field label="Account number">
-                            <input className="input" value={form.settlement_account_number} onChange={set('settlement_account_number')} />
+                            <input aria-label="Account number" className="input" value={form.settlement_account_number} onChange={set('settlement_account_number')} />
                         </Field>
                         <Field label="Account name">
-                            <input className="input" value={form.settlement_account_name} onChange={set('settlement_account_name')} />
+                            <input aria-label="Account name" className="input" value={form.settlement_account_name} onChange={set('settlement_account_name')} />
                         </Field>
                     </div>
 
                     <SectionHead icon={Banknote} title="Customisation" />
                     <div className="grid grid-cols-2 gap-3">
-                        <Field label="Account reference"><input className="input" value={form.account_reference} onChange={set('account_reference')} /></Field>
-                        <Field label="Transaction description"><input className="input" value={form.transaction_desc} onChange={set('transaction_desc')} /></Field>
+                        <Field label="Account reference"><input aria-label="Account reference" className="input" value={form.account_reference} onChange={set('account_reference')} /></Field>
+                        <Field label="Transaction description"><input aria-label="Transaction description" className="input" value={form.transaction_desc} onChange={set('transaction_desc')} /></Field>
                     </div>
 
                     <div className="flex justify-end pt-2 border-t border-ink-100 dark:border-ink-800">
-                        <button onClick={saveConfig} disabled={saving}
+                        <button type="button" onClick={saveConfig} disabled={saving}
                                 className="px-4 py-2 rounded-lg bg-accent-600 text-white text-sm font-medium hover:bg-accent-700 disabled:opacity-60">
                             {saving ? 'Saving…' : 'Save account'}
                         </button>
@@ -240,22 +240,22 @@ export default function PlatformSubscriptions() {
                             </select>
                         </Field>
                         <Field label="Billing phone (M-Pesa)">
-                            <input className="input" value={chargePhone} onChange={e => setChargePhone(e.target.value)} placeholder="07XXXXXXXX or 2547XXXXXXXX" />
+                            <input aria-label="Billing phone (M-Pesa)" className="input" value={chargePhone} onChange={e => setChargePhone(e.target.value)} placeholder="07XXXXXXXX or 2547XXXXXXXX" />
                         </Field>
-                        <button onClick={saveContact} disabled={savingContact || !chargeTenant}
+                        <button type="button" onClick={saveContact} disabled={savingContact || !chargeTenant}
                                 className="text-xs text-accent-700 dark:text-accent-300 font-medium hover:underline disabled:opacity-50">
                             {savingContact ? 'Saving…' : 'Save as this tenant’s default billing phone'}
                         </button>
                         <div className="grid grid-cols-2 gap-3 pt-1">
-                            <Field label="Amount (KES)"><input className="input" type="number" value={chargeAmount} onChange={e => setChargeAmount(e.target.value)} placeholder="18500" /></Field>
-                            <Field label="Period label"><input className="input" value={chargePeriod} onChange={e => setChargePeriod(e.target.value)} placeholder="May 2026 — Standard" /></Field>
+                            <Field label="Amount (KES)"><input aria-label="Amount (KES)" className="input" type="number" value={chargeAmount} onChange={e => setChargeAmount(e.target.value)} placeholder="18500" /></Field>
+                            <Field label="Period label"><input aria-label="Period label" className="input" value={chargePeriod} onChange={e => setChargePeriod(e.target.value)} placeholder="May 2026 — Standard" /></Field>
                         </div>
                         <div className="flex gap-2 pt-1">
-                            <button onClick={() => charge(false)} disabled={charging || !health?.ready}
+                            <button type="button" onClick={() => charge(false)} disabled={charging || !health?.ready}
                                     className="flex-1 px-3 py-2 rounded-lg bg-accent-600 text-white text-sm font-medium hover:bg-accent-700 disabled:opacity-60">
                                 {charging ? 'Sending…' : 'Charge subscription'}
                             </button>
-                            <button onClick={() => charge(true)} disabled={charging || !health?.ready}
+                            <button type="button" onClick={() => charge(true)} disabled={charging || !health?.ready}
                                     className="px-3 py-2 rounded-lg border border-accent-200 dark:border-accent-500/30 text-accent-700 dark:text-accent-300 text-sm font-medium hover:bg-accent-50 dark:hover:bg-accent-500/10 disabled:opacity-60 inline-flex items-center gap-1">
                                 <Send size={14} /> Test
                             </button>
@@ -317,7 +317,7 @@ function HealthBanner({ health }) {
         <div data-tour="sub-health" className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 text-sm text-amber-900 dark:text-amber-200 w-full">
             <div className="font-semibold inline-flex items-center gap-2 mb-1"><AlertCircle size={16} /> Not ready yet — finish these first</div>
             <ul className="list-disc pl-5 text-xs space-y-0.5">
-                {(health.blockers || []).map((b, i) => <li key={i}>{b}</li>)}
+                {(health.blockers || []).map((b) => <li key={b}>{b}</li>)}
             </ul>
         </div>
     );

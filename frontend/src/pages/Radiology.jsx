@@ -147,11 +147,11 @@ export default function Radiology() {
             />
             <div data-tour="radio-tabs" className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" className="flex bg-ink-100/70 dark:bg-ink-800/40 p-1 rounded-xl w-full max-w-md">
-                    <button role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
+                    <button type="button" role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
                             className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-soft ring-1 ring-ink-200/70 dark:ring-ink-800' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'}`}>
                         <Radio size={16} className={activeTab === 'queue' ? 'text-brand-600' : 'text-ink-400'} /> Reading room
                     </button>
-                    <button role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')}
+                    <button type="button" role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')}
                             className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-soft ring-1 ring-ink-200/70 dark:ring-ink-800' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'}`}>
                         <FileDigit size={16} className={activeTab === 'catalog' ? 'text-accent-600' : 'text-ink-400'} /> Exam Catalog
                     </button>
@@ -162,7 +162,7 @@ export default function Radiology() {
                 <>
                     {/* Queue */}
                     <div data-tour="radio-queue" className="card shrink-0 flex flex-col z-20">
-                        <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 dark:bg-ink-800/40 hover:bg-brand-50/40 dark:hover:bg-ink-800/50 transition-colors rounded-t-2xl">
+                        <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 dark:bg-ink-800/40 hover:bg-brand-50/40 dark:hover:bg-ink-800/50 transition-colors rounded-t-2xl">
                             <div className="flex items-center gap-3">
                                 <Activity className="text-brand-600" size={18} />
                                 <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Pending imaging requests</h2>
@@ -228,7 +228,7 @@ export default function Radiology() {
                                                 {activeCatalog && <> · <span className="text-ink-700 dark:text-ink-200">{activeCatalog.modality}{activeCatalog.body_part ? ` · ${activeCatalog.body_part}` : ''}</span></>}
                                             </p>
                                         </div>
-                                        <button onClick={() => printRadiologyReport({
+                                        <button type="button" onClick={() => printRadiologyReport({
                                             patient: { full_name: activeRequest.patient_name, outpatient_no: activeRequest.patient_opd },
                                             request: {
                                                 request_id: activeRequest.request_id,
@@ -268,8 +268,8 @@ export default function Radiology() {
                                             )}
 
                                             <div className="flex flex-wrap justify-center gap-3">
-                                                <button onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Cancel</button>
-                                                <button data-tour="radio-acknowledge" onClick={handleAcknowledge} className="btn-primary">
+                                                <button type="button" onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Cancel</button>
+                                                <button type="button" data-tour="radio-acknowledge" onClick={handleAcknowledge} className="btn-primary">
                                                     <CheckCircle2 size={16} /> Acknowledge & begin exam
                                                 </button>
                                             </div>
@@ -291,24 +291,24 @@ export default function Radiology() {
                                                 </h3>
                                                 <div className="space-y-4">
                                                     <div>
-                                                        <label className="label">Detailed findings</label>
-                                                        <textarea rows="5" value={findings} onChange={(e) => setFindings(e.target.value)} className="input resize-none" placeholder="Enter detailed radiological findings…" />
+                                                        <label htmlFor="radiol-detailed-findings" className="label">Detailed findings</label>
+                                                        <textarea id="radiol-detailed-findings" rows="5" value={findings} onChange={(e) => setFindings(e.target.value)} className="input resize-none" placeholder="Enter detailed radiological findings…" />
                                                     </div>
                                                     <div>
-                                                        <label className="label">Conclusion / impression</label>
-                                                        <textarea rows="3" value={conclusion} onChange={(e) => setConclusion(e.target.value)} className="input resize-none" placeholder="Enter summary impression…" />
+                                                        <label htmlFor="radiol-conclusion-impression" className="label">Conclusion / impression</label>
+                                                        <textarea id="radiol-conclusion-impression" rows="3" value={conclusion} onChange={(e) => setConclusion(e.target.value)} className="input resize-none" placeholder="Enter summary impression…" />
                                                     </div>
                                                     {activeCatalog?.requires_contrast && (
                                                         <div>
-                                                            <label className="label">Contrast used</label>
-                                                            <input type="text" value={contrastUsed} onChange={(e) => setContrastUsed(e.target.value)} className="input" placeholder="e.g. Iohexol 100 mL IV" />
+                                                            <label htmlFor="radiol-contrast-used" className="label">Contrast used</label>
+                                                            <input id="radiol-contrast-used" type="text" value={contrastUsed} onChange={(e) => setContrastUsed(e.target.value)} className="input" placeholder="e.g. Iohexol 100 mL IV" />
                                                         </div>
                                                     )}
                                                     <div>
-                                                        <label className="label">Attach image / DICOM URL (optional)</label>
+                                                        <label htmlFor="radiol-attach-image-dicom-url-optional" className="label">Attach image / DICOM URL (optional)</label>
                                                         <div className="relative">
                                                             <ImageIcon size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-                                                            <input type="text" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="input pl-10" placeholder="https://pacs.internal/images/…" />
+                                                            <input id="radiol-attach-image-dicom-url-optional" type="text" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="input pl-10" placeholder="https://pacs.internal/images/…" />
                                                         </div>
                                                     </div>
                                                 </div>
@@ -319,8 +319,8 @@ export default function Radiology() {
 
                                 {activeRequest.status === 'In Progress' && (
                                     <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0 z-10">
-                                        <button onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Close</button>
-                                        <button data-tour="radio-publish" onClick={handleRelease} className="btn-success">
+                                        <button type="button" onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Close</button>
+                                        <button type="button" data-tour="radio-publish" onClick={handleRelease} className="btn-success">
                                             <Send size={16} /> Sign & publish report
                                         </button>
                                     </div>
@@ -341,7 +341,7 @@ export default function Radiology() {
                             </h2>
                             <p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Add or revise exams, default templates and pricing.</p>
                         </div>
-                        <button data-tour="radio-new-exam" onClick={startCreate} className="btn-primary"><Plus size={16} /> New exam</button>
+                        <button type="button" data-tour="radio-new-exam" onClick={startCreate} className="btn-primary"><Plus size={16} /> New exam</button>
                     </div>
 
                     <div data-tour="radio-catalog" className="flex-1 overflow-auto">
@@ -373,9 +373,9 @@ export default function Radiology() {
                                         <td>{row.requires_contrast ? <span className="badge-warn text-2xs">Yes</span> : <span className="badge-neutral text-2xs">No</span>}</td>
                                         <td>{row.is_active ? <span className="badge-success text-2xs">Active</span> : <span className="badge-neutral text-2xs">Inactive</span>}</td>
                                         <td className="text-right">
-                                            <button onClick={() => startEdit(row)} className="text-brand-600 hover:text-brand-800 p-1.5" aria-label="Edit"><Pencil size={15} /></button>
+                                            <button type="button" onClick={() => startEdit(row)} className="text-brand-600 hover:text-brand-800 p-1.5" aria-label="Edit"><Pencil size={15} /></button>
                                             {row.is_active && (
-                                                <button onClick={() => deactivate(row)} className="text-rose-600 hover:text-rose-800 p-1.5 ml-1" aria-label="Deactivate"><Trash2 size={15} /></button>
+                                                <button type="button" onClick={() => deactivate(row)} className="text-rose-600 hover:text-rose-800 p-1.5 ml-1" aria-label="Deactivate"><Trash2 size={15} /></button>
                                             )}
                                         </td>
                                     </tr>
@@ -388,7 +388,7 @@ export default function Radiology() {
 
             {editorOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
                     <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
@@ -398,7 +398,7 @@ export default function Radiology() {
                                     {editing ? `Editing ${editing.exam_name}` : 'Configure a new exam'}
                                 </h2>
                             </div>
-                            <button onClick={() => setEditorOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full">
+                            <button type="button" onClick={() => setEditorOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
@@ -407,26 +407,26 @@ export default function Radiology() {
                             <div className="card p-5 space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="label">Exam name *</label>
-                                        <input className="input" value={form.exam_name}
+                                        <label htmlFor="radiol-exam-name" className="label">Exam name *</label>
+                                        <input id="radiol-exam-name" className="input" value={form.exam_name}
                                                onChange={e => setForm({ ...form, exam_name: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="label">Modality *</label>
-                                        <select className="input" value={form.modality}
+                                        <label htmlFor="radiol-modality" className="label">Modality *</label>
+                                        <select id="radiol-modality" className="input" value={form.modality}
                                                 onChange={e => setForm({ ...form, modality: e.target.value })}>
                                             {['X-Ray', 'CT', 'MRI', 'Ultrasound', 'Mammography', 'Fluoroscopy', 'Nuclear Medicine', 'Other'].map(m => <option key={m}>{m}</option>)}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="label">Body part</label>
-                                        <input className="input" value={form.body_part || ''}
+                                        <label htmlFor="radiol-body-part" className="label">Body part</label>
+                                        <input id="radiol-body-part" className="input" value={form.body_part || ''}
                                                onChange={e => setForm({ ...form, body_part: e.target.value })}
                                                placeholder="Chest, Abdomen, Right Knee…" />
                                     </div>
                                     <div>
-                                        <label className="label">Base price</label>
-                                        <input type="number" min="0" step="0.01" className="input" value={form.base_price}
+                                        <label htmlFor="radiol-base-price" className="label">Base price</label>
+                                        <input id="radiol-base-price" type="number" min="0" step="0.01" className="input" value={form.base_price}
                                                onChange={e => setForm({ ...form, base_price: e.target.value })} />
                                     </div>
                                 </div>
@@ -450,21 +450,21 @@ export default function Radiology() {
                                 </div>
 
                                 <div>
-                                    <label className="label">Description</label>
-                                    <textarea rows="2" className="input resize-none" value={form.description || ''}
+                                    <label htmlFor="radiol-description" className="label">Description</label>
+                                    <textarea id="radiol-description" rows="2" className="input resize-none" value={form.description || ''}
                                               onChange={e => setForm({ ...form, description: e.target.value })} />
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="label">Default findings template</label>
-                                        <textarea rows="4" className="input resize-none" value={form.default_findings_template || ''}
+                                        <label htmlFor="radiol-default-findings-template" className="label">Default findings template</label>
+                                        <textarea id="radiol-default-findings-template" rows="4" className="input resize-none" value={form.default_findings_template || ''}
                                                   onChange={e => setForm({ ...form, default_findings_template: e.target.value })}
                                                   placeholder="Pre-populated for the radiologist…" />
                                     </div>
                                     <div>
-                                        <label className="label">Default impression template</label>
-                                        <textarea rows="4" className="input resize-none" value={form.default_impression_template || ''}
+                                        <label htmlFor="radiol-default-impression-template" className="label">Default impression template</label>
+                                        <textarea id="radiol-default-impression-template" rows="4" className="input resize-none" value={form.default_impression_template || ''}
                                                   onChange={e => setForm({ ...form, default_impression_template: e.target.value })} />
                                     </div>
                                 </div>
@@ -472,8 +472,8 @@ export default function Radiology() {
                         </div>
 
                         <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0">
-                            <button onClick={() => setEditorOpen(false)} className="btn-secondary">Cancel</button>
-                            <button onClick={save} className="btn-primary"><Save size={15} /> Save</button>
+                            <button type="button" onClick={() => setEditorOpen(false)} className="btn-secondary">Cancel</button>
+                            <button type="button" onClick={save} className="btn-primary"><Save size={15} /> Save</button>
                         </div>
                     </div>
                 </div>

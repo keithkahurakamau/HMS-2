@@ -53,6 +53,15 @@ function tempPwdReducer(state, action) {
     }
 }
 
+// Pure helper hoisted to module scope (no component state).
+const keyOf = (u) => `${u.tenant_id}:${u.user_id}`;
+
+const RESET_BADGE = (
+    <span className="badge-success inline-flex items-center gap-1.5">
+        <ShieldCheck size={11} aria-hidden="true" /> Reset, not reveal
+    </span>
+);
+
 export default function UsersManager() {
     const [data, dispatchData] = useReducer(dataReducer, initialData);
     const { users, tenants, errors, isLoading } = data;
@@ -94,8 +103,6 @@ export default function UsersManager() {
             dispatchData({ type: 'done' });
         }
     };
-
-    const keyOf = (u) => `${u.tenant_id}:${u.user_id}`;
 
     const resetPassword = async (u) => {
         if (!window.confirm(`Issue a one-time temporary password for ${u.full_name} (${u.email})?\n\nTheir current password stops working immediately and they must set a new one at next login.`)) return;
@@ -158,11 +165,7 @@ export default function UsersManager() {
                 title="Users & Access — cross-tenant"
                 subtitle="Recover access securely: reset, unlock, or disable. Passwords are never shown."
                 tone="brand"
-                meta={
-                    <span className="badge-success inline-flex items-center gap-1.5">
-                        <ShieldCheck size={11} aria-hidden="true" /> Reset, not reveal
-                    </span>
-                }
+                meta={RESET_BADGE}
                 actions={
                     <button type="button" onClick={fetchUsers} className="btn-secondary cursor-pointer">
                         <RefreshCw size={14} aria-hidden="true" /> Refresh
@@ -217,8 +220,8 @@ export default function UsersManager() {
                     <div>
                         <p className="font-semibold uppercase tracking-[0.14em] text-2xs text-rose-700 dark:text-rose-300">Partial results</p>
                         <ul className="mt-1 space-y-0.5">
-                            {errors.map((e, i) => (
-                                <li key={i} className="font-mono"><span className="text-rose-900 dark:text-rose-200">{e.tenant_db}</span> · {e.error}</li>
+                            {errors.map((e) => (
+                                <li key={`${e.tenant_db}-${e.error}`} className="font-mono"><span className="text-rose-900 dark:text-rose-200">{e.tenant_db}</span> · {e.error}</li>
                             ))}
                         </ul>
                     </div>

@@ -14,7 +14,7 @@ export function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg, n
                 {subtitle && <p className="text-sm text-ink-600 dark:text-ink-400 mt-1">{subtitle}</p>}
             </div>
             {onNew && (
-                <button onClick={onNew} disabled={disabled} title={disabled ? disabledMsg : undefined}
+                <button type="button" onClick={onNew} disabled={disabled} title={disabled ? disabledMsg : undefined}
                         className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed">
                     <Plus size={16} /> {newLabel}
                 </button>
@@ -41,7 +41,7 @@ export function ModalShell({ title, onClose, wide, children }) {
             <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{title}</h3>
-                    <button onClick={onClose} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">
+                    <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">
                         <X size={18} />
                     </button>
                 </div>
@@ -54,11 +54,11 @@ export function ModalShell({ title, onClose, wide, children }) {
 export function ModalActions({ onClose, onSubmit, saving, submitLabel = 'Save' }) {
     return (
         <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-ink-100 dark:border-ink-800">
-            <button onClick={onClose}
+            <button type="button" onClick={onClose}
                     className="px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50 dark:text-ink-200">
                 Cancel
             </button>
-            <button onClick={onSubmit} disabled={saving}
+            <button type="button" onClick={onSubmit} disabled={saving}
                     className="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                 {saving ? 'Saving...' : submitLabel}
             </button>

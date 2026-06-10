@@ -146,7 +146,7 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <button type="button" aria-label="Close" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative w-full max-w-3xl bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
                 <div className="p-5 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-between items-center">
                     <div className="min-w-0">
@@ -158,7 +158,7 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                             Effective permissions are role defaults + grants − revokes.
                         </p>
                     </div>
-                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/50 cursor-pointer">
+                    <button type="button" onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/50 cursor-pointer">
                         <X size={20} aria-hidden="true" />
                     </button>
                 </div>
@@ -187,7 +187,7 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                                     </span>
                                 )}
                             </div>
-                            <button
+                            <button type="button"
                                 onClick={resetAll}
                                 disabled={Object.keys(draft).length === 0}
                                 className="text-xs font-semibold text-slate-600 dark:text-ink-400 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 px-2 py-1 disabled:opacity-40"
@@ -278,13 +278,13 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                         </div>
 
                         <div className="p-4 border-t border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-end gap-3 shrink-0">
-                            <button
+                            <button type="button"
                                 onClick={onClose}
                                 className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-ink-300 hover:bg-slate-200 dark:hover:bg-ink-800/50 rounded-lg"
                             >
                                 Cancel
                             </button>
-                            <button
+                            <button type="button"
                                 onClick={save}
                                 disabled={!dirty || saving}
                                 className="px-6 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-brand-700 disabled:opacity-40 flex items-center gap-2"

@@ -89,7 +89,7 @@ export default function NotesTab() {
                             <th className="text-left px-4 py-2 font-medium">Dr / Cr</th>
                             <th className="text-right px-4 py-2 font-medium">Amount</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -115,18 +115,18 @@ export default function NotesTab() {
                                 <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
                                     {n.status === 'draft' && (
                                         <>
-                                            <button onClick={() => post(n.note_id)}
+                                            <button type="button" onClick={() => post(n.note_id)}
                                                     className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline">
                                                 <CheckCircle2 size={12} /> Post
                                             </button>
-                                            <button onClick={() => del(n.note_id)}
+                                            <button type="button" onClick={() => del(n.note_id)}
                                                     className="inline-flex items-center gap-1 text-xs text-rose-600 hover:underline">
                                                 <Trash2 size={12} /> Delete
                                             </button>
                                         </>
                                     )}
                                     {n.status === 'posted' && (
-                                        <button onClick={() => voidNote(n.note_id)}
+                                        <button type="button" onClick={() => voidNote(n.note_id)}
                                                 className="inline-flex items-center gap-1 text-xs text-rose-700 hover:underline">
                                             <Slash size={12} /> Void
                                         </button>
@@ -142,6 +142,21 @@ export default function NotesTab() {
                                    onClose={() => setOpenNew(false)}
                                    onSaved={() => { setOpenNew(false); load(); }} />}
         </div>
+    );
+}
+
+// Account picker, hoisted to module scope so it keeps a stable component
+// identity across NoteModal re-renders. Defined inline it would be a brand-new
+// component every render, remounting the <select> and dropping focus/selection.
+// `accounts` is passed in explicitly instead of captured from closure.
+function AccountSelect({ value, onChange, accounts }) {
+    return (
+        <select className="input" value={value} onChange={onChange}>
+            <option value="">— select account —</option>
+            {accounts.map((a) => (
+                <option key={a.account_id} value={a.account_id}>{a.code} {a.name}</option>
+            ))}
+        </select>
     );
 }
 
@@ -178,15 +193,6 @@ function NoteModal({ accounts, onClose, onSaved }) {
         finally { setSaving(false); }
     };
 
-    const AccountSelect = ({ value, onChange }) => (
-        <select className="input" value={value} onChange={onChange}>
-            <option value="">— select account —</option>
-            {accounts.map(a => (
-                <option key={a.account_id} value={a.account_id}>{a.code} {a.name}</option>
-            ))}
-        </select>
-    );
-
     return (
         <ModalShell title="New debit/credit note" onClose={onClose}>
             <div className="grid grid-cols-2 gap-3">
@@ -198,30 +204,30 @@ function NoteModal({ accounts, onClose, onSaved }) {
                     </select>
                 </Field>
                 <Field label="Date *">
-                    <input type="date" className="input" value={form.note_date}
+                    <input aria-label="Date *" type="date" className="input" value={form.note_date}
                            onChange={(e) => setForm({ ...form, note_date: e.target.value })} />
                 </Field>
                 <Field label="Amount *">
-                    <input type="number" step="0.01" min="0" className="input" value={form.amount}
+                    <input aria-label="Amount *" type="number" step="0.01" min="0" className="input" value={form.amount}
                            onChange={(e) => setForm({ ...form, amount: e.target.value })} />
                 </Field>
                 <Field label="Invoice ID">
-                    <input type="number" className="input" value={form.invoice_id}
+                    <input aria-label="Invoice ID" type="number" className="input" value={form.invoice_id}
                            onChange={(e) => setForm({ ...form, invoice_id: e.target.value })}
                            placeholder="optional" />
                 </Field>
                 <Field label="Debit account *">
-                    <AccountSelect value={form.debit_account_id}
+                    <AccountSelect accounts={accounts} value={form.debit_account_id}
                                    onChange={(e) => setForm({ ...form, debit_account_id: e.target.value })} />
                 </Field>
                 <Field label="Credit account *">
-                    <AccountSelect value={form.credit_account_id}
+                    <AccountSelect accounts={accounts} value={form.credit_account_id}
                                    onChange={(e) => setForm({ ...form, credit_account_id: e.target.value })} />
                 </Field>
             </div>
             <div className="mt-3">
                 <Field label="Reason">
-                    <textarea className="input min-h-[60px]" value={form.reason}
+                    <textarea aria-label="Reason" className="input min-h-[60px]" value={form.reason}
                               onChange={(e) => setForm({ ...form, reason: e.target.value })} />
                 </Field>
             </div>

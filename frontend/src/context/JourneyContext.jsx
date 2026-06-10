@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { createContext, use, useCallback, useEffect, useMemo, useState } from 'react';
 import { JOURNEYS, readProgress, writeProgress } from '../journeys';
 import { useAuth } from './AuthContext';
 
@@ -93,7 +93,7 @@ export function JourneyProvider({ children }) {
 }
 
 export function useJourney() {
-    const ctx = useContext(JourneyContext);
+    const ctx = use(JourneyContext);
     if (!ctx) throw new Error('useJourney must be used within JourneyProvider');
     return ctx;
 }

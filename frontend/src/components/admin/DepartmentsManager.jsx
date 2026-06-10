@@ -62,14 +62,14 @@ export default function DepartmentsManager() {
             <div className="p-4 border-b border-slate-100 dark:border-ink-800 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50 dark:bg-ink-800/40">
                 <div className="relative w-full max-w-md">
                     <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
+                    <input aria-label="Search departments..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search departments..."
                         className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-ink-800 dark:bg-ink-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                 </div>
-                <button
+                <button type="button"
                     onClick={() => setEditing('new')}
                     className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 shadow-sm"
                 >
@@ -118,13 +118,13 @@ export default function DepartmentsManager() {
                                     )}
                                 </div>
                                 <div className="flex gap-2">
-                                    <button
+                                    <button type="button"
                                         onClick={() => setEditing(d)}
                                         className="flex-1 text-xs font-bold px-3 py-1.5 rounded border border-slate-200 dark:border-ink-800 text-brand-600 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-500/15 hover:border-brand-200 flex items-center justify-center gap-1"
                                     >
                                         <Edit3 size={12} /> Edit
                                     </button>
-                                    <button
+                                    <button type="button"
                                         onClick={() => remove(d)}
                                         className="text-xs font-bold px-3 py-1.5 rounded border border-slate-200 dark:border-ink-800 text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center gap-1"
                                     >
@@ -219,7 +219,7 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <button type="button" aria-label="Close" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
                 <div className="p-5 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-between items-center">
                     <div>
@@ -230,15 +230,15 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
                             Members get an auto-managed group chat with each other.
                         </p>
                     </div>
-                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/50 cursor-pointer">
+                    <button type="button" onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/50 cursor-pointer">
                         <X size={20} aria-hidden="true" />
                     </button>
                 </div>
 
                 <div className="p-5 overflow-y-auto space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Name</label>
-                        <input
+                        <label htmlFor="depart-name" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Name</label>
+                        <input id="depart-name"
                             value={name}
                             onChange={(e) => dispatch({ type: 'setName', value: e.target.value })}
                             placeholder="e.g. ICU Day Shift"
@@ -246,8 +246,8 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Description</label>
-                        <textarea
+                        <label htmlFor="depart-description" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Description</label>
+                        <textarea id="depart-description"
                             value={description}
                             onChange={(e) => dispatch({ type: 'setDescription', value: e.target.value })}
                             rows={2}
@@ -263,7 +263,7 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
                             </label>
                             <div className="relative w-56">
                                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
+                                <input aria-label="Filter staff..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Filter staff..."
@@ -299,10 +299,10 @@ function DepartmentEditor({ dept, staff, onClose, onSaved }) {
                 </div>
 
                 <div className="p-4 border-t border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-end gap-3 shrink-0">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-ink-400 hover:bg-slate-200 dark:hover:bg-ink-800/50 rounded-lg">
+                    <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-ink-400 hover:bg-slate-200 dark:hover:bg-ink-800/50 rounded-lg">
                         Cancel
                     </button>
-                    <button
+                    <button type="button"
                         onClick={save}
                         disabled={busy}
                         className="px-6 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-brand-700 disabled:opacity-50"
