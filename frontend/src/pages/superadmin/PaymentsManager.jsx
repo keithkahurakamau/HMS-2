@@ -129,10 +129,11 @@ export default function PaymentsManager() {
             <ProvisioningGuide />
 
             <div data-tour="prov-hospital" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5">
-                <label className="block text-xs font-semibold text-ink-600 dark:text-ink-400 mb-1.5 inline-flex items-center gap-1.5">
+                <label htmlFor="pay-hospital" className="block text-xs font-semibold text-ink-600 dark:text-ink-400 mb-1.5 inline-flex items-center gap-1.5">
                     <Building2 size={14} className="text-brand-600" /> Hospital
                 </label>
                 <select
+                    id="pay-hospital"
                     className="input max-w-md"
                     value={selected || ''}
                     onChange={(e) => loadConfig(e.target.value)}
@@ -158,7 +159,7 @@ export default function PaymentsManager() {
                         <SectionHead icon={Hash} title="Hospital Safaricom shortcode" />
                         <div className="grid grid-cols-2 gap-3">
                             <Field label="Shortcode (PayBill / Till)">
-                                <input className="input" value={form.shortcode}
+                                <input aria-label="Shortcode (PayBill / Till)" className="input" value={form.shortcode}
                                        onChange={e => setForm({ ...form, shortcode: e.target.value })}
                                        placeholder="e.g. 247247 or 5123456" />
                             </Field>
@@ -179,7 +180,7 @@ export default function PaymentsManager() {
                             the values from their Pay Hero dashboard.
                         </p>
                         <Field label="Pay Hero channel id">
-                            <input className="input" value={form.payhero_channel_id}
+                            <input aria-label="Pay Hero channel id" className="input" value={form.payhero_channel_id}
                                    onChange={e => setForm({ ...form, payhero_channel_id: e.target.value })}
                                    placeholder="copied from the Pay Hero dashboard" />
                         </Field>
@@ -223,11 +224,11 @@ export default function PaymentsManager() {
                                 </select>
                             </Field>
                             <Field label="Account number">
-                                <input className="input" value={form.settlement_account_number}
+                                <input aria-label="Account number" className="input" value={form.settlement_account_number}
                                        onChange={e => setForm({ ...form, settlement_account_number: e.target.value })} />
                             </Field>
                             <Field label="Account name">
-                                <input className="input" value={form.settlement_account_name}
+                                <input aria-label="Account name" className="input" value={form.settlement_account_name}
                                        onChange={e => setForm({ ...form, settlement_account_name: e.target.value })} />
                             </Field>
                         </div>
@@ -235,17 +236,17 @@ export default function PaymentsManager() {
                         <SectionHead icon={Banknote} title="Customisation" />
                         <div className="grid grid-cols-2 gap-3">
                             <Field label="Account reference">
-                                <input className="input" value={form.account_reference}
+                                <input aria-label="Account reference" className="input" value={form.account_reference}
                                        onChange={e => setForm({ ...form, account_reference: e.target.value })} />
                             </Field>
                             <Field label="Transaction description">
-                                <input className="input" value={form.transaction_desc}
+                                <input aria-label="Transaction description" className="input" value={form.transaction_desc}
                                        onChange={e => setForm({ ...form, transaction_desc: e.target.value })} />
                             </Field>
                         </div>
 
                         <div className="flex justify-end pt-2 border-t border-ink-100 dark:border-ink-800">
-                            <button onClick={save} disabled={saving}
+                            <button type="button" onClick={save} disabled={saving}
                                     className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                                 {saving ? 'Saving…' : 'Save wiring'}
                             </button>
@@ -261,10 +262,10 @@ export default function PaymentsManager() {
                             <p className="text-xs text-ink-500 dark:text-ink-400">
                                 Real KES&nbsp;1 STK push using this hospital's saved wiring.
                             </p>
-                            <input className="input" value={testPhone}
+                            <input aria-label="07XXXXXXXX or 2547XXXXXXXX" className="input" value={testPhone}
                                    onChange={e => setTestPhone(e.target.value)}
                                    placeholder="07XXXXXXXX or 2547XXXXXXXX" />
-                            <button onClick={testStk} disabled={testing || !config?.mpesa_active}
+                            <button type="button" onClick={testStk} disabled={testing || !config?.mpesa_active}
                                     className="w-full px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                                 {testing ? 'Sending…' : 'Send test'}
                             </button>

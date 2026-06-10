@@ -115,8 +115,8 @@ export default function PatientPortal() {
                         </div>
 
                         <div>
-                            <label className="label">OP Number</label>
-                            <input
+                            <label htmlFor="patien-op-number" className="label">OP Number</label>
+                            <input id="patien-op-number"
                                 required type="text"
                                 value={verifyForm.outpatient_no}
                                 onChange={(e) => setVerifyForm({ ...verifyForm, outpatient_no: e.target.value.toUpperCase() })}
@@ -125,14 +125,14 @@ export default function PatientPortal() {
                             />
                         </div>
                         <div>
-                            <label className="label">Date of birth</label>
-                            <input required type="date" value={verifyForm.date_of_birth}
+                            <label htmlFor="patien-date-of-birth" className="label">Date of birth</label>
+                            <input id="patien-date-of-birth" required type="date" value={verifyForm.date_of_birth}
                                 onChange={(e) => setVerifyForm({ ...verifyForm, date_of_birth: e.target.value })}
                                 className="input" />
                         </div>
                         <div>
-                            <label className="label">Last 4 digits of phone</label>
-                            <input
+                            <label htmlFor="patien-last-4-digits-of-phone" className="label">Last 4 digits of phone</label>
+                            <input id="patien-last-4-digits-of-phone"
                                 required type="text" inputMode="numeric" pattern="\d{4}" maxLength={4}
                                 value={verifyForm.phone_last4}
                                 onChange={(e) => setVerifyForm({ ...verifyForm, phone_last4: e.target.value.replace(/\D/g, '') })}
@@ -171,13 +171,13 @@ export default function PatientPortal() {
                             <p className="text-xs text-ink-500 font-mono">{profile?.outpatient_no}</p>
                         </div>
                     </div>
-                    <button onClick={handleLogout} className="flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-rose-600 px-3 py-2 rounded-lg hover:bg-rose-50 transition-colors">
+                    <button type="button" onClick={handleLogout} className="flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-rose-600 px-3 py-2 rounded-lg hover:bg-rose-50 transition-colors">
                         <LogOut size={15} /> Sign out
                     </button>
                 </div>
                 <nav className="max-w-5xl mx-auto px-4 sm:px-6 flex gap-1 border-t border-ink-100 overflow-x-auto" aria-label="Portal sections">
                     {TABS.map(({ key, label, icon: Icon }) => (
-                        <button key={key} onClick={() => setActiveTab(key)}
+                        <button type="button" key={key} onClick={() => setActiveTab(key)}
                             aria-current={activeTab === key ? 'page' : undefined}
                             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
                                 activeTab === key

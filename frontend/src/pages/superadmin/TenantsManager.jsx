@@ -16,11 +16,11 @@ const formatApiError = (err, fallback = 'Request failed.') => {
     if (typeof detail === 'string' && detail.trim()) return detail;
     if (Array.isArray(detail)) {
         return detail
-            .map((d) => {
+            .flatMap((d) => {
                 const where = Array.isArray(d.loc) ? d.loc.slice(1).join('.') : '';
-                return where ? `${where}: ${d.msg}` : d.msg;
+                const msg = where ? `${where}: ${d.msg}` : d.msg;
+                return msg ? [msg] : [];
             })
-            .filter(Boolean)
             .join(' · ') || fallback;
     }
     if (detail && typeof detail === 'object' && detail.msg) return detail.msg;
@@ -33,6 +33,9 @@ const showApiError = (err, fallback) => {
     const duration = err?.response?.data?.detail ? 6000 : 4000;
     toast.error(msg, { duration });
 };
+
+// Pure helper hoisted to module scope (no component state).
+const tenantNumericId = (t) => String(t.id || t.tenant_id || '').replace(/^tenant_/, '');
 
 export default function TenantsManager() {
     const [tenants, setTenants] = useState([]);
@@ -65,8 +68,6 @@ export default function TenantsManager() {
     // legacy free-text editor in that case.
     const [moduleCatalogue, setModuleCatalogue] = useState([]);
     const [moduleSearch, setModuleSearch] = useState('');
-
-    const tenantNumericId = (t) => String(t.id || t.tenant_id || '').replace(/^tenant_/, '');
 
     const openEdit = (tenant) => {
         setEditing(tenant);
@@ -273,11 +274,11 @@ export default function TenantsManager() {
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => openEdit(tenant)} aria-label={`Edit ${tenant.name}`}
+                                                <button type="button" onClick={() => openEdit(tenant)} aria-label={`Edit ${tenant.name}`}
                                                     className="p-2 hover:bg-ink-100 rounded-lg text-ink-500 hover:text-ink-900 transition-colors cursor-pointer" title="Edit configuration">
                                                     <Edit2 size={15} aria-hidden="true" />
                                                 </button>
-                                                <button onClick={() => handleSuspendToggle(tenant)}
+                                                <button type="button" onClick={() => handleSuspendToggle(tenant)}
                                                     aria-label={(tenant.is_active ?? true) ? `Suspend ${tenant.name}` : `Reactivate ${tenant.name}`}
                                                     className={`p-2 rounded-lg transition-colors cursor-pointer ${(tenant.is_active ?? true) ? 'text-ink-500 hover:bg-rose-50 hover:text-rose-600' : 'text-accent-600 hover:bg-accent-50'}`}
                                                     title={(tenant.is_active ?? true) ? 'Suspend instance' : 'Reactivate instance'}>
@@ -764,37 +765,37 @@ export default function TenantsManager() {
                     <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
                         <div className="px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-center">
                             <h2 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">Provision new tenant</h2>
-                            <button onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 transition-colors cursor-pointer"><X size={18} /></button>
+                            <button type="button" onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 transition-colors cursor-pointer"><X size={18} /></button>
                         </div>
                         <form onSubmit={handleProvisionTenant} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Hospital Name</label>
-                                <input required type="text" value={newTenant.name} onChange={e => setNewTenant({...newTenant, name: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="e.g. Aga Khan Hospital" />
+                                <label htmlFor="tenant-hospital-name" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Hospital Name</label>
+                                <input id="tenant-hospital-name" required type="text" value={newTenant.name} onChange={e => setNewTenant({...newTenant, name: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="e.g. Aga Khan Hospital" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Subdomain Route</label>
-                                    <input required type="text" value={newTenant.domain} onChange={e => setNewTenant({...newTenant, domain: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="e.g. agakhan.hms.com" />
+                                    <label htmlFor="tenant-subdomain-route" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Subdomain Route</label>
+                                    <input id="tenant-subdomain-route" required type="text" value={newTenant.domain} onChange={e => setNewTenant({...newTenant, domain: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="e.g. agakhan.hms.com" />
                                 </div>
                                 <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Database Name</label>
-                                    <input required type="text" value={newTenant.db_name} onChange={e => setNewTenant({...newTenant, db_name: e.target.value})} className="w-full bg-ink-50 dark:bg-ink-800/40 border border-ink-200 dark:border-ink-800 rounded-lg px-4 py-2 text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none font-mono text-sm" placeholder="e.g. agakhan_db" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Bootstrap Admin Email</label>
-                                    <input required type="email" value={newTenant.admin_email} onChange={e => setNewTenant({...newTenant, admin_email: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="admin@agakhan.com" />
-                                </div>
-                                <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Admin Full Name</label>
-                                    <input required type="text" value={newTenant.admin_full_name} onChange={e => setNewTenant({...newTenant, admin_full_name: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="Jane Mwangi" />
+                                    <label htmlFor="tenant-database-name" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Database Name</label>
+                                    <input id="tenant-database-name" required type="text" value={newTenant.db_name} onChange={e => setNewTenant({...newTenant, db_name: e.target.value})} className="w-full bg-ink-50 dark:bg-ink-800/40 border border-ink-200 dark:border-ink-800 rounded-lg px-4 py-2 text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none font-mono text-sm" placeholder="e.g. agakhan_db" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Theme Color</label>
-                                    <select value={newTenant.theme_color} onChange={e => setNewTenant({...newTenant, theme_color: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all">
+                                    <label htmlFor="tenant-bootstrap-admin-email" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Bootstrap Admin Email</label>
+                                    <input id="tenant-bootstrap-admin-email" required type="email" value={newTenant.admin_email} onChange={e => setNewTenant({...newTenant, admin_email: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="admin@agakhan.com" />
+                                </div>
+                                <div>
+                                    <label htmlFor="tenant-admin-full-name" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Admin Full Name</label>
+                                    <input id="tenant-admin-full-name" required type="text" value={newTenant.admin_full_name} onChange={e => setNewTenant({...newTenant, admin_full_name: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all" placeholder="Jane Mwangi" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="tenant-theme-color" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Theme Color</label>
+                                    <select id="tenant-theme-color" value={newTenant.theme_color} onChange={e => setNewTenant({...newTenant, theme_color: e.target.value})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all">
                                         <option value="blue">Blue (Default)</option>
                                         <option value="emerald">Emerald</option>
                                         <option value="rose">Rose</option>
@@ -802,8 +803,8 @@ export default function TenantsManager() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Subscription Tier</label>
-                                    <select value={newTenant.is_premium} onChange={e => setNewTenant({...newTenant, is_premium: e.target.value === 'true'})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all">
+                                    <label htmlFor="tenant-subscription-tier" className="block text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em] mb-1.5">Subscription Tier</label>
+                                    <select id="tenant-subscription-tier" value={newTenant.is_premium} onChange={e => setNewTenant({...newTenant, is_premium: e.target.value === 'true'})} className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3.5 py-2.5 text-sm text-ink-900 dark:text-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all">
                                         <option value="false">Standard (Basic Modules)</option>
                                         <option value="true">Premium (All Modules)</option>
                                     </select>

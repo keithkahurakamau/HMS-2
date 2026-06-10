@@ -12,6 +12,15 @@ import PageHeader from '../../components/PageHeader';
  * there and rolling-restart workers; we surface the *effective* values here so
  * a superadmin can verify the runtime state matches their expectation.
  */
+const PROBING_BADGE = (
+    <span className="text-ink-500 dark:text-ink-400 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" aria-hidden="true" /> Probing</span>
+);
+const OPERATIONAL_BADGE = (
+    <span className="badge-success inline-flex items-center gap-1.5">
+        <Server size={11} aria-hidden="true" /> Operational
+    </span>
+);
+
 export default function PlatformSettings() {
     const [health, setHealth] = useState(null);
     const [tenants, setTenants] = useState(0);
@@ -116,15 +125,7 @@ export default function PlatformSettings() {
                 title="Platform Settings"
                 subtitle="Runtime configuration snapshot. Edit .env and rolling-restart workers to change values."
                 tone="accent"
-                meta={
-                    isLoading ? (
-                        <span className="text-ink-500 dark:text-ink-400 text-xs flex items-center gap-2"><Activity size={14} className="animate-spin" aria-hidden="true" /> Probing</span>
-                    ) : (
-                        <span className="badge-success inline-flex items-center gap-1.5">
-                            <Server size={11} aria-hidden="true" /> Operational
-                        </span>
-                    )
-                }
+                meta={isLoading ? PROBING_BADGE : OPERATIONAL_BADGE}
             />
 
             {sections.map(({ title, icon: Icon, rows }) => (

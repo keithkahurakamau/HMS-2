@@ -42,6 +42,12 @@ const defaultForm = {
     description: '', event_date: '', severity: 'N/A', status: 'Active', is_sensitive: false
 };
 
+const KDPA_BADGE = (
+    <span className="badge-success">
+        <ShieldCheck size={12} /> KDPA 2019
+    </span>
+);
+
 export default function MedicalHistory() {
     const [searchParams] = useSearchParams();
     const [chart, setChart] = useState(null);
@@ -199,11 +205,7 @@ export default function MedicalHistory() {
                 icon={FileText}
                 title="Medical History"
                 subtitle="Full patient medical chart — KDPA 2019 compliant."
-                meta={
-                    <span className="badge-success">
-                        <ShieldCheck size={12} /> KDPA 2019
-                    </span>
-                }
+                meta={KDPA_BADGE}
             />
 
             {/* Patient Search */}
@@ -211,7 +213,7 @@ export default function MedicalHistory() {
                 <form onSubmit={handleSearch} className="flex gap-2 relative flex-wrap">
                     <div className="relative flex-1 min-w-[16rem]">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-                        <input
+                        <input aria-label="Search patient by name, ID, or phone to load their medical chart…"
                             type="text" placeholder="Search patient by name, ID, or phone to load their medical chart…"
                             value={searchInput}
                             onChange={e => { setSearchInput(e.target.value); setShowSuggestions(true); }}
@@ -273,7 +275,7 @@ export default function MedicalHistory() {
                                     <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-100">Patient chart</span>
                                     <h2 className="text-xl sm:text-2xl font-semibold mt-1 tracking-tight">{chart.patient_name}</h2>
                                     <p className="text-brand-100/90 text-sm mt-1 font-mono">{chart.opd_number}</p>
-                                    <button
+                                    <button type="button"
                                         onClick={() => printMedicalHistory({
                                             patient: { full_name: chart.patient_name, outpatient_no: chart.opd_number, date_of_birth: chart.date_of_birth, sex: chart.sex },
                                             entries: chart.entries || [],
@@ -325,7 +327,7 @@ export default function MedicalHistory() {
                             const colorClass = colorMap[type.color];
                             return (
                                 <div key={type.key} id={`mh-section-${type.key}`} data-tour={type.key === ENTRY_TYPES[0].key ? 'mh-entry-section' : undefined} className="card overflow-hidden scroll-mt-20">
-                                    <button
+                                    <button type="button"
                                         onClick={() => toggleSection(type.key)}
                                         className="w-full flex items-center justify-between p-4 hover:bg-ink-50/50 dark:hover:bg-ink-800/50 transition-colors"
                                     >
@@ -371,10 +373,10 @@ export default function MedicalHistory() {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1 shrink-0">
-                                                                    <button onClick={() => openEditModal(entry)} className="p-1.5 text-slate-400 dark:text-ink-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors">
+                                                                    <button type="button" onClick={() => openEditModal(entry)} className="p-1.5 text-slate-400 dark:text-ink-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors">
                                                                         <Edit size={14} />
                                                                     </button>
-                                                                    <button onClick={() => handleDelete(entry.entry_id)} className="p-1.5 text-slate-400 dark:text-ink-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
+                                                                    <button type="button" onClick={() => handleDelete(entry.entry_id)} className="p-1.5 text-slate-500 dark:text-ink-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
                                                                         <Trash2 size={14} />
                                                                     </button>
                                                                 </div>
@@ -419,50 +421,50 @@ export default function MedicalHistory() {
             {/* Add / Edit Entry Modal */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)} />
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)} />
                     <div className="relative w-full max-w-lg bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up max-h-[90vh]">
                         <div className="p-5 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-between items-center shrink-0">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editEntry ? 'Edit History Entry' : 'Add History Entry'}</h2>
                                 <p className="text-xs text-slate-500 dark:text-ink-400 mt-0.5">All entries are audit-logged per KDPA 2019.</p>
                             </div>
-                            <button onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer"><X size={20} aria-hidden="true" /></button>
+                            <button type="button" onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 rounded-lg hover:bg-ink-100 cursor-pointer"><X size={20} aria-hidden="true" /></button>
                         </div>
 
                         <form id="historyForm" onSubmit={handleAddEntry} className="p-5 space-y-4 overflow-y-auto">
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Entry Type <span className="text-red-500">*</span></label>
-                                <select value={form.entry_type} onChange={e => setForm({ ...form, entry_type: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">
+                                <label htmlFor="medica-entry-type" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Entry Type <span className="text-red-500">*</span></label>
+                                <select id="medica-entry-type" value={form.entry_type} onChange={e => setForm({ ...form, entry_type: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">
                                     {ENTRY_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
                                 </select>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Title <span className="text-red-500">*</span></label>
-                                <input required type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Appendectomy, Penicillin Allergy" className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:bg-ink-900 dark:text-white" />
+                                <label htmlFor="medica-title" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Title <span className="text-red-500">*</span></label>
+                                <input id="medica-title" required type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Appendectomy, Penicillin Allergy" className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:bg-ink-900 dark:text-white" />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Detailed Description <span className="text-red-500">*</span></label>
-                                <textarea required rows="3" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Full clinical description of the event..." className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none dark:bg-ink-900 dark:text-white" />
+                                <label htmlFor="medica-detailed-description" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Detailed Description <span className="text-red-500">*</span></label>
+                                <textarea id="medica-detailed-description" required rows="3" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Full clinical description of the event..." className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none dark:bg-ink-900 dark:text-white" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Approximate Date</label>
-                                    <input type="text" value={form.event_date} onChange={e => setForm({ ...form, event_date: e.target.value })} placeholder="e.g. March 2019, 2015" className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:bg-ink-900 dark:text-white" />
+                                    <label htmlFor="medica-approximate-date" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Approximate Date</label>
+                                    <input id="medica-approximate-date" type="text" value={form.event_date} onChange={e => setForm({ ...form, event_date: e.target.value })} placeholder="e.g. March 2019, 2015" className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none dark:bg-ink-900 dark:text-white" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Severity</label>
-                                    <select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">
+                                    <label htmlFor="medica-severity" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Severity</label>
+                                    <select id="medica-severity" value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">
                                         {SEVERITY_LEVELS.map(s => <option key={s}>{s}</option>)}
                                     </select>
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Status</label>
-                                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">
+                                <label htmlFor="medica-status" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Status</label>
+                                <select id="medica-status" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">
                                     {STATUSES.map(s => <option key={s}>{s}</option>)}
                                 </select>
                             </div>
@@ -524,7 +526,9 @@ function ConsentCard({ patientId, consents, onRecorded }) {
         return (consents || [])
             .filter(c => c.consent_type === 'Treatment' && c.consent_given
                 && (!c.consent_expires_at || new Date(c.consent_expires_at).getTime() > now))
-            .sort((a, b) => new Date(b.consented_at) - new Date(a.consented_at))[0] || null;
+            .reduce((latest, c) =>
+                (!latest || new Date(c.consented_at).getTime() > new Date(latest.consented_at).getTime()) ? c : latest,
+                null);
     }, [consents]);
 
     const submit = async (e) => {
@@ -612,25 +616,25 @@ function ConsentCard({ patientId, consents, onRecorded }) {
                 <form onSubmit={submit} className="p-4 border-t border-ink-100 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/40 space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                            <label className="label">Consent type</label>
-                            <select name="consent_type" value={form.consent_type} onChange={handle} className="input">
+                            <label htmlFor="medica-consent-type" className="label">Consent type</label>
+                            <select id="medica-consent-type" name="consent_type" value={form.consent_type} onChange={handle} className="input">
                                 {CONSENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="label">Method</label>
-                            <select name="consent_method" value={form.consent_method} onChange={handle} className="input">
+                            <label htmlFor="medica-method" className="label">Method</label>
+                            <select id="medica-method" name="consent_method" value={form.consent_method} onChange={handle} className="input">
                                 {CONSENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="label">Expires (optional)</label>
-                            <input type="date" name="consent_expires_at" value={form.consent_expires_at} onChange={handle} className="input" />
+                            <label htmlFor="medica-expires-optional" className="label">Expires (optional)</label>
+                            <input id="medica-expires-optional" type="date" name="consent_expires_at" value={form.consent_expires_at} onChange={handle} className="input" />
                         </div>
                     </div>
                     <div>
-                        <label className="label">Notes (optional)</label>
-                        <textarea name="notes" value={form.notes} onChange={handle} rows="2" className="input" placeholder="e.g., Patient consented verbally during admission" />
+                        <label htmlFor="medica-notes-optional" className="label">Notes (optional)</label>
+                        <textarea id="medica-notes-optional" name="notes" value={form.notes} onChange={handle} rows="2" className="input" placeholder="e.g., Patient consented verbally during admission" />
                     </div>
                     <div className="flex gap-2 justify-end">
                         <button type="button" onClick={() => setOpen(false)} className="btn-secondary text-xs">Cancel</button>

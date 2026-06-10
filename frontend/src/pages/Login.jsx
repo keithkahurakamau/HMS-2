@@ -206,6 +206,7 @@ export default function Login() {
                 </div>
 
                 <p className="mt-12 text-2xs text-ink-400 uppercase tracking-[0.16em]">
+                    {/* react-doctor-disable-next-line react-doctor/rendering-hydration-mismatch-time */}
                     &copy; {new Date().getFullYear()} {tenantName}
                 </p>
             </main>

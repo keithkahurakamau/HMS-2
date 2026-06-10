@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { createContext, use, useEffect, useMemo, useState, useCallback } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from './AuthContext';
 
@@ -65,7 +65,7 @@ export const ModuleProvider = ({ children }) => {
 };
 
 export const useModules = () => {
-    const ctx = useContext(ModuleContext);
+    const ctx = use(ModuleContext);
     if (!ctx) {
         throw new Error('useModules must be used within ModuleProvider');
     }

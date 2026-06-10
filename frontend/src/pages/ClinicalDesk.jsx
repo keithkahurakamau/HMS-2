@@ -17,11 +17,16 @@ const ICD_DATABASE = ["A09 - Infectious gastroenteritis", "E11.9 - Type 2 diabet
 // Prescription pick-lists — kept at module scope so the dropdowns are stable.
 const FORMULATIONS = ["Tablet", "Capsule", "Syrup", "Suspension", "Injection", "Cream / Ointment", "Drops", "Inhaler", "Suppository", "Other"];
 const FREQUENCIES = ["OD (once daily)", "BD (twice daily)", "TDS (three times daily)", "QDS (four times daily)", "PRN (as needed)", "STAT (immediately)", "Nocte (at night)"];
-const blankMed = () => ({ drug: '', formulation: 'Tablet', dosage: '', frequency: '', duration: '' });
+const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tablet', dosage: '', frequency: '', duration: '' });
 
 // Split a stored chief-complaint string back into discrete complaints. Newer
 // records join with "; "; older free-text ones become a single complaint.
-const splitComplaints = (s) => (s || '').split(/\s*;\s*|\n+/).map((c) => c.trim()).filter(Boolean);
+const splitComplaints = (s) => (s || '').split(/\s*;\s*|\n+/).flatMap((c) => { const t = c.trim(); return t ? [t] : []; });
+
+// Pure helper — hoisted to module scope (uses no component state).
+const handleNotImplemented = (moduleName) => {
+    toast(`The ${moduleName} module is currently under development.`, { icon: '🚧' });
+};
 
 export default function ClinicalDesk() {
     const navigate = useNavigate();
@@ -200,10 +205,6 @@ export default function ClinicalDesk() {
     };
 
     // --- ACTION HANDLERS ---
-    const handleNotImplemented = (moduleName) => {
-        toast(`The ${moduleName} module is currently under development.`, { icon: '🚧' });
-    };
-
     // --- CHIEF COMPLAINT (multi-entry) ---
     const addComplaint = () => {
         const value = complaintInput.trim();
@@ -296,7 +297,7 @@ export default function ClinicalDesk() {
             // Structured prescriptions serialise to JSON in treatment_plan —
             // this is what the Pharmacy queue parses back into rows.
             treatment_plan: medications.some((m) => m.drug.trim())
-                ? JSON.stringify(medications.filter((m) => m.drug.trim()))
+                ? JSON.stringify(medications.filter((m) => m.drug.trim()).map(({ _uid, ...m }) => m))
                 : null,
             internal_notes: clinicalNotes.internal_notes
         };
@@ -374,7 +375,7 @@ export default function ClinicalDesk() {
             {/* TOP PANEL: Collapsible Queue */}
             <div data-tour="clinical-queue" className="card shrink-0 flex flex-col z-20">
                 <div className="w-full p-4 flex justify-between items-center gap-3 bg-ink-50/60 dark:bg-ink-800/40 rounded-t-2xl">
-                    <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="flex items-center gap-3 min-w-0 hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded-lg">
+                    <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="flex items-center gap-3 min-w-0 hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded-lg">
                         <Users className="text-brand-600 dark:text-brand-400 shrink-0" size={18} />
                         <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Active Queue</h2>
                         <span className="badge-brand">{queue.length} Waiting</span>
@@ -499,7 +500,7 @@ export default function ClinicalDesk() {
                                     { icon: Dna,       label: 'Family Hx',     entry_type: 'FAMILY_HISTORY' },
                                     { icon: Syringe,   label: 'Immunizations', entry_type: 'IMMUNIZATION' },
                                 ].map(({ icon: Icon, label, entry_type }) => (
-                                    <button
+                                    <button type="button"
                                         key={label}
                                         onClick={() => {
                                             const params = new URLSearchParams({ patient_id: String(activePatient.patient_id) });
@@ -520,17 +521,17 @@ export default function ClinicalDesk() {
                             <div data-tour="clinical-vitals" className="card-flush p-5 border-l-4 border-l-brand-500">
                                 <div className="flex justify-between items-center mb-4 border-b border-ink-100 dark:border-ink-800 pb-3">
                                     <h3 className="section-eyebrow flex items-center gap-2"><Activity size={16} className="text-brand-500" /> Vital signs</h3>
-                                    <button onClick={() => handleNotImplemented('Vitals Trends')} className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1"><Activity size={13} /> View trends</button>
+                                    <button type="button" onClick={() => handleNotImplemented('Vitals Trends')} className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1"><Activity size={13} /> View trends</button>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-                                    <div><label className="label">BP (mmHg)</label><input type="text" value={vitals.bp} onChange={(e) => setVitals({...vitals, bp: e.target.value})} placeholder="120/80" className="input" /></div>
-                                    <div><label className="label">HR (bpm)</label><input type="number" value={vitals.hr} onChange={(e) => setVitals({...vitals, hr: e.target.value})} placeholder="72" className="input" /></div>
-                                    <div><label className="label">Resp (bpm)</label><input type="number" value={vitals.rr} onChange={(e) => setVitals({...vitals, rr: e.target.value})} placeholder="16" className="input" /></div>
-                                    <div><label className="label">Temp (°C)</label><input type="number" step="0.1" value={vitals.temp} onChange={(e) => setVitals({...vitals, temp: e.target.value})} placeholder="37.2" className="input" /></div>
-                                    <div><label className="label">SpO₂ (%)</label><input type="number" value={vitals.spo2} onChange={(e) => setVitals({...vitals, spo2: e.target.value})} placeholder="98" className="input" /></div>
-                                    <div><label className="label">Weight (kg)</label><input type="number" value={vitals.weight} onChange={(e) => setVitals({...vitals, weight: e.target.value})} placeholder="70" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
-                                    <div><label className="label">Height (cm)</label><input type="number" value={vitals.height} onChange={(e) => setVitals({...vitals, height: e.target.value})} placeholder="175" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
-                                    <div><label className="label text-brand-700 dark:text-brand-300">BMI</label><div className="input bg-brand-50 dark:bg-brand-500/10 ring-1 ring-brand-200 dark:ring-brand-500/20 text-brand-800 dark:text-brand-300 font-semibold text-center">{calculateBMI()}</div></div>
+                                    <div><label htmlFor="clinic-bp-mmhg" className="label">BP (mmHg)</label><input id="clinic-bp-mmhg" type="text" value={vitals.bp} onChange={(e) => setVitals({...vitals, bp: e.target.value})} placeholder="120/80" className="input" /></div>
+                                    <div><label htmlFor="clinic-hr-bpm" className="label">HR (bpm)</label><input id="clinic-hr-bpm" type="number" value={vitals.hr} onChange={(e) => setVitals({...vitals, hr: e.target.value})} placeholder="72" className="input" /></div>
+                                    <div><label htmlFor="clinic-resp-bpm" className="label">Resp (bpm)</label><input id="clinic-resp-bpm" type="number" value={vitals.rr} onChange={(e) => setVitals({...vitals, rr: e.target.value})} placeholder="16" className="input" /></div>
+                                    <div><label htmlFor="clinic-temp-c" className="label">Temp (°C)</label><input id="clinic-temp-c" type="number" step="0.1" value={vitals.temp} onChange={(e) => setVitals({...vitals, temp: e.target.value})} placeholder="37.2" className="input" /></div>
+                                    <div><label htmlFor="clinic-spo" className="label">SpO₂ (%)</label><input id="clinic-spo" type="number" value={vitals.spo2} onChange={(e) => setVitals({...vitals, spo2: e.target.value})} placeholder="98" className="input" /></div>
+                                    <div><label htmlFor="clinic-weight-kg" className="label">Weight (kg)</label><input id="clinic-weight-kg" type="number" value={vitals.weight} onChange={(e) => setVitals({...vitals, weight: e.target.value})} placeholder="70" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
+                                    <div><label htmlFor="clinic-height-cm" className="label">Height (cm)</label><input id="clinic-height-cm" type="number" value={vitals.height} onChange={(e) => setVitals({...vitals, height: e.target.value})} placeholder="175" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
+                                    <div><span className="label text-brand-700 dark:text-brand-300 block">BMI</span><div className="input bg-brand-50 dark:bg-brand-500/10 ring-1 ring-brand-200 dark:ring-brand-500/20 text-brand-800 dark:text-brand-300 font-semibold text-center">{calculateBMI()}</div></div>
                                 </div>
                             </div>
 
@@ -538,9 +539,9 @@ export default function ClinicalDesk() {
                             <div className="card-flush p-5 border-l-4 border-l-ink-700 space-y-4">
                                 <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><FileText size={16} className="text-ink-600 dark:text-ink-400" /> Clinical documentation</h3>
                                 <div>
-                                    <label className="label">Chief complaint(s) (CC)</label>
+                                    <label htmlFor="clinic-chief-complaint-s-cc" className="label">Chief complaint(s) (CC)</label>
                                     <div className="flex gap-2">
-                                        <input
+                                        <input id="clinic-chief-complaint-s-cc"
                                             type="text"
                                             value={complaintInput}
                                             onChange={(e) => setComplaintInput(e.target.value)}
@@ -553,7 +554,7 @@ export default function ClinicalDesk() {
                                     {complaints.length > 0 && (
                                         <ol className="mt-3 space-y-1.5">
                                             {complaints.map((c, idx) => (
-                                                <li key={idx} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
+                                                <li key={c} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
                                                     <span className="font-mono text-2xs font-semibold text-ink-400 w-5 shrink-0">{idx + 1}.</span>
                                                     <span className="flex-1 text-ink-800 dark:text-ink-200">{c}</span>
                                                     <button type="button" onClick={() => removeComplaint(idx)} aria-label={`Remove complaint ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0"><X size={14} /></button>
@@ -562,8 +563,8 @@ export default function ClinicalDesk() {
                                         </ol>
                                     )}
                                 </div>
-                                <div><label className="label">History of present illness (HPI)</label><textarea rows="3" value={clinicalNotes.hpi} onChange={(e) => setClinicalNotes({...clinicalNotes, hpi: e.target.value})} className="input resize-none" placeholder="Narrative of the patient's symptoms…"></textarea></div>
-                                <div><label className="label">Physical examination (Objective)</label><textarea rows="3" value={clinicalNotes.objective} onChange={(e) => setClinicalNotes({...clinicalNotes, objective: e.target.value})} className="input resize-none" placeholder="Systematic findings…"></textarea></div>
+                                <div><label htmlFor="clinic-history-of-present-illness-hpi" className="label">History of present illness (HPI)</label><textarea id="clinic-history-of-present-illness-hpi" rows="3" value={clinicalNotes.hpi} onChange={(e) => setClinicalNotes({...clinicalNotes, hpi: e.target.value})} className="input resize-none" placeholder="Narrative of the patient's symptoms…"></textarea></div>
+                                <div><label htmlFor="clinic-physical-examination-objective" className="label">Physical examination (Objective)</label><textarea id="clinic-physical-examination-objective" rows="3" value={clinicalNotes.objective} onChange={(e) => setClinicalNotes({...clinicalNotes, objective: e.target.value})} className="input resize-none" placeholder="Systematic findings…"></textarea></div>
                             </div>
 
                             {/* Orders & Prescriptions */}
@@ -571,11 +572,11 @@ export default function ClinicalDesk() {
                                 <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><Pill size={16} className="text-accent-600 dark:text-accent-400" /> Diagnosis &amp; orders</h3>
 
                                 <div className="relative">
-                                    <label className="label">Final diagnosis (ICD-10)</label>
-                                    <input type="text" value={icdSearch} onChange={(e) => { setIcdSearch(e.target.value); setShowIcdDropdown(true); }} onFocus={() => setShowIcdDropdown(true)} className="input" placeholder="Type to search ICD-10 codes…" />
+                                    <label htmlFor="clinic-final-diagnosis-icd-10" className="label">Final diagnosis (ICD-10)</label>
+                                    <input id="clinic-final-diagnosis-icd-10" type="text" value={icdSearch} onChange={(e) => { setIcdSearch(e.target.value); setShowIcdDropdown(true); }} onFocus={() => setShowIcdDropdown(true)} className="input" placeholder="Type to search ICD-10 codes…" />
                                     {showIcdDropdown && icdSearch.length > 0 && (
                                         <div className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-elevated max-h-48 overflow-y-auto custom-scrollbar">
-                                            {filteredIcd.length > 0 ? filteredIcd.map((code, idx) => (<button type="button" key={idx} onClick={() => {setIcdSearch(code); setShowIcdDropdown(false);}} className="block w-full text-left px-4 py-2 hover:bg-brand-50 dark:hover:bg-brand-500/15 text-sm dark:text-ink-200">{code}</button>)) : <div className="px-4 py-3 text-sm text-ink-500 dark:text-ink-400">No codes found.</div>}
+                                            {filteredIcd.length > 0 ? filteredIcd.map((code) => (<button type="button" key={code} onClick={() => {setIcdSearch(code); setShowIcdDropdown(false);}} className="block w-full text-left px-4 py-2 hover:bg-brand-50 dark:hover:bg-brand-500/15 text-sm dark:text-ink-200">{code}</button>)) : <div className="px-4 py-3 text-sm text-ink-500 dark:text-ink-400">No codes found.</div>}
                                         </div>
                                     )}
                                 </div>
@@ -611,45 +612,45 @@ export default function ClinicalDesk() {
                                     ) : (
                                         <div className="space-y-2">
                                             {medications.map((med, idx) => (
-                                                <div key={idx} className="rounded-lg border border-accent-200/70 dark:border-accent-500/20 bg-white dark:bg-ink-900 p-3">
+                                                <div key={med._uid} className="rounded-lg border border-accent-200/70 dark:border-accent-500/20 bg-white dark:bg-ink-900 p-3">
                                                     <div className="flex items-center gap-2 mb-2">
                                                         <span className="size-5 shrink-0 rounded-full bg-accent-100 dark:bg-accent-500/20 text-accent-700 dark:text-accent-300 text-2xs font-bold flex items-center justify-center">{idx + 1}</span>
-                                                        <input value={med.drug} onChange={(e) => updateMedication(idx, 'drug', e.target.value)} className="input flex-1 py-1.5" placeholder="Drug name (e.g. Amoxicillin)" />
+                                                        <input aria-label="Drug name (e.g. Amoxicillin)" value={med.drug} onChange={(e) => updateMedication(idx, 'drug', e.target.value)} className="input flex-1 py-1.5" placeholder="Drug name (e.g. Amoxicillin)" />
                                                         <button type="button" onClick={() => removeMedication(idx)} aria-label={`Remove medication ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0"><Trash2 size={15} /></button>
                                                     </div>
                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                                         <div>
-                                                            <label className="label text-2xs">Formulation</label>
-                                                            <select value={med.formulation} onChange={(e) => updateMedication(idx, 'formulation', e.target.value)} className="input py-1.5 text-sm">
+                                                            <label htmlFor="clinic-formulation" className="label text-2xs">Formulation</label>
+                                                            <select id="clinic-formulation" value={med.formulation} onChange={(e) => updateMedication(idx, 'formulation', e.target.value)} className="input py-1.5 text-sm">
                                                                 {FORMULATIONS.map((f) => <option key={f} value={f}>{f}</option>)}
                                                             </select>
                                                         </div>
                                                         <div>
-                                                            <label className="label text-2xs">Dosage</label>
-                                                            <input value={med.dosage} onChange={(e) => updateMedication(idx, 'dosage', e.target.value)} className="input py-1.5 text-sm" placeholder="500 mg" />
+                                                            <label htmlFor="clinic-dosage" className="label text-2xs">Dosage</label>
+                                                            <input id="clinic-dosage" value={med.dosage} onChange={(e) => updateMedication(idx, 'dosage', e.target.value)} className="input py-1.5 text-sm" placeholder="500 mg" />
                                                         </div>
                                                         <div>
-                                                            <label className="label text-2xs">Frequency</label>
-                                                            <input list="rx-frequencies" value={med.frequency} onChange={(e) => updateMedication(idx, 'frequency', e.target.value)} className="input py-1.5 text-sm" placeholder="TDS" />
+                                                            <label htmlFor="clinic-frequency" className="label text-2xs">Frequency</label>
+                                                            <input id="clinic-frequency" list="rx-frequencies" value={med.frequency} onChange={(e) => updateMedication(idx, 'frequency', e.target.value)} className="input py-1.5 text-sm" placeholder="TDS" />
                                                         </div>
                                                         <div>
-                                                            <label className="label text-2xs">Duration</label>
-                                                            <input value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} className="input py-1.5 text-sm" placeholder="5 days" />
+                                                            <label htmlFor="clinic-duration" className="label text-2xs">Duration</label>
+                                                            <input id="clinic-duration" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} className="input py-1.5 text-sm" placeholder="5 days" />
                                                         </div>
                                                     </div>
                                                 </div>
                                             ))}
-                                            <datalist id="rx-frequencies">{FREQUENCIES.map((f) => <option key={f} value={f} />)}</datalist>
+                                            <datalist id="rx-frequencies">{FREQUENCIES.map((f) => <option key={f} value={f}>{f}</option>)}</datalist>
                                         </div>
                                     )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div><label className="label">Internal notes (nursing / ward)</label><input type="text" value={clinicalNotes.internal_notes} onChange={(e) => setClinicalNotes({...clinicalNotes, internal_notes: e.target.value})} className="input" placeholder="e.g. Please administer stat dose before discharge" /></div>
+                                    <div><label htmlFor="clinic-internal-notes-nursing-ward" className="label">Internal notes (nursing / ward)</label><input id="clinic-internal-notes-nursing-ward" type="text" value={clinicalNotes.internal_notes} onChange={(e) => setClinicalNotes({...clinicalNotes, internal_notes: e.target.value})} className="input" placeholder="e.g. Please administer stat dose before discharge" /></div>
                                     <div>
-                                        <label className="label flex items-center gap-1">
+                                        <span className="label flex items-center gap-1">
                                             <CalendarPlus size={13} aria-hidden="true" /> Next follow-up
-                                        </label>
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={() => setIsFollowUpOpen(true)}
@@ -697,18 +698,18 @@ export default function ClinicalDesk() {
                         {/* Footer actions */}
                         <div data-tour="clinical-submit" className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap justify-between items-center gap-3 shrink-0 z-10">
                             <div className="flex gap-2">
-                                <button data-tour="clinical-save-draft" onClick={() => handleClinicalSubmit('Draft')} disabled={isSubmitting} className="btn-secondary"><Save size={15} /> Save draft</button>
-                                <button onClick={() => handleNotImplemented('External Referrals')} className="btn-ghost"><ArrowRightLeft size={15} /> Refer patient</button>
+                                <button type="button" data-tour="clinical-save-draft" onClick={() => handleClinicalSubmit('Draft')} disabled={isSubmitting} className="btn-secondary"><Save size={15} /> Save draft</button>
+                                <button type="button" onClick={() => handleNotImplemented('External Referrals')} className="btn-ghost"><ArrowRightLeft size={15} /> Refer patient</button>
                             </div>
 
                             <div className="flex gap-2">
-                                <button data-tour="clinical-send-billing" onClick={() => handleClinicalSubmit('Billed')} disabled={isSubmitting} className="btn-secondary text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-500/30 hover:bg-brand-50 dark:hover:bg-brand-500/15">
+                                <button type="button" data-tour="clinical-send-billing" onClick={() => handleClinicalSubmit('Billed')} disabled={isSubmitting} className="btn-secondary text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-500/30 hover:bg-brand-50 dark:hover:bg-brand-500/15">
                                     <Receipt size={15} /> Send to billing
                                 </button>
-                                <button data-tour="clinical-forward-pharmacy" onClick={() => handleClinicalSubmit('Pharmacy')} disabled={isSubmitting} className="btn-success">
+                                <button type="button" data-tour="clinical-forward-pharmacy" onClick={() => handleClinicalSubmit('Pharmacy')} disabled={isSubmitting} className="btn-success">
                                     <Pill size={15} /> Forward to pharmacy
                                 </button>
-                                <button data-tour="clinical-finalize" onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 dark:bg-ink-700 text-white hover:bg-ink-900 dark:hover:bg-ink-600 shadow-soft">
+                                <button type="button" data-tour="clinical-finalize" onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 dark:bg-ink-700 text-white hover:bg-ink-900 dark:hover:bg-ink-600 shadow-soft">
                                     <FileSignature size={15} /> Finalize &amp; sign
                                 </button>
                             </div>
@@ -767,7 +768,7 @@ const CONSENT_METHODS = ['Verbal', 'Written', 'Guardian/Next of Kin', 'Implied (
 function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
-            <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
+            <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="flex items-center gap-3">
@@ -779,7 +780,7 @@ function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit 
                             <p className="text-xs text-ink-500 dark:text-ink-400">KDPA Section 30 · {patient.patient_name}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full">
+                    <button type="button" onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full">
                         <X size={18} />
                     </button>
                 </div>
@@ -791,8 +792,8 @@ function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit 
                     </p>
 
                     <div>
-                        <label className="label">Consent method</label>
-                        <select
+                        <label htmlFor="clinic-consent-method" className="label">Consent method</label>
+                        <select id="clinic-consent-method"
                             className="input"
                             value={draft.consent_method}
                             onChange={(e) => setDraft({ ...draft, consent_method: e.target.value })}
@@ -807,8 +808,8 @@ function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit 
                     </div>
 
                     <div>
-                        <label className="label">Notes (optional)</label>
-                        <textarea
+                        <label htmlFor="clinic-notes-optional" className="label">Notes (optional)</label>
+                        <textarea id="clinic-notes-optional"
                             rows="3"
                             className="input resize-none"
                             placeholder="e.g. Witnessed by Nurse Atieno; patient confirmed understanding of treatment plan."
@@ -1295,7 +1296,7 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
     const initial = existing?.appointment_date
         ? new Date(existing.appointment_date)
         : addToDate(new Date(), { weeks: 1 });
-    const [date, setDate] = useState(toDateInput(initial));
+    const [date, setDate] = useState(() => toDateInput(initial));
     const [time, setTime] = useState(() => {
         const pad = (n) => String(n).padStart(2, '0');
         const hours = initial.getHours() || 9;
@@ -1304,7 +1305,12 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
     });
     const [notes, setNotes] = useState(existing?.notes || 'Follow-up consultation');
     const [bookings, setBookings] = useState([]);
-    const [busy, setBusy] = useState(false);
+    // `busy` is derived, not stored: it's true whenever the bookings we hold were
+    // loaded for a different (doctor, date) than the one currently selected. This
+    // avoids flipping a loading flag from inside the effect purely because a prop
+    // changed (no-adjust-state-on-prop-change).
+    const [loadedKey, setLoadedKey] = useState(null);
+    const busy = !!(doctorId && date) && loadedKey !== `${doctorId}|${date}`;
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
@@ -1326,22 +1332,22 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
 
     useEffect(() => {
         if (!doctorId || !date) return;
+        const key = `${doctorId}|${date}`;
         let cancelled = false;
-        setBusy(true);
         apiClient.get('/appointments/availability', { params: { doctor_id: doctorId, date } })
             .then(res => { if (!cancelled) setBookings(res.data?.bookings || []); })
             .catch(() => { if (!cancelled) setBookings([]); })
-            .finally(() => { if (!cancelled) setBusy(false); });
+            .finally(() => { if (!cancelled) setLoadedKey(key); });
         return () => { cancelled = true; };
     }, [doctorId, date]);
 
     const bookingTimes = useMemo(() => new Set(
-        bookings.map(b => {
-            if (!b.appointment_date) return null;
+        bookings.flatMap(b => {
+            if (!b.appointment_date) return [];
             const d = new Date(b.appointment_date);
             const pad = (n) => String(n).padStart(2, '0');
-            return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        }).filter(Boolean)
+            return [`${pad(d.getHours())}:${pad(d.getMinutes())}`];
+        })
     ), [bookings]);
 
     const applyQuickPick = (offset) => {
@@ -1448,6 +1454,7 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
                                 type="date"
                                 value={date}
                                 onChange={e => setDate(e.target.value)}
+                                // react-doctor-disable-next-line react-doctor/rendering-hydration-mismatch-time
                                 min={toDateInput(new Date())}
                                 className="mt-1.5 w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                             />

@@ -115,6 +115,11 @@ export default function Support() {
         // Strip the state so a back-forward navigation doesn't re-open the
         // composer with stale prefill data.
         navigate(location.pathname, { replace: true, state: null });
+        // location is react-router's useLocation() — a reactive value, so these
+        // deps are correct and the effect must re-run on navigation. The
+        // no-mutable-in-deps rule matches the name "location" and can't tell it
+        // apart from window.location here; this is its documented false positive.
+        // react-doctor-disable-next-line react-doctor/no-mutable-in-deps
     }, [location.state, location.pathname, navigate]);
 
     const fetchTickets = async () => {
@@ -200,7 +205,7 @@ export default function Support() {
     // rather than on the server so the filter chips above can show counts.
     const sortedTickets = useMemo(() => {
         const filtered = statusFilter ? tickets.filter(t => t.status === statusFilter) : tickets;
-        return [...filtered].sort((a, b) => {
+        return filtered.toSorted((a, b) => {
             const at = new Date(a.updated_at || a.created_at || 0).getTime();
             const bt = new Date(b.updated_at || b.created_at || 0).getTime();
             return bt - at;
@@ -216,8 +221,8 @@ export default function Support() {
                 subtitle="Raise tickets to the MediFleet platform team. Bug reports, billing, feature requests, anything."
                 actions={
                     <>
-                        <button onClick={fetchTickets} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
-                        <button data-tour="support-new" onClick={() => dispatchCompose({ type: 'open' })} className="btn-primary cursor-pointer"><Plus size={15} /> New ticket</button>
+                        <button type="button" onClick={fetchTickets} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
+                        <button type="button" data-tour="support-new" onClick={() => dispatchCompose({ type: 'open' })} className="btn-primary cursor-pointer"><Plus size={15} /> New ticket</button>
                     </>
                 }
             />
@@ -382,9 +387,9 @@ export default function Support() {
 
                             {activeTicket.status !== 'Closed' && (
                                 <div data-tour="support-reply" className="p-3 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex gap-2">
-                                    <textarea rows="2" className="input flex-1 resize-none" placeholder="Reply to MediFleet support…"
+                                    <textarea aria-label="Reply to MediFleet support…" rows="2" className="input flex-1 resize-none" placeholder="Reply to MediFleet support…"
                                               value={reply} onChange={e => dispatchReply({ type: 'setReply', value: e.target.value })} />
-                                    <button onClick={sendReply} disabled={sendingReply || !reply.trim()} className="btn-primary self-end disabled:opacity-50">
+                                    <button type="button" onClick={sendReply} disabled={sendingReply || !reply.trim()} className="btn-primary self-end disabled:opacity-50">
                                         {sendingReply ? <Activity size={16} className="animate-spin" /> : <Send size={16} />}
                                     </button>
                                 </div>
@@ -397,40 +402,40 @@ export default function Support() {
             {/* New ticket modal */}
             {isNewOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => dispatchCompose({ type: 'close' })} />
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => dispatchCompose({ type: 'close' })} />
                     <div className="relative w-full max-w-xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="flex justify-between items-center p-5 border-b border-ink-100 dark:border-ink-800">
                             <h2 className="text-xl font-semibold flex items-center gap-2 dark:text-white"><LifeBuoy size={20} className="text-brand-600" /> Raise a ticket</h2>
-                            <button onClick={() => dispatchCompose({ type: 'close' })} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
+                            <button type="button" onClick={() => dispatchCompose({ type: 'close' })} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">
                                 <X size={20} />
                             </button>
                         </div>
                         <form onSubmit={submitNew} className="flex-1 overflow-y-auto p-5 bg-ink-50/60 dark:bg-ink-800/40 space-y-4">
                             <div>
-                                <label className="label">Subject *</label>
-                                <input required className="input" value={draft.subject} maxLength="200"
+                                <label htmlFor="suppor-subject" className="label">Subject *</label>
+                                <input id="suppor-subject" required className="input" value={draft.subject} maxLength="200"
                                        onChange={e => dispatchCompose({ type: 'setField', field: 'subject', value: e.target.value })}
                                        placeholder="Short summary of the issue" />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="label">Category</label>
-                                    <select className="input" value={draft.category}
+                                    <label htmlFor="suppor-category" className="label">Category</label>
+                                    <select id="suppor-category" className="input" value={draft.category}
                                             onChange={e => dispatchCompose({ type: 'setField', field: 'category', value: e.target.value })}>
                                         {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="label">Priority</label>
-                                    <select className="input" value={draft.priority}
+                                    <label htmlFor="suppor-priority" className="label">Priority</label>
+                                    <select id="suppor-priority" className="input" value={draft.priority}
                                             onChange={e => dispatchCompose({ type: 'setField', field: 'priority', value: e.target.value })}>
                                         {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                                     </select>
                                 </div>
                             </div>
                             <div>
-                                <label className="label">What's going on? *</label>
-                                <textarea required rows="8" className="input resize-none" value={draft.body}
+                                <label htmlFor="suppor-what-s-going-on" className="label">What's going on? *</label>
+                                <textarea id="suppor-what-s-going-on" required rows="8" className="input resize-none" value={draft.body}
                                           onChange={e => dispatchCompose({ type: 'setField', field: 'body', value: e.target.value })}
                                           placeholder="Describe the issue, what you expected, and what happened. Include steps, screenshots URLs, or error messages." />
                             </div>

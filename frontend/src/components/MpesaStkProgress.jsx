@@ -56,7 +56,7 @@ export default function MpesaStkProgress({
                     {errorDesc || 'The customer cancelled the prompt, the PIN timed out, or funds were insufficient.'}
                 </p>
                 {onRetry && (
-                    <button
+                    <button type="button"
                         onClick={onRetry}
                         className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700"
                     >
@@ -96,7 +96,7 @@ export default function MpesaStkProgress({
                 Ask the customer to enter their M-Pesa PIN on their phone.
             </p>
             {onCancel && (
-                <button
+                <button type="button"
                     onClick={onCancel}
                     className="mt-5 px-3 py-1.5 rounded-lg border border-ink-200 dark:border-ink-700 text-xs font-medium text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800"
                 >

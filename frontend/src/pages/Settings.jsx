@@ -96,6 +96,7 @@ export default function Settings() {
         if (item.data_type === 'boolean') {
             return (
                 <label className="inline-flex items-center cursor-pointer">
+                    <span className="sr-only">{item.label || item.key}</span>
                     <input type="checkbox"
                            checked={current === true || current === 'true'}
                            onChange={(e) => set(e.target.checked)} className="sr-only peer" />
@@ -104,14 +105,14 @@ export default function Settings() {
             );
         }
         if (item.data_type === 'number') {
-            return <input type="number" className="input" value={current ?? ''} onChange={(e) => set(e.target.value)} />;
+            return <input type="number" aria-label={item.label || item.key} className="input" value={current ?? ''} onChange={(e) => set(e.target.value)} />;
         }
         if (item.data_type === 'json') {
-            return <textarea rows="3" className="input font-mono text-xs resize-none"
+            return <textarea rows="3" aria-label={item.label || item.key} className="input font-mono text-xs resize-none"
                              value={typeof current === 'string' ? current : JSON.stringify(current ?? null, null, 2)}
                              onChange={(e) => set(e.target.value)} />;
         }
-        return <input type={item.is_sensitive ? 'password' : 'text'} className="input"
+        return <input type={item.is_sensitive ? 'password' : 'text'} aria-label={item.label || item.key} className="input"
                       value={current ?? ''} onChange={(e) => set(e.target.value)} />;
     };
 
@@ -169,9 +170,9 @@ export default function Settings() {
                         >
                             <Sparkles size={15} /> Replay tours
                         </button>
-                        <button onClick={fetchSettings} className="btn-secondary cursor-pointer"><RefreshCcw size={15} /> Refresh</button>
-                        <button data-tour="settings-custom" onClick={() => dispatchCustom({ type: 'open' })} className="btn-secondary cursor-pointer"><Plus size={15} /> Custom setting</button>
-                        <button data-tour="settings-save" onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50 cursor-pointer">
+                        <button type="button" onClick={fetchSettings} className="btn-secondary cursor-pointer"><RefreshCcw size={15} /> Refresh</button>
+                        <button type="button" data-tour="settings-custom" onClick={() => dispatchCustom({ type: 'open' })} className="btn-secondary cursor-pointer"><Plus size={15} /> Custom setting</button>
+                        <button type="button" data-tour="settings-save" onClick={save} disabled={saving || dirtyIds.length === 0} className="btn-primary disabled:opacity-50 cursor-pointer">
                             {saving ? <Activity size={15} className="animate-spin" /> : <Save size={15} />} Save changes ({dirtyIds.length})
                         </button>
                     </>
@@ -218,7 +219,7 @@ export default function Settings() {
                             const Icon = meta.icon;
                             const active = activeCategory === c.key;
                             return (
-                                <button key={c.key} onClick={() => setActiveCategory(c.key)}
+                                <button type="button" key={c.key} onClick={() => setActiveCategory(c.key)}
                                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${active ? 'bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300 ring-1 ring-brand-200 dark:ring-brand-500/20' : 'text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800/50'}`}>
                                     <Icon size={15} />
                                     <span className="capitalize">{meta.label}</span>
@@ -265,42 +266,42 @@ export default function Settings() {
 
             {showCustomForm && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => dispatchCustom({ type: 'close' })} />
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => dispatchCustom({ type: 'close' })} />
                     <div className="relative w-full max-w-lg bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <h2 className="text-lg font-semibold dark:text-white flex items-center gap-2"><Plus size={18} /> Add custom setting</h2>
-                            <button onClick={() => dispatchCustom({ type: 'close' })} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full cursor-pointer">
+                            <button type="button" onClick={() => dispatchCustom({ type: 'close' })} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full cursor-pointer">
                                 <X size={20} aria-hidden="true" />
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-ink-50/60 dark:bg-ink-800/40">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="label">Category *</label>
-                                    <input className="input" value={customDraft.category}
+                                    <label htmlFor="settin-category" className="label">Category *</label>
+                                    <input id="settin-category" className="input" value={customDraft.category}
                                            onChange={e => dispatchCustom({ type: 'setField', field: 'category', value: e.target.value })}
                                            placeholder="e.g. integrations" />
                                 </div>
                                 <div>
-                                    <label className="label">Key *</label>
-                                    <input className="input" value={customDraft.key}
+                                    <label htmlFor="settin-key" className="label">Key *</label>
+                                    <input id="settin-key" className="input" value={customDraft.key}
                                            onChange={e => dispatchCustom({ type: 'setField', field: 'key', value: e.target.value })}
                                            placeholder="e.g. slack_webhook" />
                                 </div>
                             </div>
                             <div>
-                                <label className="label">Display label</label>
-                                <input className="input" value={customDraft.label}
+                                <label htmlFor="settin-display-label" className="label">Display label</label>
+                                <input id="settin-display-label" className="input" value={customDraft.label}
                                        onChange={e => dispatchCustom({ type: 'setField', field: 'label', value: e.target.value })} />
                             </div>
                             <div>
-                                <label className="label">Description</label>
-                                <textarea rows="2" className="input resize-none" value={customDraft.description}
+                                <label htmlFor="settin-description" className="label">Description</label>
+                                <textarea id="settin-description" rows="2" className="input resize-none" value={customDraft.description}
                                           onChange={e => dispatchCustom({ type: 'setField', field: 'description', value: e.target.value })} />
                             </div>
                             <div>
-                                <label className="label">Type</label>
-                                <select className="input" value={customDraft.data_type}
+                                <label htmlFor="settin-type" className="label">Type</label>
+                                <select id="settin-type" className="input" value={customDraft.data_type}
                                         onChange={e => dispatchCustom({ type: 'setField', field: 'data_type', value: e.target.value })}>
                                     <option value="string">string</option>
                                     <option value="number">number</option>
@@ -309,14 +310,14 @@ export default function Settings() {
                                 </select>
                             </div>
                             <div>
-                                <label className="label">Initial value</label>
-                                <input className="input" value={customDraft.value}
+                                <label htmlFor="settin-initial-value" className="label">Initial value</label>
+                                <input id="settin-initial-value" className="input" value={customDraft.value}
                                        onChange={e => dispatchCustom({ type: 'setField', field: 'value', value: e.target.value })} />
                             </div>
                         </div>
                         <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0">
-                            <button onClick={() => dispatchCustom({ type: 'close' })} className="btn-secondary">Cancel</button>
-                            <button onClick={saveCustom} className="btn-primary"><Save size={15} /> Add setting</button>
+                            <button type="button" onClick={() => dispatchCustom({ type: 'close' })} className="btn-secondary">Cancel</button>
+                            <button type="button" onClick={saveCustom} className="btn-primary"><Save size={15} /> Add setting</button>
                         </div>
                     </div>
                 </div>

@@ -63,7 +63,7 @@ export default function Accounting() {
 
             <div data-tour="acc-tabs" className="flex flex-wrap gap-2 border-b border-ink-200/70 dark:border-ink-800">
                 {TABS.map(({ key, label, icon: Icon }) => (
-                    <button
+                    <button type="button"
                         key={key}
                         onClick={() => setTab(key)}
                         className={
@@ -118,7 +118,7 @@ function ChartOfAccountsTab() {
     return (
         <div data-tour="acc-coa" className="space-y-4">
             <div className="flex justify-end">
-                <button
+                <button type="button"
                     onClick={() => setOpenModal(true)}
                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700"
                 >
@@ -167,7 +167,7 @@ function AccountNode({ node, depth }) {
                 style={{ paddingLeft: 12 + depth * 16 }}
             >
                 {hasChildren ? (
-                    <button onClick={() => setOpen(!open)} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">
+                    <button type="button" onClick={() => setOpen(!open)} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">
                         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
                 ) : (
@@ -229,12 +229,12 @@ function NewAccountModal({ flatAccounts, onClose, onSaved }) {
         <ModalShell title="New account" onClose={onClose}>
             <div className="space-y-3">
                 <Field label="Code">
-                    <input className="input" value={form.code}
+                    <input aria-label="Code" className="input" value={form.code}
                            onChange={(e) => setForm({ ...form, code: e.target.value })}
                            placeholder="e.g. 1180" />
                 </Field>
                 <Field label="Name">
-                    <input className="input" value={form.name}
+                    <input aria-label="Name" className="input" value={form.name}
                            onChange={(e) => setForm({ ...form, name: e.target.value })}
                            placeholder="e.g. Prepayments" />
                 </Field>
@@ -319,7 +319,7 @@ function JournalEntriesTab() {
     return (
         <div className="space-y-4">
             <div className="flex justify-end">
-                <button
+                <button type="button"
                     onClick={() => setOpenModal(true)}
                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700"
                 >
@@ -338,7 +338,7 @@ function JournalEntriesTab() {
                             <th className="text-left px-4 py-2 font-medium">Memo</th>
                             <th className="text-right px-4 py-2 font-medium">Total (Dr)</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th className="px-4 py-2"></th>
+                            <th className="px-4 py-2" aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -363,13 +363,13 @@ function JournalEntriesTab() {
                                     </td>
                                     <td className="px-4 py-2 text-right">
                                         {e.status === 'draft' && (
-                                            <button onClick={() => post(e.entry_id)}
+                                            <button type="button" onClick={() => post(e.entry_id)}
                                                     className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 hover:underline">
                                                 <CheckCircle2 size={14} /> Post
                                             </button>
                                         )}
                                         {e.status === 'posted' && (
-                                            <button onClick={() => reverse(e.entry_id)}
+                                            <button type="button" onClick={() => reverse(e.entry_id)}
                                                     className="inline-flex items-center gap-1 text-xs text-rose-700 dark:text-rose-300 hover:underline">
                                                 <RotateCcw size={14} /> Reverse
                                             </button>
@@ -403,8 +403,8 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
         memo: '',
     });
     const [lines, setLines] = useState([
-        { account_id: '', debit: '', credit: '', description: '' },
-        { account_id: '', debit: '', credit: '', description: '' },
+        { _uid: crypto.randomUUID(), account_id: '', debit: '', credit: '', description: '' },
+        { _uid: crypto.randomUUID(), account_id: '', debit: '', credit: '', description: '' },
     ]);
     const [saving, setSaving] = useState(false);
 
@@ -418,7 +418,7 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
         setLines((prev) => prev.map((l, i) => i === idx ? { ...l, ...patch } : l));
     };
 
-    const addLine = () => setLines([...lines, { account_id: '', debit: '', credit: '', description: '' }]);
+    const addLine = () => setLines([...lines, { _uid: crypto.randomUUID(), account_id: '', debit: '', credit: '', description: '' }]);
     const removeLine = (idx) => setLines(lines.filter((_, i) => i !== idx));
 
     const submit = async () => {
@@ -456,7 +456,7 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
         <ModalShell title="New journal entry" onClose={onClose} wide>
             <div className="grid grid-cols-3 gap-3">
                 <Field label="Date">
-                    <input type="date" className="input" value={form.entry_date}
+                    <input aria-label="Date" type="date" className="input" value={form.entry_date}
                            onChange={(e) => setForm({ ...form, entry_date: e.target.value })} />
                 </Field>
                 <Field label="Currency">
@@ -467,13 +467,13 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                     </select>
                 </Field>
                 <Field label="Reference">
-                    <input className="input" value={form.reference}
+                    <input aria-label="Reference" className="input" value={form.reference}
                            onChange={(e) => setForm({ ...form, reference: e.target.value })}
                            placeholder="optional" />
                 </Field>
             </div>
             <Field label="Memo">
-                <input className="input" value={form.memo}
+                <input aria-label="Memo" className="input" value={form.memo}
                        onChange={(e) => setForm({ ...form, memo: e.target.value })}
                        placeholder="optional" />
             </Field>
@@ -486,12 +486,12 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                             <th className="text-right px-3 py-2 font-medium w-32">Debit</th>
                             <th className="text-right px-3 py-2 font-medium w-32">Credit</th>
                             <th className="text-left px-3 py-2 font-medium">Description</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {lines.map((l, idx) => (
-                            <tr key={idx}>
+                            <tr key={l._uid}>
                                 <td className="px-3 py-1.5">
                                     <select className="input" value={l.account_id}
                                             onChange={(e) => setLine(idx, { account_id: e.target.value })}>
@@ -504,21 +504,23 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                                 </td>
                                 <td className="px-3 py-1.5">
                                     <input type="number" step="0.01" className="input text-right"
+                                           aria-label={`Debit, line ${idx + 1}`}
                                            value={l.debit}
                                            onChange={(e) => setLine(idx, { debit: e.target.value, credit: e.target.value ? '' : l.credit })} />
                                 </td>
                                 <td className="px-3 py-1.5">
                                     <input type="number" step="0.01" className="input text-right"
+                                           aria-label={`Credit, line ${idx + 1}`}
                                            value={l.credit}
                                            onChange={(e) => setLine(idx, { credit: e.target.value, debit: e.target.value ? '' : l.debit })} />
                                 </td>
                                 <td className="px-3 py-1.5">
-                                    <input className="input" value={l.description}
+                                    <input className="input" aria-label={`Description, line ${idx + 1}`} value={l.description}
                                            onChange={(e) => setLine(idx, { description: e.target.value })} />
                                 </td>
                                 <td className="px-2">
                                     {lines.length > 2 && (
-                                        <button onClick={() => removeLine(idx)} className="text-ink-400 hover:text-rose-600">
+                                        <button type="button" onClick={() => removeLine(idx)} className="text-ink-400 hover:text-rose-600">
                                             <X size={14} />
                                         </button>
                                     )}
@@ -529,7 +531,7 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                     <tfoot className="bg-ink-50 dark:bg-ink-800/40">
                         <tr>
                             <td className="px-3 py-2">
-                                <button onClick={addLine}
+                                <button type="button" onClick={addLine}
                                         className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                                     <Plus size={12} /> Add line
                                 </button>
@@ -588,7 +590,7 @@ function CurrenciesTab() {
             <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft">
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Currencies</h3>
-                    <button onClick={() => setOpenCur(true)}
+                    <button type="button" onClick={() => setOpenCur(true)}
                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                         <Plus size={12} /> Add
                     </button>
@@ -614,7 +616,7 @@ function CurrenciesTab() {
             <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft">
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Exchange rates</h3>
-                    <button onClick={() => setOpenFx(true)}
+                    <button type="button" onClick={() => setOpenFx(true)}
                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                         <Plus size={12} /> Record rate
                     </button>
@@ -659,13 +661,13 @@ function NewCurrencyModal({ onClose, onSaved }) {
     return (
         <ModalShell title="Add currency" onClose={onClose}>
             <div className="grid grid-cols-2 gap-3">
-                <Field label="Code (ISO-4217)"><input className="input" maxLength={3}
+                <Field label="Code (ISO-4217)"><input aria-label="Code (ISO-4217)" className="input" maxLength={3}
                     value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="USD" /></Field>
-                <Field label="Name"><input className="input"
+                <Field label="Name"><input aria-label="Name" className="input"
                     value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="US Dollar" /></Field>
-                <Field label="Symbol"><input className="input"
+                <Field label="Symbol"><input aria-label="Symbol" className="input"
                     value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} placeholder="$" /></Field>
-                <Field label="Decimals"><input type="number" className="input"
+                <Field label="Decimals"><input aria-label="Decimals" type="number" className="input"
                     value={form.decimals} onChange={(e) => setForm({ ...form, decimals: Number(e.target.value) })} /></Field>
             </div>
             <label className="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-200 mt-3">
@@ -720,9 +722,9 @@ function NewFxRateModal({ currencies, onClose, onSaved }) {
                         {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
                 </Field>
-                <Field label="Rate"><input type="number" step="0.000001" className="input"
+                <Field label="Rate"><input aria-label="Rate" type="number" step="0.000001" className="input"
                     value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} /></Field>
-                <Field label="Effective date"><input type="date" className="input"
+                <Field label="Effective date"><input aria-label="Effective date" type="date" className="input"
                     value={form.effective_date} onChange={(e) => setForm({ ...form, effective_date: e.target.value })} /></Field>
             </div>
             <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
@@ -732,6 +734,18 @@ function NewFxRateModal({ currencies, onClose, onSaved }) {
 
 
 /* ─── Settings ───────────────────────────────────────────────────────────── */
+
+// Pure helper hoisted to module scope (no component state).
+const seedYear = async () => {
+    const yearStr = window.prompt('Year to seed periods for (e.g. 2026):', new Date().getFullYear().toString());
+    if (!yearStr) return;
+    try {
+        await apiClient.post('/accounting/fiscal-periods/seed-year', { year: Number(yearStr) });
+        toast.success(`Seeded periods for ${yearStr}.`);
+    } catch (err) {
+        toast.error(err?.response?.data?.detail || 'Could not seed periods.');
+    }
+};
 
 function SettingsTab() {
     const [settings, setSettings] = useState(null);
@@ -765,29 +779,18 @@ function SettingsTab() {
         }
     };
 
-    const seedYear = async () => {
-        const yearStr = window.prompt('Year to seed periods for (e.g. 2026):', new Date().getFullYear().toString());
-        if (!yearStr) return;
-        try {
-            await apiClient.post('/accounting/fiscal-periods/seed-year', { year: Number(yearStr) });
-            toast.success(`Seeded periods for ${yearStr}.`);
-        } catch (err) {
-            toast.error(err?.response?.data?.detail || 'Could not seed periods.');
-        }
-    };
-
     if (!settings) return <div className="text-sm text-ink-500 dark:text-ink-400 p-6">Loading...</div>;
 
     return (
         <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5 max-w-2xl">
             <Field label="Base currency">
-                <input className="input bg-ink-50 dark:bg-ink-800/40" value={settings.base_currency_code} disabled />
+                <input aria-label="Base currency" className="input bg-ink-50 dark:bg-ink-800/40" value={settings.base_currency_code} readOnly disabled />
                 <p className="text-xs text-ink-500 dark:text-ink-400 mt-1">
                     Change the base currency from the Currencies tab. Locked once any entry is posted.
                 </p>
             </Field>
             <Field label="Go-live date">
-                <input type="date" className="input"
+                <input aria-label="Go-live date" type="date" className="input"
                        value={settings.go_live_date || ''}
                        onChange={(e) => setSettings({ ...settings, go_live_date: e.target.value || null })} />
                 <p className="text-xs text-ink-500 dark:text-ink-400 mt-1">
@@ -804,11 +807,11 @@ function SettingsTab() {
             </Field>
 
             <div className="flex items-center gap-3 pt-2">
-                <button onClick={save} disabled={saving}
+                <button type="button" onClick={save} disabled={saving}
                         className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                     {saving ? 'Saving...' : 'Save settings'}
                 </button>
-                <button onClick={seedYear}
+                <button type="button" onClick={seedYear}
                         className="px-4 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50">
                     Seed fiscal periods for a year
                 </button>
@@ -835,7 +838,7 @@ function ConfigurationTab() {
             <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
                 <nav className="space-y-1">
                     {CONFIG_SECTIONS.map(({ key, label, icon: Icon }) => (
-                        <button key={key}
+                        <button type="button" key={key}
                                 onClick={() => setSection(key)}
                                 className={
                                     'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ' +
@@ -889,7 +892,7 @@ function SuppliersSection() {
                             <th className="text-left px-4 py-2 font-medium">KRA PIN</th>
                             <th className="text-right px-4 py-2 font-medium">Terms (days)</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -905,7 +908,7 @@ function SuppliersSection() {
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
-                                    <button onClick={() => { setEditing(s); setOpen(true); }}
+                                    <button type="button" onClick={() => { setEditing(s); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
@@ -955,17 +958,17 @@ function SupplierModal({ initial, onClose, onSaved }) {
     return (
         <ModalShell title={isEdit ? 'Edit supplier' : 'New supplier'} onClose={onClose} wide>
             <div className="grid grid-cols-2 gap-3">
-                <Field label="Name *"><input className="input" value={form.name}
+                <Field label="Name *"><input aria-label="Name *" className="input" value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-                <Field label="Contact person"><input className="input" value={form.contact_person || ''}
+                <Field label="Contact person"><input aria-label="Contact person" className="input" value={form.contact_person || ''}
                     onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></Field>
-                <Field label="Email"><input type="email" className="input" value={form.email || ''}
+                <Field label="Email"><input aria-label="Email" type="email" className="input" value={form.email || ''}
                     onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-                <Field label="Phone"><input className="input" value={form.phone || ''}
+                <Field label="Phone"><input aria-label="Phone" className="input" value={form.phone || ''}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-                <Field label="KRA PIN"><input className="input" value={form.tax_pin || ''}
+                <Field label="KRA PIN"><input aria-label="KRA PIN" className="input" value={form.tax_pin || ''}
                     onChange={(e) => setForm({ ...form, tax_pin: e.target.value })} /></Field>
-                <Field label="Payment terms (days)"><input type="number" className="input" value={form.payment_terms_days}
+                <Field label="Payment terms (days)"><input aria-label="Payment terms (days)" type="number" className="input" value={form.payment_terms_days}
                     onChange={(e) => setForm({ ...form, payment_terms_days: Number(e.target.value) })} /></Field>
                 <Field label="Default payable account">
                     <select className="input" value={form.default_payable_account_id || ''}
@@ -985,11 +988,11 @@ function SupplierModal({ initial, onClose, onSaved }) {
                 )}
             </div>
             <Field label="Address">
-                <textarea className="input min-h-[60px]" value={form.address || ''}
+                <textarea aria-label="Address" className="input min-h-[60px]" value={form.address || ''}
                           onChange={(e) => setForm({ ...form, address: e.target.value })} />
             </Field>
             <Field label="Notes">
-                <textarea className="input min-h-[60px]" value={form.notes || ''}
+                <textarea aria-label="Notes" className="input min-h-[60px]" value={form.notes || ''}
                           onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </Field>
             <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
@@ -1026,7 +1029,7 @@ function InsuranceSection() {
                             <th className="text-left px-4 py-2 font-medium">Contact</th>
                             <th className="text-left px-4 py-2 font-medium">Phone</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -1041,7 +1044,7 @@ function InsuranceSection() {
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
-                                    <button onClick={() => { setEditing(p); setOpen(true); }}
+                                    <button type="button" onClick={() => { setEditing(p); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
@@ -1087,14 +1090,14 @@ function ProviderModal({ initial, onClose, onSaved }) {
     return (
         <ModalShell title={isEdit ? 'Edit insurance provider' : 'New insurance provider'} onClose={onClose}>
             <div className="space-y-3">
-                <Field label="Name *"><input className="input" value={form.name}
+                <Field label="Name *"><input aria-label="Name *" className="input" value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Contact person"><input className="input" value={form.contact_person || ''}
+                    <Field label="Contact person"><input aria-label="Contact person" className="input" value={form.contact_person || ''}
                         onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></Field>
-                    <Field label="Email"><input type="email" className="input" value={form.email || ''}
+                    <Field label="Email"><input aria-label="Email" type="email" className="input" value={form.email || ''}
                         onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-                    <Field label="Phone"><input className="input" value={form.phone || ''}
+                    <Field label="Phone"><input aria-label="Phone" className="input" value={form.phone || ''}
                         onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
                     <Field label="Default receivable account">
                         <select className="input" value={form.default_receivable_account_id || ''}
@@ -1105,7 +1108,7 @@ function ProviderModal({ initial, onClose, onSaved }) {
                     </Field>
                 </div>
                 <Field label="Address">
-                    <textarea className="input min-h-[60px]" value={form.address || ''}
+                    <textarea aria-label="Address" className="input min-h-[60px]" value={form.address || ''}
                               onChange={(e) => setForm({ ...form, address: e.target.value })} />
                 </Field>
             </div>
@@ -1153,7 +1156,7 @@ function SchemesSection() {
                             <th className="text-left px-4 py-2 font-medium">Code</th>
                             <th className="text-right px-4 py-2 font-medium">Coverage limit</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -1171,7 +1174,7 @@ function SchemesSection() {
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
-                                    <button onClick={() => { setEditing(s); setOpen(true); }}
+                                    <button type="button" onClick={() => { setEditing(s); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
@@ -1224,12 +1227,12 @@ function SchemeModal({ initial, providers, onClose, onSaved }) {
                         {providers.map(p => <option key={p.provider_id} value={p.provider_id}>{p.name}</option>)}
                     </select>
                 </Field>
-                <Field label="Scheme name *"><input className="input" value={form.name}
+                <Field label="Scheme name *"><input aria-label="Scheme name *" className="input" value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Scheme code"><input className="input" value={form.scheme_code || ''}
+                    <Field label="Scheme code"><input aria-label="Scheme code" className="input" value={form.scheme_code || ''}
                         onChange={(e) => setForm({ ...form, scheme_code: e.target.value })} /></Field>
-                    <Field label="Coverage limit"><input type="number" step="0.01" className="input"
+                    <Field label="Coverage limit"><input aria-label="Coverage limit" type="number" step="0.01" className="input"
                         value={form.coverage_limit || ''}
                         onChange={(e) => setForm({ ...form, coverage_limit: e.target.value })} /></Field>
                 </div>
@@ -1283,7 +1286,7 @@ function PriceListSection() {
                             <th className="text-right px-4 py-2 font-medium">Unit price</th>
                             <th className="text-right px-4 py-2 font-medium">Tax %</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -1302,7 +1305,7 @@ function PriceListSection() {
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
-                                    <button onClick={() => { setEditing(p); setOpen(true); }}
+                                    <button type="button" onClick={() => { setEditing(p); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
@@ -1358,7 +1361,7 @@ function PriceModal({ initial, categories, onClose, onSaved }) {
     return (
         <ModalShell title={isEdit ? 'Edit price item' : 'New price item'} onClose={onClose} wide>
             <div className="grid grid-cols-2 gap-3">
-                <Field label="Service code *"><input className="input" value={form.service_code}
+                <Field label="Service code *"><input aria-label="Service code *" className="input" value={form.service_code}
                     disabled={isEdit}
                     onChange={(e) => setForm({ ...form, service_code: e.target.value })} /></Field>
                 <Field label="Category *">
@@ -1368,13 +1371,13 @@ function PriceModal({ initial, categories, onClose, onSaved }) {
                     </select>
                 </Field>
                 <Field label="Service name *" >
-                    <input className="input" value={form.name}
+                    <input aria-label="Service name *" className="input" value={form.name}
                            onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 </Field>
-                <Field label="Unit price *"><input type="number" step="0.01" className="input"
+                <Field label="Unit price *"><input aria-label="Unit price *" type="number" step="0.01" className="input"
                     value={form.unit_price}
                     onChange={(e) => setForm({ ...form, unit_price: e.target.value })} /></Field>
-                <Field label="Tax rate (%)"><input type="number" step="0.01" className="input"
+                <Field label="Tax rate (%)"><input aria-label="Tax rate (%)" type="number" step="0.01" className="input"
                     value={form.tax_rate_pct}
                     onChange={(e) => setForm({ ...form, tax_rate_pct: e.target.value })} /></Field>
                 <Field label="Revenue account">
@@ -1386,7 +1389,7 @@ function PriceModal({ initial, categories, onClose, onSaved }) {
                 </Field>
             </div>
             <Field label="Description">
-                <textarea className="input min-h-[60px]" value={form.description || ''}
+                <textarea aria-label="Description" className="input min-h-[60px]" value={form.description || ''}
                           onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </Field>
             <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
@@ -1438,7 +1441,7 @@ function MappingsSection() {
                             <th className="text-left px-4 py-2 font-medium">Description</th>
                             <th className="text-left px-4 py-2 font-medium">Debit (Dr)</th>
                             <th className="text-left px-4 py-2 font-medium">Credit (Cr)</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -1450,7 +1453,7 @@ function MappingsSection() {
                                 <td className="px-4 py-1.5">{codeName(c.mapping?.credit_account_id)}</td>
                                 <td className="px-4 py-1.5 text-right">
                                     {c.mapping ? (
-                                        <button onClick={() => setEditing(c.mapping)}
+                                        <button type="button" onClick={() => setEditing(c.mapping)}
                                                 className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                     ) : (
                                         <span className="text-xs text-amber-700 dark:text-amber-300">missing</span>
@@ -1522,7 +1525,7 @@ function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg }) {
                 <h3 className="text-lg font-semibold text-ink-900 dark:text-white">{title}</h3>
                 {subtitle && <p className="text-sm text-ink-600 dark:text-ink-400 mt-1">{subtitle}</p>}
             </div>
-            <button onClick={onNew} disabled={disabled} title={disabled ? disabledMsg : undefined}
+            <button type="button" onClick={onNew} disabled={disabled} title={disabled ? disabledMsg : undefined}
                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed">
                 <Plus size={16} /> New
             </button>
@@ -1640,7 +1643,7 @@ function TransactionLogTab() {
             <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-3 flex flex-wrap items-end gap-3">
                 <div className="relative flex-1 min-w-[180px]">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-                    <input
+                    <input aria-label="Search entry no., reference, memo…"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search entry no., reference, memo…"
@@ -1648,15 +1651,15 @@ function TransactionLogTab() {
                     />
                 </div>
                 <div>
-                    <label className="block text-xs text-ink-500 dark:text-ink-400 mb-1">Source</label>
-                    <select value={source} onChange={(e) => setSource(e.target.value)}
+                    <label htmlFor="accoun-source" className="block text-xs text-ink-500 dark:text-ink-400 mb-1">Source</label>
+                    <select id="accoun-source" value={source} onChange={(e) => setSource(e.target.value)}
                             className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2">
                         {SOURCE_OPTIONS.map((o) => <option key={o.value || 'all'} value={o.value}>{o.label}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs text-ink-500 dark:text-ink-400 mb-1">Status</label>
-                    <select value={status} onChange={(e) => setStatus(e.target.value)}
+                    <label htmlFor="accoun-status" className="block text-xs text-ink-500 dark:text-ink-400 mb-1">Status</label>
+                    <select id="accoun-status" value={status} onChange={(e) => setStatus(e.target.value)}
                             className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2">
                         <option value="">All</option>
                         <option value="posted">Posted</option>
@@ -1665,16 +1668,16 @@ function TransactionLogTab() {
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs text-ink-500 dark:text-ink-400 mb-1">From</label>
-                    <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                    <label htmlFor="accoun-from" className="block text-xs text-ink-500 dark:text-ink-400 mb-1">From</label>
+                    <input id="accoun-from" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
                            className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2" />
                 </div>
                 <div>
-                    <label className="block text-xs text-ink-500 dark:text-ink-400 mb-1">To</label>
-                    <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                    <label htmlFor="accoun-to" className="block text-xs text-ink-500 dark:text-ink-400 mb-1">To</label>
+                    <input id="accoun-to" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
                            className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2" />
                 </div>
-                <button onClick={exportCsv}
+                <button type="button" onClick={exportCsv}
                         className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50">
                     <Download size={15} /> Export CSV
                 </button>
@@ -1724,11 +1727,11 @@ function TransactionLogTab() {
             <div className="flex items-center justify-between text-sm text-ink-600 dark:text-ink-400">
                 <span>{total === 0 ? 'No records' : `Showing ${pageStart}–${pageEnd} of ${total}`}</span>
                 <div className="flex items-center gap-2">
-                    <button disabled={offset === 0 || loading} onClick={() => go(Math.max(0, offset - PAGE_SIZE))}
+                    <button type="button" disabled={offset === 0 || loading} onClick={() => go(Math.max(0, offset - PAGE_SIZE))}
                             className="px-3 py-1.5 rounded-lg border border-ink-200 dark:border-ink-800 disabled:opacity-40 hover:bg-ink-50 dark:hover:bg-ink-800/50">
                         Previous
                     </button>
-                    <button disabled={pageEnd >= total || loading} onClick={() => go(offset + PAGE_SIZE)}
+                    <button type="button" disabled={pageEnd >= total || loading} onClick={() => go(offset + PAGE_SIZE)}
                             className="px-3 py-1.5 rounded-lg border border-ink-200 dark:border-ink-800 disabled:opacity-40 hover:bg-ink-50 dark:hover:bg-ink-800/50">
                         Next
                     </button>
@@ -1773,9 +1776,9 @@ function csvDownload(filename, rows, headers) {
 
 function ReportsTab() {
     const [report, setReport] = useState('trial-balance');
-    const [asOf, setAsOf] = useState(todayISO());
-    const [from, setFrom] = useState(firstOfMonthISO());
-    const [to, setTo] = useState(todayISO());
+    const [asOf, setAsOf] = useState(() => todayISO());
+    const [from, setFrom] = useState(() => firstOfMonthISO());
+    const [to, setTo] = useState(() => todayISO());
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
 
@@ -1808,24 +1811,24 @@ function ReportsTab() {
                 </Field>
                 {meta.range === 'as_of' ? (
                     <Field label="As of">
-                        <input type="date" className="input" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+                        <input aria-label="As of" type="date" className="input" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
                     </Field>
                 ) : (
                     <>
                         <Field label="From">
-                            <input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
+                            <input aria-label="From" type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
                         </Field>
                         <Field label="To">
-                            <input type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
+                            <input aria-label="To" type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
                         </Field>
                     </>
                 )}
-                <button onClick={load} disabled={loading}
+                <button type="button" onClick={load} disabled={loading}
                         className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                     {loading ? 'Loading...' : 'Run'}
                 </button>
                 {data && (
-                    <button onClick={() => exportReport(report, data)}
+                    <button type="button" onClick={() => exportReport(report, data)}
                             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50">
                         <Download size={14} /> Export CSV
                     </button>
@@ -1926,7 +1929,7 @@ function TrialBalanceView({ data }) {
                         <td colSpan={3} className="px-4 py-2 font-semibold">Totals</td>
                         <td className="px-4 py-2 text-right font-mono font-semibold">{formatAmount(data.totals.debit)}</td>
                         <td className="px-4 py-2 text-right font-mono font-semibold">{formatAmount(data.totals.credit)}</td>
-                        <td className="px-4 py-2"></td>
+                        <td className="px-4 py-2" aria-label="Actions"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -2035,8 +2038,8 @@ function DailyCollectionsView({ data }) {
                 <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                     {data.rows.length === 0 ? (
                         <tr><td colSpan={4} className="px-4 py-6 text-ink-500 dark:text-ink-400">No cash collections in this window.</td></tr>
-                    ) : data.rows.map((r, idx) => (
-                        <tr key={idx}>
+                    ) : data.rows.map((r) => (
+                        <tr key={r.account_code}>
                             <td className="px-4 py-1.5">{r.date}</td>
                             <td className="px-4 py-1.5 font-mono text-xs">{r.account_code}</td>
                             <td className="px-4 py-1.5">{r.account_name}</td>
@@ -2109,7 +2112,7 @@ function DebtorsTab() {
             <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
                 <nav className="space-y-1">
                     {DEBTORS_SECTIONS.map(({ key, label, icon: Icon }) => (
-                        <button key={key}
+                        <button type="button" key={key}
                                 onClick={() => setSection(key)}
                                 className={
                                     'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ' +
@@ -2203,14 +2206,14 @@ function ClaimsSection() {
                             <th className="text-right px-4 py-2 font-medium">Claimed</th>
                             <th className="text-right px-4 py-2 font-medium">Settled</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map(c => (
                             <tr key={c.schedule_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
                                 <td className="px-4 py-2 font-mono text-xs">
-                                    <button onClick={() => setSelected(c)} className="hover:underline">
+                                    <button type="button" onClick={() => setSelected(c)} className="hover:underline">
                                         {c.schedule_number}
                                     </button>
                                 </td>
@@ -2226,16 +2229,16 @@ function ClaimsSection() {
                                 </td>
                                 <td className="px-4 py-2 text-right space-x-2">
                                     {c.status === 'draft' && (
-                                        <button onClick={() => submit(c.schedule_id)}
+                                        <button type="button" onClick={() => submit(c.schedule_id)}
                                                 className="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-sky-300 hover:underline">
                                             <Send size={12} /> Submit
                                         </button>
                                     )}
                                     {c.status === 'submitted' && (
                                         <>
-                                            <button onClick={() => settle(c.schedule_id)}
+                                            <button type="button" onClick={() => settle(c.schedule_id)}
                                                     className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline">Settle</button>
-                                            <button onClick={() => reject(c.schedule_id)}
+                                            <button type="button" onClick={() => reject(c.schedule_id)}
                                                     className="text-xs text-rose-700 dark:text-rose-300 hover:underline">Reject</button>
                                         </>
                                     )}
@@ -2265,20 +2268,22 @@ function ClaimModal({ providers, onClose, onSaved }) {
         notes: '',
     });
     const [items, setItems] = useState([{
-        invoice_reference: '', patient_name: '', member_number: '', amount_claimed: '',
+        _uid: crypto.randomUUID(), invoice_reference: '', patient_name: '', member_number: '', amount_claimed: '',
     }]);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        if (!form.provider_id) { setSchemes([]); return; }
+        if (!form.provider_id) return;
+        let cancelled = false;
         apiClient.get(`/accounting/config/medical-schemes?provider_id=${form.provider_id}`)
-            .then(r => setSchemes(r.data || []))
-            .catch(() => setSchemes([]));
+            .then(r => { if (!cancelled) setSchemes(r.data || []); })
+            .catch(() => { if (!cancelled) setSchemes([]); });
+        return () => { cancelled = true; };
     }, [form.provider_id]);
 
     const setItem = (idx, patch) =>
         setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
-    const addItem = () => setItems([...items, { invoice_reference: '', patient_name: '', member_number: '', amount_claimed: '' }]);
+    const addItem = () => setItems([...items, { _uid: crypto.randomUUID(), invoice_reference: '', patient_name: '', member_number: '', amount_claimed: '' }]);
     const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
 
     const total = useMemo(() =>
@@ -2321,15 +2326,15 @@ function ClaimModal({ providers, onClose, onSaved }) {
                     <select className="input" value={form.scheme_id}
                             onChange={(e) => setForm({ ...form, scheme_id: e.target.value })}>
                         <option value="">— any/none —</option>
-                        {schemes.map(s => <option key={s.scheme_id} value={s.scheme_id}>{s.name}</option>)}
+                        {(form.provider_id ? schemes : []).map(s => <option key={s.scheme_id} value={s.scheme_id}>{s.name}</option>)}
                     </select>
                 </Field>
                 <Field label="Period from *">
-                    <input type="date" className="input" value={form.period_from}
+                    <input aria-label="Period from *" type="date" className="input" value={form.period_from}
                            onChange={(e) => setForm({ ...form, period_from: e.target.value })} />
                 </Field>
                 <Field label="Period to *">
-                    <input type="date" className="input" value={form.period_to}
+                    <input aria-label="Period to *" type="date" className="input" value={form.period_to}
                            onChange={(e) => setForm({ ...form, period_to: e.target.value })} />
                 </Field>
             </div>
@@ -2342,24 +2347,25 @@ function ClaimModal({ providers, onClose, onSaved }) {
                             <th className="text-left px-3 py-2 font-medium">Patient</th>
                             <th className="text-left px-3 py-2 font-medium">Member #</th>
                             <th className="text-right px-3 py-2 font-medium w-32">Amount</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {items.map((it, idx) => (
-                            <tr key={idx}>
-                                <td className="px-3 py-1.5"><input className="input" value={it.invoice_reference}
+                            <tr key={it._uid}>
+                                <td className="px-3 py-1.5"><input className="input" aria-label="Invoice reference" value={it.invoice_reference}
                                     onChange={e => setItem(idx, { invoice_reference: e.target.value })} /></td>
-                                <td className="px-3 py-1.5"><input className="input" value={it.patient_name}
+                                <td className="px-3 py-1.5"><input className="input" aria-label="Patient name" value={it.patient_name}
                                     onChange={e => setItem(idx, { patient_name: e.target.value })} /></td>
-                                <td className="px-3 py-1.5"><input className="input" value={it.member_number}
+                                <td className="px-3 py-1.5"><input className="input" aria-label="Member number" value={it.member_number}
                                     onChange={e => setItem(idx, { member_number: e.target.value })} /></td>
                                 <td className="px-3 py-1.5"><input type="number" step="0.01" className="input text-right"
+                                    aria-label="Amount claimed"
                                     value={it.amount_claimed}
                                     onChange={e => setItem(idx, { amount_claimed: e.target.value })} /></td>
                                 <td className="px-2">
                                     {items.length > 1 && (
-                                        <button onClick={() => removeItem(idx)} className="text-ink-400 hover:text-rose-600">
+                                        <button type="button" onClick={() => removeItem(idx)} className="text-ink-400 hover:text-rose-600">
                                             <X size={14} />
                                         </button>
                                     )}
@@ -2370,20 +2376,20 @@ function ClaimModal({ providers, onClose, onSaved }) {
                     <tfoot className="bg-ink-50 dark:bg-ink-800/40">
                         <tr>
                             <td colSpan={3} className="px-3 py-2">
-                                <button onClick={addItem}
+                                <button type="button" onClick={addItem}
                                         className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                                     <Plus size={12} /> Add item
                                 </button>
                             </td>
                             <td className="px-3 py-2 text-right font-mono font-semibold">{formatAmount(total)}</td>
-                            <td></td>
+                            <td aria-label="Actions"></td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
 
             <Field label="Notes">
-                <textarea className="input min-h-[60px]" value={form.notes}
+                <textarea aria-label="Notes" className="input min-h-[60px]" value={form.notes}
                           onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </Field>
             <ModalActions onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Create draft" />
@@ -2471,7 +2477,7 @@ function DepositsSection() {
                             <th className="text-right px-4 py-2 font-medium">Applied</th>
                             <th className="text-right px-4 py-2 font-medium">Available</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -2494,11 +2500,11 @@ function DepositsSection() {
                                     <td className="px-4 py-1.5 text-right space-x-3 whitespace-nowrap">
                                         {avail > 0 && (
                                             <>
-                                                <button onClick={() => setApplying(d)}
+                                                <button type="button" onClick={() => setApplying(d)}
                                                         className="text-xs text-brand-700 dark:text-brand-300 hover:underline">
                                                     Apply
                                                 </button>
-                                                <button onClick={() => setAllocating(d)}
+                                                <button type="button" onClick={() => setAllocating(d)}
                                                         className="text-xs text-brand-700 dark:text-brand-300 hover:underline">
                                                     Bulk allocate
                                                 </button>
@@ -2553,11 +2559,11 @@ function DepositModal({ onClose, onSaved }) {
     return (
         <ModalShell title="New deposit" onClose={onClose}>
             <div className="grid grid-cols-2 gap-3">
-                <Field label="Patient ID *"><input type="number" className="input" value={form.patient_id}
+                <Field label="Patient ID *"><input aria-label="Patient ID *" type="number" className="input" value={form.patient_id}
                     onChange={(e) => setForm({ ...form, patient_id: e.target.value })} /></Field>
-                <Field label="Date"><input type="date" className="input" value={form.deposit_date}
+                <Field label="Date"><input aria-label="Date" type="date" className="input" value={form.deposit_date}
                     onChange={(e) => setForm({ ...form, deposit_date: e.target.value })} /></Field>
-                <Field label="Amount *"><input type="number" step="0.01" className="input" value={form.amount}
+                <Field label="Amount *"><input aria-label="Amount *" type="number" step="0.01" className="input" value={form.amount}
                     onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field>
                 <Field label="Method">
                     <select className="input" value={form.method}
@@ -2565,11 +2571,11 @@ function DepositModal({ onClose, onSaved }) {
                         {['Cash', 'Bank', 'M-Pesa', 'Cheque', 'Card'].map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                 </Field>
-                <Field label="Reference"><input className="input" value={form.reference}
+                <Field label="Reference"><input aria-label="Reference" className="input" value={form.reference}
                     onChange={(e) => setForm({ ...form, reference: e.target.value })} placeholder="Receipt no., M-Pesa code, etc." /></Field>
             </div>
             <Field label="Notes">
-                <textarea className="input min-h-[60px]" value={form.notes}
+                <textarea aria-label="Notes" className="input min-h-[60px]" value={form.notes}
                           onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </Field>
             <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
@@ -2606,14 +2612,14 @@ function DepositApplyModal({ deposit, onClose, onSaved }) {
                 Patient #{deposit.patient_id} · Available: <span className="font-mono font-semibold">{formatAmount(available)}</span>
             </p>
             <div className="space-y-3">
-                <Field label="Invoice ID *"><input type="number" className="input" value={form.invoice_id}
+                <Field label="Invoice ID *"><input aria-label="Invoice ID *" type="number" className="input" value={form.invoice_id}
                     onChange={(e) => setForm({ ...form, invoice_id: e.target.value })} /></Field>
                 <Field label="Amount to apply *">
-                    <input type="number" step="0.01" max={available} className="input" value={form.amount}
+                    <input aria-label="Amount to apply *" type="number" step="0.01" max={available} className="input" value={form.amount}
                            onChange={(e) => setForm({ ...form, amount: e.target.value })} />
                 </Field>
                 <Field label="Notes">
-                    <textarea className="input min-h-[50px]" value={form.notes}
+                    <textarea aria-label="Notes" className="input min-h-[50px]" value={form.notes}
                               onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                 </Field>
             </div>
@@ -2646,7 +2652,7 @@ function BankTab() {
             <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
                 <nav className="space-y-1">
                     {BANK_SECTIONS.map(({ key, label, icon: Icon }) => (
-                        <button key={key}
+                        <button type="button" key={key}
                                 onClick={() => setSection(key)}
                                 className={
                                     'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ' +
@@ -2708,7 +2714,7 @@ function BankAccountsSection() {
                             <th className="text-left px-4 py-2 font-medium">Currency</th>
                             <th className="text-left px-4 py-2 font-medium">GL link</th>
                             <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -2725,7 +2731,7 @@ function BankAccountsSection() {
                                     </span>
                                 </td>
                                 <td className="px-4 py-1.5 text-right">
-                                    <button onClick={() => { setEditing(b); setOpen(true); }}
+                                    <button type="button" onClick={() => { setEditing(b); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
                             </tr>
@@ -2769,17 +2775,17 @@ function BankAccountModal({ initial, accounts, onClose, onSaved }) {
     return (
         <ModalShell title={isEdit ? 'Edit bank account' : 'New bank account'} onClose={onClose} wide>
             <div className="grid grid-cols-2 gap-3">
-                <Field label="Name *"><input className="input" value={form.name}
+                <Field label="Name *"><input aria-label="Name *" className="input" value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Main Operations" /></Field>
-                <Field label="Bank *"><input className="input" value={form.bank_name}
+                <Field label="Bank *"><input aria-label="Bank *" className="input" value={form.bank_name}
                     onChange={(e) => setForm({ ...form, bank_name: e.target.value })} placeholder="e.g. Equity Bank" /></Field>
-                <Field label="Branch"><input className="input" value={form.branch || ''}
+                <Field label="Branch"><input aria-label="Branch" className="input" value={form.branch || ''}
                     onChange={(e) => setForm({ ...form, branch: e.target.value })} /></Field>
-                <Field label="Account number *"><input className="input" value={form.account_number}
+                <Field label="Account number *"><input aria-label="Account number *" className="input" value={form.account_number}
                     onChange={(e) => setForm({ ...form, account_number: e.target.value })} /></Field>
-                <Field label="SWIFT"><input className="input" value={form.swift_code || ''}
+                <Field label="SWIFT"><input aria-label="SWIFT" className="input" value={form.swift_code || ''}
                     onChange={(e) => setForm({ ...form, swift_code: e.target.value })} /></Field>
-                <Field label="Currency"><input className="input" maxLength={3} value={form.currency_code}
+                <Field label="Currency"><input aria-label="Currency" className="input" maxLength={3} value={form.currency_code}
                     onChange={(e) => setForm({ ...form, currency_code: e.target.value.toUpperCase() })} /></Field>
                 <Field label="GL account">
                     <select className="input" value={form.gl_account_id || ''}
@@ -2788,12 +2794,12 @@ function BankAccountModal({ initial, accounts, onClose, onSaved }) {
                         {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
                     </select>
                 </Field>
-                <Field label="Opening balance"><input type="number" step="0.01" className="input"
+                <Field label="Opening balance"><input aria-label="Opening balance" type="number" step="0.01" className="input"
                     value={form.opening_balance}
                     onChange={(e) => setForm({ ...form, opening_balance: e.target.value })} /></Field>
             </div>
             <Field label="Notes">
-                <textarea className="input min-h-[50px]" value={form.notes || ''}
+                <textarea aria-label="Notes" className="input min-h-[50px]" value={form.notes || ''}
                           onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </Field>
             <ModalActions onClose={onClose} onSubmit={submit} saving={saving} />
@@ -2929,20 +2935,20 @@ function BankTxModal({ accounts, onClose, onSaved }) {
                         {accounts.map(a => <option key={a.bank_account_id} value={a.bank_account_id}>{a.name}</option>)}
                     </select>
                 </Field>
-                <Field label="Date *"><input type="date" className="input" value={form.transaction_date}
+                <Field label="Date *"><input aria-label="Date *" type="date" className="input" value={form.transaction_date}
                     onChange={(e) => setForm({ ...form, transaction_date: e.target.value })} /></Field>
                 <Field label="Description *">
-                    <input className="input" value={form.description}
+                    <input aria-label="Description *" className="input" value={form.description}
                            onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </Field>
                 <Field label="Reference">
-                    <input className="input" value={form.reference}
+                    <input aria-label="Reference" className="input" value={form.reference}
                            onChange={(e) => setForm({ ...form, reference: e.target.value })} />
                 </Field>
-                <Field label="Amount * (signed: + in / − out)"><input type="number" step="0.01" className="input"
+                <Field label="Amount * (signed: + in / − out)"><input aria-label="Amount * (signed: + in / − out)" type="number" step="0.01" className="input"
                     value={form.amount}
                     onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field>
-                <Field label="Running balance"><input type="number" step="0.01" className="input"
+                <Field label="Running balance"><input aria-label="Running balance" type="number" step="0.01" className="input"
                     value={form.running_balance}
                     onChange={(e) => setForm({ ...form, running_balance: e.target.value })} /></Field>
             </div>
@@ -3015,7 +3021,7 @@ function ReconciliationSection() {
                             <th className="text-left px-4 py-2 font-medium">Description</th>
                             <th className="text-left px-4 py-2 font-medium">Reference</th>
                             <th className="text-right px-4 py-2 font-medium">Amount</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -3029,11 +3035,11 @@ function ReconciliationSection() {
                                     {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
                                 </td>
                                 <td className="px-4 py-1.5 text-right space-x-2">
-                                    <button onClick={() => setMatching(t)}
+                                    <button type="button" onClick={() => setMatching(t)}
                                             className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline inline-flex items-center gap-1">
                                         <Check size={12} /> Match
                                     </button>
-                                    <button onClick={() => ignore(t.bank_transaction_id)}
+                                    <button type="button" onClick={() => ignore(t.bank_transaction_id)}
                                             className="text-xs text-ink-500 dark:text-ink-400 hover:underline inline-flex items-center gap-1">
                                         <Slash size={12} /> Ignore
                                     </button>
@@ -3099,7 +3105,7 @@ function MatchModal({ tx, onClose, onSaved }) {
                                 <th className="text-right px-3 py-2 font-medium">Debit</th>
                                 <th className="text-right px-3 py-2 font-medium">Credit</th>
                                 <th className="text-left px-3 py-2 font-medium">Memo</th>
-                                <th></th>
+                                <th aria-label="Actions"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -3111,7 +3117,7 @@ function MatchModal({ tx, onClose, onSaved }) {
                                     <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.credit)}</td>
                                     <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{c.memo || c.description || '—'}</td>
                                     <td className="px-3 py-1.5 text-right">
-                                        <button onClick={() => match(c.line_id)} disabled={saving}
+                                        <button type="button" onClick={() => match(c.line_id)} disabled={saving}
                                                 className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline">
                                             Match
                                         </button>
@@ -3123,7 +3129,7 @@ function MatchModal({ tx, onClose, onSaved }) {
                 </div>
             )}
             <div className="flex justify-end pt-4">
-                <button onClick={onClose} className="px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm hover:bg-ink-50 dark:hover:bg-ink-800/50">Close</button>
+                <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm hover:bg-ink-50 dark:hover:bg-ink-800/50">Close</button>
             </div>
         </ModalShell>
     );
@@ -3140,7 +3146,7 @@ function ModalShell({ title, onClose, wide, children }) {
             <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{title}</h3>
-                    <button onClick={onClose} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">
+                    <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">
                         <X size={18} />
                     </button>
                 </div>
@@ -3153,11 +3159,11 @@ function ModalShell({ title, onClose, wide, children }) {
 function ModalActions({ onClose, onSubmit, saving, submitLabel = 'Save' }) {
     return (
         <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-ink-100 dark:border-ink-800">
-            <button onClick={onClose}
+            <button type="button" onClick={onClose}
                     className="px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50">
                 Cancel
             </button>
-            <button onClick={onSubmit} disabled={saving}
+            <button type="button" onClick={onSubmit} disabled={saving}
                     className="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                 {saving ? 'Saving...' : submitLabel}
             </button>

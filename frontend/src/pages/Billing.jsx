@@ -208,13 +208,13 @@ export default function Billing() {
                     <div className="flex gap-2 flex-wrap items-center">
                     <div data-tour="billing-search" className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" size={16} />
-                        <input
+                        <input aria-label="Search invoices…"
                             type="text" placeholder="Search invoices…"
                             value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                             className="input pl-9 w-64"
                         />
                     </div>
-                    <button data-tour="billing-mpesa" onClick={openLedger} className="btn-success cursor-pointer">
+                    <button type="button" data-tour="billing-mpesa" onClick={openLedger} className="btn-success cursor-pointer">
                         <Smartphone size={15} /> M-Pesa Ledger
                     </button>
                     </div>
@@ -273,7 +273,7 @@ export default function Billing() {
                                         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-400">Balance due</p>
                                         <p className="text-2xl sm:text-3xl font-semibold text-accent-400 tracking-tight">KES {(activeInvoice.total_amount - activeInvoice.amount_paid).toFixed(2)}</p>
                                     </div>
-                                    <button onClick={() => printInvoice(activeInvoice)} className="p-2 bg-white/10 hover:bg-white/15 text-white rounded-lg transition-colors ring-1 ring-white/10 no-print flex items-center gap-2 px-3" title="Print invoice / receipt">
+                                    <button type="button" onClick={() => printInvoice(activeInvoice)} className="p-2 bg-white/10 hover:bg-white/15 text-white rounded-lg transition-colors ring-1 ring-white/10 no-print flex items-center gap-2 px-3" title="Print invoice / receipt">
                                         <Printer size={16} />
                                         <span className="text-xs font-semibold">Print</span>
                                     </button>
@@ -342,8 +342,8 @@ export default function Billing() {
 
                                         {paymentMethod === 'M-Pesa' && (
                                             <div className="mb-5 animate-fade-in">
-                                                <label className="label">Patient phone number for STK push</label>
-                                                <input
+                                                <label htmlFor="billin-patient-phone-number-for-stk-push" className="label">Patient phone number for STK push</label>
+                                                <input id="billin-patient-phone-number-for-stk-push"
                                                     type="text"
                                                     required={paymentMethod === 'M-Pesa'}
                                                     value={mpesaPhone}
@@ -394,7 +394,7 @@ export default function Billing() {
                                 )}
                             </div>
                             {mpesaStatus !== 'waiting' && (
-                                <button onClick={resetMpesa} className="text-ink-400 hover:text-ink-700" aria-label="Close">
+                                <button type="button" onClick={resetMpesa} className="text-ink-400 hover:text-ink-700" aria-label="Close">
                                     <X size={18} />
                                 </button>
                             )}
@@ -417,14 +417,14 @@ export default function Billing() {
             {/* --- M-PESA LEDGER MODAL --- */}
             {isLedgerOpen && (
                 <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsLedgerOpen(false)}></div>
+                    <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsLedgerOpen(false)} />
                     <div className="relative w-full max-w-4xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-ink-900 to-ink-950 text-white shrink-0 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2"><Smartphone size={20} className="text-accent-400" /> M-Pesa Receipts Ledger</h2>
                                 <p className="text-sm text-ink-400 mt-1">Verify real-time STK push statuses and Daraja receipt codes.</p>
                             </div>
-                            <button onClick={() => setIsLedgerOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-400 hover:text-white hover:bg-white/10 transition-colors"><X size={20} /></button>
+                            <button type="button" onClick={() => setIsLedgerOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-400 hover:text-white hover:bg-white/10 transition-colors"><X size={20} /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 bg-ink-50/40 custom-scrollbar">
                             <div className="card overflow-hidden overflow-x-auto">
