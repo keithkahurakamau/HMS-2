@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import {
@@ -20,11 +20,23 @@ const STATUS_OPTIONS = ['Scheduled', 'Confirmed', 'Completed', 'Cancelled', 'No-
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+// Server data + its loading flag are one logical unit, owned by the fetch
+// routines below — grouped in a reducer so the directory load is a single
+// dispatch instead of two separate setState calls.
+const initialData = { appointments: [], doctors: [], patients: [], isLoading: true };
+function dataReducer(state, action) {
+    switch (action.type) {
+        case 'loading':         return { ...state, isLoading: true };
+        case 'setAppointments': return { ...state, appointments: action.value };
+        case 'loaded':          return { ...state, isLoading: false };
+        case 'setDirectory':    return { ...state, doctors: action.doctors, patients: action.patients };
+        default:                return state;
+    }
+}
+
 export default function Appointments() {
-    const [appointments, setAppointments] = useState([]);
-    const [doctors, setDoctors] = useState([]);
-    const [patients, setPatients] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [data, dispatch] = useReducer(dataReducer, initialData);
+    const { appointments, doctors, patients, isLoading } = data;
     const [filter, setFilter] = useState({ status: '', from: todayISO(), to: '' });
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [form, setForm] = useState({ patient_id: '', doctor_id: '', appointment_date: '', notes: '' });
@@ -33,18 +45,18 @@ export default function Appointments() {
     const { activePatient } = useActivePatient();
 
     const fetchAppointments = async () => {
-        setIsLoading(true);
+        dispatch({ type: 'loading' });
         try {
             const params = {};
             if (filter.status) params.status = filter.status;
             if (filter.from)   params.date_from = `${filter.from}T00:00:00`;
             if (filter.to)     params.date_to   = `${filter.to}T23:59:59`;
             const res = await apiClient.get('/appointments/', { params });
-            setAppointments(res.data || []);
+            dispatch({ type: 'setAppointments', value: res.data || [] });
         } catch (error) {
             toast.error(error.response?.data?.detail || 'Failed to load appointments');
         } finally {
-            setIsLoading(false);
+            dispatch({ type: 'loaded' });
         }
     };
 
@@ -56,8 +68,7 @@ export default function Appointments() {
                 apiClient.get('/appointments/doctors').catch(() => ({ data: [] })),
                 apiClient.get('/patients/').catch(() => ({ data: [] })),
             ]);
-            setDoctors(doctorsRes.data || []);
-            setPatients(patientsRes.data || []);
+            dispatch({ type: 'setDirectory', doctors: doctorsRes.data || [], patients: patientsRes.data || [] });
         } catch (error) { /* non-fatal */ }
     };
 

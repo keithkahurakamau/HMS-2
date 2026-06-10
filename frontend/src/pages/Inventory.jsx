@@ -331,9 +331,9 @@ export default function Inventory() {
                                         <label className="label">Destination Department</label>
                                         <select required value={transferForm.to_loc_id} onChange={(e) => setTransferForm({...transferForm, to_loc_id: e.target.value})} className="input">
                                             <option value="">Select Destination...</option>
-                                            {locations.filter(l => l.id !== activeLocation.id).map(loc => (
+                                            {locations.flatMap(loc => loc.id !== activeLocation.id ? [
                                                 <option key={loc.id} value={loc.id}>{loc.name}</option>
-                                            ))}
+                                            ] : [])}
                                         </select>
                                     </div>
                                 </div>

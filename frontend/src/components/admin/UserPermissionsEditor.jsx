@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useReducer, useState, useMemo } from 'react';
 import { X, Activity, ShieldCheck, Plus, Minus, RotateCcw, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
@@ -14,10 +14,31 @@ import { apiClient } from '../../api/client';
  * The Admin role can't be overridden (wildcard by design); we render a
  * read-only banner if the target user is an Admin.
  */
+// The initial fetch loads the catalogue + the user's saved overrides and flips
+// the loading flag — one logical unit, so it lives in a single reducer.
+const initialLoad = { data: null, permissions: [], loading: true };
+function loadReducer(state, action) {
+    switch (action.type) {
+        case 'start':  return { ...state, loading: true };
+        case 'loaded': return { ...state, permissions: action.permissions, data: action.data };
+        case 'done':   return { ...state, loading: false };
+        default:       return state;
+    }
+}
+
+// Collect the codenames whose draft state matches `state` in a single pass,
+// replacing the repeated Object.entries(draft).filter(...).map(...) chains.
+function codenamesWithState(draft, state) {
+    const out = [];
+    for (const [codename, s] of Object.entries(draft)) {
+        if (s === state) out.push(codename);
+    }
+    return out;
+}
+
 export default function UserPermissionsEditor({ user, onClose, onSaved }) {
-    const [data, setData] = useState(null);     // GET /admin/users/{id}/permissions
-    const [permissions, setPermissions] = useState([]); // catalogue
-    const [loading, setLoading] = useState(true);
+    const [load, dispatch] = useReducer(loadReducer, initialLoad);
+    const { data, permissions, loading } = load; // data: GET /…/permissions; permissions: catalogue
     const [saving, setSaving] = useState(false);
 
     // Local working copy: codename -> 'inherit' | 'grant' | 'revoke'
@@ -26,15 +47,14 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
     useEffect(() => {
         let cancelled = false;
         (async () => {
-            setLoading(true);
+            dispatch({ type: 'start' });
             try {
                 const [permsRes, userPermsRes] = await Promise.all([
                     apiClient.get('/admin/permissions'),
                     apiClient.get(`/admin/users/${user.user_id}/permissions`),
                 ]);
                 if (cancelled) return;
-                setPermissions(permsRes.data || []);
-                setData(userPermsRes.data);
+                dispatch({ type: 'loaded', permissions: permsRes.data || [], data: userPermsRes.data });
 
                 // Build draft from current state.
                 const next = {};
@@ -44,7 +64,7 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
             } catch (e) {
                 toast.error(e.response?.data?.detail || 'Could not load permissions.');
             } finally {
-                if (!cancelled) setLoading(false);
+                if (!cancelled) dispatch({ type: 'done' });
             }
         })();
         return () => { cancelled = true; };
@@ -58,10 +78,10 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
     // What the saved effective set will be after the draft is applied.
     const effectivePreview = useMemo(() => {
         const grants = new Set(
-            Object.entries(draft).filter(([, s]) => s === 'grant').map(([c]) => c)
+            codenamesWithState(draft, 'grant')
         );
         const revokes = new Set(
-            Object.entries(draft).filter(([, s]) => s === 'revoke').map(([c]) => c)
+            codenamesWithState(draft, 'revoke')
         );
         const out = new Set(rolePerms);
         grants.forEach((c) => out.add(c));
@@ -83,8 +103,8 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
     const save = async () => {
         setSaving(true);
         try {
-            const granted = Object.entries(draft).filter(([, s]) => s === 'grant').map(([c]) => c);
-            const revoked = Object.entries(draft).filter(([, s]) => s === 'revoke').map(([c]) => c);
+            const granted = codenamesWithState(draft, 'grant');
+            const revoked = codenamesWithState(draft, 'revoke');
             const res = await apiClient.put(
                 `/admin/users/${user.user_id}/permissions`,
                 { granted, revoked }
@@ -102,10 +122,10 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
         const origGrants = new Set(data?.granted || []);
         const origRevokes = new Set(data?.revoked || []);
         const draftGrants = new Set(
-            Object.entries(draft).filter(([, s]) => s === 'grant').map(([c]) => c)
+            codenamesWithState(draft, 'grant')
         );
         const draftRevokes = new Set(
-            Object.entries(draft).filter(([, s]) => s === 'revoke').map(([c]) => c)
+            codenamesWithState(draft, 'revoke')
         );
         if (origGrants.size !== draftGrants.size) return true;
         if (origRevokes.size !== draftRevokes.size) return true;

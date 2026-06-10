@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useReducer, useState, useCallback } from 'react';
 import { ShieldCheck, Plus, Trash2, X, Lock, Activity, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
@@ -57,32 +57,42 @@ const categoryLabel = (prefix) =>
     CATEGORY_LABELS[prefix] ||
     prefix.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
+// Roles + permission catalogue + loading flag are loaded together by fetchAll,
+// so they share one reducer.
+const initialRoles = { roles: [], permissions: [], loading: true };
+function rolesReducer(state, action) {
+    switch (action.type) {
+        case 'start':  return { ...state, loading: true };
+        case 'loaded': return { ...state, roles: action.roles, permissions: action.permissions };
+        case 'done':   return { ...state, loading: false };
+        default:       return state;
+    }
+}
+
 export default function RolesManager() {
-    const [roles, setRoles] = useState([]);
-    const [permissions, setPermissions] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [rolesState, dispatch] = useReducer(rolesReducer, initialRoles);
+    const { roles, permissions, loading } = rolesState;
     const [editing, setEditing] = useState(null); // null | 'new' | role
     const [activeRoleId, setActiveRoleId] = useState(null);
     const [draftPerms, setDraftPerms] = useState(new Set());
     const [savingPerms, setSavingPerms] = useState(false);
 
     const fetchAll = useCallback(async () => {
-        setLoading(true);
+        dispatch({ type: 'start' });
         try {
             const [rRes, pRes] = await Promise.all([
                 apiClient.get('/admin/roles'),
                 apiClient.get('/admin/permissions'),
             ]);
             const rolesData = rRes.data || [];
-            setRoles(rolesData);
-            setPermissions(pRes.data || []);
+            dispatch({ type: 'loaded', roles: rolesData, permissions: pRes.data || [] });
             if (rolesData.length && activeRoleId == null) {
                 setActiveRoleId(rolesData[0].role_id);
             }
         } catch {
             toast.error('Could not load roles.');
         } finally {
-            setLoading(false);
+            dispatch({ type: 'done' });
         }
     }, [activeRoleId]);
 
