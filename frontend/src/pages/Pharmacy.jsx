@@ -12,6 +12,9 @@ import PageHeader from '../components/PageHeader';
 import MpesaStkProgress from '../components/MpesaStkProgress';
 import usePaymentSocket from '../hooks/usePaymentSocket';
 
+// Pure helper hoisted to module scope (no component state).
+const genKey = () => crypto.randomUUID();
+
 export default function Pharmacy() {
     // --- APP STATE ---
     const [activeTab, setActiveTab] = useState('rx'); // 'rx' | 'otc' | 'transactions'
@@ -101,8 +104,6 @@ export default function Pharmacy() {
     // crypto.randomUUID() is collision-resistant; the prior Math.random
     // construction could repeat under load and let a double-click look like
     // a single idempotent retry on the server side.
-    const genKey = () => crypto.randomUUID();
-
     // Loops the cart and posts one /pharmacy/dispense call per line.
     // Returns the array of API responses (each carries invoice_id +
     // invoice_balance when the patient is known).
@@ -266,17 +267,18 @@ export default function Pharmacy() {
             {/* GLOBAL PHARMACY HEADER & TABS */}
             <div data-tour="pharmacy-tabs" className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Pharmacy mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
-                    <button role="tab" aria-selected={activeTab === 'rx'} onClick={() => setActiveTab('rx')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'rx' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                    <button type="button" role="tab" aria-selected={activeTab === 'rx'} onClick={() => setActiveTab('rx')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'rx' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <Pill size={16} className={activeTab === 'rx' ? 'text-brand-600' : 'text-ink-400'} /> Rx Fulfillment
                     </button>
-                    <button role="tab" aria-selected={activeTab === 'otc'} onClick={() => setActiveTab('otc')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'otc' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                    <button type="button" role="tab" aria-selected={activeTab === 'otc'} onClick={() => setActiveTab('otc')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'otc' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <Store size={16} className={activeTab === 'otc' ? 'text-accent-600' : 'text-ink-400'} /> OTC Point of Sale
                     </button>
-                    <button role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'transactions' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                    <button type="button" role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'transactions' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <History size={16} className={activeTab === 'transactions' ? 'text-brand-600' : 'text-ink-400'} /> Transactions
                     </button>
                 </div>
                 <div className="text-right px-3 text-xs font-semibold text-ink-500">
+                    {/* react-doctor-disable-next-line react-doctor/rendering-hydration-mismatch-time */}
                     {new Date().toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
             </div>
@@ -287,7 +289,7 @@ export default function Pharmacy() {
             {activeTab === 'rx' && (
                 <>
                     <div data-tour="pharmacy-dispense-queue" className="card shrink-0 flex flex-col z-20">
-                        <button onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
+                        <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
                             <div className="flex items-center gap-3">
                                 <Package className="text-brand-600" size={18} />
                                 <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Pending prescriptions</h2>
@@ -361,7 +363,7 @@ export default function Pharmacy() {
 
                                 <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-3 bg-ink-50/40 custom-scrollbar">
                                     {activeOrder.prescriptions?.map((med, idx) => (
-                                        <div key={idx} className="card-flush p-5">
+                                        <div key={`${med.drug}-${med.dosage}-${med.frequency}-${idx}`} className="card-flush p-5">
                                             <div className="flex justify-between items-start gap-4">
                                                 <div className="flex-1">
                                                     <h4 className="font-semibold text-base text-ink-900 dark:text-ink-100 tracking-tight flex items-center gap-2">
@@ -384,7 +386,7 @@ export default function Pharmacy() {
                                 </div>
 
                                 <div data-tour="pharmacy-rx-actions" className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap justify-end gap-2 shrink-0 z-10">
-                                    <button
+                                    <button type="button"
                                         onClick={() => printPrescription({
                                             patient: { full_name: activeOrder.patient, outpatient_no: activeOrder.op_no, allergies: activeOrder.allergies },
                                             doctor:  { full_name: activeOrder.doctor, license_number: activeOrder.doctor_license },
@@ -396,8 +398,8 @@ export default function Pharmacy() {
                                     >
                                         <Printer size={15} /> Print Rx
                                     </button>
-                                    <button onClick={handleReturnToDoctor} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50"><XCircle size={15} /> Return to doctor</button>
-                                    <button onClick={handleRxDispense} disabled={isProcessing} className="btn-primary">
+                                    <button type="button" onClick={handleReturnToDoctor} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50"><XCircle size={15} /> Return to doctor</button>
+                                    <button type="button" onClick={handleRxDispense} disabled={isProcessing} className="btn-primary">
                                         <CheckCircle2 size={16} /> {isProcessing ? 'Processing…' : 'Dispense & close'}
                                     </button>
                                 </div>
@@ -417,7 +419,7 @@ export default function Pharmacy() {
                         <div className="p-4 border-b border-ink-100 dark:border-ink-800 bg-ink-50/40">
                             <div className="relative">
                                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-                                <input
+                                <input aria-label="Search pharmacy inventory…"
                                     type="text"
                                     placeholder="Search pharmacy inventory…"
                                     value={otcSearch}
@@ -449,7 +451,7 @@ export default function Pharmacy() {
                                                 </div>
                                                 <div className="text-2xs text-ink-400 mt-1 uppercase tracking-wider font-mono">Batch: {item.batch_number}</div>
                                             </div>
-                                            <button
+                                            <button type="button"
                                                 onClick={() => addToCart(item)}
                                                 disabled={item.quantity === 0}
                                                 aria-label={`Add ${item.name} (batch ${item.batch_number}) to cart`}
@@ -484,14 +486,14 @@ export default function Pharmacy() {
                                     <div key={item.batch_id} className="card-flush p-3">
                                         <div className="flex justify-between items-start mb-2 gap-2">
                                             <h4 className="font-semibold text-sm text-ink-800 dark:text-ink-200 line-clamp-1">{item.name}</h4>
-                                            <button onClick={() => removeFromCart(item.batch_id)} aria-label="Remove" className="text-ink-400 hover:text-rose-600 transition-colors p-0.5"><Trash2 size={15} /></button>
+                                            <button type="button" onClick={() => removeFromCart(item.batch_id)} aria-label="Remove" className="text-ink-400 hover:text-rose-600 transition-colors p-0.5"><Trash2 size={15} /></button>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-xs font-medium text-ink-500">KES {item.unit_price} &times; {item.qty}</span>
                                             <div className="flex items-center gap-1 bg-ink-50 dark:bg-ink-900/40 border border-ink-200 dark:border-ink-800 rounded-lg p-0.5">
-                                                <button onClick={() => updateQty(item.batch_id, -1)} aria-label="Decrease" className="p-1 hover:bg-white dark:hover:bg-ink-800 rounded text-ink-600 dark:text-ink-400"><Minus size={13} /></button>
+                                                <button type="button" onClick={() => updateQty(item.batch_id, -1)} aria-label="Decrease" className="p-1 hover:bg-white dark:hover:bg-ink-800 rounded text-ink-600 dark:text-ink-400"><Minus size={13} /></button>
                                                 <span className="text-sm font-semibold w-6 text-center">{item.qty}</span>
-                                                <button onClick={() => updateQty(item.batch_id, 1)} aria-label="Increase" className="p-1 hover:bg-white dark:hover:bg-ink-800 rounded text-ink-600 dark:text-ink-400"><Plus size={13} /></button>
+                                                <button type="button" onClick={() => updateQty(item.batch_id, 1)} aria-label="Increase" className="p-1 hover:bg-white dark:hover:bg-ink-800 rounded text-ink-600 dark:text-ink-400"><Plus size={13} /></button>
                                             </div>
                                         </div>
                                     </div>
@@ -548,24 +550,24 @@ function OtcPayBar({ disabled, onCash, onCard, onMpesa }) {
     return (
         <div className="space-y-2">
             <div className="grid grid-cols-3 gap-2">
-                <button onClick={onCash} disabled={disabled}
+                <button type="button" onClick={onCash} disabled={disabled}
                         className="btn-success py-3 flex flex-col items-center gap-1 text-xs">
                     <Banknote size={18} /><span>Cash</span>
                 </button>
-                <button onClick={onCard} disabled={disabled}
+                <button type="button" onClick={onCard} disabled={disabled}
                         className="btn-primary py-3 flex flex-col items-center gap-1 text-xs">
                     <CreditCard size={18} /><span>Card</span>
                 </button>
-                <button onClick={() => setShowMpesa((s) => !s)} disabled={disabled}
+                <button type="button" onClick={() => setShowMpesa((s) => !s)} disabled={disabled}
                         className="py-3 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-60 flex flex-col items-center gap-1">
                     <Smartphone size={18} /><span>M-Pesa</span>
                 </button>
             </div>
             {showMpesa && (
                 <div className="flex gap-2 pt-1">
-                    <input className="input flex-1" placeholder="07XXXXXXXX or 2547XXXXXXXX"
+                    <input aria-label="07XXXXXXXX or 2547XXXXXXXX" className="input flex-1" placeholder="07XXXXXXXX or 2547XXXXXXXX"
                            value={phone} onChange={(e) => setPhone(e.target.value)} />
-                    <button onClick={() => onMpesa(phone)} disabled={disabled || !phone}
+                    <button type="button" onClick={() => onMpesa(phone)} disabled={disabled || !phone}
                             className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-60">
                         Send STK
                     </button>
@@ -655,6 +657,16 @@ function escapeHtml(s) {
 
 /* ─── Transactions tab ────────────────────────────────────────────────────── */
 
+// Pure helper hoisted to module scope (no component state).
+const printReceipt = async (dispenseId) => {
+    try {
+        const r = await apiClient.get(`/pharmacy/dispense/${dispenseId}/receipt`);
+        printPharmacyReceipt(r.data);
+    } catch (err) {
+        toast.error(err?.response?.data?.detail || 'Could not load receipt.');
+    }
+};
+
 function TransactionsTab() {
     const today = new Date().toISOString().slice(0, 10);
     const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -683,23 +695,14 @@ function TransactionsTab() {
 
     useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-    const printReceipt = async (dispenseId) => {
-        try {
-            const r = await apiClient.get(`/pharmacy/dispense/${dispenseId}/receipt`);
-            printPharmacyReceipt(r.data);
-        } catch (err) {
-            toast.error(err?.response?.data?.detail || 'Could not load receipt.');
-        }
-    };
-
     const total = rows.reduce((s, r) => s + Number(r.total_cost || 0), 0);
     const paid  = rows.reduce((s, r) => s + Number(r.amount_paid || 0), 0);
 
     return (
         <div className="card p-4 flex-1 overflow-auto">
             <div className="flex flex-wrap items-end gap-3 mb-4">
-                <Field label="From"><input type="date" className="input" value={from} onChange={e => setFrom(e.target.value)} /></Field>
-                <Field label="To"><input type="date" className="input" value={to} onChange={e => setTo(e.target.value)} /></Field>
+                <Field label="From"><input aria-label="From" type="date" className="input" value={from} onChange={e => setFrom(e.target.value)} /></Field>
+                <Field label="To"><input aria-label="To" type="date" className="input" value={to} onChange={e => setTo(e.target.value)} /></Field>
                 <Field label="Method">
                     <select className="input" value={method} onChange={e => setMethod(e.target.value)}>
                         <option value="">All</option>
@@ -718,7 +721,7 @@ function TransactionsTab() {
                         <option>Pending M-Pesa</option>
                     </select>
                 </Field>
-                <button onClick={load}
+                <button type="button" onClick={load}
                         className="btn-primary text-sm"
                         disabled={loading}>
                     {loading ? 'Loading...' : 'Apply'}
@@ -741,7 +744,7 @@ function TransactionsTab() {
                             <th className="text-left px-3 py-2 font-medium">Method</th>
                             <th className="text-left px-3 py-2 font-medium">Status</th>
                             <th className="text-left px-3 py-2 font-medium">Cashier</th>
-                            <th></th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
@@ -771,7 +774,7 @@ function TransactionsTab() {
                                 </td>
                                 <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{r.cashier || '—'}</td>
                                 <td className="px-3 py-1.5 text-right">
-                                    <button onClick={() => printReceipt(r.dispense_id)}
+                                    <button type="button" onClick={() => printReceipt(r.dispense_id)}
                                             className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
                                         <ReceiptText size={12} /> Receipt
                                     </button>
@@ -816,7 +819,6 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
     // push is pending, and run a visible countdown alongside it.
     useEffect(() => {
         if (mpesaStatus !== 'waiting') return undefined;
-        setSecondsLeft(STK_TIMEOUT);
 
         const tick = setInterval(() => {
             setSecondsLeft((s) => {
@@ -891,6 +893,10 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                 onSettled();
             } else if (method === 'mpesa') {
                 toast.success('STK push sent. Customer to confirm on their phone.');
+                // Start a fresh countdown alongside the wait state here, rather
+                // than resetting it inside the polling effect when the status
+                // changes. (Initial mount and retry() also seed STK_TIMEOUT.)
+                setSecondsLeft(STK_TIMEOUT);
                 setMpesaStatus('waiting');
             }
         } catch (err) {
@@ -910,7 +916,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                             {patientName ? `${patientName} · ` : ''}Invoice #{invoiceId} · KES {Number(amountDue || 0).toLocaleString()}
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-ink-400 hover:text-ink-700" aria-label="Close">
+                    <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-700" aria-label="Close">
                         <XIcon size={18} />
                     </button>
                 </div>
@@ -929,17 +935,17 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                     ) : (
                         <>
                             <div className="flex gap-2 border-b border-ink-100 dark:border-ink-800">
-                                <button onClick={() => setMethod('cash')}
+                                <button type="button" onClick={() => setMethod('cash')}
                                         className={'flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
                                             (method === 'cash' ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-500')}>
                                     <Banknote size={14} /> Cash
                                 </button>
-                                <button onClick={() => setMethod('mpesa')}
+                                <button type="button" onClick={() => setMethod('mpesa')}
                                         className={'flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
                                             (method === 'mpesa' ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-500')}>
                                     <Smartphone size={14} /> M-Pesa
                                 </button>
-                                <button disabled
+                                <button type="button" disabled
                                         className="flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px border-transparent text-ink-300 cursor-not-allowed"
                                         title="Card integration coming soon">
                                     <CreditCard size={14} /> Card
@@ -971,11 +977,11 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                             </label>
 
                             <div className="flex justify-end gap-2 pt-2">
-                                <button onClick={onClose}
+                                <button type="button" onClick={onClose}
                                         className="px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium hover:bg-ink-50 dark:hover:bg-ink-800/50">
                                     Cancel
                                 </button>
-                                <button onClick={submit} disabled={submitting}
+                                <button type="button" onClick={submit} disabled={submitting}
                                         className="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                                     {submitting ? 'Sending…' : (method === 'mpesa' ? 'Send STK push' : 'Record cash')}
                                 </button>

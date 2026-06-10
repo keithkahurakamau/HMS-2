@@ -90,7 +90,7 @@ export default function Portal() {
                 || h.domain.toLowerCase().includes(needle))
             : hospitals;
         const sorter = SORT_OPTIONS.find(o => o.key === sortKey) || SORT_OPTIONS[0];
-        return [...filtered].sort(sorter.cmp);
+        return filtered.toSorted(sorter.cmp);
     }, [hospitals, searchQuery, sortKey]);
 
     // Headline counts derived from the live registry so the stat strip
@@ -351,6 +351,7 @@ export default function Portal() {
                 <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
                     <Logo variant="full" size={28} />
                     <p className="text-xs text-ink-500 uppercase tracking-[0.18em]">
+                        {/* react-doctor-disable-next-line react-doctor/rendering-hydration-mismatch-time */}
                         &copy; {new Date().getFullYear()} MediFleet &mdash; Multi-tenant clinical cloud
                     </p>
                     <div className="flex items-center gap-4 text-xs text-ink-500">
@@ -425,12 +426,14 @@ function StatTile({ icon, label, value, hint }) {
    list cascades in instead of popping; the parent re-keys on sort/search
    so the cascade re-runs when the user changes the order.
    ────────────────────────────────────────────────────────────────────── */
+// Pure helper hoisted to module scope (no component state).
+const handleMove = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+    e.currentTarget.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+};
+
 function HospitalCard({ tenant, chip, delayMs, onSelect }) {
-    const handleMove = (e) => {
-        const r = e.currentTarget.getBoundingClientRect();
-        e.currentTarget.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
-        e.currentTarget.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
-    };
     return (
         <button
             type="button"

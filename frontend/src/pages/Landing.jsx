@@ -46,7 +46,7 @@ export default function Landing() {
                         <Link to="/portal" className="hidden sm:inline-flex btn-secondary text-xs cursor-pointer">
                             Find your hospital
                         </Link>
-                        <button onClick={() => navigate('/portal')} className="btn-primary text-xs cursor-pointer">
+                        <button type="button" onClick={() => navigate('/portal')} className="btn-primary text-xs cursor-pointer">
                             Sign in <ArrowRight size={14} />
                         </button>
                     </div>
@@ -79,11 +79,11 @@ export default function Landing() {
                             on patients, not paperwork.
                         </p>
                         <div className="mt-8 flex flex-wrap items-center gap-3">
-                            <button onClick={() => navigate('/portal')} className="btn-primary text-base px-5 py-3 cursor-pointer group">
+                            <button type="button" onClick={() => navigate('/portal')} className="btn-primary text-base px-5 py-3 cursor-pointer group">
                                 Open your hospital
                                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
                             </button>
-                            <button onClick={() => navigate('/portal?next=/patient')} className="btn-secondary text-base px-5 py-3 cursor-pointer">
+                            <button type="button" onClick={() => navigate('/portal?next=/patient')} className="btn-secondary text-base px-5 py-3 cursor-pointer">
                                 <HeartPulse size={16} /> Patient portal
                             </button>
                             <Link to="/superadmin/login" className="text-sm font-semibold text-ink-500 hover:text-brand-700 transition-colors px-3 py-3 cursor-pointer">
@@ -238,7 +238,7 @@ export default function Landing() {
                                 </p>
                             </div>
                             <div className="flex flex-wrap gap-3">
-                                <button onClick={() => navigate('/portal')} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-brand-700 font-semibold text-sm hover:bg-ink-50 transition-all shadow-soft cursor-pointer">
+                                <button type="button" onClick={() => navigate('/portal')} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-brand-700 font-semibold text-sm hover:bg-ink-50 transition-all shadow-soft cursor-pointer">
                                     Open your hospital <ArrowRight size={16} />
                                 </button>
                                 <Link to="/superadmin/login" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 text-white font-semibold text-sm ring-1 ring-white/20 hover:bg-white/15 transition-all cursor-pointer">
@@ -276,6 +276,7 @@ export default function Landing() {
                         <Logo variant="full" size={28} />
                     </div>
                     <p className="text-xs text-ink-500 uppercase tracking-[0.18em]">
+                        {/* react-doctor-disable-next-line react-doctor/rendering-hydration-mismatch-time */}
                         &copy; {new Date().getFullYear()} MediFleet — Clinical-grade workspace
                     </p>
                     <div className="flex items-center gap-4 text-xs text-ink-500">
@@ -636,7 +637,7 @@ function ModuleShowcase({ navigate }) {
                     {MODULE_GROUPS.map(g => {
                         const isActive = g.key === activeKey;
                         return (
-                            <button
+                            <button type="button"
                                 key={g.key}
                                 role="tab"
                                 aria-selected={isActive}
@@ -684,7 +685,7 @@ function ModuleShowcase({ navigate }) {
                     <p className="text-sm font-semibold">Don't see what you need? Tell us — we ship modules every sprint.</p>
                     <p className="text-xs text-ink-200 mt-1">Or jump in: the always-on modules are live the moment your hospital is provisioned.</p>
                 </div>
-                <button
+                <button type="button"
                     onClick={() => navigate('/portal')}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-brand-700 font-semibold text-sm hover:bg-ink-50 transition-colors shadow-soft cursor-pointer"
                 >
@@ -699,10 +700,15 @@ function ModuleCard({ module: m, delayMs, navigate }) {
     const Icon = m.icon;
     const [hover, setHover] = useState(false);
     return (
+        // Clickable card with flow content (<h3>/<p>/<ul>); a <button> may only contain phrasing content, so role="button" is the correct pattern here.
+        // react-doctor-disable-next-line react-doctor/prefer-tag-over-role
         <div
+            role="button"
+            tabIndex={0}
             onMouseEnter={() => setHover(true)}
             onMouseLeave={() => setHover(false)}
             onClick={() => navigate('/portal')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/portal'); } }}
             className="group relative bg-white rounded-2xl p-5 ring-1 ring-ink-200/70 hover:ring-brand-300 shadow-soft hover:shadow-elevated cursor-pointer transition-all animate-slide-up"
             style={{ animationDelay: `${delayMs}ms`, animationFillMode: 'both' }}
         >

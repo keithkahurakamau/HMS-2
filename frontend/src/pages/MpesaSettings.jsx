@@ -115,7 +115,7 @@ export default function MpesaSettings() {
 
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Shortcode (PayBill / Till) *">
-                            <input className="input" value={form.shortcode}
+                            <input aria-label="Shortcode (PayBill / Till) *" className="input" value={form.shortcode}
                                    onChange={e => setForm({ ...form, shortcode: e.target.value })}
                                    placeholder="e.g. 247247 or 5123456" />
                         </Field>
@@ -153,11 +153,11 @@ export default function MpesaSettings() {
                             </select>
                         </Field>
                         <Field label="Account number *">
-                            <input className="input" value={form.settlement_account_number}
+                            <input aria-label="Account number *" className="input" value={form.settlement_account_number}
                                    onChange={e => setForm({ ...form, settlement_account_number: e.target.value })} />
                         </Field>
                         <Field label="Account name">
-                            <input className="input" value={form.settlement_account_name}
+                            <input aria-label="Account name" className="input" value={form.settlement_account_name}
                                    onChange={e => setForm({ ...form, settlement_account_name: e.target.value })}
                                    placeholder="as it appears on the bank statement" />
                         </Field>
@@ -167,17 +167,17 @@ export default function MpesaSettings() {
                     <SectionHead icon={Banknote} title="Customisation" />
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Account reference">
-                            <input className="input" value={form.account_reference}
+                            <input aria-label="Account reference" className="input" value={form.account_reference}
                                    onChange={e => setForm({ ...form, account_reference: e.target.value })} />
                         </Field>
                         <Field label="Transaction description">
-                            <input className="input" value={form.transaction_desc}
+                            <input aria-label="Transaction description" className="input" value={form.transaction_desc}
                                    onChange={e => setForm({ ...form, transaction_desc: e.target.value })} />
                         </Field>
                     </div>
 
                     <div className="flex justify-end pt-2 border-t border-ink-100 dark:border-ink-800">
-                        <button onClick={save} disabled={saving}
+                        <button type="button" onClick={save} disabled={saving}
                                 className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                             {saving ? 'Saving…' : 'Save settings'}
                         </button>
@@ -194,10 +194,10 @@ export default function MpesaSettings() {
                             Sends a real KES&nbsp;1 prompt to the phone below. It doesn't
                             actually charge — the customer can decline.
                         </p>
-                        <input className="input" value={testPhone}
+                        <input aria-label="07XXXXXXXX or 2547XXXXXXXX" className="input" value={testPhone}
                                onChange={e => setTestPhone(e.target.value)}
                                placeholder="07XXXXXXXX or 2547XXXXXXXX" />
-                        <button onClick={testStk} disabled={testing || !config?.mpesa_active}
+                        <button type="button" onClick={testStk} disabled={testing || !config?.mpesa_active}
                                 className="w-full px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
                             {testing ? 'Sending…' : 'Send test'}
                         </button>

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, useRef } from 'react';
+import React, { createContext, useCallback, use, useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
 
@@ -203,6 +203,11 @@ export const PatientProvider = ({ children }) => {
         apiClient
             .post(`/patients/${activePatient.patient_id}/access`, { module })
             .catch(() => { /* non-critical, swallow */ });
+        // location is react-router's useLocation() — reactive, so this dep is
+        // correct and the access-log effect must re-run on each route change.
+        // The rule matches the name "location" and can't distinguish it from
+        // window.location; documented false positive.
+        // react-doctor-disable-next-line react-doctor/no-mutable-in-deps
     }, [activePatient, location.pathname]);
 
     const value = useMemo(() => ({
@@ -215,7 +220,7 @@ export const PatientProvider = ({ children }) => {
 };
 
 export const useActivePatient = () => {
-    const ctx = useContext(PatientContext);
+    const ctx = use(PatientContext);
     if (!ctx) throw new Error('useActivePatient must be used within PatientProvider');
     return ctx;
 };
