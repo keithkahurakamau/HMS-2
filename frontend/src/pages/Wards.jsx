@@ -283,9 +283,9 @@ export default function Wards() {
                                             <option value="">Assign a bed…</option>
                                             {wards.map(ward => (
                                                 <optgroup key={ward.id} label={ward.name}>
-                                                    {ward.beds.filter(b => b.status === 'Available').map(bed => (
+                                                    {ward.beds.flatMap(bed => bed.status === 'Available' ? [
                                                         <option key={bed.id} value={bed.id}>Bed {bed.number}</option>
-                                                    ))}
+                                                    ] : [])}
                                                 </optgroup>
                                             ))}
                                         </select>

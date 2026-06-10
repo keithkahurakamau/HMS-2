@@ -23,7 +23,7 @@ import { useEffect } from 'react';
 const SITE_NAME = 'MediFleet';
 const ORIGIN = 'https://www.medifleet.app';
 const DEFAULT_DESCRIPTION =
-  'MediFleet is a multi-tenant hospital management platform unifying registration, clinical desk, pharmacy, lab, radiology, wards, and billing in one secure, audited workspace.';
+  'MediFleet is a multi-tenant hospital management platform in Kenya unifying registration, clinical desk, pharmacy, lab, radiology, wards, and billing in one secure, audited workspace.';
 const DEFAULT_OG_IMAGE = `${ORIGIN}/og-image.svg`;
 
 function upsertMeta(attr, key, content) {

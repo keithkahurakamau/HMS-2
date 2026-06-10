@@ -522,8 +522,8 @@ function ConsentCard({ patientId, consents, onRecorded }) {
     const activeTreatment = useMemo(() => {
         const now = Date.now();
         return (consents || [])
-            .filter(c => c.consent_type === 'Treatment' && c.consent_given)
-            .filter(c => !c.consent_expires_at || new Date(c.consent_expires_at).getTime() > now)
+            .filter(c => c.consent_type === 'Treatment' && c.consent_given
+                && (!c.consent_expires_at || new Date(c.consent_expires_at).getTime() > now))
             .sort((a, b) => new Date(b.consented_at) - new Date(a.consented_at))[0] || null;
     }, [consents]);
 

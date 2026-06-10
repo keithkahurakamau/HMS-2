@@ -283,7 +283,7 @@ export default function SuperAdminPatients() {
                                         <ShieldCheck size={13} aria-hidden="true" /> Read-only — no actions are exposed in this view.
                                     </div>
                                     <div className="card divide-y divide-ink-100 dark:divide-ink-800">
-                                        {Object.entries(detail).filter(([k]) => k !== 'tenant').map(([k, v]) => (
+                                        {Object.entries(detail).flatMap(([k, v]) => k === 'tenant' ? [] : [
                                             <div key={k} className="px-4 sm:px-5 py-3 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-3 items-start">
                                                 <div className="text-2xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-[0.14em]">{k.replace(/_/g, ' ')}</div>
                                                 <div className="sm:col-span-2 text-sm text-ink-900 dark:text-white break-words">
@@ -292,7 +292,7 @@ export default function SuperAdminPatients() {
                                                         String(v)}
                                                 </div>
                                             </div>
-                                        ))}
+                                        ])}
                                     </div>
                                 </div>
                             ) : (

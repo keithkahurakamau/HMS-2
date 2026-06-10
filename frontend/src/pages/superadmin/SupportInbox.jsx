@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useReducer, useState } from 'react';
 import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import {
@@ -38,25 +38,52 @@ const DESKS = {
     Technical: { cats: ['Bug', 'Feature'],                  icon: Wrench },
 };
 
-export default function SupportInbox() {
-    const [tickets, setTickets] = useState([]);
-    const [summary, setSummary] = useState({});
-    const [active, setActive] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+// Server data: the ticket list, the summary tiles, and the loading flag.
+const initialData = { tickets: [], summary: {}, isLoading: true };
+function dataReducer(state, action) {
+    switch (action.type) {
+        case 'loading':    return { ...state, isLoading: true };
+        case 'setTickets': return { ...state, tickets: action.value };
+        case 'setSummary': return { ...state, summary: action.value };
+        case 'done':       return { ...state, isLoading: false };
+        default:           return state;
+    }
+}
 
-    const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState('Open');
-    const [categoryFilter, setCategoryFilter] = useState('');
-    const [priorityFilter, setPriorityFilter] = useState('');
-    const [deskFilter, setDeskFilter] = useState('');   // '' = all desks
+// The five inbox filters — one object, so each change is a single dispatch.
+const initialFilters = { search: '', statusFilter: 'Open', categoryFilter: '', priorityFilter: '', deskFilter: '' };
+function filtersReducer(state, action) {
+    switch (action.type) {
+        case 'set': return { ...state, [action.field]: action.value };
+        default:    return state;
+    }
+}
+
+// Reply box on the active ticket: the text + the send-in-flight flag.
+const initialReplyBox = { reply: '', sendingReply: false };
+function replyReducer(state, action) {
+    switch (action.type) {
+        case 'setReply': return { ...state, reply: action.value };
+        case 'sending':  return { ...state, sendingReply: action.value };
+        default:         return state;
+    }
+}
+
+export default function SupportInbox() {
+    const [data, dispatchData] = useReducer(dataReducer, initialData);
+    const { tickets, summary, isLoading } = data;
+    const [active, setActive] = useState(null);
+
+    const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
+    const { search, statusFilter, categoryFilter, priorityFilter, deskFilter } = filters;
 
     // Desk grouping is applied client-side over the fetched list.
     const visibleTickets = deskFilter
         ? tickets.filter(t => DESKS[deskFilter].cats.includes(t.category))
         : tickets;
 
-    const [reply, setReply] = useState('');
-    const [sendingReply, setSendingReply] = useState(false);
+    const [replyBox, dispatchReply] = useReducer(replyReducer, initialReplyBox);
+    const { reply, sendingReply } = replyBox;
 
     useEffect(() => { fetchAll(); }, []);  // initial
     useEffect(() => {
@@ -72,14 +99,14 @@ export default function SupportInbox() {
     const fetchSummary = async () => {
         try {
             const res = await apiClient.get('/public/superadmin/tickets/summary');
-            setSummary(res.data || {});
+            dispatchData({ type: 'setSummary', value: res.data || {} });
         } catch {
             // Summary is decorative — silently degrade if it fails.
         }
     };
 
     const fetchTickets = async () => {
-        setIsLoading(true);
+        dispatchData({ type: 'loading' });
         try {
             const params = new URLSearchParams();
             if (search) params.set('search', search);
@@ -87,11 +114,11 @@ export default function SupportInbox() {
             if (categoryFilter) params.set('category', categoryFilter);
             if (priorityFilter) params.set('priority', priorityFilter);
             const res = await apiClient.get(`/public/superadmin/tickets/?${params.toString()}`);
-            setTickets(res.data || []);
+            dispatchData({ type: 'setTickets', value: res.data || [] });
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Failed to load tickets.');
         } finally {
-            setIsLoading(false);
+            dispatchData({ type: 'done' });
         }
     };
 
@@ -106,17 +133,17 @@ export default function SupportInbox() {
 
     const sendReply = async () => {
         if (!reply.trim() || !active) return;
-        setSendingReply(true);
+        dispatchReply({ type: 'sending', value: true });
         try {
             const res = await apiClient.post(`/public/superadmin/tickets/${active.ticket_id}/reply`, { body: reply });
             setActive(res.data);
-            setReply('');
+            dispatchReply({ type: 'setReply', value: '' });
             fetchTickets();
             fetchSummary();
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Failed to send reply.');
         } finally {
-            setSendingReply(false);
+            dispatchReply({ type: 'sending', value: false });
         }
     };
 
@@ -162,7 +189,7 @@ export default function SupportInbox() {
                         <button
                             key={s}
                             type="button"
-                            onClick={() => setStatusFilter(s)}
+                            onClick={() => dispatchFilters({ type: 'set', field: 'statusFilter', value: s })}
                             aria-pressed={isActive}
                             className={`text-left rounded-2xl p-4 border transition-colors cursor-pointer ${
                                 isActive
@@ -191,7 +218,7 @@ export default function SupportInbox() {
                             type="button"
                             role="tab"
                             aria-selected={selected}
-                            onClick={() => setDeskFilter(d)}
+                            onClick={() => dispatchFilters({ type: 'set', field: 'deskFilter', value: d })}
                             className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium ring-1 ring-inset transition-colors cursor-pointer ${
                                 selected
                                     ? 'bg-brand-600 text-white ring-brand-600'
@@ -217,7 +244,7 @@ export default function SupportInbox() {
                         className="w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg pl-9 pr-4 py-2 text-sm text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
                         placeholder="Search subject…"
                         value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        onChange={e => dispatchFilters({ type: 'set', field: 'search', value: e.target.value })}
                     />
                 </div>
                 <div className="relative">
@@ -227,7 +254,7 @@ export default function SupportInbox() {
                         id="cat-filter"
                         className="w-full sm:w-auto bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg pl-9 pr-8 py-2 text-sm text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                         value={categoryFilter}
-                        onChange={e => setCategoryFilter(e.target.value)}
+                        onChange={e => dispatchFilters({ type: 'set', field: 'categoryFilter', value: e.target.value })}
                     >
                         <option value="">All categories</option>
                         {CATEGORIES.map(c => <option key={c}>{c}</option>)}
@@ -238,14 +265,14 @@ export default function SupportInbox() {
                     id="prio-filter"
                     className="w-full sm:w-auto bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                     value={priorityFilter}
-                    onChange={e => setPriorityFilter(e.target.value)}
+                    onChange={e => dispatchFilters({ type: 'set', field: 'priorityFilter', value: e.target.value })}
                 >
                     <option value="">All priorities</option>
                     {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                 </select>
                 <button
                     type="button"
-                    onClick={() => setStatusFilter('')}
+                    onClick={() => dispatchFilters({ type: 'set', field: 'statusFilter', value: '' })}
                     className="text-2xs text-ink-600 dark:text-ink-400 hover:text-brand-700 uppercase tracking-wider cursor-pointer"
                 >
                     Clear status
@@ -388,7 +415,7 @@ export default function SupportInbox() {
                                         className="flex-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-none"
                                         placeholder="Reply to the tenant…"
                                         value={reply}
-                                        onChange={e => setReply(e.target.value)}
+                                        onChange={e => dispatchReply({ type: 'setReply', value: e.target.value })}
                                     />
                                     <button
                                         type="button"

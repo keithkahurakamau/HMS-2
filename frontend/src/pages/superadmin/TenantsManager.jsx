@@ -429,7 +429,7 @@ export default function TenantsManager() {
                                                         type="button"
                                                         onClick={() => {
                                                             const flags = { ...(editForm.feature_flags || {}) };
-                                                            moduleCatalogue.filter(m => !m.always_on).forEach(m => { flags[m.key] = true; });
+                                                            moduleCatalogue.forEach(m => { if (!m.always_on) flags[m.key] = true; });
                                                             setEditForm({ ...editForm, feature_flags: flags });
                                                         }}
                                                         className="text-2xs font-semibold px-2.5 py-1.5 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50 cursor-pointer"
@@ -440,7 +440,7 @@ export default function TenantsManager() {
                                                         type="button"
                                                         onClick={() => {
                                                             const flags = { ...(editForm.feature_flags || {}) };
-                                                            moduleCatalogue.filter(m => !m.always_on).forEach(m => { flags[m.key] = false; });
+                                                            moduleCatalogue.forEach(m => { if (!m.always_on) flags[m.key] = false; });
                                                             setEditForm({ ...editForm, feature_flags: flags });
                                                         }}
                                                         className="text-2xs font-semibold px-2.5 py-1.5 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50 cursor-pointer"

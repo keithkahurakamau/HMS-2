@@ -422,14 +422,14 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
     const removeLine = (idx) => setLines(lines.filter((_, i) => i !== idx));
 
     const submit = async () => {
-        const cleaned = lines
-            .filter((l) => l.account_id && (Number(l.debit) > 0 || Number(l.credit) > 0))
-            .map((l) => ({
+        const cleaned = lines.flatMap((l) => (
+            l.account_id && (Number(l.debit) > 0 || Number(l.credit) > 0) ? [{
                 account_id: Number(l.account_id),
                 debit: Number(l.debit || 0),
                 credit: Number(l.credit || 0),
                 description: l.description || null,
-            }));
+            }] : []
+        ));
         if (cleaned.length < 2) {
             toast.error('Need at least two non-empty lines.');
             return;
@@ -2285,12 +2285,12 @@ function ClaimModal({ providers, onClose, onSaved }) {
         items.reduce((s, it) => s + Number(it.amount_claimed || 0), 0), [items]);
 
     const submit = async () => {
-        const cleaned = items.filter(i => Number(i.amount_claimed) > 0).map(i => ({
+        const cleaned = items.flatMap(i => Number(i.amount_claimed) > 0 ? [{
             invoice_reference: i.invoice_reference || null,
             patient_name: i.patient_name || null,
             member_number: i.member_number || null,
             amount_claimed: Number(i.amount_claimed),
-        }));
+        }] : []);
         if (cleaned.length === 0) { toast.error('Add at least one item.'); return; }
         setSaving(true);
         try {
