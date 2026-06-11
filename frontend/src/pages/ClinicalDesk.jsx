@@ -11,9 +11,6 @@ import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
 import { useActivePatient } from '../context/PatientContext';
 
-// Static ICD lookup list — module scope so it isn't rebuilt every render.
-const ICD_DATABASE = ["A09 - Infectious gastroenteritis", "E11.9 - Type 2 diabetes mellitus", "I10 - Essential hypertension", "B50.9 - Severe Malaria", "J03.90 - Acute tonsillitis", "R50.9 - Fever, unspecified"];
-
 // Prescription pick-lists — kept at module scope so the dropdowns are stable.
 const FORMULATIONS = ["Tablet", "Capsule", "Syrup", "Suspension", "Injection", "Cream / Ointment", "Drops", "Inhaler", "Suppository", "Other"];
 const FREQUENCIES = ["OD (once daily)", "BD (twice daily)", "TDS (three times daily)", "QDS (four times daily)", "PRN (as needed)", "STAT (immediately)", "Nocte (at night)"];
@@ -40,15 +37,28 @@ export default function ClinicalDesk() {
 
     // --- FORM STATE ---
     const [vitals, setVitals] = useState({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
-    const [clinicalNotes, setClinicalNotes] = useState({ hpi: '', objective: '', diagnosis: '', internal_notes: '' });
+    const [clinicalNotes, setClinicalNotes] = useState({ hpi: '', diagnosis: '', internal_notes: '' });
     // Chief complaint is now a list — a patient can present with several.
     const [complaints, setComplaints] = useState([]);
     const [complaintInput, setComplaintInput] = useState('');
+    // Physical examination is a list too — one entry per system/finding
+    // (e.g. "Chest: clear air entry bilaterally"). Persists "; "-joined in
+    // physical_examination, same convention as chief complaints.
+    const [physicalExams, setPhysicalExams] = useState([]);
+    const [examInput, setExamInput] = useState('');
     // Structured, numbered prescription rows routed to Pharmacy.
     const [medications, setMedications] = useState([]);
     const [icdSearch, setIcdSearch] = useState('');
     const [showIcdDropdown, setShowIcdDropdown] = useState(false);
+    // Server-side ICD-10 type-ahead results — the full CMS ICD-10-CM
+    // catalogue (~74k codes) lives in the backend, not in the bundle.
+    const [icdResults, setIcdResults] = useState([]);
     const [chargeConsultation, setChargeConsultation] = useState(false);
+    // The logged-in doctor's own consultation fee (per-doctor price-list row
+    // server-side). Null until loaded; the charge endpoint resolves the fee
+    // server-side either way, so this only drives the display + editor.
+    const [myFee, setMyFee] = useState(null);
+    const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
 
     // --- LAB / IMAGING / FOLLOW-UP MODAL STATE ---
     const [isLabModalOpen, setIsLabModalOpen] = useState(false);
@@ -77,12 +87,39 @@ export default function ClinicalDesk() {
     // it so the rest of the system sees the doctor's current focus.
     const { setActivePatient: setGlobalActivePatient } = useActivePatient();
 
-    const filteredIcd = ICD_DATABASE.filter(code => code.toLowerCase().includes(icdSearch.toLowerCase()));
-
     // --- DATA FETCHING ---
     useEffect(() => {
         fetchQueue();
+        fetchMyFee();
     }, []);
+
+    // Debounced ICD-10 type-ahead against /clinical/icd10/search. Cleared
+    // when the dropdown closes (e.g. right after picking a code) so a stale
+    // result list can't flash open on the next focus.
+    useEffect(() => {
+        if (!showIcdDropdown || icdSearch.trim().length < 2) {
+            setIcdResults([]);
+            return undefined;
+        }
+        const timer = setTimeout(async () => {
+            try {
+                const res = await apiClient.get('/clinical/icd10/search', { params: { q: icdSearch } });
+                setIcdResults(res.data || []);
+            } catch {
+                setIcdResults([]);
+            }
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [icdSearch, showIcdDropdown]);
+
+    const fetchMyFee = async () => {
+        try {
+            const response = await apiClient.get('/billing/consultation-fee/me');
+            setMyFee(response.data);
+        } catch {
+            // Non-blocking — the server still resolves the right fee at charge time.
+        }
+    };
 
     const fetchQueue = async () => {
         setIsLoadingQueue(true);
@@ -158,9 +195,11 @@ export default function ClinicalDesk() {
         setIsQueueOpen(false);
         // Reset all forms for the new patient
         setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
-        setClinicalNotes({ hpi: '', objective: '', diagnosis: '', internal_notes: '' });
+        setClinicalNotes({ hpi: '', diagnosis: '', internal_notes: '' });
         setComplaints([]);
         setComplaintInput('');
+        setPhysicalExams([]);
+        setExamInput('');
         setMedications([]);
         setIcdSearch('');
         // Pre-fill from the nurse's triage so the doctor doesn't re-key vitals.
@@ -218,6 +257,19 @@ export default function ClinicalDesk() {
         setComplaintInput('');
     };
     const removeComplaint = (idx) => setComplaints((prev) => prev.filter((_, i) => i !== idx));
+
+    // --- PHYSICAL EXAMINATION (multi-entry) ---
+    const addExam = () => {
+        const value = examInput.trim();
+        if (!value) return;
+        if (physicalExams.some((c) => c.toLowerCase() === value.toLowerCase())) {
+            setExamInput('');
+            return;
+        }
+        setPhysicalExams((prev) => [...prev, value]);
+        setExamInput('');
+    };
+    const removeExam = (idx) => setPhysicalExams((prev) => prev.filter((_, i) => i !== idx));
 
     // --- MEDICATIONS (structured, numbered) ---
     const addMedication = () => setMedications((prev) => [...prev, blankMed()]);
@@ -291,7 +343,7 @@ export default function ClinicalDesk() {
             // "; "-joined string (no schema change); splitComplaints() reverses it.
             chief_complaint: complaints.join('; '),
             history_of_present_illness: clinicalNotes.hpi,
-            physical_examination: clinicalNotes.objective,
+            physical_examination: physicalExams.join('; '),
             diagnosis: clinicalNotes.diagnosis || icdSearch,
             icd10_code: icdSearch,
             // Structured prescriptions serialise to JSON in treatment_plan —
@@ -311,9 +363,9 @@ export default function ClinicalDesk() {
             // the validator already forced the checkbox on, so this branch
             // posts unconditionally for that path.
             if (chargeConsultation && targetStatus !== 'Draft') {
+                // No amount sent — the server bills the doctor's own saved fee.
                 await apiClient.post('/billing/consultation-fee', {
-                    patient_id: activePatient.patient_id,
-                    amount: 1000.0
+                    patient_id: activePatient.patient_id
                 });
             }
 
@@ -564,7 +616,31 @@ export default function ClinicalDesk() {
                                     )}
                                 </div>
                                 <div><label htmlFor="clinic-history-of-present-illness-hpi" className="label">History of present illness (HPI)</label><textarea id="clinic-history-of-present-illness-hpi" rows="3" value={clinicalNotes.hpi} onChange={(e) => setClinicalNotes({...clinicalNotes, hpi: e.target.value})} className="input resize-none" placeholder="Narrative of the patient's symptoms…"></textarea></div>
-                                <div><label htmlFor="clinic-physical-examination-objective" className="label">Physical examination (Objective)</label><textarea id="clinic-physical-examination-objective" rows="3" value={clinicalNotes.objective} onChange={(e) => setClinicalNotes({...clinicalNotes, objective: e.target.value})} className="input resize-none" placeholder="Systematic findings…"></textarea></div>
+                                <div>
+                                    <label htmlFor="clinic-physical-examination-objective" className="label">Physical examination(s) (Objective)</label>
+                                    <div className="flex gap-2">
+                                        <input id="clinic-physical-examination-objective"
+                                            type="text"
+                                            value={examInput}
+                                            onChange={(e) => setExamInput(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addExam(); } }}
+                                            className="input flex-1"
+                                            placeholder="e.g. Chest: clear air entry bilaterally — press Enter to add"
+                                        />
+                                        <button type="button" onClick={addExam} className="btn-secondary shrink-0 px-3"><Plus size={15} /> Add</button>
+                                    </div>
+                                    {physicalExams.length > 0 && (
+                                        <ol className="mt-3 space-y-1.5">
+                                            {physicalExams.map((c, idx) => (
+                                                <li key={c} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
+                                                    <span className="font-mono text-2xs font-semibold text-ink-400 w-5 shrink-0">{idx + 1}.</span>
+                                                    <span className="flex-1 text-ink-800 dark:text-ink-200">{c}</span>
+                                                    <button type="button" onClick={() => removeExam(idx)} aria-label={`Remove examination finding ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0"><X size={14} /></button>
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Orders & Prescriptions */}
@@ -574,9 +650,16 @@ export default function ClinicalDesk() {
                                 <div className="relative">
                                     <label htmlFor="clinic-final-diagnosis-icd-10" className="label">Final diagnosis (ICD-10)</label>
                                     <input id="clinic-final-diagnosis-icd-10" type="text" value={icdSearch} onChange={(e) => { setIcdSearch(e.target.value); setShowIcdDropdown(true); }} onFocus={() => setShowIcdDropdown(true)} className="input" placeholder="Type to search ICD-10 codes…" />
-                                    {showIcdDropdown && icdSearch.length > 0 && (
+                                    {showIcdDropdown && icdSearch.trim().length >= 2 && (
                                         <div className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-elevated max-h-48 overflow-y-auto custom-scrollbar">
-                                            {filteredIcd.length > 0 ? filteredIcd.map((code) => (<button type="button" key={code} onClick={() => {setIcdSearch(code); setShowIcdDropdown(false);}} className="block w-full text-left px-4 py-2 hover:bg-brand-50 dark:hover:bg-brand-500/15 text-sm dark:text-ink-200">{code}</button>)) : <div className="px-4 py-3 text-sm text-ink-500 dark:text-ink-400">No codes found.</div>}
+                                            {icdResults.length > 0 ? icdResults.map((r) => {
+                                                const display = `${r.code} - ${r.description}`;
+                                                return (
+                                                    <button type="button" key={r.code} onClick={() => { setIcdSearch(display); setShowIcdDropdown(false); }} className="block w-full text-left px-4 py-2 hover:bg-brand-50 dark:hover:bg-brand-500/15 text-sm dark:text-ink-200">
+                                                        <span className="font-mono font-semibold">{r.code}</span> — {r.description}
+                                                    </button>
+                                                );
+                                            }) : <div className="px-4 py-3 text-sm text-ink-500 dark:text-ink-400">No codes found.</div>}
                                         </div>
                                     )}
                                 </div>
@@ -690,7 +773,18 @@ export default function ClinicalDesk() {
                                             <span className="text-xs text-brand-700 dark:text-brand-300">Automatically generate a consultation invoice at the cashier.</span>
                                         </div>
                                     </div>
-                                    <span className="text-base font-semibold text-brand-700 dark:text-brand-300">KES 1,000</span>
+                                    <div className="text-right">
+                                        <span className="text-base font-semibold text-brand-700 dark:text-brand-300 block">
+                                            KES {Number(myFee?.amount ?? 1000).toLocaleString()}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsFeeModalOpen(true); }}
+                                            className="text-xs text-brand-700 dark:text-brand-300 underline hover:text-brand-800 dark:hover:text-brand-200 cursor-pointer"
+                                        >
+                                            Change my fee
+                                        </button>
+                                    </div>
                                 </label>
                             </div>
                         </div>
@@ -751,6 +845,96 @@ export default function ClinicalDesk() {
                     onSubmit={handleConsentSubmit}
                 />
             )}
+
+            {isFeeModalOpen && (
+                <ConsultationFeeModal
+                    current={myFee}
+                    onClose={() => setIsFeeModalOpen(false)}
+                    onSaved={(fee) => { setMyFee(fee); setIsFeeModalOpen(false); }}
+                />
+            )}
+        </div>
+    );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Consultation fee modal — doctor self-service pricing.                     */
+/*                                                                            */
+/*  PUTs /billing/consultation-fee/me, which upserts a per-doctor row in the  */
+/*  master price list (service code CONSULT-DR-<id>). The charge endpoint     */
+/*  resolves the fee server-side from that row, so this editor is the single  */
+/*  source of truth — the client never sends an amount when charging.         */
+/* ────────────────────────────────────────────────────────────────────────── */
+function ConsultationFeeModal({ current, onClose, onSaved }) {
+    const [amount, setAmount] = useState(current?.amount ? String(current.amount) : '');
+    const [submitting, setSubmitting] = useState(false);
+
+    const submit = async () => {
+        const value = parseFloat(amount);
+        if (!Number.isFinite(value) || value <= 0) {
+            toast.error('Enter a fee greater than zero.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const response = await apiClient.put('/billing/consultation-fee/me', { amount: value });
+            toast.success('Your consultation fee has been updated.');
+            onSaved(response.data);
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Failed to update consultation fee.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
+            <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-sm overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                            <Receipt size={17} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">My consultation fee</h3>
+                            <p className="text-xs text-ink-500 dark:text-ink-400">Billed whenever you authorize a consultation fee.</p>
+                        </div>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="p-5 space-y-3">
+                    <div>
+                        <label htmlFor="clinic-my-consultation-fee" className="label">Fee amount (KES)</label>
+                        <input
+                            id="clinic-my-consultation-fee"
+                            type="number"
+                            min="1"
+                            step="50"
+                            className="input"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            placeholder="e.g. 1500"
+                        />
+                        <p className="text-2xs text-ink-500 dark:text-ink-400 mt-1">
+                            Saved to the hospital price list under your name — admins can also
+                            see and adjust it from Accounting → Config → Price list.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t border-ink-100 dark:border-ink-800 flex justify-end gap-2 bg-ink-50/40 dark:bg-ink-800/40">
+                    <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
+                    <button type="button" onClick={submit} disabled={submitting} className="btn-primary cursor-pointer">
+                        {submitting
+                            ? <><Activity size={14} className="animate-spin" /> Saving…</>
+                            : <><Receipt size={14} /> Save fee</>}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }

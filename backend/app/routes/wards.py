@@ -10,7 +10,7 @@ from app.models.wards import Ward, Bed, AdmissionRecord
 from app.models.patient import Patient
 from app.models.inventory import StockBatch, InventoryItem, InventoryUsageLog, Location
 from app.schemas.wards import AdmissionRequest, DischargeRequest
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/wards", tags=["Wards & Admissions"])
@@ -69,6 +69,151 @@ def get_bed_board(db: Session = Depends(get_db)):
         board.append(ward_data)
         
     return board
+
+# --- WARD & BED SETUP (so beds exist before anyone can allocate them) ---
+
+class WardCreateRequest(BaseModel):
+    name: str
+    capacity: int
+
+
+class WardUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    capacity: Optional[int] = None
+
+
+class BedCreateRequest(BaseModel):
+    """Either a single named bed (bed_number) or a bulk run (count + prefix,
+    auto-numbered prefix-1 … prefix-N continuing after existing beds)."""
+    bed_number: Optional[str] = None
+    count: Optional[int] = None
+    prefix: Optional[str] = None
+
+
+# Occupied is deliberately excluded — that transition only happens via /admit.
+BED_SETUP_STATUSES = ("Available", "Maintenance", "Cleaning")
+
+
+class BedUpdateRequest(BaseModel):
+    status: str
+
+
+@router.post("/", dependencies=[Depends(RequirePermission("wards:manage"))])
+def create_ward(req: WardCreateRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Ward name is required.")
+    if req.capacity < 1:
+        raise HTTPException(status_code=400, detail="Capacity must be at least 1.")
+    if db.query(Ward).filter(func.lower(Ward.name) == name.lower()).first():
+        raise HTTPException(status_code=409, detail=f"Ward '{name}' already exists.")
+    ward = Ward(name=name, capacity=req.capacity)
+    db.add(ward)
+    db.flush()
+    log_audit(db, current_user["user_id"], "CREATE", "Ward", str(ward.ward_id), None,
+              {"name": name, "capacity": req.capacity}, None)
+    db.commit()
+    return {"message": "Ward created.", "ward_id": ward.ward_id}
+
+
+@router.patch("/{ward_id}", dependencies=[Depends(RequirePermission("wards:manage"))])
+def update_ward(ward_id: int, req: WardUpdateRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    ward = db.query(Ward).filter(Ward.ward_id == ward_id).first()
+    if not ward:
+        raise HTTPException(status_code=404, detail="Ward not found.")
+    before = {"name": ward.name, "capacity": ward.capacity}
+    if req.name is not None:
+        name = req.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Ward name cannot be empty.")
+        clash = db.query(Ward).filter(func.lower(Ward.name) == name.lower(), Ward.ward_id != ward_id).first()
+        if clash:
+            raise HTTPException(status_code=409, detail=f"Ward '{name}' already exists.")
+        ward.name = name
+    if req.capacity is not None:
+        bed_count = db.query(func.count(Bed.bed_id)).filter(Bed.ward_id == ward_id).scalar() or 0
+        if req.capacity < bed_count:
+            raise HTTPException(status_code=400, detail=f"Capacity cannot be below the {bed_count} bed(s) already set up.")
+        ward.capacity = req.capacity
+    log_audit(db, current_user["user_id"], "UPDATE", "Ward", str(ward_id), before,
+              {"name": ward.name, "capacity": ward.capacity}, None)
+    db.commit()
+    return {"message": "Ward updated."}
+
+
+@router.post("/{ward_id}/beds", dependencies=[Depends(RequirePermission("wards:manage"))])
+def add_beds(ward_id: int, req: BedCreateRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    ward = db.query(Ward).filter(Ward.ward_id == ward_id).first()
+    if not ward:
+        raise HTTPException(status_code=404, detail="Ward not found.")
+
+    existing = db.query(func.count(Bed.bed_id)).filter(Bed.ward_id == ward_id).scalar() or 0
+
+    if req.bed_number:
+        labels = [req.bed_number.strip()]
+    elif req.count:
+        if req.count < 1 or req.count > 200:
+            raise HTTPException(status_code=400, detail="Count must be between 1 and 200.")
+        prefix = (req.prefix or ward.name[:3].upper()).strip()
+        labels = [f"{prefix}-{existing + i + 1}" for i in range(req.count)]
+    else:
+        raise HTTPException(status_code=400, detail="Provide a bed_number, or a count for bulk creation.")
+
+    if existing + len(labels) > ward.capacity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ward capacity is {ward.capacity} and {existing} bed(s) exist — "
+                   f"adding {len(labels)} would exceed it. Increase the ward capacity first.",
+        )
+
+    # bed_number is globally unique — reject any clash up front so the whole
+    # batch lands or none of it does.
+    clashes = [b.bed_number for b in db.query(Bed).filter(Bed.bed_number.in_(labels)).all()]
+    if clashes:
+        raise HTTPException(status_code=409, detail=f"Bed number(s) already in use: {', '.join(clashes)}")
+
+    for label in labels:
+        db.add(Bed(ward_id=ward_id, bed_number=label, status="Available"))
+    log_audit(db, current_user["user_id"], "CREATE", "Bed", f"ward:{ward_id}", None,
+              {"beds": labels}, None)
+    db.commit()
+    return {"message": f"Added {len(labels)} bed(s) to {ward.name}.", "beds": labels}
+
+
+@router.patch("/beds/{bed_id}", dependencies=[Depends(RequirePermission("wards:manage"))])
+def update_bed(bed_id: int, req: BedUpdateRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """Maintenance-state changes only — occupancy is owned by admit/discharge."""
+    bed = db.query(Bed).filter(Bed.bed_id == bed_id).first()
+    if not bed:
+        raise HTTPException(status_code=404, detail="Bed not found.")
+    if bed.status == "Occupied":
+        raise HTTPException(status_code=400, detail="Bed is occupied — discharge the patient first.")
+    if req.status not in BED_SETUP_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Status must be one of {list(BED_SETUP_STATUSES)}.")
+    before = bed.status
+    bed.status = req.status
+    log_audit(db, current_user["user_id"], "UPDATE", "Bed", str(bed_id),
+              {"status": before}, {"status": req.status}, None)
+    db.commit()
+    return {"message": "Bed updated."}
+
+
+@router.delete("/beds/{bed_id}", dependencies=[Depends(RequirePermission("wards:manage"))])
+def delete_bed(bed_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    bed = db.query(Bed).filter(Bed.bed_id == bed_id).first()
+    if not bed:
+        raise HTTPException(status_code=404, detail="Bed not found.")
+    if bed.status == "Occupied":
+        raise HTTPException(status_code=400, detail="Bed is occupied — discharge the patient first.")
+    # Past admissions FK this bed; keep history intact by refusing the delete.
+    if db.query(AdmissionRecord).filter(AdmissionRecord.bed_id == bed_id).first():
+        raise HTTPException(status_code=400, detail="Bed has admission history — set it to Maintenance instead of deleting.")
+    db.delete(bed)
+    log_audit(db, current_user["user_id"], "DELETE", "Bed", str(bed_id),
+              {"bed_number": bed.bed_number, "ward_id": bed.ward_id}, None, None)
+    db.commit()
+    return {"message": "Bed deleted."}
+
 
 @router.post("/admit")
 def admit_patient(req: AdmissionRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):

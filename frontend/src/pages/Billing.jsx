@@ -185,10 +185,12 @@ export default function Billing() {
 
     const fetchMpesaLogs = async () => {
         try {
-            const res = await apiClient.get('/billing/mpesa-transactions');
+            // Unified feed: settled cash/card/M-Pesa payments + unsettled
+            // Pay Hero attempts, each with type, receipt, status, description.
+            const res = await apiClient.get('/billing/transactions');
             setMpesaLogs(res.data || []);
         } catch (error) {
-            toast.error("Failed to fetch M-Pesa ledger");
+            toast.error("Failed to fetch payments ledger");
         }
     };
 
@@ -421,37 +423,45 @@ export default function Billing() {
                     <div className="relative w-full max-w-4xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-ink-900 to-ink-950 text-white shrink-0 flex justify-between items-center">
                             <div>
-                                <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2"><Smartphone size={20} className="text-accent-400" /> M-Pesa Receipts Ledger</h2>
-                                <p className="text-sm text-ink-400 mt-1">Verify real-time STK push statuses and Daraja receipt codes.</p>
+                                <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2"><Smartphone size={20} className="text-accent-400" /> Payments Ledger</h2>
+                                <p className="text-sm text-ink-400 mt-1">Every payment — cash, card, and M-Pesa — with receipts, statuses, and live STK push tracking.</p>
                             </div>
                             <button type="button" onClick={() => setIsLedgerOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-400 hover:text-white hover:bg-white/10 transition-colors"><X size={20} /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 bg-ink-50/40 custom-scrollbar">
                             <div className="card overflow-hidden overflow-x-auto">
-                                <table className="table-clean min-w-[800px]">
+                                <table className="table-clean min-w-[900px]">
                                     <thead className="sticky top-0">
                                         <tr>
                                             <th>Timestamp</th>
-                                            <th>Phone</th>
+                                            <th>Type</th>
                                             <th>Invoice</th>
                                             <th>Amount (KES)</th>
-                                            <th>Receipt details</th>
+                                            <th>Receipt</th>
+                                            <th>Description</th>
                                             <th className="text-right">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="font-mono text-xs">
                                         {mpesaLogs.length === 0 ? (
-                                            <tr><td colSpan="6" className="px-6 py-12 text-center text-ink-400 font-sans">No M-Pesa transactions found.</td></tr>
+                                            <tr><td colSpan="7" className="px-6 py-12 text-center text-ink-400 font-sans">No payments recorded yet.</td></tr>
                                         ) : (
                                             mpesaLogs.map((log) => (
                                                 <tr key={log.id}>
-                                                    <td className="text-ink-500">{new Date(log.created_at).toLocaleString()}</td>
-                                                    <td className="font-semibold text-ink-800 dark:text-ink-200">{log.phone_number}</td>
-                                                    <td className="font-semibold text-brand-700">INV-{log.invoice_id}</td>
-                                                    <td className="font-semibold text-ink-900 dark:text-ink-100">{log.amount ? log.amount.toFixed(2) : '-'}</td>
-                                                    <td className="text-ink-500 max-w-xs truncate">{log.receipt_number || log.result_desc || 'Waiting for callback…'}</td>
+                                                    <td className="text-ink-500">{log.date ? new Date(log.date).toLocaleString() : '—'}</td>
+                                                    <td>
+                                                        <span className="badge-neutral">{log.type}</span>
+                                                    </td>
+                                                    <td className="font-semibold text-brand-700">{log.invoice_id ? `INV-${log.invoice_id}` : '—'}</td>
+                                                    <td className="font-semibold text-ink-900 dark:text-ink-100">{log.amount != null ? log.amount.toFixed(2) : '—'}</td>
+                                                    <td className="font-semibold text-ink-800 dark:text-ink-200">{log.receipt}</td>
+                                                    <td className="text-ink-500 max-w-xs truncate" title={log.description}>{log.description}{log.phone_number ? ` · ${log.phone_number}` : ''}</td>
                                                     <td className="text-right">
-                                                        <span className={log.status === 'Success' ? 'badge-success' : log.status === 'Failed' ? 'badge-danger' : 'badge-warn animate-pulse-soft'}>
+                                                        <span className={
+                                                            (log.status === 'Success' || log.status === 'Completed') ? 'badge-success'
+                                                            : (log.status === 'Failed' || log.status === 'Amount Mismatch') ? 'badge-danger'
+                                                            : 'badge-warn animate-pulse-soft'
+                                                        }>
                                                             {log.status}
                                                         </span>
                                                     </td>

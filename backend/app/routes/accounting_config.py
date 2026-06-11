@@ -234,6 +234,62 @@ def update_price(price_id: int, payload: PriceListItemUpdate, db: Session = Depe
     return row
 
 
+@router.delete("/price-list/{price_id}", dependencies=[WRITE])
+def delete_price(price_id: int, db: Session = Depends(get_db)):
+    """Hard-delete a price item. Safe because nothing FKs the price list —
+    invoice items copy the amount at charge time, so history is unaffected."""
+    row = db.query(PriceListItem).filter(PriceListItem.price_id == price_id).first()
+    if not row:
+        raise HTTPException(404, detail="Price item not found.")
+    db.delete(row)
+    db.commit()
+    return {"message": "Price item deleted.", "price_id": price_id}
+
+
+@router.post("/price-list/import-lab-tests", dependencies=[WRITE])
+def import_lab_tests(db: Session = Depends(get_db)):
+    """Seed the price list from the laboratory catalogue.
+
+    Creates one 'Lab' price item per active catalogue test (service code
+    ``LAB-<catalog_id>``, priced at the test's base_price). Idempotent:
+    existing service codes are left untouched so a re-import never clobbers
+    prices an accountant has hand-tuned.
+    """
+    from app.models.laboratory import LabTestCatalog
+
+    tests = (
+        db.query(LabTestCatalog)
+        .filter(LabTestCatalog.is_active == True)  # noqa: E712
+        .order_by(LabTestCatalog.test_name)
+        .all()
+    )
+    existing_codes = {
+        code for (code,) in db.query(PriceListItem.service_code)
+        .filter(PriceListItem.service_code.like("LAB-%")).all()
+    }
+
+    created = 0
+    for t in tests:
+        code = f"LAB-{t.catalog_id}"
+        if code in existing_codes:
+            continue
+        db.add(PriceListItem(
+            service_code=code,
+            name=t.test_name[:200],
+            category="Lab",
+            unit_price=t.base_price or 0,
+            description=(t.description or None),
+        ))
+        created += 1
+
+    db.commit()
+    return {
+        "message": f"Imported {created} lab test(s) into the price list.",
+        "created": created,
+        "skipped": len(tests) - created,
+    }
+
+
 # ─── Ledger mappings ─────────────────────────────────────────────────────────
 
 @router.get("/ledger-mappings", response_model=List[LedgerMappingResponse], dependencies=[VIEW])
