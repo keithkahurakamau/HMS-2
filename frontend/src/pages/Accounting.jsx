@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import {
@@ -1247,34 +1247,73 @@ function PriceListSection() {
     const [items, setItems] = useState([]);
     const [categories, setCategories] = useState([]);
     const [filter, setFilter] = useState('');
+    const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState(null);
+    const [importing, setImporting] = useState(false);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try {
+            const params = new URLSearchParams({ include_inactive: 'true' });
+            if (filter) params.set('category', filter);
+            if (search.trim()) params.set('q', search.trim());
             const [pR, cR] = await Promise.all([
-                apiClient.get(`/accounting/config/price-list?include_inactive=true${filter ? `&category=${filter}` : ''}`),
+                apiClient.get(`/accounting/config/price-list?${params.toString()}`),
                 apiClient.get('/accounting/config/price-list/categories'),
             ]);
             setItems(pR.data || []);
             setCategories(cR.data || []);
         } catch { toast.error('Could not load price list.'); }
         finally { setLoading(false); }
+    }, [filter, search]);
+    // Search is debounced so each keystroke doesn't fire a request.
+    useEffect(() => {
+        const timer = setTimeout(load, search ? 300 : 0);
+        return () => clearTimeout(timer);
+    }, [load, search]);
+
+    const importLabTests = async () => {
+        setImporting(true);
+        try {
+            const r = await apiClient.post('/accounting/config/price-list/import-lab-tests');
+            toast.success(r.data?.message || 'Lab tests imported.');
+            load();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Import failed.'); }
+        finally { setImporting(false); }
     };
-    useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter]);
+
+    const deleteItem = async (p) => {
+        if (!window.confirm(`Delete "${p.name}" (${p.service_code}) from the price list?`)) return;
+        try {
+            await apiClient.delete(`/accounting/config/price-list/${p.price_id}`);
+            toast.success('Price item deleted.');
+            load();
+        } catch (err) { toast.error(err?.response?.data?.detail || 'Could not delete.'); }
+    };
 
     return (
         <div className="space-y-4">
             <SectionHeader title="Price List" subtitle="Master list of billable services."
                            onNew={() => { setEditing(null); setOpen(true); }} />
-            <div className="flex items-center gap-2">
-                <span className="text-xs text-ink-500 dark:text-ink-400">Filter:</span>
-                <select className="input max-w-xs" value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <div className="flex flex-wrap items-center gap-2">
+                <input
+                    type="search"
+                    aria-label="Search price list"
+                    className="input max-w-xs"
+                    placeholder="Search by name or code…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+                <select aria-label="Filter by category" className="input max-w-xs" value={filter} onChange={(e) => setFilter(e.target.value)}>
                     <option value="">All categories</option>
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
+                <button type="button" onClick={importLabTests} disabled={importing}
+                        className="btn-secondary ml-auto text-xs">
+                    {importing ? 'Importing…' : 'Import lab tests'}
+                </button>
             </div>
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No price items yet.">
                 <table className="w-full text-sm">
@@ -1304,9 +1343,11 @@ function PriceListSection() {
                                         {p.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="px-4 py-1.5 text-right whitespace-nowrap">
                                     <button type="button" onClick={() => { setEditing(p); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
+                                    <button type="button" onClick={() => deleteItem(p)}
+                                            className="text-xs text-rose-600 dark:text-rose-400 hover:underline ml-3">Delete</button>
                                 </td>
                             </tr>
                         ))}

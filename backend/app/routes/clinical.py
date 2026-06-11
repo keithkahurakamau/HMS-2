@@ -1,4 +1,6 @@
+import gzip
 import json
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -316,3 +318,67 @@ def get_vitals_history(
     # Reverse to oldest-first so the UI can plot left-to-right naturally.
     out.reverse()
     return out
+
+
+# ==========================================
+# 7. ICD-10-CM CODE SEARCH
+# ==========================================
+_ICD10_CODES: List[dict] = []  # lazy-loaded once per process
+
+
+def _icd10_catalog() -> List[dict]:
+    """Full ICD-10-CM FY2026 catalogue (CMS code-descriptions file, ~74k
+    rows) loaded lazily and kept in process memory. Codes are exposed dotted
+    (E11.9) because that's the clinical/billing display convention.
+
+    Refreshing for a new fiscal year = drop in the new CMS file under
+    app/data/ and update the filename here.
+    """
+    global _ICD10_CODES
+    if not _ICD10_CODES:
+        path = Path(__file__).resolve().parents[1] / "data" / "icd10cm_codes_2026.txt.gz"
+        rows = []
+        with gzip.open(path, "rt", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                parts = line.strip().split(None, 1)
+                if len(parts) != 2:
+                    continue
+                raw, desc = parts
+                code = f"{raw[:3]}.{raw[3:]}" if len(raw) > 3 else raw
+                rows.append({
+                    "code": code,
+                    "description": desc,
+                    "_code_l": raw.lower(),
+                    "_hay": f"{raw.lower()} {desc.lower()}",
+                })
+        _ICD10_CODES = rows
+    return _ICD10_CODES
+
+
+@router.get("/icd10/search", dependencies=[Depends(RequirePermission("clinical:read"))])
+def search_icd10(q: str = "", limit: int = 30):
+    """Type-ahead search over the full ICD-10-CM catalogue.
+
+    Code-prefix matches (dotted or undotted input) rank above description
+    substring matches, so typing "E11" surfaces the diabetes block before
+    descriptions that merely mention it.
+    """
+    term = q.strip().lower()
+    if len(term) < 2:
+        return []
+    limit = max(1, min(limit, 100))
+
+    code_term = term.replace(".", "")
+    prefix_hits, text_hits = [], []
+    for row in _icd10_catalog():
+        if row["_code_l"].startswith(code_term):
+            prefix_hits.append(row)
+            if len(prefix_hits) >= limit:
+                break
+        elif len(text_hits) < limit and term in row["_hay"]:
+            text_hits.append(row)
+
+    return [
+        {"code": r["code"], "description": r["description"]}
+        for r in (prefix_hits + text_hits)[:limit]
+    ]
