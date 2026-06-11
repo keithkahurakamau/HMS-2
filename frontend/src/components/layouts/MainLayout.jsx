@@ -7,7 +7,7 @@ import {
     LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
     ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy,
-    BookOpen, Smartphone, HelpCircle, HeartPulse,
+    BookOpen, Smartphone, HelpCircle, HeartPulse, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -70,6 +70,17 @@ export default function MainLayout() {
     const { hasModule, loading: modulesLoading } = useModules();
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    // Desktop-only: collapse the sidebar for a full-width workspace view.
+    // Persisted so the preference survives reloads; mobile keeps its own
+    // overlay behaviour untouched.
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+        () => localStorage.getItem('hms_sidebar_collapsed') === '1'
+    );
+    const toggleSidebar = () => setIsSidebarCollapsed((prev) => {
+        const next = !prev;
+        localStorage.setItem('hms_sidebar_collapsed', next ? '1' : '0');
+        return next;
+    });
     const { branding } = useBranding();
     const { startJourney, forceStartJourney, activeKey } = useJourney();
 
@@ -127,7 +138,7 @@ export default function MainLayout() {
                             bg-gradient-to-b from-ink-900 via-ink-900 to-ink-950 text-ink-300
                             border-r border-white/5
                             transition-transform duration-300 ease-out
-                            md:relative md:translate-x-0
+                            ${isSidebarCollapsed ? 'md:hidden' : 'md:relative md:translate-x-0'}
                             ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
             >
                 {/* Brand block */}
@@ -199,6 +210,14 @@ export default function MainLayout() {
                             aria-label="Open navigation menu"
                         >
                             <Menu size={20} aria-hidden="true" />
+                        </button>
+                        <button type="button"
+                            className="hidden md:inline-flex p-2 -ml-2 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-ink-800 transition-colors"
+                            onClick={toggleSidebar}
+                            aria-label={isSidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+                            title={isSidebarCollapsed ? 'Show sidebar' : 'Hide sidebar for a full-width workspace'}
+                        >
+                            {isSidebarCollapsed ? <PanelLeftOpen size={20} aria-hidden="true" /> : <PanelLeftClose size={20} aria-hidden="true" />}
                         </button>
                         <div className="hidden sm:block min-w-0">
                             <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-400 leading-none">Workspace</div>
