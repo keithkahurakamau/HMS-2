@@ -15,8 +15,13 @@ export default function Wards() {
     const [patients, setPatients] = useState([]);
     
     // UI Modals & Target Entities
-    const [activeBed, setActiveBed] = useState(null); 
+    const [activeBed, setActiveBed] = useState(null);
     const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
+    // Ward/bed setup: create wards, add beds (single or bulk).
+    const [isSetupOpen, setIsSetupOpen] = useState(false);
+    // A non-occupied bed the user clicked — opens the status/delete sheet
+    // (this is also the only way a "Cleaning" bed returns to "Available").
+    const [setupBed, setSetupBed] = useState(null);
     
     // Data Mutation Payloads
     const [admitForm, setAdmitForm] = useState({ patient_id: '', bed_id: '', diagnosis: '' });
@@ -156,9 +161,14 @@ export default function Wards() {
                 title="Ward & Bed Management"
                 subtitle="Monitor hospital capacity, manage admissions, and track clinical inventory."
                 actions={
-                    <button type="button" data-tour="ward-admit" onClick={() => setIsAdmitModalOpen(true)} className="btn-primary cursor-pointer">
-                        <UserPlus size={16} /> Admit patient
-                    </button>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => setIsSetupOpen(true)} className="btn-secondary cursor-pointer">
+                            <Plus size={16} /> Set up ward / beds
+                        </button>
+                        <button type="button" data-tour="ward-admit" onClick={() => setIsAdmitModalOpen(true)} className="btn-primary cursor-pointer">
+                            <UserPlus size={16} /> Admit patient
+                        </button>
+                    </div>
                 }
             />
 
@@ -209,10 +219,10 @@ export default function Wards() {
                         <div className="p-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                             {ward.beds.map(bed => {
                                 const variantBg = {
-                                    Available: 'bg-white dark:bg-ink-900 border-accent-200 dark:border-accent-500/20',
+                                    Available: 'bg-white dark:bg-ink-900 border-accent-200 dark:border-accent-500/20 hover:border-accent-400 cursor-pointer hover:-translate-y-0.5',
                                     Occupied:  'bg-blue-50/60 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 hover:border-blue-400 cursor-pointer hover:-translate-y-0.5',
-                                    Cleaning:  'bg-purple-50 dark:bg-purple-500/10 border-purple-200 dark:border-purple-500/20',
-                                }[bed.status] || 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20';
+                                    Cleaning:  'bg-purple-50 dark:bg-purple-500/10 border-purple-200 dark:border-purple-500/20 hover:border-purple-400 cursor-pointer hover:-translate-y-0.5',
+                                }[bed.status] || 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 hover:border-amber-400 cursor-pointer hover:-translate-y-0.5';
                                 const dotBg = {
                                     Available: 'bg-accent-500',
                                     Occupied:  'bg-blue-500 animate-pulse-soft',
@@ -224,7 +234,9 @@ export default function Wards() {
                                 }[bed.status] || 'text-amber-700';
                                 return (
                                     <button key={bed.id} type="button"
-                                        onClick={() => bed.status === 'Occupied' ? setActiveBed({ ...bed, wardName: ward.name }) : null}
+                                        onClick={() => bed.status === 'Occupied'
+                                            ? setActiveBed({ ...bed, wardName: ward.name })
+                                            : setSetupBed({ ...bed, wardName: ward.name })}
                                         className={`relative text-left flex flex-col p-3.5 rounded-xl border transition-all duration-150 ${variantBg}`}>
                                         <span className={`absolute top-3 right-3 size-2 rounded-full ${dotBg}`} />
                                         <div className="flex items-center gap-2 mb-2">
@@ -416,6 +428,254 @@ export default function Wards() {
                     </div>
                 </div>
             )}
+
+            {isSetupOpen && (
+                <WardSetupModal
+                    wards={wards}
+                    onClose={() => setIsSetupOpen(false)}
+                    onSaved={() => { setIsSetupOpen(false); fetchBedBoard(); }}
+                />
+            )}
+
+            {setupBed && (
+                <BedActionModal
+                    bed={setupBed}
+                    onClose={() => setSetupBed(null)}
+                    onSaved={() => { setSetupBed(null); fetchBedBoard(); }}
+                />
+            )}
+        </div>
+    );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Ward & bed setup modal.                                                   */
+/*                                                                            */
+/*  Two tabs: create a new ward (name + capacity) or add beds to an existing  */
+/*  ward — a single named bed, or a bulk run auto-numbered after a prefix.    */
+/*  Beds land "Available" so they're immediately allocatable from /admit.     */
+/* ────────────────────────────────────────────────────────────────────────── */
+function WardSetupModal({ wards, onClose, onSaved }) {
+    const [tab, setTab] = useState(wards.length === 0 ? 'ward' : 'beds');
+    const [saving, setSaving] = useState(false);
+    const [wardForm, setWardForm] = useState({ name: '', capacity: '' });
+    const [bedForm, setBedForm] = useState({
+        ward_id: wards[0]?.id ? String(wards[0].id) : '',
+        mode: 'bulk', bed_number: '', count: '', prefix: '',
+    });
+
+    const submitWard = async () => {
+        const capacity = parseInt(wardForm.capacity, 10);
+        if (!wardForm.name.trim() || !Number.isFinite(capacity) || capacity < 1) {
+            toast.error('Enter a ward name and a capacity of at least 1.');
+            return;
+        }
+        setSaving(true);
+        try {
+            await apiClient.post('/wards/', { name: wardForm.name.trim(), capacity });
+            toast.success(`Ward "${wardForm.name.trim()}" created — now add its beds.`);
+            onSaved();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not create ward.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const submitBeds = async () => {
+        if (!bedForm.ward_id) { toast.error('Pick a ward first.'); return; }
+        const payload = bedForm.mode === 'single'
+            ? { bed_number: bedForm.bed_number.trim() }
+            : { count: parseInt(bedForm.count, 10), prefix: bedForm.prefix.trim() || undefined };
+        if (bedForm.mode === 'single' && !payload.bed_number) {
+            toast.error('Enter a bed number.'); return;
+        }
+        if (bedForm.mode === 'bulk' && (!Number.isFinite(payload.count) || payload.count < 1)) {
+            toast.error('Enter how many beds to add.'); return;
+        }
+        setSaving(true);
+        try {
+            const r = await apiClient.post(`/wards/${bedForm.ward_id}/beds`, payload);
+            toast.success(r.data?.message || 'Beds added.');
+            onSaved();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not add beds.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
+            <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                            <Bed size={17} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">Set up wards &amp; beds</h3>
+                            <p className="text-xs text-ink-500 dark:text-ink-400">Beds must exist here before they can be allocated.</p>
+                        </div>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="px-5 pt-4 flex gap-2">
+                    <button type="button" onClick={() => setTab('ward')}
+                        className={tab === 'ward' ? 'btn-primary text-xs py-1.5' : 'btn-secondary text-xs py-1.5'}>
+                        New ward
+                    </button>
+                    <button type="button" onClick={() => setTab('beds')} disabled={wards.length === 0}
+                        className={tab === 'beds' ? 'btn-primary text-xs py-1.5' : 'btn-secondary text-xs py-1.5'}>
+                        Add beds
+                    </button>
+                </div>
+
+                {tab === 'ward' ? (
+                    <div className="p-5 space-y-3">
+                        <div>
+                            <label htmlFor="ward-setup-name" className="label">Ward name</label>
+                            <input id="ward-setup-name" type="text" className="input" value={wardForm.name}
+                                onChange={(e) => setWardForm({ ...wardForm, name: e.target.value })}
+                                placeholder="e.g. Maternity Wing" />
+                        </div>
+                        <div>
+                            <label htmlFor="ward-setup-capacity" className="label">Bed capacity</label>
+                            <input id="ward-setup-capacity" type="number" min="1" className="input" value={wardForm.capacity}
+                                onChange={(e) => setWardForm({ ...wardForm, capacity: e.target.value })}
+                                placeholder="e.g. 12" />
+                            <p className="text-2xs text-ink-500 dark:text-ink-400 mt-1">The maximum number of beds this ward can hold.</p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="p-5 space-y-3">
+                        <div>
+                            <label htmlFor="bed-setup-ward" className="label">Ward</label>
+                            <select id="bed-setup-ward" className="input" value={bedForm.ward_id}
+                                onChange={(e) => setBedForm({ ...bedForm, ward_id: e.target.value })}>
+                                {wards.map((w) => (
+                                    <option key={w.id} value={w.id}>{w.name} ({w.beds.length}/{w.capacity} beds)</option>
+                                ))}
+                            </select>
+                        </div>
+                        <fieldset>
+                            <legend className="label">How many?</legend>
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setBedForm({ ...bedForm, mode: 'bulk' })}
+                                    className={bedForm.mode === 'bulk' ? 'btn-primary text-xs py-1.5 flex-1' : 'btn-secondary text-xs py-1.5 flex-1'}>
+                                    Several at once
+                                </button>
+                                <button type="button" onClick={() => setBedForm({ ...bedForm, mode: 'single' })}
+                                    className={bedForm.mode === 'single' ? 'btn-primary text-xs py-1.5 flex-1' : 'btn-secondary text-xs py-1.5 flex-1'}>
+                                    One named bed
+                                </button>
+                            </div>
+                        </fieldset>
+                        {bedForm.mode === 'single' ? (
+                            <div>
+                                <label htmlFor="bed-setup-number" className="label">Bed number</label>
+                                <input id="bed-setup-number" type="text" className="input" value={bedForm.bed_number}
+                                    onChange={(e) => setBedForm({ ...bedForm, bed_number: e.target.value })}
+                                    placeholder="e.g. MAT-1" />
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label htmlFor="bed-setup-count" className="label">Number of beds</label>
+                                    <input id="bed-setup-count" type="number" min="1" max="200" className="input" value={bedForm.count}
+                                        onChange={(e) => setBedForm({ ...bedForm, count: e.target.value })}
+                                        placeholder="e.g. 10" />
+                                </div>
+                                <div>
+                                    <label htmlFor="bed-setup-prefix" className="label">Numbering prefix</label>
+                                    <input id="bed-setup-prefix" type="text" className="input" value={bedForm.prefix}
+                                        onChange={(e) => setBedForm({ ...bedForm, prefix: e.target.value })}
+                                        placeholder="auto (ward initials)" />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <div className="p-4 border-t border-ink-100 dark:border-ink-800 flex justify-end gap-2 bg-ink-50/40 dark:bg-ink-800/40">
+                    <button type="button" onClick={onClose} className="btn-secondary cursor-pointer">Cancel</button>
+                    <button type="button" onClick={tab === 'ward' ? submitWard : submitBeds} disabled={saving} className="btn-primary cursor-pointer">
+                        {saving
+                            ? <><Activity size={14} className="animate-spin" /> Saving…</>
+                            : <><Plus size={14} /> {tab === 'ward' ? 'Create ward' : 'Add beds'}</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Bed action sheet — status changes for non-occupied beds.                  */
+/*                                                                            */
+/*  This is also the housekeeping loop: discharge flags a bed "Cleaning" and  */
+/*  this sheet is how it returns to "Available" for the next allocation.      */
+/* ────────────────────────────────────────────────────────────────────────── */
+function BedActionModal({ bed, onClose, onSaved }) {
+    const [busy, setBusy] = useState(false);
+
+    const setStatus = async (status) => {
+        setBusy(true);
+        try {
+            await apiClient.patch(`/wards/beds/${bed.id}`, { status });
+            toast.success(`Bed ${bed.number} marked ${status}.`);
+            onSaved();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not update bed.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const deleteBed = async () => {
+        if (!window.confirm(`Delete bed ${bed.number} from ${bed.wardName}? This cannot be undone.`)) return;
+        setBusy(true);
+        try {
+            await apiClient.delete(`/wards/beds/${bed.id}`);
+            toast.success(`Bed ${bed.number} deleted.`);
+            onSaved();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not delete bed.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const statuses = ['Available', 'Cleaning', 'Maintenance'].filter((s) => s !== bed.status);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
+            <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-xs overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
+                    <div>
+                        <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Bed {bed.number}</h3>
+                        <p className="text-xs text-ink-500 dark:text-ink-400">{bed.wardName} · currently {bed.status}</p>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full">
+                        <X size={16} />
+                    </button>
+                </div>
+                <div className="p-4 space-y-2">
+                    {statuses.map((s) => (
+                        <button key={s} type="button" disabled={busy} onClick={() => setStatus(s)} className="btn-secondary w-full justify-center text-sm">
+                            {s === 'Available' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />} Mark {s}
+                        </button>
+                    ))}
+                    <button type="button" disabled={busy} onClick={deleteBed} className="btn-danger w-full justify-center text-sm bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 shadow-none">
+                        <Trash2 size={14} /> Delete bed
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
