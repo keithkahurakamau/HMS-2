@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import {
@@ -1253,7 +1253,7 @@ function PriceListSection() {
     const [editing, setEditing] = useState(null);
     const [importing, setImporting] = useState(false);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try {
             const params = new URLSearchParams({ include_inactive: 'true' });
@@ -1267,13 +1267,12 @@ function PriceListSection() {
             setCategories(cR.data || []);
         } catch { toast.error('Could not load price list.'); }
         finally { setLoading(false); }
-    };
+    }, [filter, search]);
     // Search is debounced so each keystroke doesn't fire a request.
     useEffect(() => {
         const timer = setTimeout(load, search ? 300 : 0);
         return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filter, search]);
+    }, [load, search]);
 
     const importLabTests = async () => {
         setImporting(true);
