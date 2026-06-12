@@ -100,3 +100,38 @@ class TestPaymentsLedger:
         })
         assert r.status_code == 400
         assert "outstanding" in r.json()["detail"].lower()
+
+
+class TestAccountingTransactionLog:
+    def test_rebuild_backfills_cash_payment_into_journal(self, client, admin_cookies, doctor_cookies, receptionist_cookies):
+        """A cash payment must be visible in the Accounting transaction log.
+
+        The live path auto-posts; the rebuild endpoint replays history. We
+        assert the end state: after a cash payment + rebuild, the journal
+        register contains a billing entry referencing the invoice.
+        """
+        patient = _new_patient(client, receptionist_cookies)
+        r = client.post("/api/billing/consultation-fee", cookies=doctor_cookies,
+                        json={"patient_id": patient["patient_id"]})
+        assert r.status_code == 200, r.text
+        r = client.get("/api/billing/queue", cookies=receptionist_cookies)
+        invoice = next(inv for inv in r.json() if inv["patient_id"] == patient["patient_id"])
+        r = client.post("/api/billing/process-payment", cookies=receptionist_cookies, json={
+            "invoice_id": invoice["invoice_id"],
+            "amount": invoice["total_amount"],
+            "payment_method": "Cash",
+            "idempotency_key": uuid.uuid4().hex,
+        })
+        assert r.status_code == 200, r.text
+
+        r = client.post("/api/accounting/transaction-log/rebuild", cookies=admin_cookies)
+        assert r.status_code == 200, r.text
+        assert "totals" in r.json()
+
+        r = client.get("/api/accounting/transaction-log", cookies=admin_cookies,
+                       params={"q": f"INV-{invoice['invoice_id']}", "source": "billing"})
+        assert r.status_code == 200, r.text
+        items = r.json().get("items", [])
+        assert items, "cash payment missing from the accounting transaction log"
+        memos = " | ".join((i.get("memo") or "") for i in items)
+        assert "Cash" in memos or "Payment" in memos
