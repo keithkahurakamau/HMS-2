@@ -49,6 +49,18 @@ class TestImportLabTests:
         lab_codes = [p["service_code"] for p in r.json()]
         assert any(code.startswith("LAB-") for code in lab_codes)
 
+    def test_standard_catalogue_preloaded(self, client, admin_cookies):
+        """The full standard menu (~136 tests) lands in the price list —
+        the 'already preloaded' requirement."""
+        client.post("/api/accounting/config/price-list/import-lab-tests", cookies=admin_cookies)
+        r = client.get("/api/accounting/config/price-list", params={"category": "Lab"}, cookies=admin_cookies)
+        items = r.json()
+        assert len(items) >= 130, f"expected the standard menu preloaded, got {len(items)}"
+        names = {p["name"] for p in items}
+        for expected in ("Full Blood Count (CBC)", "Liver Function Tests (LFTs)",
+                         "Urinalysis (Dipstick + Microscopy)", "Blood Culture & Sensitivity"):
+            assert expected in names, f"missing standard test: {expected}"
+
 
 class TestSearchAndDelete:
     def test_q_search_matches_code_and_name(self, client, admin_cookies):
