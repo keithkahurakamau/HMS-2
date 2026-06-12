@@ -544,26 +544,31 @@ def _apply_tenant_column_patches(tenant_url: str) -> None:
     engine = create_engine(tenant_url)
     label = tenant_url.rsplit("@", 1)[-1]
     try:
-        with engine.connect() as conn:
+        # MIGRATE-BUG-001: this used to be `engine.connect()` + a nested
+        # `conn.begin()`. Under SQLAlchemy 2.x the `inspect(conn)` call
+        # autobegins a transaction, so the explicit begin() always raised
+        # "connection has already initialized a Transaction" — every column
+        # patch pass failed (caught + logged) and the patches NEVER applied.
+        # `engine.begin()` gives one transaction for the whole pass.
+        with engine.begin() as conn:
             existing_tables = set(inspect(conn).get_table_names())
             applied = 0
-            with conn.begin():
-                for table, ddl in TENANT_COLUMN_PATCHES:
-                    if table not in existing_tables:
-                        continue
-                    # Snapshot column set before applying so we can detect
-                    # whether the patch actually changed anything (the DDL
-                    # itself is silent on IF NOT EXISTS no-ops).
-                    cols_before = {c["name"] for c in inspect(conn).get_columns(table)}
-                    conn.execute(text(ddl))
-                    cols_after = {c["name"] for c in inspect(conn).get_columns(table)}
-                    if cols_after - cols_before:
-                        added_cols = ", ".join(sorted(cols_after - cols_before))
-                        LOG.warning(
-                            "[%s] added column(s) to %s: %s",
-                            label, table, added_cols,
-                        )
-                        applied += 1
+            for table, ddl in TENANT_COLUMN_PATCHES:
+                if table not in existing_tables:
+                    continue
+                # Snapshot column set before applying so we can detect
+                # whether the patch actually changed anything (the DDL
+                # itself is silent on IF NOT EXISTS no-ops).
+                cols_before = {c["name"] for c in inspect(conn).get_columns(table)}
+                conn.execute(text(ddl))
+                cols_after = {c["name"] for c in inspect(conn).get_columns(table)}
+                if cols_after - cols_before:
+                    added_cols = ", ".join(sorted(cols_after - cols_before))
+                    LOG.warning(
+                        "[%s] added column(s) to %s: %s",
+                        label, table, added_cols,
+                    )
+                    applied += 1
             if applied == 0:
                 LOG.debug("[%s] column patches: no drift", label)
     except Exception as exc:  # noqa: BLE001
@@ -638,6 +643,73 @@ def _seed_hospital_settings_defaults(tenant_url: str) -> None:
         engine.dispose()
 
 
+def _seed_accounting_defaults(tenant_url: str) -> None:
+    """Seed base currency, settings, default CoA, and ledger mappings.
+
+    TENANT-DRIFT-003: legacy-bootstrapped tenants were stamped at alembic
+    head without ever running the accounting migrations' data seeds — empty
+    acc_accounts/acc_ledger_mappings means post_from_event skips every
+    payment and the transaction log stays empty. Idempotent, never touches
+    accounts/mappings a tenant customised.
+    """
+    from app.services.accounting_defaults_seed import seed_accounting_defaults
+
+    engine = create_engine(tenant_url)
+    safe_label = tenant_url.rsplit("@", 1)[-1]
+    try:
+        with engine.begin() as conn:
+            insp = inspect(conn)
+            needed = ("acc_currencies", "acc_settings", "acc_accounts", "acc_ledger_mappings")
+            if not all(insp.has_table(t) for t in needed):
+                LOG.error("[%s] accounting tables missing after migrate — skipping accounting seed", safe_label)
+                return
+            created = seed_accounting_defaults(conn)
+            if created["accounts"] or created["mappings"]:
+                LOG.warning(
+                    "[%s] seeded %d CoA account(s), %d ledger mapping(s)",
+                    safe_label, created["accounts"], created["mappings"],
+                )
+    finally:
+        engine.dispose()
+
+
+def _seed_standard_lab_catalog(tenant_url: str) -> None:
+    """Preload the standard lab-test catalogue + price-list mirror, idempotently.
+
+    Every tenant ships with the full standard test menu (app/data/
+    standard_lab_tests.py) in both the lab catalogue and the billing price
+    list (LAB-<catalog_id> rows). Inserts are guarded WHERE NOT EXISTS /
+    keyed on test_name + service_code, so hospitals that renamed prices,
+    deactivated tests, or added their own are never disturbed — re-running
+    on a converged tenant is a no-op.
+    """
+    from app.services.lab_catalog_seed import (
+        seed_standard_lab_catalog,
+        sync_lab_prices_to_price_list,
+    )
+
+    engine = create_engine(tenant_url)
+    safe_label = tenant_url.rsplit("@", 1)[-1]
+    try:
+        with engine.begin() as conn:
+            insp = inspect(conn)
+            if not insp.has_table("lab_test_catalog") or not insp.has_table("acc_price_list"):
+                LOG.error(
+                    "[%s] lab_test_catalog/acc_price_list missing after migrate — skipping lab seed",
+                    safe_label,
+                )
+                return
+            created_tests = seed_standard_lab_catalog(conn)
+            created_prices = sync_lab_prices_to_price_list(conn)
+            if created_tests or created_prices:
+                LOG.warning(
+                    "[%s] seeded %d standard lab test(s), %d price-list row(s)",
+                    safe_label, created_tests, created_prices,
+                )
+    finally:
+        engine.dispose()
+
+
 def migrate_one(tenant_db_name: str, default_url: str) -> None:
     tenant_url = _tenant_db_url(default_url, tenant_db_name)
     safe_label = tenant_url.rsplit("@", 1)[-1]  # hide creds in logs
@@ -667,6 +739,13 @@ def migrate_one(tenant_db_name: str, default_url: str) -> None:
     # ADD COLUMN IF NOT EXISTS statements the relevant migrations carry so
     # legacy-stamped tenants pick up columns added since their bootstrap.
     _apply_tenant_column_patches(tenant_url)
+    # Accounting reference data (CoA, currency, settings, ledger mappings) —
+    # without it post_from_event skips every payment and the transaction log
+    # stays empty (idempotent; customised tenants untouched).
+    _seed_accounting_defaults(tenant_url)
+    # Preload the standard lab-test catalogue + price-list mirror so every
+    # tenant ships with the full test menu out of the box (idempotent).
+    _seed_standard_lab_catalog(tenant_url)
 
 
 def main() -> int:

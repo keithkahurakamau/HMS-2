@@ -8,7 +8,7 @@ import {
     BarChart3, Download,
     Users as UsersIcon, Send, FileText, Wallet,
     Landmark, ArrowDownToLine, Check, Slash,
-    Receipt, Search, Target, FileMinus,
+    Receipt, Search, Target, FileMinus, RefreshCw,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import BudgetingTab from './accounting/BudgetingTab';
@@ -1311,8 +1311,9 @@ function PriceListSection() {
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <button type="button" onClick={importLabTests} disabled={importing}
-                        className="btn-secondary ml-auto text-xs">
-                    {importing ? 'Importing…' : 'Import lab tests'}
+                        className="btn-secondary ml-auto text-xs"
+                        title="Loads the full standard lab-test menu into the catalogue and price list. Never overwrites prices you've edited.">
+                    {importing ? 'Loading…' : 'Preload lab tests'}
                 </button>
             </div>
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No price items yet.">
@@ -1622,6 +1623,7 @@ function TransactionLogTab() {
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [offset, setOffset] = useState(0);
+    const [rebuilding, setRebuilding] = useState(false);
 
     // Filter inputs. `search` is debounced into the request; the rest apply live.
     const [source, setSource] = useState('');
@@ -1675,6 +1677,25 @@ function TransactionLogTab() {
         URL.revokeObjectURL(url);
     };
 
+    // Replays every source record (billing payments incl. cash, pharmacy,
+    // Pay Hero, cheques) into the journal so the log shows ALL transactions
+    // that ever happened. Server-side it's idempotent — safe to re-run.
+    const rebuildLog = async () => {
+        if (!window.confirm('Sync the transaction log from all source records? This backfills any payment that is missing from the log. It never duplicates existing entries.')) return;
+        setRebuilding(true);
+        try {
+            const res = await apiClient.post('/accounting/transaction-log/rebuild');
+            const totals = res.data?.totals || {};
+            toast.success(`Sync complete — ${totals.posted ?? 0} transaction(s) in the log, ${totals.skipped ?? 0} skipped.`);
+            load(0);
+            setOffset(0);
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not sync the transaction log.');
+        } finally {
+            setRebuilding(false);
+        }
+    };
+
     const pageStart = total === 0 ? 0 : offset + 1;
     const pageEnd = Math.min(offset + PAGE_SIZE, total);
 
@@ -1718,6 +1739,11 @@ function TransactionLogTab() {
                     <input id="accoun-to" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
                            className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2" />
                 </div>
+                <button type="button" onClick={rebuildLog} disabled={rebuilding}
+                        title="Backfill the log from billing, pharmacy, Pay Hero, and cheque records — shows every transaction, even ones made before auto-posting was configured."
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-60">
+                    <RefreshCw size={15} className={rebuilding ? 'animate-spin' : ''} /> {rebuilding ? 'Syncing…' : 'Sync all transactions'}
+                </button>
                 <button type="button" onClick={exportCsv}
                         className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50">
                     <Download size={15} /> Export CSV

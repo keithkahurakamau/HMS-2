@@ -248,45 +248,36 @@ def delete_price(price_id: int, db: Session = Depends(get_db)):
 
 @router.post("/price-list/import-lab-tests", dependencies=[WRITE])
 def import_lab_tests(db: Session = Depends(get_db)):
-    """Seed the price list from the laboratory catalogue.
+    """Preload the standard lab-test menu and mirror it into the price list.
 
-    Creates one 'Lab' price item per active catalogue test (service code
-    ``LAB-<catalog_id>``, priced at the test's base_price). Idempotent:
-    existing service codes are left untouched so a re-import never clobbers
-    prices an accountant has hand-tuned.
+    Two idempotent steps (shared with the migrate-all-tenants pipeline, so
+    this button is also the manual catch-up for a tenant that predates the
+    seeding deploy):
+
+      1. Insert any missing tests from the curated standard catalogue into
+         the lab catalogue (keyed case-insensitively on test_name).
+      2. Create a ``LAB-<catalog_id>`` price item for every active
+         catalogue test that doesn't have one yet — including the
+         hospital's own custom tests.
+
+    Hand-tuned prices, renames, deactivations, and custom tests are never
+    touched; re-running on a converged tenant is a no-op.
     """
-    from app.models.laboratory import LabTestCatalog
-
-    tests = (
-        db.query(LabTestCatalog)
-        .filter(LabTestCatalog.is_active == True)  # noqa: E712
-        .order_by(LabTestCatalog.test_name)
-        .all()
+    from app.services.lab_catalog_seed import (
+        seed_standard_lab_catalog,
+        sync_lab_prices_to_price_list,
     )
-    existing_codes = {
-        code for (code,) in db.query(PriceListItem.service_code)
-        .filter(PriceListItem.service_code.like("LAB-%")).all()
-    }
 
-    created = 0
-    for t in tests:
-        code = f"LAB-{t.catalog_id}"
-        if code in existing_codes:
-            continue
-        db.add(PriceListItem(
-            service_code=code,
-            name=t.test_name[:200],
-            category="Lab",
-            unit_price=t.base_price or 0,
-            description=(t.description or None),
-        ))
-        created += 1
-
+    created_tests = seed_standard_lab_catalog(db)
+    created_prices = sync_lab_prices_to_price_list(db)
     db.commit()
     return {
-        "message": f"Imported {created} lab test(s) into the price list.",
-        "created": created,
-        "skipped": len(tests) - created,
+        "message": (
+            f"Preloaded {created_tests} standard lab test(s) and added "
+            f"{created_prices} price-list item(s)."
+        ),
+        "created_catalog_tests": created_tests,
+        "created": created_prices,
     }
 
 
