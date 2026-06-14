@@ -57,7 +57,7 @@ from app.config.database import Base, DATABASE_URL  # noqa: E402,F401
 # corresponding tables are silently skipped and only surface as runtime 500s.
 # Keep this list in sync with app/models/ — every .py file there belongs here.
 from app.models import (  # noqa: E402,F401
-    accounting, audit, auth_tokens, billing, breach, cheque, clinical,
+    accounting, audit, auth_tokens, billing, breach, calendar, cheque, clinical,
     email_events, idempotency, inventory, laboratory, master, medical_history,
     messaging, notification, patient, payhero, radiology, referral,
     settings as _settings, support, user, wards,

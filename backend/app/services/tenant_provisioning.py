@@ -57,6 +57,7 @@ from app.models import referral as _referral  # noqa: F401
 from app.models import cheque as _cheque  # noqa: F401
 from app.models import support as _support  # noqa: F401
 from app.models import accounting as _accounting  # noqa: F401
+from app.models import calendar as _calendar  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

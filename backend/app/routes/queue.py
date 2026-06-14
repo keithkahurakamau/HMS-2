@@ -10,6 +10,7 @@ from app.schemas.queue import (
 )
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
+from app.utils.notify import notify_permission
 from app.routes.patients import _canonical_department
 
 router = APIRouter(prefix="/api/queue", tags=["Triage Queue"])
@@ -33,6 +34,23 @@ def add_to_queue(queue_in: QueueCreate, request: Request, db: Session = Depends(
         None, payload,
         request.client.host if request.client else None,
     )
+
+    # Tell the doctors a patient is waiting — the front desk queues the
+    # patient, but it's the clinical side that needs to react.
+    if payload["department"] == "Consultation":
+        from app.models.patient import Patient
+        patient = db.query(Patient).filter(Patient.patient_id == payload["patient_id"]).first()
+        patient_name = f"{patient.other_names} {patient.surname}" if patient else "A patient"
+        acuity = payload["acuity_level"]
+        notify_permission(
+            db, "clinical:write",
+            title="Patient waiting in the consultation queue",
+            body=f"{patient_name} · acuity {acuity}",
+            link="/app/clinical",
+            category="critical" if acuity == 1 else ("warning" if acuity == 2 else "info"),
+            exclude_user_id=current_user["user_id"],
+        )
+
     db.commit()
     db.refresh(new_queue)
     return new_queue

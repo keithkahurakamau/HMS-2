@@ -19,6 +19,7 @@ import app.auth.auth as auth_module
 import app.routes.dashboard as dashboard_module
 import app.routes.patients as patients_module
 import app.routes.appointments as appointments_module
+import app.routes.calendar as calendar_module
 import app.routes.queue as queue_module
 import app.routes.triage as triage_module
 import app.routes.clinical as clinical_module
@@ -271,6 +272,7 @@ app.include_router(users_module.router)
 app.include_router(admin_module.router)
 app.include_router(patients_module.router)
 app.include_router(appointments_module.router)
+app.include_router(calendar_module.router)
 app.include_router(queue_module.router)
 app.include_router(triage_module.router)
 app.include_router(clinical_module.router)

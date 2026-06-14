@@ -8,6 +8,7 @@ import {
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
     ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy,
     BookOpen, Smartphone, HelpCircle, HeartPulse, PanelLeftClose, PanelLeftOpen,
+    CalendarClock, Home,
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -31,12 +32,14 @@ const ROUTE_TO_JOURNEY = [
     ['/app/cheques',         'cheques'],
     ['/app/medical-history', 'medical_history'],
     ['/app/appointments',    'appointments'],
+    ['/app/calendar',        'appointments'],
     ['/app/messages',        'messages'],
     ['/app/settings',        'settings'],
     ['/app/branding',        'branding'],
     ['/app/accounting',      'accounting'],
     ['/app/support',         'support'],
     ['/app/mpesa-settings',  'payhero'],
+    ['/app/home',            'dashboard'],
     ['/app/dashboard',       'dashboard'],
     ['/app',                 'dashboard'],   // role-redirect fallback
 ];
@@ -45,6 +48,8 @@ const ROUTE_TO_JOURNEY = [
 // allocated once. Each module declares legacy `allowedRoles` + a
 // `requiredPermission`; we prefer permissions and fall back to role names.
 const NAVIGATION = [
+    // Home is the universal landing — visible to every role, no gate.
+    { name: 'Home',              path: '/app/home',            icon: <Home size={18} />,            allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Accountant'], moduleKey: null },
     { name: 'Command Center',    path: '/app/admin',           icon: <LayoutDashboard size={18} />, allowedRoles: ['Admin'],                                          requiredPermission: 'users:manage',     moduleKey: 'dashboard' },
     { name: 'Messages',          path: '/app/messages',        icon: <MessageSquare size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Receptionist'], requiredPermission: 'messaging:read', moduleKey: 'messaging' },
     { name: 'Patient Registry',  path: '/app/patients',        icon: <Users size={18} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'patients:read',    moduleKey: 'patients' },
@@ -56,6 +61,10 @@ const NAVIGATION = [
     { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={18} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'],                  requiredPermission: 'pharmacy:read',    moduleKey: 'pharmacy' },
     { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={18} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'wards:manage',     moduleKey: 'wards' },
     { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'appointments:read',moduleKey: 'appointments' },
+    // Calendar carries each user's personal events (every role gets one) plus
+    // the appointments overlay for roles that can see appointments. No
+    // permission gate — it's account-level — so it falls back to allowedRoles.
+    { name: 'Calendar',          path: '/app/calendar',        icon: <CalendarClock size={18} />,   allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Accountant'], moduleKey: 'appointments' },
     { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'inventory:read',   moduleKey: 'inventory' },
     { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={18} />,         allowedRoles: ['Admin', 'Receptionist'],                          requiredPermission: 'billing:read',     moduleKey: 'billing' },
     { name: 'Cheque Register',   path: '/app/cheques',         icon: <Banknote size={18} />,        allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'cheques:read',     moduleKey: 'cheques' },

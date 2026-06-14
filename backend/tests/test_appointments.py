@@ -28,6 +28,13 @@ HEADERS = {"X-Tenant-ID": TENANT}
 @pytest.fixture(scope="module")
 def client():
     with httpx.Client(base_url=BASE, headers=HEADERS, follow_redirects=True) as c:
+        # The server enforces double-submit CSRF on state-changing methods. A
+        # safe GET sets the csrf_token cookie; echo it back on every later
+        # request so POST/PATCH/DELETE exercise the real protected path.
+        c.get("/api/queue/")
+        token = c.cookies.get("csrf_token")
+        if token:
+            c.headers["x-csrf-token"] = token
         yield c
 
 
@@ -305,10 +312,13 @@ class TestAppointmentListFilters:
             assert row["status"] == "Scheduled"
 
     def test_filter_by_date_range(self, client, receptionist_cookies, seeded_appt):
+        # Pass via params= so httpx URL-encodes the "+00:00" tz offset — an
+        # f-string would let the "+" decode server-side as a space → 422.
         date_from = (datetime.now(timezone.utc) + timedelta(days=149)).isoformat()
         date_to = (datetime.now(timezone.utc) + timedelta(days=151)).isoformat()
         r = client.get(
-            f"/api/appointments/?date_from={date_from}&date_to={date_to}",
+            "/api/appointments/",
+            params={"date_from": date_from, "date_to": date_to},
             cookies=receptionist_cookies,
         )
         assert r.status_code == 200, r.text

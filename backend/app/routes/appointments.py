@@ -13,6 +13,7 @@ from app.models.patient import Patient
 from app.models.user import User, Role
 from app.schemas.appointment import AppointmentCreate, AppointmentResponse
 from app.utils.audit import log_audit
+from app.utils.notify import notify
 
 
 router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
@@ -175,6 +176,20 @@ def create_appointment(
         request.client.host if request.client else None,
     )
 
+    # Tell the doctor a patient was booked onto their calendar (unless they
+    # booked it themselves). The reception desk usually creates these.
+    if new_appt.doctor_id != current_user["user_id"]:
+        patient = db.query(Patient).filter(Patient.patient_id == new_appt.patient_id).first()
+        patient_name = f"{patient.other_names} {patient.surname}" if patient else "A patient"
+        when = new_appt.appointment_date.strftime("%a %d %b, %H:%M") if new_appt.appointment_date else "soon"
+        notify(
+            db, user_id=new_appt.doctor_id,
+            title="New appointment booked",
+            body=f"{patient_name} · {when}",
+            link="/app/calendar",
+            category="info",
+        )
+
     db.commit()
     db.refresh(new_appt)
     return _enrich(db, new_appt)
@@ -276,5 +291,19 @@ def cancel_appointment(
         {"status": old_status}, {"status": "Cancelled"},
         request.client.host if request.client else None,
     )
+
+    # Let the doctor know a slot freed up on their calendar.
+    if appt.doctor_id != current_user["user_id"]:
+        patient = db.query(Patient).filter(Patient.patient_id == appt.patient_id).first()
+        patient_name = f"{patient.other_names} {patient.surname}" if patient else "A patient"
+        when = appt.appointment_date.strftime("%a %d %b, %H:%M") if appt.appointment_date else ""
+        notify(
+            db, user_id=appt.doctor_id,
+            title="Appointment cancelled",
+            body=f"{patient_name} · {when}".strip(" ·"),
+            link="/app/calendar",
+            category="warning",
+        )
+
     db.commit()
     return {"message": "Appointment cancelled."}
