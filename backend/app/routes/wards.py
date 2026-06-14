@@ -256,9 +256,14 @@ def admit_patient(req: AdmissionRequest, db: Session = Depends(get_db), current_
     db.commit()
     return {"message": "Patient admitted successfully."}
 
-@router.post("/discharge/{admission_id}")
-def discharge_patient(admission_id: int, req: DischargeRequest, db: Session = Depends(get_db)):
-    """Ends the admission and flags the bed for cleaning."""
+@router.post("/discharge/{admission_id}", dependencies=[Depends(RequirePermission("wards:manage"))])
+def discharge_patient(admission_id: int, req: DischargeRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """Ends the admission and flags the bed for cleaning.
+
+    SEC: previously had NO auth dependency at all — any caller who could reach
+    the tenant API could discharge a patient. Now gated on wards:manage, the
+    same capability /admit and the bed-setup endpoints require.
+    """
     admission = db.query(AdmissionRecord).filter(AdmissionRecord.admission_id == admission_id).first()
     if not admission or admission.status != "Active":
         raise HTTPException(status_code=404, detail="Active admission not found.")

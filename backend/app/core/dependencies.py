@@ -156,6 +156,21 @@ def require_superadmin(request: Request, db: Session = Depends(get_master_db)) -
 
     return {"admin_id": admin.admin_id, "email": admin.email, "full_name": admin.full_name}
 
+
+def optional_superadmin(request: Request, db: Session = Depends(get_master_db)):
+    """Soft superadmin check for endpoints that are public but reveal *more*
+    to a platform admin. Returns the admin dict when a valid superadmin cookie
+    is present, otherwise None — never raises. Used by the public hospital
+    picker so anonymous callers get a minimal, active-only view while the
+    Tenants Manager (superadmin) still gets flags/limits/suspended rows.
+    """
+    if not request.cookies.get("superadmin_token"):
+        return None
+    try:
+        return require_superadmin(request, db)
+    except HTTPException:
+        return None
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict:
     """
     Extracts the JWT access token from the HttpOnly cookie.

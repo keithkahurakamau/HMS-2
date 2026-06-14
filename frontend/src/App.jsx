@@ -38,6 +38,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Appointments = lazy(() => import('./pages/Appointments'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Home = lazy(() => import('./pages/Home'));
+const Profile = lazy(() => import('./pages/Profile'));
 const PatientPortal = lazy(() => import('./pages/PatientPortal'));
 const Messages = lazy(() => import('./pages/Messages'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -203,6 +204,7 @@ export default function App() {
 
             <Route path="appointments" element={<Appointments />} />
             <Route path="calendar" element={<Calendar />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="billing" element={<ModuleGuard moduleKey="billing"><Billing /></ModuleGuard>} />
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
