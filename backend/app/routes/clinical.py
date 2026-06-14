@@ -15,6 +15,7 @@ from app.schemas.clinical import MedicalRecordCreate, MedicalRecordResponse
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
 from app.utils.consent import require_active_consent
+from app.utils.notify import notify, notify_permission
 
 router = APIRouter(prefix="/api/clinical", tags=["Clinical Desk"])
 
@@ -122,7 +123,29 @@ def submit_consultation(record_in: dict, request: Request, db: Session = Depends
 
         # Log the action to the Immutable Audit Ledger
         log_audit(db, current_user["user_id"], "CREATE", "MedicalRecord", str(new_record.record_id), None, record_in, request.client.host)
-        
+
+        # Hand-off notifications: tell the next station in the workflow.
+        status = record_in.get("record_status")
+        if status in ("Pharmacy", "Billed"):
+            patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
+            patient_name = f"{patient.other_names} {patient.surname}" if patient else "A patient"
+            if status == "Pharmacy":
+                notify_permission(
+                    db, "pharmacy:manage",
+                    title="New prescription to dispense",
+                    body=f"{patient_name} · RX-{new_record.record_id}",
+                    link="/app/pharmacy",
+                    exclude_user_id=current_user["user_id"],
+                )
+            else:
+                notify_permission(
+                    db, "billing:manage",
+                    title="Patient ready at the cashier",
+                    body=f"{patient_name} has been sent to billing.",
+                    link="/app/billing",
+                    exclude_user_id=current_user["user_id"],
+                )
+
         db.commit()
         return {"message": "Record saved successfully."}
 
@@ -268,6 +291,17 @@ def return_prescription(
         {"record_status": "Pharmacy"}, {"record_status": "Returned", "reason": payload.reason},
         request.client.host if request.client else None,
     )
+
+    # Tell the authoring doctor directly — they own the clarification.
+    if record.doctor_id and record.doctor_id != current_user["user_id"]:
+        notify(
+            db, user_id=record.doctor_id,
+            title="Prescription returned by pharmacy",
+            body=f"RX-{record_id}: {payload.reason}",
+            link="/app/clinical",
+            category="warning",
+        )
+
     db.commit()
     return {"message": "Prescription returned to doctor.", "record_id": record_id}
 

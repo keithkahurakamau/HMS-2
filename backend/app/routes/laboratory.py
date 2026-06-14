@@ -11,6 +11,7 @@ from app.models.inventory import StockBatch, InventoryItem, InventoryUsageLog, L
 from app.models.patient import Patient
 from app.models.user import User
 from app.core.dependencies import get_current_user, RequirePermission
+from app.utils.notify import notify, notify_role
 
 logger = logging.getLogger(__name__)
 
@@ -373,6 +374,19 @@ def create_lab_orders(
             "status": test.status,
         })
 
+    # Lab Technicians own the bench — notify the role, not laboratory:read
+    # (doctors hold that too and just placed this order themselves).
+    patient_name = f"{patient.other_names} {patient.surname}"
+    has_stat = any(t.priority == "STAT" for t in payload.tests)
+    notify_role(
+        db, "Lab Technician",
+        title=f"{len(created)} lab test(s) ordered",
+        body=f"{patient_name} · {', '.join(c['test_name'] for c in created)[:140]}",
+        link="/app/laboratory",
+        category="warning" if has_stat else "info",
+        exclude_user_id=current_user["user_id"],
+    )
+
     db.commit()
     return {"created": created, "count": len(created)}
 
@@ -469,6 +483,18 @@ def complete_lab_test(
         test.status = "Completed"
         test.completed_at = datetime.now()
         test.performed_by_id = current_user["user_id"]
+
+        # Results are back — tell the doctor who ordered the test.
+        if test.ordered_by and test.ordered_by != current_user["user_id"]:
+            patient = db.query(Patient).filter(Patient.patient_id == test.patient_id).first()
+            patient_name = f"{patient.other_names} {patient.surname}" if patient else "patient"
+            notify(
+                db, user_id=test.ordered_by,
+                title="Lab results ready",
+                body=f"{test.test_name} for {patient_name} is complete.",
+                link="/app/clinical",
+                category="success",
+            )
 
         db.commit()
         return {"status": "success", "message": "Test completed and inventory updated."}
