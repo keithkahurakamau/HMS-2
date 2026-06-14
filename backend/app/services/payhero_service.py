@@ -302,4 +302,24 @@ def settle_invoice_match(
         reference=f"INV-{invoice.invoice_id}",
         user_id=user_id,
     )
+
+    # M-Pesa settles asynchronously via webhook — the cashier isn't watching
+    # the STK screen, so the bell is how they learn the money landed.
+    try:
+        from app.utils.notify import notify_permission
+        fully_paid = invoice.status == "Paid"
+        notify_permission(
+            db, "billing:manage",
+            title="M-Pesa payment received",
+            body=(
+                f"KES {amount} on Invoice #{invoice.invoice_id} "
+                f"({'paid in full' if fully_paid else 'partial'}) · "
+                f"receipt {txn.receipt_number or '—'}"
+            ),
+            link="/app/billing",
+            category="success",
+        )
+    except Exception:  # noqa: BLE001 — notification must never break settlement
+        logger.warning("settle_invoice_match: notify failed", exc_info=True)
+
     return payment

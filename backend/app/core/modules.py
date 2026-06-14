@@ -96,6 +96,9 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/settings/",                    "settings"),
     ("/api/patients/",                    "patients"),
     ("/api/appointments/",                "appointments"),
+    # Personal calendar is account-level; ride the always-on appointments
+    # module so it's never accidentally gated off.
+    ("/api/calendar/",                    "appointments"),
     ("/api/queue/",                       "patients"),
     # optional modules.
     # Triage is part of the clinical workflow — gate it with the Clinical Desk.
