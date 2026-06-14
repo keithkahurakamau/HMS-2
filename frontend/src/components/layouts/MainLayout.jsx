@@ -8,7 +8,7 @@ import {
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
     ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy,
     BookOpen, Smartphone, HelpCircle, HeartPulse, PanelLeftClose, PanelLeftOpen,
-    CalendarClock, Home,
+    CalendarClock, Home, UserCog,
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -195,9 +195,14 @@ export default function MainLayout() {
                     </div>
                 </nav>
 
-                {/* User card */}
+                {/* User card — links to the self-service profile page */}
                 <div className="p-4 border-t border-white/5 shrink-0">
-                    <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.04] ring-1 ring-white/5">
+                    <NavLink
+                        to="/app/profile"
+                        onClick={handleNavClick}
+                        title="Profile & security"
+                        className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.04] ring-1 ring-white/5 hover:bg-white/[0.08] transition-colors group"
+                    >
                         <div className="size-10 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 flex items-center justify-center text-white font-semibold shadow-glow shrink-0">
                             {user?.full_name?.charAt(0) || 'U'}
                         </div>
@@ -205,7 +210,8 @@ export default function MainLayout() {
                             <p className="text-sm font-semibold text-white truncate leading-tight">{user?.full_name}</p>
                             <p className="text-xs text-brand-300/90 font-medium truncate mt-0.5">{user?.role}</p>
                         </div>
-                    </div>
+                        <UserCog size={16} className="text-ink-400 group-hover:text-white shrink-0 transition-colors" aria-hidden="true" />
+                    </NavLink>
                 </div>
             </aside>
 
