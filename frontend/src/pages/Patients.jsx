@@ -1134,6 +1134,8 @@ export default function Patients() {
                         onExport={exportPatientData}
                         onDeactivate={deactivatePatient}
                         onErase={erasePatient}
+                        routeTargets={ROUTE_TARGETS}
+                        onRoute={(p, t) => { closeDropdown(); openRoutePicker(p, t); }}
                     />
                 );
             })()}
@@ -1424,7 +1426,8 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
 const MENU_WIDTH = 232;
 const MENU_MARGIN = 8;
 
-function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport, onDeactivate, onErase }) {
+function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport, onDeactivate, onErase, routeTargets = [], onRoute }) {
+    const [showRoute, setShowRoute] = useState(false);
     const menuRef = useRef(null);
     const [pos, setPos] = useState({ top: 0, left: 0, ready: false });
 
@@ -1508,6 +1511,33 @@ function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport
             <button type="button" role="menuitem" onClick={() => onExport(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
                 <Download size={15} className="text-ink-500" aria-hidden="true" /> Export (KDPA S.26)
             </button>
+
+            {routeTargets.length > 0 && onRoute && (
+                <>
+                    <div className="border-t border-ink-100 dark:border-ink-800 my-1.5" aria-hidden="true" />
+                    <button type="button" role="menuitem" aria-haspopup="true" aria-expanded={showRoute}
+                        onClick={() => setShowRoute((v) => !v)}
+                        className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
+                        <Send size={15} className="text-ink-500" aria-hidden="true" /> Route to queue
+                        <ChevronDown size={13} className={`ml-auto text-ink-400 transition-transform ${showRoute ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    </button>
+                    {showRoute && (
+                        <div className="px-1.5 pb-1 grid grid-cols-2 gap-1">
+                            {routeTargets.map((t) => {
+                                const Icon = t.icon;
+                                return (
+                                    <button key={t.department} type="button" role="menuitem"
+                                        onClick={() => onRoute(patient, t)}
+                                        className={`inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md text-2xs font-semibold border transition-colors cursor-pointer ${t.accent}`}>
+                                        <Icon size={12} aria-hidden="true" /> {t.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </>
+            )}
+
             <div className="border-t border-ink-100 dark:border-ink-800 my-1.5" aria-hidden="true" />
             <button type="button" role="menuitem" onClick={() => onDeactivate(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer">
                 <UserMinus size={15} aria-hidden="true" /> Deactivate
