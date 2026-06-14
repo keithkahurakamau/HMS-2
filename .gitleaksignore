@@ -1,0 +1,7 @@
+# gitleaks false positives — fingerprints of findings confirmed to be
+# non-secrets. Each entry is a specific commit:file:rule:line, so this
+# suppresses only the exact line, not the file or rule globally.
+
+# Dummy password literal in a password-change unit test (test asserts that a
+# wrong current password is rejected). Not a real credential.
+5822db117ce9012ae2e387ec688ca5e9ac974bd3:backend/tests/test_profile.py:generic-api-key:60
