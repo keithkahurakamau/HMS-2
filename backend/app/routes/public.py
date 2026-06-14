@@ -14,7 +14,7 @@ import re
 from app.config.database import get_master_db, get_tenant_engine, invalidate_tenant_registry
 from app.utils.audit import log_audit
 from app.config.settings import settings
-from app.core.dependencies import require_superadmin
+from app.core.dependencies import require_superadmin, optional_superadmin
 from app.core.limiter import limiter
 from app.models.master import Tenant, SuperAdmin
 from app.models.support import SupportTicket, SupportMessage
@@ -245,18 +245,24 @@ def get_module_catalogue():
 def get_available_hospitals(
     include_inactive: bool = False,
     db: Session = Depends(get_master_db),
+    admin=Depends(optional_superadmin),
 ):
     """Returns tenants from the master registry.
 
-    By default only active ones are listed (used by the public hospital
-    picker). Superadmins pass ``include_inactive=true`` to see suspended
-    rows from the Tenants Manager.
+    This endpoint is public (the portal hospital picker needs it before any
+    login), so anonymous callers get an active-only list with *minimal*
+    fields. The commercial internals (feature_flags, plan_limits, operator
+    notes) and suspended tenants are only revealed to an authenticated
+    superadmin (Tenants Manager). Without this split anyone could enumerate
+    every hospital's plan and private operator notes. (SEC: info disclosure.)
     """
+    is_admin = admin is not None
     query = db.query(Tenant)
-    if not include_inactive:
-        query = query.filter(Tenant.is_active == True)
+    # Only a superadmin may list suspended tenants.
+    if not (include_inactive and is_admin):
+        query = query.filter(Tenant.is_active == True)  # noqa: E712
     tenants = query.order_by(Tenant.name).all()
-    return [_serialize_tenant(t) for t in tenants]
+    return [_serialize_tenant(t, include_flags=is_admin) for t in tenants]
 
 
 class TenantCreate(BaseModel):
