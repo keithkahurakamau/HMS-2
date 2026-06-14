@@ -91,7 +91,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const value = useMemo(
-        () => ({ user, login, logout, loading, mustChangePassword, pendingEmail, pendingPassword, clearMustChange }),
+        () => ({ user, login, logout, loading, mustChangePassword, pendingEmail, pendingPassword, clearMustChange, refreshUser: checkAuthStatus }),
         [user, loading, mustChangePassword, pendingEmail, pendingPassword],
     );
 
