@@ -57,7 +57,7 @@ class TestPasswordChange:
 
     def test_wrong_current_rejected(self, client, nurse_cookies):
         r = client.post("/api/users/me/change-password", cookies=nurse_cookies, json={
-            "current_password": "definitely-wrong", "new_password": "BrandNewPass123",
+            "current_password": "definitely-wrong", "new_password": "BrandNewPass123",  # gitleaks:allow — dummy test value
         })
         assert r.status_code == 400
 
