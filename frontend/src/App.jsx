@@ -36,6 +36,8 @@ const Portal = lazy(() => import('./pages/Portal'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Appointments = lazy(() => import('./pages/Appointments'));
+const Calendar = lazy(() => import('./pages/Calendar'));
+const Home = lazy(() => import('./pages/Home'));
 const PatientPortal = lazy(() => import('./pages/PatientPortal'));
 const Messages = lazy(() => import('./pages/Messages'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -132,23 +134,13 @@ const ThemeApplier = () => {
 const RoleBasedRedirect = () => {
     const { user, loading } = useAuth();
     
-    if (loading) return null; 
+    if (loading) return null;
     if (!user) return <Navigate to="/login" replace />;
-    
-    switch (user.role) {
-        case 'Admin': return <Navigate to="/app/admin" replace />;
-        case 'Doctor': return <Navigate to="/app/clinical" replace />;
-        case 'Nurse': return <Navigate to="/app/triage" replace />;
-        case 'Pharmacist': return <Navigate to="/app/pharmacy" replace />;
-        case 'Lab Technician': return <Navigate to="/app/laboratory" replace />;
-        case 'Radiologist': return <Navigate to="/app/radiology" replace />;
-        case 'Receptionist': return <Navigate to="/app/patients" replace />;
-        default:
-            // Custom roles (admin-created) don't have a baked-in landing page,
-            // so we drop them on Messages — every role gets messaging:read by
-            // default, so the page is guaranteed to render something useful.
-            return <Navigate to="/app/messages" replace />;
-    }
+
+    // Everyone lands on the role-aware Home page — it adapts its quick
+    // actions, schedule, and notifications to the user's permissions, so a
+    // single landing works for built-in and custom roles alike.
+    return <Navigate to="/app/home" replace />;
 };
 
 export default function App() {
@@ -193,9 +185,11 @@ export default function App() {
           </Route>
 
           <Route path="/app" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<RoleBasedRedirect />} /> 
-            
+            <Route index element={<Navigate to="home" replace />} />
+            <Route path="home" element={<Home />} />
+            {/* Legacy: older links/bookmarks land on the role-based redirect. */}
+            <Route path="dashboard" element={<RoleBasedRedirect />} />
+
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="patients" element={<Patients />} />
             <Route path="triage" element={<ModuleGuard moduleKey="clinical"><Triage /></ModuleGuard>} />
@@ -208,6 +202,7 @@ export default function App() {
             <Route path="medical-history" element={<ModuleGuard moduleKey="medical_history"><MedicalHistory /></ModuleGuard>} />
 
             <Route path="appointments" element={<Appointments />} />
+            <Route path="calendar" element={<Calendar />} />
             <Route path="billing" element={<ModuleGuard moduleKey="billing"><Billing /></ModuleGuard>} />
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />

@@ -12,6 +12,7 @@ from app.models.inventory import StockBatch, InventoryItem, InventoryUsageLog, L
 from app.schemas.wards import AdmissionRequest, DischargeRequest
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
+from app.utils.notify import notify_permission
 
 router = APIRouter(prefix="/api/wards", tags=["Wards & Admissions"])
 
@@ -241,6 +242,17 @@ def admit_patient(req: AdmissionRequest, db: Session = Depends(get_db), current_
     )
     
     db.add(admission)
+    db.flush()
+
+    # Ward nursing staff manage admitted patients — page them on a new admission.
+    notify_permission(
+        db, "wards:manage",
+        title="New patient admitted",
+        body=f"{patient.other_names} {patient.surname} → bed {bed.bed_number} · {req.diagnosis}",
+        link="/app/wards",
+        exclude_user_id=current_user["user_id"],
+    )
+
     db.commit()
     return {"message": "Patient admitted successfully."}
 

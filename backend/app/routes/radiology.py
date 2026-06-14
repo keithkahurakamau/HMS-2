@@ -12,6 +12,7 @@ from app.schemas.radiology import (
 )
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
+from app.utils.notify import notify, notify_role
 
 router = APIRouter(prefix="/api/radiology", tags=["Radiology"])
 
@@ -126,6 +127,16 @@ def create_radiology_request(
         None,
         req_in.model_dump(),
         request.client.host,
+    )
+
+    # Radiographers/radiologists own the imaging worklist.
+    notify_role(
+        db, "Radiologist",
+        title="New imaging request",
+        body=f"{patient.other_names} {patient.surname} · {new_request.exam_type}",
+        link="/app/radiology",
+        category="warning" if priority == "STAT" else "info",
+        exclude_user_id=current_user["user_id"],
     )
 
     db.commit()
@@ -246,6 +257,18 @@ def add_radiology_result(
         result_in.model_dump(),
         request.client.host,
     )
+
+    # Report is ready — notify the doctor who requested the imaging.
+    if req.requested_by and req.requested_by != current_user["user_id"]:
+        patient = db.query(Patient).filter(Patient.patient_id == req.patient_id).first()
+        patient_name = f"{patient.other_names} {patient.surname}" if patient else "patient"
+        notify(
+            db, user_id=req.requested_by,
+            title="Radiology report ready",
+            body=f"{req.exam_type} for {patient_name} has been reported.",
+            link="/app/clinical",
+            category="success",
+        )
 
     db.commit()
     db.refresh(new_result)
