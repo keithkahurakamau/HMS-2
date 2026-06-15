@@ -54,29 +54,35 @@ export default function Landing() {
                 </div>
             </header>
 
-            {/* ============== Hero ============== */}
-            <section className="relative pt-36 pb-20 sm:pt-44 sm:pb-28 overflow-hidden">
+            {/* ============== Hero (dark immersive WebGL stage) ============== */}
+            <section className="relative pt-36 pb-32 sm:pt-44 sm:pb-40 overflow-hidden bg-ink-950 isolate">
                 <div className="absolute inset-0 pointer-events-none">
-                    {/* WebGL (OpenGL ES) flowing brand-tinted shader wash — see WebGLHero.jsx */}
-                    <WebGLHero className="absolute inset-0 opacity-70 mix-blend-soft-light" />
-                    <div className="absolute inset-0 bg-aurora" />
-                    <div className="absolute inset-0 bg-grid-faint bg-grid-faint opacity-50" />
-                    <div className="absolute -top-32 -right-24 size-[40rem] bg-brand-300/20 rounded-full blur-[120px] animate-blob-breathe" />
-                    <div className="absolute -bottom-40 -left-24 size-[36rem] bg-accent-300/20 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
+                    {/* Deep brand-tinted base so the neon mesh reads as high-grade */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-ink-950 via-brand-950 to-ink-950" />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-10%,rgba(8,145,178,0.35),transparent_60%)]" />
+                    {/* 3D WebGL (OpenGL ES) wireframe mesh terrain — see WebGLHero.jsx */}
+                    <WebGLHero className="absolute inset-0 opacity-90" />
+                    {/* Breathing colour orbs for depth */}
+                    <div className="absolute -top-32 -right-24 size-[40rem] bg-brand-500/20 rounded-full blur-[120px] animate-blob-breathe" />
+                    <div className="absolute top-1/3 -left-24 size-[34rem] bg-teal-500/15 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
+                    {/* Left scrim keeps the headline crisp over the mesh */}
+                    <div className="absolute inset-y-0 left-0 w-full lg:w-2/3 bg-gradient-to-r from-ink-950/90 via-ink-950/55 to-transparent" />
+                    {/* Bottom fade dissolves the dark stage into the light page below */}
+                    <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-transparent to-ink-50" />
                 </div>
 
                 <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-10 items-center">
                     <div className="lg:col-span-7 animate-slide-up">
-                        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 ring-1 ring-brand-200 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">
-                            <Sparkles size={12} className="text-teal-500" />
+                        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md ring-1 ring-white/20 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-200">
+                            <Sparkles size={12} className="text-teal-300" />
                             Multi-tenant clinical cloud · est. 2026
                         </span>
-                        <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tightest leading-[1.05]">
+                        <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tightest leading-[1.05] text-white">
                             Care that{' '}
                             <span className="text-gradient-brand">flows</span>{' '}
                             across every shift, ward, and clinic.
                         </h1>
-                        <p className="mt-6 text-lg text-ink-600 leading-relaxed max-w-xl">
+                        <p className="mt-6 text-lg text-ink-300 leading-relaxed max-w-xl">
                             MediFleet unifies registration, clinical desk, pharmacy, lab, radiology,
                             wards, and billing into one secure workspace — so your team spends time
                             on patients, not paperwork.
@@ -89,14 +95,14 @@ export default function Landing() {
                             <button type="button" onClick={() => navigate('/portal?next=/patient')} className="btn-secondary text-base px-5 py-3 cursor-pointer">
                                 <HeartPulse size={16} /> Patient portal
                             </button>
-                            <Link to="/superadmin/login" className="text-sm font-semibold text-ink-500 hover:text-brand-700 transition-colors px-3 py-3 cursor-pointer">
+                            <Link to="/superadmin/login" className="text-sm font-semibold text-ink-400 hover:text-brand-300 transition-colors px-3 py-3 cursor-pointer">
                                 Platform console &rarr;
                             </Link>
                         </div>
-                        <div className="mt-10 flex items-center gap-6 text-xs text-ink-500">
-                            <Trust icon={<Lock size={14} className="text-brand-600" />} label="HttpOnly JWT · CSRF" />
-                            <Trust icon={<ShieldCheck size={14} className="text-teal-600" />} label="KDPA aligned" />
-                            <Trust icon={<Globe2 size={14} className="text-accent-600" />} label="Database per tenant" />
+                        <div className="mt-10 flex items-center gap-6 text-xs text-ink-400">
+                            <Trust icon={<Lock size={14} className="text-brand-300" />} label="HttpOnly JWT · CSRF" />
+                            <Trust icon={<ShieldCheck size={14} className="text-teal-300" />} label="KDPA aligned" />
+                            <Trust icon={<Globe2 size={14} className="text-accent-300" />} label="Database per tenant" />
                         </div>
                     </div>
 
@@ -299,7 +305,7 @@ export default function Landing() {
 
 function Trust({ icon, label }) {
     return (
-        <span className="inline-flex items-center gap-2 font-medium text-ink-600">
+        <span className="inline-flex items-center gap-2 font-medium text-ink-300">
             {icon}{label}
         </span>
     );
