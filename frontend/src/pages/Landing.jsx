@@ -15,6 +15,7 @@ import ContactStrip from '../components/ContactStrip';
 import ContactForm from '../components/ContactForm';
 import Reveal from '../components/Reveal';
 import PremiumBackground from '../components/PremiumBackground';
+import WebGLHero from '../components/WebGLHero';
 import Seo from '../components/Seo';
 
 export default function Landing() {
@@ -56,6 +57,8 @@ export default function Landing() {
             {/* ============== Hero ============== */}
             <section className="relative pt-36 pb-20 sm:pt-44 sm:pb-28 overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none">
+                    {/* WebGL (OpenGL ES) flowing brand-tinted shader wash — see WebGLHero.jsx */}
+                    <WebGLHero className="absolute inset-0 opacity-70 mix-blend-soft-light" />
                     <div className="absolute inset-0 bg-aurora" />
                     <div className="absolute inset-0 bg-grid-faint bg-grid-faint opacity-50" />
                     <div className="absolute -top-32 -right-24 size-[40rem] bg-brand-300/20 rounded-full blur-[120px] animate-blob-breathe" />
