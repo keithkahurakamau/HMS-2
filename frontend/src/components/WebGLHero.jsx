@@ -1,90 +1,85 @@
 import React, { useEffect, useRef } from 'react';
 
-/* Decorative WebGL (OpenGL ES via the browser) layer for the hero.
+/* High-grade decorative WebGL (OpenGL ES) layer for the hero.
 
-   A single full-screen quad runs a fragment shader that animates a slow,
-   flowing field of domain-warped value noise tinted with the MediFleet
-   brand palette (cyan → teal → emerald). It's a quiet, continuously-alive
-   wash that sits *behind* the hero content and complements the CSS-driven
-   PremiumBackground — no new dependencies, just raw WebGL.
+   Renders a real 3D wireframe MESH terrain — a perspective-projected grid
+   whose vertices are displaced every frame by layered sine surfaces, drawn
+   as additively-blended glowing lines + node points, tinted with the
+   MediFleet brand palette (deep teal → cyan → emerald) and dissolved into
+   the dark hero with distance fog. A gentle cursor parallax sways the camera.
 
-   Why raw WebGL instead of three.js:
+   Why raw WebGL (no three.js / gl-matrix):
      • Zero added bundle weight / no package-lock churn.
-     • One quad + one shader is all this effect needs.
+     • The effect is one grid + two draw calls; the 4×4 matrix math fits in
+       ~30 lines, so a 600 kB dependency would be pure overhead.
 
    Performance & safety
-     • Honors prefers-reduced-motion: the rAF loop never starts and the
-       canvas paints a single static frame (or nothing if WebGL is absent).
+     • Honors prefers-reduced-motion: paints a single static frame, no rAF.
+     • Graceful no-op when WebGL is unavailable (CSS hero background remains).
+     • Grid density adapts to viewport; DPR capped at 2; resizes with parent.
+     • Single rAF loop, no React re-renders. Full GL teardown on unmount,
+       including WEBGL_lose_context.
      • aria-hidden + pointer-events-none — purely cosmetic.
-     • Single rAF loop, no React re-renders. Full GL teardown on unmount.
-     • Caps the drawing-buffer at devicePixelRatio≤2 so it stays cheap on
-       hi-dpi screens; resizes with the container.
 */
 
 const VERT_SRC = `
-attribute vec2 a_pos;
+attribute vec2 a_uv;
+uniform mat4 u_proj;
+uniform mat4 u_view;
+uniform float u_time;
+uniform float u_point;
+varying float v_h;
+varying float v_fog;
+
+const float SPAN_X = 26.0;   // mesh width
+const float Z_NEAR =  5.0;   // nearest row (below camera)
+const float Z_FAR  = -30.0;  // farthest row (toward horizon)
+
+// Layered sine surface — cheap, smooth, and continuously flowing.
+float surface(vec2 w, float t) {
+  float y = 0.0;
+  y += sin(w.x * 0.45 + t)              * 0.90;
+  y += sin(w.y * 0.40 + t * 0.80)       * 0.80;
+  y += sin((w.x + w.y) * 0.30 - t * 0.6) * 0.55;
+  y += sin(length(w) * 0.50 - t * 1.10) * 0.45;
+  return y;
+}
+
 void main() {
-  gl_Position = vec4(a_pos, 0.0, 1.0);
+  float x = (a_uv.x - 0.5) * SPAN_X;
+  float z = mix(Z_NEAR, Z_FAR, a_uv.y);
+  float y = surface(vec2(x, z), u_time) - 1.5;
+
+  vec4 viewPos = u_view * vec4(x, y, z, 1.0);
+  gl_Position = u_proj * viewPos;
+  gl_PointSize = u_point;
+
+  v_h   = y;
+  v_fog = clamp((-viewPos.z) / 34.0, 0.0, 1.0);
 }
 `;
 
-// Domain-warped value noise, tinted with the brand gradient. Kept compact
-// and dependency-free; runs comfortably on integrated GPUs at this size.
 const FRAG_SRC = `
 precision mediump float;
-uniform vec2  u_res;
-uniform float u_time;
-
-// hash + value noise
-float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
-}
-float noise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  float a = hash(i);
-  float b = hash(i + vec2(1.0, 0.0));
-  float c = hash(i + vec2(0.0, 1.0));
-  float d = hash(i + vec2(1.0, 1.0));
-  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
-float fbm(vec2 p) {
-  float v = 0.0;
-  float amp = 0.5;
-  for (int i = 0; i < 5; i++) {
-    v += amp * noise(p);
-    p *= 2.0;
-    amp *= 0.5;
-  }
-  return v;
-}
+varying float v_h;
+varying float v_fog;
+uniform float u_alpha;
 
 void main() {
-  vec2 uv = gl_FragCoord.xy / u_res.xy;
-  vec2 p  = uv * 3.0;
-  p.x *= u_res.x / u_res.y;          // keep noise isotropic
+  float h = clamp(v_h * 0.35 + 0.5, 0.0, 1.0);
 
-  float t = u_time * 0.05;
-  // domain warp for the slow "flowing" feel
-  vec2 q = vec2(fbm(p + t), fbm(p + vec2(5.2, 1.3) - t));
-  float f = fbm(p + 1.8 * q + t * 0.5);
+  vec3 deep    = vec3(0.04, 0.26, 0.40);   // deep teal trough
+  vec3 cyan    = vec3(0.22, 0.86, 0.96);   // brand cyan crest
+  vec3 emerald = vec3(0.12, 0.88, 0.56);   // emerald peak
 
-  // brand palette: cyan -> teal -> emerald
-  vec3 cyan    = vec3(0.133, 0.827, 0.933);
-  vec3 teal    = vec3(0.078, 0.722, 0.651);
-  vec3 emerald = vec3(0.063, 0.725, 0.506);
+  vec3 col = mix(deep, cyan, smoothstep(0.25, 0.70, h));
+  col = mix(col, emerald, smoothstep(0.65, 1.0, h));
 
-  vec3 col = mix(cyan, teal, smoothstep(0.2, 0.6, f));
-  col = mix(col, emerald, smoothstep(0.5, 0.9, f));
+  // Brighter where high, dissolved by distance fog.
+  float a = u_alpha * (0.22 + 0.62 * h) * (1.0 - v_fog);
 
-  // soft vignette + gentle overall transparency so the wash stays subtle
-  float vign = smoothstep(1.15, 0.25, length(uv - 0.5));
-  float alpha = (0.18 + 0.32 * f) * vign;
-
-  gl_FragColor = vec4(col, alpha);
+  // Additive blend (SRC_ALPHA, ONE): rgb is added * a, so output raw colour.
+  gl_FragColor = vec4(col, a);
 }
 `;
 
@@ -99,6 +94,56 @@ function compile(gl, type, src) {
   return sh;
 }
 
+// ── Minimal column-major mat4 helpers (no gl-matrix dependency) ──
+function perspective(fovy, aspect, near, far) {
+  const f = 1 / Math.tan(fovy / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f / aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far + near) * nf, -1,
+    0, 0, 2 * far * near * nf, 0,
+  ]);
+}
+function lookAt(eye, center, up) {
+  let z0 = eye[0] - center[0], z1 = eye[1] - center[1], z2 = eye[2] - center[2];
+  const zl = 1 / Math.hypot(z0, z1, z2); z0 *= zl; z1 *= zl; z2 *= zl;
+  let x0 = up[1] * z2 - up[2] * z1, x1 = up[2] * z0 - up[0] * z2, x2 = up[0] * z1 - up[1] * z0;
+  let xl = Math.hypot(x0, x1, x2); if (xl) { xl = 1 / xl; x0 *= xl; x1 *= xl; x2 *= xl; }
+  const y0 = z1 * x2 - z2 * x1, y1 = z2 * x0 - z0 * x2, y2 = z0 * x1 - z1 * x0;
+  return new Float32Array([
+    x0, y0, z0, 0,
+    x1, y1, z1, 0,
+    x2, y2, z2, 0,
+    -(x0 * eye[0] + x1 * eye[1] + x2 * eye[2]),
+    -(y0 * eye[0] + y1 * eye[1] + y2 * eye[2]),
+    -(z0 * eye[0] + z1 * eye[1] + z2 * eye[2]),
+    1,
+  ]);
+}
+
+// Build a grid of N×N vertices (UVs in 0..1) plus the wireframe line indices.
+function buildGrid(N) {
+  const uvs = new Float32Array(N * N * 2);
+  let p = 0;
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      uvs[p++] = c / (N - 1);
+      uvs[p++] = r / (N - 1);
+    }
+  }
+  const idx = new Uint16Array(2 * 2 * N * (N - 1));
+  let i = 0;
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const a = r * N + c;
+      if (c < N - 1) { idx[i++] = a; idx[i++] = a + 1; }     // horizontal
+      if (r < N - 1) { idx[i++] = a; idx[i++] = a + N; }     // vertical
+    }
+  }
+  return { uvs, idx, count: i, verts: N * N };
+}
+
 export default function WebGLHero({ className = '' }) {
   const canvasRef = useRef(null);
 
@@ -108,9 +153,9 @@ export default function WebGLHero({ className = '' }) {
     if (!canvas) return;
 
     const gl =
-      canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: false }) ||
+      canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: true }) ||
       canvas.getContext('experimental-webgl', { alpha: true, premultipliedAlpha: false });
-    if (!gl) return; // graceful no-op when WebGL is unavailable
+    if (!gl) return; // graceful no-op
 
     const vs = compile(gl, gl.VERTEX_SHADER, VERT_SRC);
     const fs = compile(gl, gl.FRAGMENT_SHADER, FRAG_SRC);
@@ -123,26 +168,34 @@ export default function WebGLHero({ className = '' }) {
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
     gl.useProgram(prog);
 
-    // Full-screen quad (two triangles).
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
-      gl.STATIC_DRAW,
-    );
-    const aPos = gl.getAttribLocation(prog, 'a_pos');
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+    const N = window.innerWidth < 768 ? 80 : 120;
+    const grid = buildGrid(N);
 
-    const uRes = gl.getUniformLocation(prog, 'u_res');
+    const vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, grid.uvs, gl.STATIC_DRAW);
+    const aUV = gl.getAttribLocation(prog, 'a_uv');
+    gl.enableVertexAttribArray(aUV);
+    gl.vertexAttribPointer(aUV, 2, gl.FLOAT, false, 0, 0);
+
+    const ibo = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, grid.idx, gl.STATIC_DRAW);
+
+    const uProj = gl.getUniformLocation(prog, 'u_proj');
+    const uView = gl.getUniformLocation(prog, 'u_view');
     const uTime = gl.getUniformLocation(prog, 'u_time');
+    const uAlpha = gl.getUniformLocation(prog, 'u_alpha');
+    const uPoint = gl.getUniformLocation(prog, 'u_point');
 
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // additive glow
+    gl.clearColor(0, 0, 0, 0);
 
+    let dprScale = 1;
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dprScale = dpr;
       const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
       const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
       if (canvas.width !== w || canvas.height !== h) {
@@ -150,12 +203,30 @@ export default function WebGLHero({ className = '' }) {
         canvas.height = h;
       }
       gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniformMatrix4fv(uProj, false, perspective(0.9, w / h, 0.1, 100));
+    };
+
+    // Cursor parallax — lerp the camera's x toward the pointer.
+    let tx = 0, mx = 0;
+    const onMove = (e) => { tx = (e.clientX / window.innerWidth - 0.5) * 2; };
+
+    const setView = () => {
+      const eye = [mx * 2.4, 4.2, 9.0];
+      gl.uniformMatrix4fv(uView, false, lookAt(eye, [0, -1.0, -8.0], [0, 1, 0]));
     };
 
     const draw = (timeMs) => {
+      gl.clear(gl.COLOR_BUFFER_BIT);
       gl.uniform1f(uTime, timeMs * 0.001);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      setView();
+      // Lines (wireframe mesh)
+      gl.uniform1f(uAlpha, 0.55);
+      gl.uniform1f(uPoint, 1.0);
+      gl.drawElements(gl.LINES, grid.count, gl.UNSIGNED_SHORT, 0);
+      // Node points (brighter — the "artifacts" on the lattice)
+      gl.uniform1f(uAlpha, 0.9);
+      gl.uniform1f(uPoint, 2.2 * dprScale);
+      gl.drawArrays(gl.POINTS, 0, grid.verts);
     };
 
     resize();
@@ -166,9 +237,11 @@ export default function WebGLHero({ className = '' }) {
     window.addEventListener('resize', onResize, { passive: true });
 
     if (reduce) {
-      draw(0); // single static frame
+      draw(0);
     } else {
+      window.addEventListener('pointermove', onMove, { passive: true });
       const tick = (t) => {
+        mx += (tx - mx) * 0.05;
         draw(t);
         raf = requestAnimationFrame(tick);
       };
@@ -177,8 +250,10 @@ export default function WebGLHero({ className = '' }) {
 
     return () => {
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('pointermove', onMove);
       if (raf) cancelAnimationFrame(raf);
-      gl.deleteBuffer(buf);
+      gl.deleteBuffer(vbo);
+      gl.deleteBuffer(ibo);
       gl.deleteProgram(prog);
       gl.deleteShader(vs);
       gl.deleteShader(fs);
