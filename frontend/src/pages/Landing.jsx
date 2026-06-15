@@ -275,9 +275,21 @@ export default function Landing() {
                     <div className="flex items-center gap-3">
                         <Logo variant="full" size={28} />
                     </div>
-                    <p className="text-xs text-ink-500 uppercase tracking-[0.18em]">
+                    <p className="text-xs text-ink-500 uppercase tracking-[0.18em] text-center">
                         {/* react-doctor-disable-next-line react-doctor/rendering-hydration-mismatch-time */}
                         &copy; {new Date().getFullYear()} MediFleet — Clinical-grade workspace
+                        <br className="hidden md:block" />
+                        <span className="md:normal-case">
+                            A product of{' '}
+                            <a
+                                href="https://github.com/keithkahurakamau/nova-habitat"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-ink-600 hover:text-brand-700 transition-colors font-medium"
+                            >
+                                Nova-Habitat Technologies
+                            </a>
+                        </span>
                     </p>
                     <div className="flex items-center gap-4 text-xs text-ink-500">
                         <Link to="/portal" className="hover:text-brand-700 transition-colors">Sign in</Link>
