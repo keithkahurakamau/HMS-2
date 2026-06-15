@@ -83,6 +83,27 @@ void main() {
 }
 `;
 
+// Floating wireframe-polyhedron "artifacts" use raw 3D positions + a
+// per-object MVP, so they get their own tiny program.
+const ART_VERT_SRC = `
+attribute vec3 a_pos;
+uniform mat4 u_mvp;
+uniform float u_point;
+void main() {
+  gl_Position = u_mvp * vec4(a_pos, 1.0);
+  gl_PointSize = u_point;
+}
+`;
+
+const ART_FRAG_SRC = `
+precision mediump float;
+uniform vec3 u_col;
+uniform float u_alpha;
+void main() {
+  gl_FragColor = vec4(u_col, u_alpha); // additive glow
+}
+`;
+
 function compile(gl, type, src) {
   const sh = gl.createShader(type);
   gl.shaderSource(sh, src);
@@ -144,6 +165,64 @@ function buildGrid(N) {
   return { uvs, idx, count: i, verts: N * N };
 }
 
+// ── More mat4 helpers for the per-artifact model transforms ──
+function mul(a, b) {
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) {
+    for (let r = 0; r < 4; r++) {
+      o[c * 4 + r] =
+        a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] +
+        a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+    }
+  }
+  return o;
+}
+function translate(x, y, z) {
+  return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
+}
+function rotateX(a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]);
+}
+function rotateY(a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
+}
+function scaleM(s) {
+  return new Float32Array([s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1]);
+}
+
+// Edge geometry for the two artifact shapes (unit-radius), as line indices.
+const OCTA = {
+  pos: new Float32Array([
+    1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1,
+  ]),
+  idx: new Uint16Array([
+    2, 0, 2, 4, 2, 1, 2, 5, 3, 0, 3, 4, 3, 1, 3, 5, 0, 4, 4, 1, 1, 5, 5, 0,
+  ]),
+};
+const CUBE = {
+  pos: new Float32Array([
+    -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1,
+    -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
+  ]),
+  idx: new Uint16Array([
+    0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7,
+  ]),
+};
+
+// Floating artifacts above the terrain. Biased toward centre/right so they
+// don't crowd the left-aligned headline. [x, y, z, scale, shape, r, g, b, spin, alpha]
+const ARTIFACTS = [
+  { p: [4.5, 1.8, -6], s: 0.9, geom: 'cube', col: [0.30, 0.90, 1.00], spin: 0.6, a: 0.75 },
+  { p: [-3.2, 2.7, -10], s: 1.1, geom: 'octa', col: [0.20, 0.95, 0.80], spin: 0.4, a: 0.7 },
+  { p: [7.0, 3.0, -12], s: 1.2, geom: 'octa', col: [0.30, 1.00, 0.60], spin: 0.5, a: 0.6 },
+  { p: [1.8, 1.1, -4], s: 0.55, geom: 'cube', col: [0.40, 0.95, 1.00], spin: 0.9, a: 0.8 },
+  { p: [-5.8, 3.4, -15], s: 0.9, geom: 'cube', col: [0.25, 0.90, 0.85], spin: 0.35, a: 0.5 },
+  { p: [8.5, 2.2, -8], s: 0.7, geom: 'octa', col: [0.30, 0.95, 0.70], spin: 0.7, a: 0.65 },
+  { p: [0.0, 4.2, -18], s: 1.0, geom: 'octa', col: [0.35, 1.00, 0.65], spin: 0.3, a: 0.4 },
+];
+
 export default function WebGLHero({ className = '' }) {
   const canvasRef = useRef(null);
 
@@ -188,11 +267,36 @@ export default function WebGLHero({ className = '' }) {
     const uAlpha = gl.getUniformLocation(prog, 'u_alpha');
     const uPoint = gl.getUniformLocation(prog, 'u_point');
 
+    // ── Artifact program (floating wireframe polyhedra) ──
+    const avs = compile(gl, gl.VERTEX_SHADER, ART_VERT_SRC);
+    const afs = compile(gl, gl.FRAGMENT_SHADER, ART_FRAG_SRC);
+    const artProg = gl.createProgram();
+    gl.attachShader(artProg, avs);
+    gl.attachShader(artProg, afs);
+    gl.linkProgram(artProg);
+    const aPos = gl.getAttribLocation(artProg, 'a_pos');
+    const uMvp = gl.getUniformLocation(artProg, 'u_mvp');
+    const uCol = gl.getUniformLocation(artProg, 'u_col');
+    const uArtAlpha = gl.getUniformLocation(artProg, 'u_alpha');
+    const uArtPoint = gl.getUniformLocation(artProg, 'u_point');
+
+    const makeShape = (shape) => {
+      const v = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, v);
+      gl.bufferData(gl.ARRAY_BUFFER, shape.pos, gl.STATIC_DRAW);
+      const e = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, e);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, shape.idx, gl.STATIC_DRAW);
+      return { v, e, count: shape.idx.length, verts: shape.pos.length / 3 };
+    };
+    const shapes = { octa: makeShape(OCTA), cube: makeShape(CUBE) };
+
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // additive glow
     gl.clearColor(0, 0, 0, 0);
 
     let dprScale = 1;
+    let projMat = perspective(0.9, 16 / 9, 0.1, 100);
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       dprScale = dpr;
@@ -203,30 +307,63 @@ export default function WebGLHero({ className = '' }) {
         canvas.height = h;
       }
       gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.uniformMatrix4fv(uProj, false, perspective(0.9, w / h, 0.1, 100));
+      projMat = perspective(0.9, w / h, 0.1, 100);
+      gl.useProgram(prog);
+      gl.uniformMatrix4fv(uProj, false, projMat);
     };
 
     // Cursor parallax — lerp the camera's x toward the pointer.
     let tx = 0, mx = 0;
     const onMove = (e) => { tx = (e.clientX / window.innerWidth - 0.5) * 2; };
 
-    const setView = () => {
-      const eye = [mx * 2.4, 4.2, 9.0];
-      gl.uniformMatrix4fv(uView, false, lookAt(eye, [0, -1.0, -8.0], [0, 1, 0]));
-    };
-
     const draw = (timeMs) => {
+      const t = timeMs * 0.001;
       gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.uniform1f(uTime, timeMs * 0.001);
-      setView();
-      // Lines (wireframe mesh)
-      gl.uniform1f(uAlpha, 0.55);
+
+      const eye = [mx * 2.4, 4.2, 9.0];
+      const viewMat = lookAt(eye, [0, -1.0, -8.0], [0, 1, 0]);
+
+      // ── Mesh terrain ──
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.enableVertexAttribArray(aUV);
+      gl.vertexAttribPointer(aUV, 2, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      gl.uniformMatrix4fv(uView, false, viewMat);
+      gl.uniform1f(uTime, t);
+      gl.uniform1f(uAlpha, 0.55);          // wireframe lines
       gl.uniform1f(uPoint, 1.0);
       gl.drawElements(gl.LINES, grid.count, gl.UNSIGNED_SHORT, 0);
-      // Node points (brighter — the "artifacts" on the lattice)
-      gl.uniform1f(uAlpha, 0.9);
+      gl.uniform1f(uAlpha, 0.9);           // brighter lattice nodes
       gl.uniform1f(uPoint, 2.2 * dprScale);
       gl.drawArrays(gl.POINTS, 0, grid.verts);
+
+      // ── Floating wireframe artifacts ──
+      gl.useProgram(artProg);
+      gl.enableVertexAttribArray(aPos);
+      const pv = mul(projMat, viewMat);
+      let curGeom = null;
+      for (const o of ARTIFACTS) {
+        const sh = shapes[o.geom];
+        if (o.geom !== curGeom) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, sh.v);
+          gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sh.e);
+          curGeom = o.geom;
+        }
+        const bob = Math.sin(t * 0.5 + o.p[0]) * 0.35;
+        const model = mul(
+          mul(mul(translate(o.p[0], o.p[1] + bob, o.p[2]), rotateY(t * o.spin)),
+            rotateX(t * o.spin * 0.7)),
+          scaleM(o.s),
+        );
+        gl.uniformMatrix4fv(uMvp, false, mul(pv, model));
+        gl.uniform3f(uCol, o.col[0], o.col[1], o.col[2]);
+        gl.uniform1f(uArtAlpha, o.a);
+        gl.uniform1f(uArtPoint, 3.0 * dprScale);
+        gl.drawElements(gl.LINES, sh.count, gl.UNSIGNED_SHORT, 0);
+        gl.drawArrays(gl.POINTS, 0, sh.verts);
+      }
     };
 
     resize();
@@ -257,6 +394,10 @@ export default function WebGLHero({ className = '' }) {
       gl.deleteProgram(prog);
       gl.deleteShader(vs);
       gl.deleteShader(fs);
+      Object.values(shapes).forEach((sh) => { gl.deleteBuffer(sh.v); gl.deleteBuffer(sh.e); });
+      gl.deleteProgram(artProg);
+      gl.deleteShader(avs);
+      gl.deleteShader(afs);
       const lose = gl.getExtension('WEBGL_lose_context');
       if (lose) lose.loseContext();
     };
