@@ -2,13 +2,13 @@ import React from 'react';
 import { Phone, Mail, MessageCircle } from 'lucide-react';
 
 /**
- * ContactStrip — three-way contact card row (phone / email / WhatsApp).
+ * ContactStrip - three-way contact card row (phone / email / WhatsApp).
  *
  * Used on the Landing and Portal pages so a visitor stuck on a step has
  * three immediate paths to a human. WhatsApp uses the wa.me deep-link so
  * it opens the app on mobile and the web client on desktop.
  *
- * To update the support number / email, edit SUPPORT_CONTACT below — both
+ * To update the support number / email, edit SUPPORT_CONTACT below; both
  * pages pull from this single source.
  */
 const SUPPORT_CONTACT = {
@@ -29,7 +29,7 @@ export default function ContactStrip({ heading = "Need a hand?" }) {
                     </span>
                     <h2 className="mt-4 text-2xl sm:text-3xl font-semibold tracking-tight text-ink-900">{heading}</h2>
                     <p className="mt-2 text-sm text-ink-600 max-w-xl mx-auto">
-                        The MediFleet support team is reachable in three ways — pick the one that fits the moment.
+                        The MediFleet support team is reachable in three ways. Pick the one that fits the moment.
                     </p>
                 </div>
 
@@ -40,7 +40,7 @@ export default function ContactStrip({ heading = "Need a hand?" }) {
                         tone="brand"
                         label="Call us"
                         value={SUPPORT_CONTACT.phone}
-                        hint="Mon–Sat, 8 am – 8 pm EAT"
+                        hint="Mon to Sat, 8 am to 8 pm EAT"
                     />
                     <ContactCard
                         href={`https://wa.me/${SUPPORT_CONTACT.whatsappPath}`}
@@ -61,7 +61,7 @@ export default function ContactStrip({ heading = "Need a hand?" }) {
                     />
                 </div>
 
-                {/* Email a specific team — routes to the matching desk */}
+                {/* Email a specific team, routes to the matching desk */}
                 <div className="mt-8">
                     <p className="text-center text-2xs font-semibold uppercase tracking-[0.16em] text-ink-500 mb-3">Email a specific team</p>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
