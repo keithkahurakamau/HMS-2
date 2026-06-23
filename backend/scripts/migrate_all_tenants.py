@@ -533,6 +533,17 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS portal_failed_attempts INTEGER NOT NULL DEFAULT 0;"),
     ("patients",
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS portal_locked_until TIMESTAMPTZ;"),
+    # c3e8b1f4a7d2 — widen PHI columns to TEXT for column-level encryption
+    # (audit M-1). ALTER ... TYPE TEXT on an already-TEXT column is a no-op, so
+    # these are safe to re-run. (No new columns added, so the patch runner logs
+    # nothing — that's expected.)
+    ("patients", "ALTER TABLE patients ALTER COLUMN postal_address TYPE TEXT;"),
+    ("patients", "ALTER TABLE patients ALTER COLUMN residence TYPE TEXT;"),
+    ("patients", "ALTER TABLE patients ALTER COLUMN occupation TYPE TEXT;"),
+    ("patients", "ALTER TABLE patients ALTER COLUMN employer_name TYPE TEXT;"),
+    ("patients", "ALTER TABLE patients ALTER COLUMN nok_name TYPE TEXT;"),
+    ("patients", "ALTER TABLE patients ALTER COLUMN nok_contact TYPE TEXT;"),
+    ("medical_history_entries", "ALTER TABLE medical_history_entries ALTER COLUMN title TYPE TEXT;"),
 ]
 
 

@@ -16,6 +16,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.config.database import Base
+# M-1: encrypt the clinical narrative at rest (includes sensitive entries —
+# mental-health / obstetric). Text-backed Fernet type; never searched.
+from app.utils.db_types import EncryptedString
 
 
 class ConsentRecord(Base):
@@ -81,8 +84,8 @@ class MedicalHistoryEntry(Base):
     # "OBSTETRIC_HISTORY"     - Pregnancies, deliveries, complications (Female patients)
     # "MENTAL_HEALTH"         - Psychiatric diagnoses, therapy history
     
-    title = Column(String(255), nullable=False)   # e.g., "Appendectomy", "Penicillin Reaction (Anaphylaxis)"
-    description = Column(Text, nullable=False)     # Full detailed narrative
+    title = Column(EncryptedString, nullable=False)   # e.g., "Appendectomy", "Penicillin Reaction (Anaphylaxis)" — encrypted at rest (M-1)
+    description = Column(EncryptedString, nullable=False)     # Full detailed narrative — encrypted at rest (M-1)
     
     # Date of the event (not the date of recording)
     event_date = Column(String(50), nullable=True)     # Stored as string for flexibility (e.g., "2019", "March 2020")
