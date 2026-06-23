@@ -40,6 +40,13 @@ router = APIRouter(prefix="/api/portal", tags=["Patient Portal"])
 PORTAL_TOKEN_TTL_MINUTES = 60
 PORTAL_COOKIE_NAME = "patient_portal_token"
 
+# M-3: per-patient brute-force lockout. The per-IP rate limit doesn't stop a
+# rotating-IP attacker who knows a target's OP number from grinding the 10^4
+# phone-suffix space, so we also lock the individual patient record after a few
+# failed factor checks. Mirrors the staff-login policy (5 attempts / 15 min).
+PORTAL_MAX_FAILED_ATTEMPTS = 5
+PORTAL_LOCKOUT_MINUTES = 15
+
 
 # --- token helpers ----------------------------------------------------
 def _issue_portal_token(patient_id: int, tenant_db: str) -> tuple[str, datetime]:
@@ -138,10 +145,36 @@ async def portal_lookup(
 
     if not patient:
         raise generic_failure
-    if patient.date_of_birth != payload.date_of_birth:
+
+    # M-3: per-patient brute-force lockout. When the record is locked we return
+    # the SAME generic failure (never a distinct "locked" response) so the
+    # endpoint can't be turned into an OP-number existence oracle — the guesses
+    # are simply not evaluated until the lock expires.
+    now = datetime.now(timezone.utc)
+    locked_until = patient.portal_locked_until
+    if locked_until is not None:
+        if locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
+        if locked_until > now:
+            raise generic_failure
+
+    factors_ok = (
+        patient.date_of_birth == payload.date_of_birth
+        and bool(patient.telephone_1)
+        and patient.telephone_1.endswith(payload.phone_last4)
+    )
+    if not factors_ok:
+        patient.portal_failed_attempts = (patient.portal_failed_attempts or 0) + 1
+        if patient.portal_failed_attempts >= PORTAL_MAX_FAILED_ATTEMPTS:
+            patient.portal_locked_until = now + timedelta(minutes=PORTAL_LOCKOUT_MINUTES)
+        db.commit()
         raise generic_failure
-    if not patient.telephone_1 or not patient.telephone_1.endswith(payload.phone_last4):
-        raise generic_failure
+
+    # Success — clear any prior failed-attempt / lock state.
+    if patient.portal_failed_attempts or patient.portal_locked_until:
+        patient.portal_failed_attempts = 0
+        patient.portal_locked_until = None
+        db.commit()
 
     token, expires_at = _issue_portal_token(patient.patient_id, request.headers.get("X-Tenant-ID"))
 
