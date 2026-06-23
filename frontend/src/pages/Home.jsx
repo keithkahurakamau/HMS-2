@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { useModules } from '../context/ModuleContext';
 import { useBranding } from '../context/BrandingContext';
 
-// Quick-action tiles. Each declares the permission and module that gate it —
+// Quick-action tiles. Each declares the permission and module that gate it,
 // same philosophy as the sidebar, so a user only ever sees actions they can
 // actually open. `perm: null` means account-level (everyone).
 const ACTIONS = [
@@ -139,17 +139,19 @@ export default function Home() {
     return (
         <div className="space-y-6 pb-8">
             {/* Greeting banner */}
-            <div className="rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-teal-700 text-white p-6 sm:p-8 shadow-elevated">
-                <p className="text-2xs font-semibold uppercase tracking-[0.18em] text-brand-200">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-teal-700 text-white p-6 sm:p-8 shadow-elevated animate-slide-up">
+                <div className="absolute inset-0 bg-aurora opacity-40 pointer-events-none" />
+                <div className="absolute -top-20 -right-16 size-72 rounded-full bg-white/10 blur-3xl pointer-events-none animate-blob-breathe" />
+                <p className="relative text-2xs font-semibold uppercase tracking-[0.18em] text-brand-200">
                     {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
                 </p>
-                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mt-1">
+                <h1 className="relative text-2xl sm:text-3xl font-semibold tracking-tight mt-1">
                     {greeting()}, {firstName}.
                 </h1>
-                <p className="text-sm text-brand-100/90 mt-1.5">
+                <p className="relative text-sm text-brand-100/90 mt-1.5">
                     {user?.role} · {branding?.tenant_name || localStorage.getItem('hms_tenant_name') || 'MediFleet'}
                 </p>
-                <div className="flex flex-wrap gap-2 mt-4">
+                <div className="relative flex flex-wrap gap-2 mt-4">
                     <button type="button" onClick={() => navigate('/app/calendar')}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-sm font-medium backdrop-blur-sm transition-colors">
                         <CalendarClock size={15} /> My calendar
@@ -166,11 +168,12 @@ export default function Home() {
             <section>
                 <h2 className="section-eyebrow mb-3">Quick actions</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {actions.map((a) => {
+                    {actions.map((a, idx) => {
                         const Icon = a.icon;
                         return (
                             <Link key={a.to} to={a.to}
-                                className="group card p-4 hover:-translate-y-0.5 hover:shadow-elevated transition-all">
+                                style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'both' }}
+                                className="group card p-4 hover:-translate-y-0.5 hover:shadow-elevated transition-all animate-slide-up">
                                 <div className={`size-10 rounded-xl flex items-center justify-center ring-1 ${TONE[a.tone]}`}>
                                     <Icon size={19} />
                                 </div>
