@@ -163,12 +163,28 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
 
     user = db.query(User).filter(User.email == payload.email).first()
 
-    if not user:
-        # Prevent timing attacks by returning generic error
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    # AUTH-003 (audit M-2): block account enumeration. Previously the
+    # not-found path returned immediately (no password hash computed) and
+    # disabled / unknown accounts returned distinct messages + status codes —
+    # both a response-content oracle AND a timing oracle for "is this a real
+    # account?". We now:
+    #   • run a dummy Argon2id verify on the not-found / inactive path so the
+    #     wall-clock cost matches the real verify branch (same trick used by
+    #     /change-password), and
+    #   • collapse not-found, inactive, and wrong-password into one generic
+    #     401 "Invalid credentials".
+    # Lockout still returns 403 (the caller is, by definition, a known account
+    # that has already authenticated enough to trip the counter, so there is no
+    # new enumeration signal — and the UX benefit of a clear message matters).
+    generic_failure = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+    )
 
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
+    if not user or not user.is_active:
+        # Equalize timing with the success path — Argon2id verify dominates the
+        # handler's wall-clock cost.
+        verify_password(payload.password, _DUMMY_PW_HASH)
+        raise generic_failure
 
     # Lockout check
     if user.locked_until and user.locked_until > datetime.utcnow():

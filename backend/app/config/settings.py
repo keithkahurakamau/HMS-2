@@ -241,6 +241,15 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"production CORS_ORIGINS must not include wildcard or localhost: {unsafe}"
                 )
+            # AUTH-001 / audit L-1: the pepper is HMACed into every password
+            # before Argon2id hashing and is documented as "required in
+            # production", but nothing enforced it — a prod deploy that forgot
+            # PASSWORD_PEPPER silently dropped to un-peppered hashing. Fail boot
+            # with the same fail-fast posture as SECRET_KEY/ENCRYPTION_KEY.
+            if not self.PASSWORD_PEPPER.get_secret_value():
+                raise ValueError(
+                    "PASSWORD_PEPPER must be set in production (HMAC pepper for password hashing)."
+                )
             # L-2: warn (don't hard-fail) if SEED_SUPERADMIN_PASSWORD is still
             # the shipped example/placeholder. This var only seeds the *first*
             # superadmin via seed_superadmin.py; an already-bootstrapped
