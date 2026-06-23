@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 
 /**
- * ContactForm — public landing-page lead capture.
+ * ContactForm - public landing-page lead capture.
  *
  * Posts to /api/public/contact, which emails the support inbox with Reply-To
  * set to the visitor so the team replies straight to the prospect. Includes a
@@ -27,7 +27,7 @@ export default function ContactForm() {
         try {
             await apiClient.post('/public/contact', form);
             setSent(true);
-            toast.success("Thanks — we'll be in touch shortly.");
+            toast.success("Thanks, we'll be in touch shortly.");
         } catch (err) {
             const detail = err.response?.data?.detail;
             toast.error(Array.isArray(detail) ? (detail[0]?.msg || 'Could not send.') : (detail || 'Could not send your message. Please try again.'));
@@ -44,7 +44,7 @@ export default function ContactForm() {
                 </div>
                 <h3 className="mt-4 text-lg font-semibold text-ink-900">Message sent</h3>
                 <p className="mt-1.5 text-sm text-ink-600">
-                    Thanks for reaching out — the MediFleet team will reply to <strong className="text-ink-800">{form.email}</strong> within one business day.
+                    Thanks for reaching out. The MediFleet team will reply to <strong className="text-ink-800">{form.email}</strong> within one business day.
                 </p>
             </div>
         );
@@ -52,7 +52,7 @@ export default function ContactForm() {
 
     return (
         <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 sm:p-7 space-y-4">
-            {/* Honeypot — visually hidden; real users never fill it. */}
+            {/* Honeypot - visually hidden; real users never fill it. */}
             <input
                 type="text" tabIndex={-1} autoComplete="off" aria-hidden="true"
                 value={form.website} onChange={set('website')}

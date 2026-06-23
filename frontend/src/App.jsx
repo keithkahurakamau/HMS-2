@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme, applyDocumentTheme } from './context/ThemeContext';
@@ -32,7 +32,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const Radiology = lazy(() => import('./pages/Radiology'));
 const MedicalHistory = lazy(() => import('./pages/MedicalHistory'));
 const Billing = lazy(() => import('./pages/Billing'));
-const Portal = lazy(() => import('./pages/Portal'));
+const Demo = lazy(() => import('./pages/Demo'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Appointments = lazy(() => import('./pages/Appointments'));
@@ -102,12 +102,23 @@ const SuperAdminProtectedRoute = ({ children }) => {
 // the authenticated app, the patient portal, the platform back-office, or an
 // auth flow — none of which belong in a search index — so RouteMeta stamps
 // them noindex. New private routes are covered automatically.
-const PUBLIC_PATHS = new Set(['/', '/portal']);
+const PUBLIC_PATHS = new Set(['/', '/demo']);
 
 const RouteMeta = () => {
   const { pathname } = useLocation();
   if (PUBLIC_PATHS.has(pathname)) return null;
   return <Seo noindex title="Secure workspace" />;
+};
+
+// The hospital picker now lives on the Landing page. The old /portal route
+// stays as a thin redirect so every existing link and tenant-guard bounce
+// (api/client, AuthContext) keeps working — it forwards to the Landing
+// picker section, preserving staff vs patient intent via ?mode=.
+const PortalRedirect = () => {
+  const [sp] = useSearchParams();
+  const next = sp.get('next') || '';
+  const mode = next.includes('/patient') ? 'patient' : 'staff';
+  return <Navigate to={`/?mode=${mode}#find-hospital`} replace />;
 };
 
 // Route-aware dark-mode applier. Dark mode is scoped to two authenticated
@@ -164,7 +175,8 @@ export default function App() {
           <Suspense fallback={<PageFallback />}>
           <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/portal" element={<Portal />} />
+          <Route path="/portal" element={<PortalRedirect />} />
+          <Route path="/demo" element={<Demo />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />

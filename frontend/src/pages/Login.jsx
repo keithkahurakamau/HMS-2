@@ -26,7 +26,7 @@ export default function Login() {
     const hasTenantBg = !!safeBg;
 
     // If the operator reached /login by typing the URL directly, we have no
-    // tenant context — the API client wouldn't attach X-Tenant-ID and the
+    // tenant context, so the API client wouldn't attach X-Tenant-ID and the
     // login backend would 400. Bounce them to the Portal so they pick a
     // hospital first.
     useEffect(() => {
@@ -65,7 +65,7 @@ export default function Login() {
         <div className="min-h-screen w-full grid lg:grid-cols-5 bg-ink-50">
             {/* ============== Brand panel (left, lg+) ============== */}
             <aside className="hidden lg:flex lg:col-span-2 relative overflow-hidden bg-brand-gradient text-white">
-                {/* Tenant background image, when uploaded — overlaid under the gradient. */}
+                {/* Tenant background image, when uploaded, overlaid under the gradient. */}
                 {hasTenantBg && (
                     <div
                         className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-overlay pointer-events-none"
@@ -100,7 +100,7 @@ export default function Login() {
                             <span className="block text-white/70 font-light mt-2">One platform for every shift.</span>
                         </h1>
                         <p className="mt-6 text-white/75 text-base leading-relaxed">
-                            Sign in to access patient records, clinical workflows, billing, and pharmacy &mdash; all in one secure environment.
+                            Sign in to access patient records, clinical workflows, billing, and pharmacy, all in one secure environment.
                         </p>
                     </div>
 
@@ -200,7 +200,7 @@ export default function Login() {
 
                         <div className="flex items-center justify-center gap-2 pt-2 text-xs text-ink-500">
                             <ShieldAlert size={14} className="text-brand-500" />
-                            Secured via HttpOnly JWT &mdash; encrypted in transit and at rest
+                            Secured via HttpOnly JWT, encrypted in transit and at rest
                         </div>
                     </form>
                 </div>
