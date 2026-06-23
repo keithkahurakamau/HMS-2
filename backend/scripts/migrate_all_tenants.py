@@ -528,6 +528,11 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
     # its own Pay Hero account and signs callbacks with its own secret).
     ("payhero_configs",
         "ALTER TABLE payhero_configs ADD COLUMN IF NOT EXISTS payhero_webhook_secret_encrypted VARCHAR(255);"),
+    # f1a2c7d9e3b6 — patient-portal brute-force lockout (audit M-3)
+    ("patients",
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS portal_failed_attempts INTEGER NOT NULL DEFAULT 0;"),
+    ("patients",
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS portal_locked_until TIMESTAMPTZ;"),
 ]
 
 
