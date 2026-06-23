@@ -5,6 +5,7 @@ import secrets
 import string
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status, Query, Response
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, sessionmaker
 from jose import jwt
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -13,6 +14,7 @@ import re
 
 from app.config.database import get_master_db, get_tenant_engine, invalidate_tenant_registry
 from app.utils.audit import log_audit
+from app.utils.blind_index import phone_bidx
 from app.config.settings import settings
 from app.core.dependencies import require_superadmin, optional_superadmin
 from app.core.limiter import limiter
@@ -410,12 +412,17 @@ def list_patients_across_tenants(
             try:
                 q = session.query(Patient).filter(Patient.is_active == True)
                 if needle:
-                    q = q.filter(
-                        (Patient.surname.ilike(f"%{needle}%"))
-                        | (Patient.other_names.ilike(f"%{needle}%"))
-                        | (Patient.outpatient_no.ilike(f"%{needle}%"))
-                        | (Patient.telephone_1.ilike(f"%{needle}%"))
-                    )
+                    # M-1 phase 2: telephone_1 is encrypted — match it by blind
+                    # index (exact). Name + OP number stay substring.
+                    conds = [
+                        Patient.surname.ilike(f"%{needle}%"),
+                        Patient.other_names.ilike(f"%{needle}%"),
+                        Patient.outpatient_no.ilike(f"%{needle}%"),
+                    ]
+                    ph = phone_bidx(needle)
+                    if ph:
+                        conds.append(Patient.telephone_1_bidx == ph)
+                    q = q.filter(or_(*conds))
                 rows = q.order_by(Patient.registered_on.desc()).limit(limit_per_tenant).all()
                 for p in rows:
                     aggregated.append({

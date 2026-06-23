@@ -15,6 +15,7 @@ from app.core.limiter import limiter
 from app.core import cache
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.utils.audit import log_audit
+from app.utils.blind_index import phone_bidx, id_bidx
 from app.models.billing import Invoice, InvoiceItem
 
 # Cache prefixes for entries this router writes to. Mutations clear the
@@ -84,15 +85,21 @@ def get_patients(request: Request, search: str = Query("", description="Search b
     
     if search:
         search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Patient.outpatient_no.ilike(search_term),
-                Patient.surname.ilike(search_term),
-                Patient.other_names.ilike(search_term),
-                Patient.id_number.ilike(search_term),
-                Patient.telephone_1.ilike(search_term)
-            )
-        )
+        # M-1 phase 2: id_number / telephone_1 are encrypted, so they can't be
+        # ILIKE-searched. Name + OP number stay substring; phone + ID become
+        # exact-match via their blind indexes (caller must type the full value).
+        conditions = [
+            Patient.outpatient_no.ilike(search_term),
+            Patient.surname.ilike(search_term),
+            Patient.other_names.ilike(search_term),
+        ]
+        ph = phone_bidx(search)
+        if ph:
+            conditions.append(Patient.telephone_1_bidx == ph)
+        idx = id_bidx(search)
+        if idx:
+            conditions.append(Patient.id_number_bidx == idx)
+        query = query.filter(or_(*conditions))
     return query.order_by(desc(Patient.registered_on)).offset(skip).limit(limit).all()
 
 # ==========================================
@@ -125,12 +132,20 @@ def register_patient(patient_in: PatientCreate, request: Request, db: Session = 
             raise HTTPException(status_code=400, detail=f"'{required}' is required.")
 
     try:
-        existing_patient = db.query(Patient).filter(
-            or_(
-                Patient.telephone_1 == patient_data.get("telephone_1"),
-                (Patient.id_number == patient_data.get("id_number")) & (Patient.id_number.isnot(None))
-            )
-        ).first()
+        # M-1 phase 2: duplicate detection now matches on the blind indexes of
+        # the encrypted identifiers (exact match). Build conditions only for
+        # values that are present so a NULL bidx can't match other NULL rows.
+        dup_conditions = []
+        ph = phone_bidx(patient_data.get("telephone_1"))
+        if ph:
+            dup_conditions.append(Patient.telephone_1_bidx == ph)
+        idn = id_bidx(patient_data.get("id_number"))
+        if idn:
+            dup_conditions.append(Patient.id_number_bidx == idn)
+        existing_patient = (
+            db.query(Patient).filter(or_(*dup_conditions)).first()
+            if dup_conditions else None
+        )
 
         if existing_patient:
             raise HTTPException(status_code=400, detail="A patient with this Phone Number or ID already exists.")
