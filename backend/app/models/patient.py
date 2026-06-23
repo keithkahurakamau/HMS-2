@@ -55,6 +55,16 @@ class Patient(Base):
     insurance_provider = Column(String(255), nullable=True)
     insurance_policy_number = Column(String(100), nullable=True)
 
+    # 8. Patient-portal brute-force lockout (audit M-3). The self-service portal
+    # verifies low-entropy knowledge factors (OP no. + DOB + last-4 phone). The
+    # per-IP rate limit alone doesn't stop a rotating-IP attacker who knows a
+    # target's OP no. from brute-forcing the 10^4 phone-suffix space, so we also
+    # track failed attempts per patient and temporarily lock the record —
+    # mirroring the staff-login lockout. Durable (DB, not Redis) so the control
+    # never silently disappears when Redis is absent.
+    portal_failed_attempts = Column(Integer, nullable=False, server_default="0", default=0)
+    portal_locked_until = Column(DateTime(timezone=True), nullable=True)
+
     __table_args__ = (
         Index('idx_patient_name', 'surname', 'other_names'),
     )
