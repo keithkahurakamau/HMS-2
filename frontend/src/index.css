@@ -592,3 +592,213 @@ html.dark .bg-grid {
   }
   .print-page-break { page-break-after: always; }
 }
+
+/* =====================================================================
+   PREMIUM LANDING SYSTEM  (lp-*)
+   ---------------------------------------------------------------------
+   A self-contained visual language for the public marketing surfaces
+   (Landing / Demo / Patient sign-in). Built around three brand inks so
+   the pages stay uniform no matter which one a visitor lands on:
+     - Bright cyan   #00FFFF  accents, glows, dynamic edges
+     - Dark teal     #008080  deep backgrounds, active states, headings
+     - Ice cyan      #B2F0F0  soft panels, highlights, hover washes
+   Everything here is opt-in via the lp- prefix, so the authenticated
+   app and superadmin console are untouched.
+   ===================================================================== */
+:root {
+  --lp-cyan: #00ffff;
+  --lp-cyan-600: #00d4d4;
+  --lp-teal: #008080;
+  --lp-teal-deep: #023535;
+  --lp-teal-900: #012626;
+  --lp-ice: #b2f0f0;
+  --lp-ice-soft: #e6fbfb;
+}
+
+@layer components {
+  /* Frosted-glass panel — the core surface for the premium pages. */
+  .lp-glass {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow: 0 1px 2px rgba(2, 53, 53, 0.04), 0 18px 48px -20px rgba(2, 53, 53, 0.28);
+  }
+  /* Dark frosted glass — for use over the dark-teal hero. */
+  .lp-glass-dark {
+    background: rgba(2, 38, 38, 0.45);
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    border: 1px solid rgba(178, 240, 240, 0.18);
+    box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(178, 240, 240, 0.12);
+  }
+
+  /* Glowing primary CTA — cyan fill that depresses to dark teal on active. */
+  .lp-btn-glow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    color: var(--lp-teal-900);
+    background: linear-gradient(135deg, #6ff7f7 0%, var(--lp-cyan) 55%, #28e6e6 100%);
+    border-radius: 0.9rem;
+    padding: 0.75rem 1.4rem;
+    box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.35), 0 10px 30px -8px rgba(0, 255, 255, 0.55);
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background 0.2s ease-in-out, color 0.2s ease-in-out;
+  }
+  .lp-btn-glow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.5), 0 16px 42px -8px rgba(0, 255, 255, 0.7);
+  }
+  .lp-btn-glow:active {
+    transform: translateY(0);
+    background: linear-gradient(135deg, var(--lp-teal) 0%, var(--lp-teal-deep) 100%);
+    color: #eafffd;
+    box-shadow: 0 0 0 1px rgba(0, 128, 128, 0.6), 0 6px 18px -6px rgba(0, 128, 128, 0.6);
+  }
+
+  /* Ghost CTA — outline that fills with ice on hover, dark teal on active. */
+  .lp-btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--lp-teal);
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 128, 128, 0.25);
+    border-radius: 0.9rem;
+    padding: 0.75rem 1.4rem;
+    transition: all 0.2s ease-in-out;
+  }
+  .lp-btn-ghost:hover {
+    background: var(--lp-ice);
+    border-color: rgba(0, 128, 128, 0.45);
+    transform: translateY(-2px);
+  }
+  .lp-btn-ghost:active {
+    background: var(--lp-teal);
+    color: #eafffd;
+    transform: translateY(0);
+  }
+
+  /* On-dark ghost CTA variant for the hero. */
+  .lp-btn-ghost-dark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--lp-ice);
+    background: rgba(178, 240, 240, 0.06);
+    border: 1px solid rgba(178, 240, 240, 0.3);
+    border-radius: 0.9rem;
+    padding: 0.75rem 1.4rem;
+    transition: all 0.2s ease-in-out;
+  }
+  .lp-btn-ghost-dark:hover {
+    background: rgba(178, 240, 240, 0.16);
+    border-color: rgba(0, 255, 255, 0.6);
+    transform: translateY(-2px);
+  }
+  .lp-btn-ghost-dark:active {
+    background: var(--lp-teal);
+    transform: translateY(0);
+  }
+
+  /* Interactive lift card — feature grid + dashboard widgets. */
+  .lp-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px) saturate(130%);
+    -webkit-backdrop-filter: blur(16px) saturate(130%);
+    border: 1px solid rgba(178, 240, 240, 0.7);
+    border-radius: 1.25rem;
+    box-shadow: 0 1px 2px rgba(2, 53, 53, 0.04), 0 12px 32px -16px rgba(2, 53, 53, 0.18);
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
+  }
+  .lp-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(0, 255, 255, 0.7);
+    box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.25), 0 28px 60px -22px rgba(0, 128, 128, 0.4);
+  }
+
+  /* Cyan-on-teal eyebrow chip. */
+  .lp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    color: var(--lp-teal);
+    background: var(--lp-ice-soft);
+    border: 1px solid rgba(0, 128, 128, 0.18);
+  }
+  .lp-chip-dark {
+    color: var(--lp-cyan);
+    background: rgba(0, 255, 255, 0.08);
+    border: 1px solid rgba(0, 255, 255, 0.25);
+  }
+
+  /* Animated cyan gradient text. */
+  .lp-text-gradient {
+    background-image: linear-gradient(110deg, #28e6e6 0%, var(--lp-cyan) 45%, #7dfdfd 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Premium landing helpers (utilities layer for arbitrary use). */
+@layer utilities {
+  .lp-bg-hero {
+    background:
+      radial-gradient(ellipse at 75% 10%, rgba(0, 255, 255, 0.18), transparent 55%),
+      radial-gradient(ellipse at 10% 90%, rgba(0, 128, 128, 0.45), transparent 55%),
+      linear-gradient(165deg, #012626 0%, #023535 45%, #014444 100%);
+  }
+  .lp-bg-ice {
+    background:
+      radial-gradient(at 15% 12%, rgba(178, 240, 240, 0.5) 0px, transparent 50%),
+      radial-gradient(at 88% 85%, rgba(0, 255, 255, 0.1) 0px, transparent 45%),
+      linear-gradient(180deg, #ffffff 0%, #f2fdfd 100%);
+  }
+  .lp-glow-ring { box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.35), 0 0 40px -6px rgba(0, 255, 255, 0.5); }
+  .lp-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(0, 128, 128, 0.25), transparent); }
+}
+
+/* Reduced-motion: drop the lift/translate on premium cards & buttons. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-card:hover, .lp-btn-glow:hover, .lp-btn-ghost:hover, .lp-btn-ghost-dark:hover { transform: none; }
+}
+
+/* ---------------------------------------------------------------------
+   Premium polish: animated gradient text + film grain (Awwwards-grade
+   touches that top product sites use for depth without clutter).
+   --------------------------------------------------------------------- */
+@layer components {
+  .lp-text-gradient {
+    background-size: 200% auto;
+    animation: lp-shimmer 6s linear infinite;
+  }
+}
+@keyframes lp-shimmer {
+  to { background-position: 200% center; }
+}
+
+@layer utilities {
+  /* Fine film grain — sits over dark hero sections at very low opacity. */
+  .lp-grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.06;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-text-gradient { animation: none; }
+}

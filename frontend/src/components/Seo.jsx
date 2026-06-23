@@ -63,8 +63,8 @@ export default function Seo({
 }) {
   useEffect(() => {
     const fullTitle = title
-      ? `${title} — ${SITE_NAME}`
-      : `${SITE_NAME} — Multi-Hospital Management Platform`;
+      ? `${title} · ${SITE_NAME}`
+      : `${SITE_NAME} · Multi-Hospital Management Platform`;
     const canonical = path ? `${ORIGIN}${path}` : null;
     const robots = noindex
       ? 'noindex, nofollow'
