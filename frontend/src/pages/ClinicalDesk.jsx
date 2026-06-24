@@ -36,7 +36,7 @@ export default function ClinicalDesk() {
     const [isClosingClinic, setIsClosingClinic] = useState(false);
 
     // --- FORM STATE ---
-    const [vitals, setVitals] = useState({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
+    const [vitals, setVitals] = useState({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '', glucose: '' });
     const [clinicalNotes, setClinicalNotes] = useState({ hpi: '', diagnosis: '', internal_notes: '' });
     // Chief complaint is now a list — a patient can present with several.
     const [complaints, setComplaints] = useState([]);
@@ -194,7 +194,7 @@ export default function ClinicalDesk() {
         setGlobalActivePatient(patientItem);
         setIsQueueOpen(false);
         // Reset all forms for the new patient
-        setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '' });
+        setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '', glucose: '' });
         setClinicalNotes({ hpi: '', diagnosis: '', internal_notes: '' });
         setComplaints([]);
         setComplaintInput('');
@@ -232,6 +232,7 @@ export default function ClinicalDesk() {
                 rr: t.respiratory_rate ?? '',
                 temp: t.temperature ?? '',
                 spo2: t.spo2 ?? '',
+                glucose: t.blood_glucose ?? '',
             });
             if (t.chief_complaint) {
                 setComplaints(splitComplaints(t.chief_complaint));
@@ -338,6 +339,7 @@ export default function ClinicalDesk() {
             spo2: vitals.spo2 ? parseInt(vitals.spo2) : null,
             weight_kg: vitals.weight ? parseFloat(vitals.weight) : null,
             height_cm: vitals.height ? parseFloat(vitals.height) : null,
+            blood_glucose: vitals.glucose ? parseFloat(vitals.glucose) : null,
 
             // Clinical Notes — multiple complaints persist as a single
             // "; "-joined string (no schema change); splitComplaints() reverses it.
@@ -581,6 +583,7 @@ export default function ClinicalDesk() {
                                     <div><label htmlFor="clinic-resp-bpm" className="label">Resp (bpm)</label><input id="clinic-resp-bpm" type="number" value={vitals.rr} onChange={(e) => setVitals({...vitals, rr: e.target.value})} placeholder="16" className="input" /></div>
                                     <div><label htmlFor="clinic-temp-c" className="label">Temp (°C)</label><input id="clinic-temp-c" type="number" step="0.1" value={vitals.temp} onChange={(e) => setVitals({...vitals, temp: e.target.value})} placeholder="37.2" className="input" /></div>
                                     <div><label htmlFor="clinic-spo" className="label">SpO₂ (%)</label><input id="clinic-spo" type="number" value={vitals.spo2} onChange={(e) => setVitals({...vitals, spo2: e.target.value})} placeholder="98" className="input" /></div>
+                                    <div><label htmlFor="clinical-rbs" className="label">RBS (mmol/L)</label><input id="clinical-rbs" type="number" step="0.1" value={vitals.glucose} onChange={(e) => setVitals({...vitals, glucose: e.target.value})} placeholder="5.5" className="input" /></div>
                                     <div><label htmlFor="clinic-weight-kg" className="label">Weight (kg)</label><input id="clinic-weight-kg" type="number" value={vitals.weight} onChange={(e) => setVitals({...vitals, weight: e.target.value})} placeholder="70" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
                                     <div><label htmlFor="clinic-height-cm" className="label">Height (cm)</label><input id="clinic-height-cm" type="number" value={vitals.height} onChange={(e) => setVitals({...vitals, height: e.target.value})} placeholder="175" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
                                     <div><span className="label text-brand-700 dark:text-brand-300 block">BMI</span><div className="input bg-brand-50 dark:bg-brand-500/10 ring-1 ring-brand-200 dark:ring-brand-500/20 text-brand-800 dark:text-brand-300 font-semibold text-center">{calculateBMI()}</div></div>
