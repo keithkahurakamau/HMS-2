@@ -54,6 +54,56 @@ def _find_pending_invoice(client, patient_id):
     return mine[0]["invoice_id"]
 
 
+def _open_tenant_session():
+    """Open a direct Session against mayoclinic_db (consent-seed helper pattern)."""
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.config.settings import settings
+
+    base = settings.DATABASE_URL.rsplit("/", 1)[0]
+    engine = create_engine(f"{base}/mayoclinic_db")
+    Session = sessionmaker(bind=engine)
+    return engine, Session()
+
+
+def _posted_gl_entry_ids(invoice_id):
+    """entry_ids of POSTED GL entries for an invoice's items (direct DB read)."""
+    import app.models.patient  # noqa: F401 – Invoice.patient relationship target
+    from app.models.billing import InvoiceItem
+    from app.models.accounting import JournalEntry
+
+    engine, db = _open_tenant_session()
+    try:
+        item_ids = [r[0] for r in db.query(InvoiceItem.id)
+                    .filter(InvoiceItem.invoice_id == invoice_id).all()]
+        if not item_ids:
+            return []
+        return [r[0] for r in db.query(JournalEntry.entry_id).filter(
+            JournalEntry.source_type == "billing.invoice.created",
+            JournalEntry.source_id.in_(item_ids),
+            JournalEntry.status == "posted",
+        ).all()]
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def _gl_entry_statuses(entry_ids):
+    """{entry_id: status} for the given GL entry_ids (direct DB read)."""
+    from app.models.accounting import JournalEntry
+
+    engine, db = _open_tenant_session()
+    try:
+        rows = db.query(JournalEntry.entry_id, JournalEntry.status).filter(
+            JournalEntry.entry_id.in_(entry_ids)).all()
+        return {eid: status for eid, status in rows}
+    finally:
+        db.close()
+        engine.dispose()
+
+
 def test_void_requires_auth(client):
     # No auth cookie -> must reject with 401 (CSRF header still present).
     client.cookies.pop("access_token", None)
@@ -81,9 +131,22 @@ def test_void_pending_invoice_drops_from_queue(client, doctor_cookies, admin_coo
         client.cookies.update(admin_cookies)
         inv_id = _find_pending_invoice(client, pid)
 
+        # Capture the POSTED GL entries BEFORE the void. If the tenant has no
+        # ledger mapping configured nothing posts — skip rather than pass
+        # silently, so the reversal assertion is only meaningful when real.
+        pre_posted = _posted_gl_entry_ids(inv_id)
+        if not pre_posted:
+            pytest.skip("no GL posting to reverse on this tenant")
+
         r = client.post(f"/api/billing/invoices/{inv_id}/void",
                         json={"reason": "Duplicate charge"})
         assert r.status_code == 200, r.text
+
+        # The void MUST have reversed every previously-posted GL entry.
+        post_statuses = _gl_entry_statuses(pre_posted)
+        assert len(post_statuses) == len(pre_posted), post_statuses
+        assert all(post_statuses.get(eid) == "reversed" for eid in pre_posted), \
+            f"expected all {pre_posted} reversed, got {post_statuses}"
 
         q = client.get("/api/billing/queue").json()
         assert all(i["invoice_id"] != inv_id for i in q)
