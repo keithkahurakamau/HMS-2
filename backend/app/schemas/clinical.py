@@ -37,6 +37,7 @@ class MedicalRecordResponse(BaseModel):
     doctor_id: int
     record_status: str
     blood_pressure: Optional[str]
+    blood_glucose: Optional[float] = None
     chief_complaint: Optional[str]
     icd10_code: Optional[str]
     created_at: datetime
