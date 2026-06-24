@@ -10,6 +10,8 @@ import { useActivePatient } from '../context/PatientContext';
 
 // Acuity scale shown to the nurse. 1 = most urgent. Mirrors the 1–5 range the
 // backend clamps to and the doctor's queue sorts by.
+const DISPOSITIONS = ['Consultation', 'Laboratory', 'Pharmacy', 'Radiology', 'Billing', 'Wards', 'Reception'];
+
 const ACUITY_LEVELS = [
     { level: 1, label: 'Emergency',  hint: 'Immediate / resuscitation', tone: 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20' },
     { level: 2, label: 'Urgent',     hint: 'Very ill, cannot wait',     tone: 'bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/20' },
@@ -35,6 +37,7 @@ export default function Triage() {
     const [complaintInput, setComplaintInput] = useState('');
     const [triageNotes, setTriageNotes] = useState('');
     const [acuity, setAcuity] = useState(3);
+    const [disposition, setDisposition] = useState('Consultation');
 
     const { setActivePatient: setGlobalActivePatient } = useActivePatient();
 
@@ -70,6 +73,7 @@ export default function Triage() {
         setComplaintInput('');
         setTriageNotes('');
         setAcuity(item.acuity_level || 3);
+        setDisposition('Consultation');
     };
 
     const addComplaint = () => {
@@ -121,7 +125,7 @@ export default function Triage() {
             chief_complaint: allComplaints.length ? allComplaints.join('; ') : null,
             acuity_level: acuity,
             triage_notes: triageNotes || null,
-            disposition: 'Consultation',
+            disposition,
         };
 
         try {
@@ -289,10 +293,19 @@ export default function Triage() {
                         </div>
 
                         {/* Footer actions */}
-                        <div className="shrink-0 p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex items-center justify-between gap-3">
-                            <p className="text-xs text-ink-500 dark:text-ink-400 flex items-center gap-1.5">
-                                <Stethoscope size={13} /> On save, the patient is routed to the doctor's Consultation queue.
-                            </p>
+                        <div className="shrink-0 p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <p className="text-xs text-ink-500 dark:text-ink-400 flex items-center gap-1.5">
+                                    <Stethoscope size={13} /> On save, the patient is routed to {disposition}.
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor="triage-disposition" className="label mb-0">Route to</label>
+                                    <select id="triage-disposition" value={disposition}
+                                        onChange={(e) => setDisposition(e.target.value)} className="input w-auto">
+                                        {DISPOSITIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                </div>
+                            </div>
                             <button type="button" data-tour="triage-save" onClick={handleSubmit} disabled={isSubmitting} className="btn-primary">
                                 {isSubmitting ? <Activity size={15} className="animate-spin" /> : <Save size={15} />}
                                 Save &amp; send to doctor <ArrowRight size={15} />

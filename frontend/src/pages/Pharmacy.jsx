@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
+import DepartmentQueue from '../components/DepartmentQueue';
 import MpesaStkProgress from '../components/MpesaStkProgress';
 import usePaymentSocket from '../hooks/usePaymentSocket';
 
@@ -264,6 +265,9 @@ export default function Pharmacy() {
                 title="Pharmacy"
                 subtitle="Fulfil prescriptions, dispense over-the-counter sales, and track stock movements."
             />
+            {/* ── Routed patients panel ───────────────────────────────────── */}
+            <DepartmentQueue department="Pharmacy" title="Patients sent to Pharmacy" />
+
             {/* GLOBAL PHARMACY HEADER & TABS */}
             <div data-tour="pharmacy-tabs" className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Pharmacy mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
