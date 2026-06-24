@@ -101,6 +101,20 @@ export default function Radiology() {
         }
     };
 
+    const cancelRequest = async (requestId) => {
+        const reason = window.prompt('Reason for cancelling this imaging request:') ?? null;
+        if (reason === null) return;
+        try {
+            await apiClient.post(`/radiology/${requestId}/cancel`, { reason });
+            toast.success('Request cancelled.');
+            setActiveRequest(null);
+            setIsQueueOpen(true);
+            fetchData();
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not cancel the request.');
+        }
+    };
+
     /* ── Catalog editor ─────────────────────────────────────────────────── */
 
     const startCreate = () => { setEditing(null); setForm(EMPTY_CATALOG); setEditorOpen(true); };
@@ -272,7 +286,10 @@ export default function Radiology() {
                                             )}
 
                                             <div className="flex flex-wrap justify-center gap-3">
-                                                <button type="button" onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Cancel</button>
+                                                <button type="button" onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Close</button>
+                                                <button type="button" onClick={() => cancelRequest(activeRequest.request_id)} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+                                                    Cancel request
+                                                </button>
                                                 <button type="button" data-tour="radio-acknowledge" onClick={handleAcknowledge} className="btn-primary">
                                                     <CheckCircle2 size={16} /> Acknowledge & begin exam
                                                 </button>
@@ -324,6 +341,9 @@ export default function Radiology() {
                                 {activeRequest.status === 'In Progress' && (
                                     <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0 z-10">
                                         <button type="button" onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Close</button>
+                                        <button type="button" onClick={() => cancelRequest(activeRequest.request_id)} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+                                            Cancel request
+                                        </button>
                                         <button type="button" data-tour="radio-publish" onClick={handleRelease} className="btn-success">
                                             <Send size={16} /> Sign & publish report
                                         </button>
