@@ -79,8 +79,9 @@ def _seed_consent(patient_id: int, recorded_by: int) -> None:
         engine.dispose()
 
 
-def _new_patient(client, cookies):
-    r = client.post("/api/patients/", cookies=cookies, json={
+def _new_patient(client):
+    """Create a patient. Caller must have doctor cookies set on the client."""
+    r = client.post("/api/patients/", json={
         "surname": f"ZZ_RXCAN_{uuid.uuid4().hex[:6].upper()}",
         "other_names": "Rx Cancel", "sex": "Male",
         "date_of_birth": "1990-01-01", "telephone_1": _phone()})
@@ -88,10 +89,12 @@ def _new_patient(client, cookies):
     return r.json()
 
 
-def _forward_to_pharmacy(client, doctor_cookies, patient_id) -> int:
-    """Create a clinical record routed to Pharmacy; return record_id."""
+def _forward_to_pharmacy(client, patient_id) -> int:
+    """Create a clinical record routed to Pharmacy; return record_id.
+
+    Caller must have doctor cookies set on the client."""
     _seed_consent(patient_id, recorded_by=_doctor_user_id())
-    r = client.post("/api/clinical/submit", cookies=doctor_cookies, json={
+    r = client.post("/api/clinical/submit", json={
         "patient_id": patient_id,
         "record_status": "Pharmacy",
         "chief_complaint": "rx cancel test",
@@ -99,33 +102,43 @@ def _forward_to_pharmacy(client, doctor_cookies, patient_id) -> int:
     })
     assert r.status_code == 200, r.text
     # Find the record via the pending list
-    pend = client.get("/api/clinical/prescriptions/pending", cookies=doctor_cookies).json()
+    pend = client.get("/api/clinical/prescriptions/pending").json()
     mine = [p for p in pend if p.get("patient_id") == patient_id]
     assert mine, f"expected a pending script for patient {patient_id}: {pend[:2]}"
     return mine[0]["record_id"]
 
 
 def test_cancel_requires_auth(client):
+    # No auth cookie -> must reject with 401 (CSRF header still present).
+    client.cookies.pop("access_token", None)
     r = client.post("/api/clinical/prescriptions/1/cancel", json={"reason": "x"})
     assert r.status_code == 401
 
 
 def test_cancel_unknown_returns_404(client, pharmacist_cookies):
+    client.cookies.update(pharmacist_cookies)
     r = client.post("/api/clinical/prescriptions/999999999/cancel",
-                    cookies=pharmacist_cookies, json={"reason": "x"})
+                    json={"reason": "x"})
     assert r.status_code == 404
 
 
 def test_cancel_drops_from_pending(client, doctor_cookies, pharmacist_cookies):
-    patient = _new_patient(client, doctor_cookies)
+    # Doctor block: create patient + forward the script to pharmacy.
+    client.cookies.update(doctor_cookies)
+    patient = _new_patient(client)
     pid = patient["patient_id"]
     try:
-        rid = _forward_to_pharmacy(client, doctor_cookies, pid)
+        rid = _forward_to_pharmacy(client, pid)
+
+        # Pharmacist block: cancel + verify it dropped from pending.
+        client.cookies.update(pharmacist_cookies)
         r = client.post(f"/api/clinical/prescriptions/{rid}/cancel",
-                        cookies=pharmacist_cookies, json={"reason": "Duplicate script"})
+                        json={"reason": "Duplicate script"})
         assert r.status_code == 200, r.text
 
-        pend = client.get("/api/clinical/prescriptions/pending", cookies=pharmacist_cookies).json()
+        pend = client.get("/api/clinical/prescriptions/pending").json()
         assert all(p["record_id"] != rid for p in pend)
     finally:
-        client.delete(f"/api/patients/{pid}", cookies=doctor_cookies)
+        # Doctor owns the patient -> switch back before cleanup.
+        client.cookies.update(doctor_cookies)
+        client.delete(f"/api/patients/{pid}")
