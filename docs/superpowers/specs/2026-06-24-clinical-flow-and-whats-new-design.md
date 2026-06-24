@@ -98,13 +98,27 @@ surface with the diff of releases → dismiss writes last-seen.
   routed through `PATCH /api/queue/{id}/checkout`.
 
 ### B2 — Triage disposition picker (route to any module)
+
+**Architectural finding (confirmed during planning):** the generic `PatientQueue`
+is only *consumed* by Triage and Consultation. Other modules run their own
+order-based queues (`/laboratory/queue` = lab orders, `/billing/queue` = invoices,
+Pharmacy = prescriptions, `/radiology/queue`). Reception has no waiting-patient
+queue at all. So routing a triage patient to e.g. Pharmacy creates a `PatientQueue`
+row that nobody sees. To make "route to all modules" real, each destination needs a
+panel that reads the generic queue. **User chose: all modules.**
+
 - Replace the hardcoded `disposition: 'Consultation'` in `Triage.jsx` with a
-  **department selector** (canonical departments: Reception, Consultation,
-  Laboratory, Pharmacy, Radiology, Wards, …).
-- Default stays `Consultation` (preserves today's behaviour); the footer copy
-  ("routed to the doctor's Consultation queue") becomes dynamic.
-- Backend already routes via `_canonical_department`; no backend change beyond
-  confirming all target departments are accepted.
+  **department selector** (canonical departments). Default stays `Consultation`
+  (preserves today's behaviour); footer copy becomes dynamic.
+- Add **`Reception`** to `CANONICAL_DEPARTMENTS` and `_DEPARTMENT_ALIASES`
+  (`backend/app/routes/patients.py`) so it's an accepted disposition.
+- Build **one reusable `DepartmentQueue` panel** (`frontend/src/components/
+  DepartmentQueue.jsx`) that reads `GET /api/queue/?department=<X>`, shows the
+  patients routed there, and offers per-row remove (checkout) + cancel.
+- Drop the panel into the **Reception (Patients), Laboratory, Pharmacy, Radiology,
+  and Wards** pages. Consultation keeps its existing `/clinical/queue` worklist.
+- Backend already routes via `_canonical_department`; the only backend change is
+  adding `Reception` to the catalogue.
 
 ### B3 — Cancel-when-not-seen
 - Introduce a new queue status string **`"Cancelled"`** (no migration — `status`
