@@ -10,7 +10,7 @@ import { useActivePatient } from '../context/PatientContext';
 
 // Acuity scale shown to the nurse. 1 = most urgent. Mirrors the 1–5 range the
 // backend clamps to and the doctor's queue sorts by.
-const DISPOSITIONS = ['Consultation', 'Laboratory', 'Pharmacy', 'Radiology', 'Billing', 'Wards', 'Reception'];
+const DISPOSITIONS = ['Consultation', 'Laboratory', 'Pharmacy', 'Radiology', 'Billing', 'Wards'];
 
 const ACUITY_LEVELS = [
     { level: 1, label: 'Emergency',  hint: 'Immediate / resuscitation', tone: 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20' },

@@ -13,7 +13,6 @@ import {
 import { printPatientCard } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
 import { useActivePatient } from '../context/PatientContext';
-import DepartmentQueue from '../components/DepartmentQueue';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Routing destinations.                                                     */
@@ -507,9 +506,6 @@ export default function Patients() {
                     </button>
                 }
             />
-
-            {/* ── Routed patients panel ───────────────────────────────────── */}
-            <DepartmentQueue department="Reception" title="Patients sent to reception" />
 
             {/* ── Stat strip ──────────────────────────────────────────────── */}
             <div data-tour="patients-stats" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
