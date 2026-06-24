@@ -10,6 +10,7 @@ import {
     BookOpen, Smartphone, HelpCircle, HeartPulse, PanelLeftClose, PanelLeftOpen,
     CalendarClock, Home, UserCog,
 } from 'lucide-react';
+import WhatsNew from '../WhatsNew';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
 import ActivePatientBar from '../ActivePatientBar';
@@ -132,6 +133,7 @@ export default function MainLayout() {
 
     return (
         <div className="flex h-screen bg-ink-50 dark:bg-ink-950 font-sans overflow-hidden">
+            <WhatsNew />
             {isMobileMenuOpen && (
                 <button
                     type="button"
