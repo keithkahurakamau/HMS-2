@@ -19,7 +19,7 @@ from datetime import datetime
 from app.config.database import get_db
 from app.models.medical_history import MedicalHistoryEntry, ConsentRecord, DataAccessLog
 from app.models.patient import Patient
-from app.models.clinical import MedicalRecord
+from app.models.clinical import MedicalRecord, TriageRecord
 from app.models.laboratory import LabTest
 from app.models.radiology import RadiologyRequest
 from app.models.wards import AdmissionRecord
@@ -27,7 +27,7 @@ from app.models.user import User
 from app.schemas.medical_history import (
     MedicalHistoryEntryCreate, MedicalHistoryEntryUpdate, MedicalHistoryEntryResponse,
     ConsentCreate, ConsentResponse,
-    PatientMedicalChartResponse
+    PatientMedicalChartResponse, TriageHistoryItem
 )
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
@@ -121,6 +121,31 @@ def get_patient_medical_chart(
             "record_status": rec.record_status
         })
 
+    # Fetch triage history (last 10, newest first)
+    triage_rows = db.query(TriageRecord).filter(
+        TriageRecord.patient_id == patient_id
+    ).order_by(desc(TriageRecord.created_at)).limit(10).all()
+
+    triage_history = []
+    for t in triage_rows:
+        nurse = db.query(User).filter(User.user_id == t.nurse_id).first()
+        triage_history.append(TriageHistoryItem(
+            triage_id=t.triage_id,
+            date=t.created_at.isoformat() if t.created_at else None,
+            nurse=nurse.full_name if nurse else "Unknown",
+            acuity_level=t.acuity_level,
+            chief_complaint=t.chief_complaint,
+            blood_pressure=t.blood_pressure,
+            heart_rate=t.heart_rate,
+            temperature=t.temperature,
+            spo2=t.spo2,
+            weight_kg=t.weight_kg,
+            height_cm=t.height_cm,
+            calculated_bmi=t.calculated_bmi,
+            blood_glucose=t.blood_glucose,
+            triage_notes=t.triage_notes,
+        ))
+
     # Fetch consent records
     consents = db.query(ConsentRecord).filter(
         ConsentRecord.patient_id == patient_id
@@ -145,6 +170,7 @@ def get_patient_medical_chart(
         obstetric_history=filter_by_type("OBSTETRIC_HISTORY"),
         mental_health=filter_by_type("MENTAL_HEALTH"),
         recent_visits=recent_visits,
+        triage_history=triage_history,
         consents=consents
     )
 

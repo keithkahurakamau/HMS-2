@@ -26,6 +26,10 @@ HEADERS = {"X-Tenant-ID": TENANT}
 @pytest.fixture(scope="module")
 def client():
     with httpx.Client(base_url=BASE, headers=HEADERS, follow_redirects=True) as c:
+        c.get("/api/queue/")               # primes the csrf_token cookie
+        token = c.cookies.get("csrf_token")
+        if token:
+            c.headers["x-csrf-token"] = token
         yield c
 
 
@@ -180,3 +184,25 @@ class TestTriageLatest:
             assert r.json() is None
         finally:
             _cleanup_patient(client, receptionist_cookies, pid)
+
+
+# ─── 4. Reception routing ──────────────────────────────────────────────────────
+
+def test_triage_routes_to_reception(client, receptionist_cookies, nurse_cookies):
+    patient = _new_patient(client, receptionist_cookies, surname_tag="RECEP")
+    try:
+        q = _queue_to_triage(client, receptionist_cookies, patient["patient_id"])
+        r = client.post("/api/triage/submit", cookies=nurse_cookies, json={
+            "patient_id": patient["patient_id"],
+            "queue_id": q["queue_id"],
+            "chief_complaint": "Sent back to reception",
+            "acuity_level": 3,
+            "disposition": "Reception",
+        })
+        assert r.status_code == 200, r.text
+        assert r.json()["disposition"] == "Reception"
+
+        rows = client.get("/api/queue/?department=Reception", cookies=receptionist_cookies).json()
+        assert any(row["patient_id"] == patient["patient_id"] for row in rows)
+    finally:
+        client.delete(f"/api/patients/{patient['patient_id']}", cookies=receptionist_cookies)
