@@ -15,8 +15,14 @@ class QueueResponse(QueueBase):
     queue_id: int
     status: str
     joined_at: datetime
+    patient_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class QueueCancel(BaseModel):
+    # Optional free-text reason the patient was cancelled (left, no-show…).
+    reason: Optional[str] = None
 
 class QueueEndOfDay(BaseModel):
     # Optional department filter — omit to clear the whole active queue. When

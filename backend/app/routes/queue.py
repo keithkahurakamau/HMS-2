@@ -5,8 +5,9 @@ from datetime import datetime, timezone
 
 from app.config.database import get_db
 from app.models.clinical import PatientQueue
+from app.models.patient import Patient
 from app.schemas.queue import (
-    QueueCreate, QueueResponse, QueueEndOfDay, QueueCheckoutResult,
+    QueueCreate, QueueResponse, QueueEndOfDay, QueueCheckoutResult, QueueCancel,
 )
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
@@ -18,6 +19,9 @@ router = APIRouter(prefix="/api/queue", tags=["Triage Queue"])
 # Statuses that mean a patient is still actively in the queue (i.e. not yet
 # Completed). Mirrors the set the clinical desk and patient-routing use.
 ACTIVE_QUEUE_STATUSES = ["Waiting", "In Progress", "In Consultation"]
+
+# Both terminal statuses — patients removed from the active view.
+TERMINAL_QUEUE_STATUSES = ["Completed", "Cancelled"]
 
 @router.post("/", response_model=QueueResponse, dependencies=[Depends(RequirePermission("patients:write"))])
 def add_to_queue(queue_in: QueueCreate, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -57,10 +61,20 @@ def add_to_queue(queue_in: QueueCreate, request: Request, db: Session = Depends(
 
 @router.get("/", response_model=List[QueueResponse], dependencies=[Depends(RequirePermission("patients:read"))])
 def get_active_queue(department: Optional[str] = None, db: Session = Depends(get_db)):
-    query = db.query(PatientQueue).filter(PatientQueue.status != "Completed")
+    query = (
+        db.query(PatientQueue, Patient)
+        .join(Patient, PatientQueue.patient_id == Patient.patient_id)
+        .filter(~PatientQueue.status.in_(TERMINAL_QUEUE_STATUSES))
+    )
     if department:
         query = query.filter(PatientQueue.department == department)
-    return query.order_by(PatientQueue.acuity_level.asc(), PatientQueue.joined_at.asc()).all()
+    rows = query.order_by(PatientQueue.acuity_level.asc(), PatientQueue.joined_at.asc()).all()
+    result = []
+    for queue_entry, patient in rows:
+        entry_dict = {c.name: getattr(queue_entry, c.name) for c in PatientQueue.__table__.columns}
+        entry_dict["patient_name"] = f"{patient.other_names} {patient.surname}"
+        result.append(entry_dict)
+    return result
 
 
 @router.patch(
@@ -91,6 +105,43 @@ def checkout_from_queue(
         log_audit(
             db, current_user["user_id"], "UPDATE", "Queue", entry.queue_id,
             old, {"status": "Completed"},
+            request.client.host if request.client else None,
+        )
+        db.commit()
+        db.refresh(entry)
+    return entry
+
+
+@router.patch(
+    "/{queue_id}/cancel",
+    response_model=QueueResponse,
+    dependencies=[Depends(RequirePermission("patients:write"))],
+)
+def cancel_from_queue(
+    queue_id: int,
+    payload: QueueCancel,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Cancel a patient who left without being seen.
+
+    Distinct from checkout (Completed = seen & done): Cancelled means the
+    patient never received the service. Soft-terminal so analytics can tell
+    them apart and history retains the visit."""
+    entry = db.query(PatientQueue).filter(PatientQueue.queue_id == queue_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Queue entry not found")
+
+    if entry.status not in TERMINAL_QUEUE_STATUSES:
+        old = {"status": entry.status}
+        entry.status = "Cancelled"
+        entry.completed_at = datetime.now(timezone.utc)
+        if payload.reason:
+            entry.notes = ((entry.notes + " | ") if entry.notes else "") + f"Cancelled: {payload.reason}"
+        log_audit(
+            db, current_user["user_id"], "UPDATE", "Queue", entry.queue_id,
+            old, {"status": "Cancelled", "reason": payload.reason},
             request.client.host if request.client else None,
         )
         db.commit()
