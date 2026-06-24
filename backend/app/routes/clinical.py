@@ -147,7 +147,10 @@ def submit_consultation(record_in: dict, request: Request, db: Session = Depends
                 )
 
         db.commit()
-        return {"message": "Record saved successfully."}
+        return {
+            "message": "Record saved successfully.",
+            "blood_glucose": new_record.blood_glucose,
+        }
 
     except Exception as e:
         db.rollback()

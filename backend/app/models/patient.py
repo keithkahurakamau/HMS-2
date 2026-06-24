@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Index, Text
+from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Index, Text, event
 from sqlalchemy.sql import func
 from app.config.database import Base
+from app.utils.blind_index import phone_bidx, id_bidx, email_bidx
 # M-1: KDPA column-level encryption for sensitive PHI / personal data. The
 # EncryptedString type is a Text-backed Fernet TypeDecorator that decrypts on
 # read (tolerating pre-migration plaintext) and encrypts on write. Apply ONLY
@@ -33,12 +34,20 @@ class Patient(Base):
     chronic_conditions = Column(EncryptedString, nullable=True)
     
     # 3. Identification & Contact
+    # M-1 phase 2: id_number / telephone_1 / email are encrypted at rest. They
+    # can't be SQL-searched directly anymore (non-deterministic ciphertext), so
+    # each carries a deterministic blind-index column (*_bidx) for exact-match
+    # lookup, populated by the event listener below. The plaintext btree indexes
+    # are removed (useless on ciphertext) in migrate a6f2d9c4e7b1.
     id_type = Column(String(50), nullable=True)
-    id_number = Column(String(100), index=True, nullable=True)
+    id_number = Column(EncryptedString, nullable=True)
+    id_number_bidx = Column(String(64), index=True, nullable=True)
     nationality = Column(String(100), nullable=True)
-    telephone_1 = Column(String(20), index=True, nullable=True)
+    telephone_1 = Column(EncryptedString, nullable=True)
+    telephone_1_bidx = Column(String(64), index=True, nullable=True)
     telephone_2 = Column(String(20), nullable=True)
-    email = Column(String(255), nullable=True)
+    email = Column(EncryptedString, nullable=True)
+    email_bidx = Column(String(64), index=True, nullable=True)
     
     # 4. Address & Employment
     # M-1: address / employment are personal data — encrypted at rest. (postal_code
@@ -81,3 +90,16 @@ class Patient(Base):
     __table_args__ = (
         Index('idx_patient_name', 'surname', 'other_names'),
     )
+
+
+# M-1 phase 2: keep the blind-index columns in lockstep with their encrypted
+# source columns. The Python attribute holds plaintext (EncryptedString only
+# encrypts at bind time), so we hash it here on every insert/update. Recomputing
+# unconditionally is safe — the hash is deterministic, so an unrelated update
+# just rewrites the same value. NULL/blank inputs yield NULL indexes.
+@event.listens_for(Patient, "before_insert")
+@event.listens_for(Patient, "before_update")
+def _sync_patient_blind_indexes(_mapper, _connection, target: "Patient") -> None:
+    target.telephone_1_bidx = phone_bidx(target.telephone_1)
+    target.id_number_bidx = id_bidx(target.id_number)
+    target.email_bidx = email_bidx(target.email)

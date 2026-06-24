@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import { printLabReport } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
+import DepartmentQueue from '../components/DepartmentQueue';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Laboratory                                                                */
@@ -272,6 +273,9 @@ export default function Laboratory() {
                 title="Laboratory"
                 subtitle="Process orders, capture results, and publish reports — with full sample lifecycle tracking."
             />
+
+            {/* ── Routed patients panel ───────────────────────────────────── */}
+            <DepartmentQueue department="Laboratory" title="Patients sent to the Lab" />
 
             {/* Tabs */}
             <div data-tour="lab-tabs" className="card p-2 flex items-center justify-between shrink-0">

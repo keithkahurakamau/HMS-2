@@ -7,6 +7,7 @@ import {
 import toast from 'react-hot-toast';
 import { printAdmissionSlip } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
+import DepartmentQueue from '../components/DepartmentQueue';
 
 export default function Wards() {
     const [wards, setWards] = useState([]);
@@ -171,6 +172,9 @@ export default function Wards() {
                     </div>
                 }
             />
+
+            {/* ── Routed patients panel ───────────────────────────────────── */}
+            <DepartmentQueue department="Wards" title="Patients sent to Wards" />
 
             <div data-tour="ward-kpis" className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="stat-tile">
