@@ -99,7 +99,8 @@ class MedicalRecord(Base):
     weight_kg = Column(Float, nullable=True)
     height_cm = Column(Float, nullable=True)
     calculated_bmi = Column(Float, nullable=True)
-    
+    blood_glucose = Column(Float, nullable=True)  # mmol/L (RBS), carried from triage
+
     # Clinical Data (SOAP)
     chief_complaint = Column(String, nullable=True)
     history_of_present_illness = Column(String, nullable=True)

@@ -124,6 +124,26 @@ class MedicalHistoryEntryResponse(BaseModel):
 
 
 # ====================
+# Triage History Item
+# ====================
+class TriageHistoryItem(BaseModel):
+    triage_id: int
+    date: Optional[str] = None
+    nurse: Optional[str] = None
+    acuity_level: Optional[int] = None
+    chief_complaint: Optional[str] = None
+    blood_pressure: Optional[str] = None
+    heart_rate: Optional[int] = None
+    temperature: Optional[float] = None
+    spo2: Optional[int] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    calculated_bmi: Optional[float] = None
+    blood_glucose: Optional[float] = None
+    triage_notes: Optional[str] = None
+
+
+# ====================
 # Aggregated History Response (Full Patient Chart)
 # ====================
 class PatientMedicalChartResponse(BaseModel):
@@ -148,6 +168,7 @@ class PatientMedicalChartResponse(BaseModel):
     
     # Recent clinical encounters
     recent_visits: List[Dict[str, Any]] = []
+    triage_history: List[TriageHistoryItem] = []
     consents: List[ConsentResponse] = []
 
     class Config:

@@ -185,6 +185,18 @@ export default function MedicalHistory() {
         setIsAddModalOpen(true);
     };
 
+    const clearPreviousVisit = async () => {
+        if (!chart?.patient_id) return;
+        if (!window.confirm('Clear the current visit and start a fresh one? This closes any active queue entries for this patient.')) return;
+        try {
+            const res = await apiClient.post(`/queue/patients/${chart.patient_id}/close-visit`);
+            toast.success(`Visit cleared (${res.data?.closed ?? 0} active entr${(res.data?.closed === 1) ? 'y' : 'ies'} closed).`);
+            fetchChart(chart.patient_id);
+        } catch {
+            toast.error('Could not clear the visit.');
+        }
+    };
+
     const toggleSection = (key) => setExpandedSections(p => ({ ...p, [key]: !p[key] }));
 
     const getEntriesForType = (typeKey) => {
@@ -313,6 +325,17 @@ export default function MedicalHistory() {
                             </div>
                         </div>
 
+                        {/* Clear Previous Visit */}
+                        <div className="card p-4 flex items-center justify-between gap-3">
+                            <div>
+                                <h3 className="font-semibold text-ink-900 dark:text-white text-sm">Visit</h3>
+                                <p className="text-xs text-ink-500 dark:text-ink-400">Start a new visit — closes any active queue entries for this patient.</p>
+                            </div>
+                            <button type="button" onClick={clearPreviousVisit} className="btn-secondary">
+                                Clear previous visit
+                            </button>
+                        </div>
+
                         {/* Consents on file (KDPA Section 30) */}
                         <ConsentCard
                             patientId={chart.patient_id}
@@ -413,6 +436,31 @@ export default function MedicalHistory() {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+
+                        {/* Triage History */}
+                        <div className="card p-4">
+                            <h3 className="font-bold text-slate-800 dark:text-ink-200 flex items-center gap-2 mb-3">
+                                <Activity size={16} /> Triage History
+                            </h3>
+                            {(chart.triage_history || []).length === 0 ? (
+                                <p className="text-sm text-slate-400 dark:text-ink-400 italic text-center py-4">No triage records.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {chart.triage_history.map((t) => (
+                                        <div key={t.triage_id} className="p-3 bg-slate-50 dark:bg-ink-800/40 rounded-xl border border-slate-100 dark:border-ink-800">
+                                            <div className="flex justify-between items-start">
+                                                <p className="font-semibold text-sm text-slate-800 dark:text-ink-200">{t.chief_complaint || 'No complaint recorded'}</p>
+                                                <span className="text-xs text-slate-400 dark:text-ink-400">{t.date ? new Date(t.date).toLocaleDateString() : '—'}</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-ink-400 mt-1">
+                                                Acuity {t.acuity_level ?? '—'} &middot; BP {t.blood_pressure || '—'} &middot; HR {t.heart_rate ?? '—'} &middot; Temp {t.temperature ?? '—'}°C &middot; SpO₂ {t.spo2 ?? '—'}% &middot; BMI {t.calculated_bmi ?? '—'} &middot; RBS {t.blood_glucose ?? '—'} mmol/L
+                                            </p>
+                                            <p className="text-xs text-slate-400 dark:text-ink-400">Nurse: {t.nurse || '—'}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </>
                 )}

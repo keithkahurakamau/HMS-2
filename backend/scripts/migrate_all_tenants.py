@@ -544,6 +544,20 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
     ("patients", "ALTER TABLE patients ALTER COLUMN nok_name TYPE TEXT;"),
     ("patients", "ALTER TABLE patients ALTER COLUMN nok_contact TYPE TEXT;"),
     ("medical_history_entries", "ALTER TABLE medical_history_entries ALTER COLUMN title TYPE TEXT;"),
+    # a6f2d9c4e7b1 — encrypt searchable identifiers + blind indexes (audit M-1
+    # phase 2). Widen to TEXT, drop the now-useless plaintext indexes, add the
+    # *_bidx columns + their indexes. All idempotent / guarded.
+    ("patients", "ALTER TABLE patients ALTER COLUMN id_number TYPE TEXT;"),
+    ("patients", "ALTER TABLE patients ALTER COLUMN telephone_1 TYPE TEXT;"),
+    ("patients", "ALTER TABLE patients ALTER COLUMN email TYPE TEXT;"),
+    ("patients", "DROP INDEX IF EXISTS ix_patients_id_number;"),
+    ("patients", "DROP INDEX IF EXISTS ix_patients_telephone_1;"),
+    ("patients", "ALTER TABLE patients ADD COLUMN IF NOT EXISTS id_number_bidx VARCHAR(64);"),
+    ("patients", "ALTER TABLE patients ADD COLUMN IF NOT EXISTS telephone_1_bidx VARCHAR(64);"),
+    ("patients", "ALTER TABLE patients ADD COLUMN IF NOT EXISTS email_bidx VARCHAR(64);"),
+    ("patients", "CREATE INDEX IF NOT EXISTS ix_patients_id_number_bidx ON patients (id_number_bidx);"),
+    ("patients", "CREATE INDEX IF NOT EXISTS ix_patients_telephone_1_bidx ON patients (telephone_1_bidx);"),
+    ("patients", "CREATE INDEX IF NOT EXISTS ix_patients_email_bidx ON patients (email_bidx);"),
 ]
 
 
