@@ -8,6 +8,7 @@ from app.models.clinical import PatientQueue
 from app.models.patient import Patient
 from app.schemas.queue import (
     QueueCreate, QueueResponse, QueueEndOfDay, QueueCheckoutResult, QueueCancel,
+    CloseVisitResult,
 )
 from app.core.dependencies import get_current_user, RequirePermission
 from app.utils.audit import log_audit
@@ -187,3 +188,34 @@ def end_of_day_checkout(
     )
     db.commit()
     return QueueCheckoutResult(checked_out=len(entries), department=department)
+
+
+@router.post(
+    "/patients/{patient_id}/close-visit",
+    response_model=CloseVisitResult,
+    dependencies=[Depends(RequirePermission("patients:write"))],
+)
+def close_visit(
+    patient_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Close a patient's current visit by soft-completing every active queue
+    row they have, so the next registration/queue starts a clean visit.
+    Backs the 'Clear previous visit / start new visit' control on the chart."""
+    rows = db.query(PatientQueue).filter(
+        PatientQueue.patient_id == patient_id,
+        PatientQueue.status.in_(ACTIVE_QUEUE_STATUSES),
+    ).all()
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        row.status = "Completed"
+        row.completed_at = now
+    log_audit(
+        db, current_user["user_id"], "UPDATE", "Queue", f"close-visit:{patient_id}",
+        {"active_count": len(rows)}, {"status": "Completed"},
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return CloseVisitResult(closed=len(rows))

@@ -33,3 +33,6 @@ class QueueEndOfDay(BaseModel):
 class QueueCheckoutResult(BaseModel):
     checked_out: int
     department: Optional[str] = None
+
+class CloseVisitResult(BaseModel):
+    closed: int

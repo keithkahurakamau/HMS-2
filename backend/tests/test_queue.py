@@ -311,3 +311,30 @@ class TestQueuePatientName:
             )
         finally:
             _cleanup_patient(client, receptionist_cookies, patient["patient_id"])
+
+
+# ─── 8. Close visit (start a fresh visit for a patient) ─────────────────────
+
+class TestCloseVisit:
+    def test_close_visit_requires_auth(self, client):
+        r = client.post("/api/queue/patients/1/close-visit")
+        assert r.status_code == 401
+
+    def test_close_visit_completes_active_rows(self, client, receptionist_cookies):
+        patient = _new_patient(client, receptionist_cookies, surname_tag="CLOSEV")
+        try:
+            q1 = _enqueue(client, receptionist_cookies, patient["patient_id"], department="Wards")
+            q2 = _enqueue(client, receptionist_cookies, patient["patient_id"], department="Pharmacy")
+            r = client.post(
+                f"/api/queue/patients/{patient['patient_id']}/close-visit",
+                cookies=receptionist_cookies,
+            )
+            assert r.status_code == 200, r.text
+            assert r.json()["closed"] >= 2
+
+            for dept in ("Wards", "Pharmacy"):
+                rows = client.get(f"/api/queue/?department={dept}", cookies=receptionist_cookies).json()
+                ids = {row["queue_id"] for row in rows}
+                assert q1 not in ids and q2 not in ids
+        finally:
+            _cleanup_patient(client, receptionist_cookies, patient["patient_id"])
