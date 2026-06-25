@@ -55,6 +55,29 @@ export default function Triage() {
         }
     };
 
+    const removeFromTriage = async (e, queueId) => {
+        e.stopPropagation();
+        try {
+            await apiClient.patch(`/queue/${queueId}/checkout`);
+            toast.success('Removed from triage queue.');
+            fetchQueue();
+        } catch {
+            toast.error('Could not remove from the queue.');
+        }
+    };
+
+    const cancelFromTriage = async (e, queueId) => {
+        e.stopPropagation();
+        const reason = window.prompt('Cancel reason (optional):') ?? null;
+        try {
+            await apiClient.patch(`/queue/${queueId}/cancel`, { reason });
+            toast.success('Patient cancelled.');
+            fetchQueue();
+        } catch {
+            toast.error('Could not cancel.');
+        }
+    };
+
     const calculateBMI = () => {
         if (vitals.weight && vitals.height) {
             const h = parseFloat(vitals.height) / 100;
@@ -170,17 +193,29 @@ export default function Triage() {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                 {queue.map((item) => (
-                                    <button key={item.queue_id} type="button" onClick={() => handlePatientSelect(item)}
-                                        className={`text-left p-3 rounded-xl border transition-all duration-150 ${activePatient?.queue_id === item.queue_id ? 'bg-brand-50/60 dark:bg-brand-500/10 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 hover:-translate-y-0.5'}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h3 className="font-semibold text-sm text-ink-900 dark:text-white">{item.patient_name}</h3>
-                                            {item.allergies && item.allergies.toLowerCase() !== 'none' && <AlertCircle size={14} className="text-rose-500" />}
+                                    <div key={item.queue_id} className="flex flex-col">
+                                        <button type="button" onClick={() => handlePatientSelect(item)}
+                                            className={`text-left p-3 rounded-xl border transition-all duration-150 ${activePatient?.queue_id === item.queue_id ? 'bg-brand-50/60 dark:bg-brand-500/10 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 hover:-translate-y-0.5'}`}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h3 className="font-semibold text-sm text-ink-900 dark:text-white">{item.patient_name}</h3>
+                                                {item.allergies && item.allergies.toLowerCase() !== 'none' && <AlertCircle size={14} className="text-rose-500" />}
+                                            </div>
+                                            <div className="flex justify-between items-center text-xs text-ink-500 dark:text-ink-400">
+                                                <span className="font-mono">{item.outpatient_no}</span>
+                                                <span className="bg-ink-100 dark:bg-ink-800/40 px-2 py-0.5 rounded-full text-ink-600 dark:text-ink-400 flex items-center gap-1"><Clock size={10} /> {item.joined_time}</span>
+                                            </div>
+                                        </button>
+                                        <div className="mt-1 flex items-center justify-end gap-1">
+                                            <button type="button" onClick={(e) => removeFromTriage(e, item.queue_id)}
+                                                className="text-xs px-2 py-0.5 rounded-md text-ink-500 hover:text-brand-700 hover:bg-brand-50 dark:hover:bg-ink-800">
+                                                Remove
+                                            </button>
+                                            <button type="button" onClick={(e) => cancelFromTriage(e, item.queue_id)}
+                                                className="text-xs px-2 py-0.5 rounded-md text-ink-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+                                                Cancel
+                                            </button>
                                         </div>
-                                        <div className="flex justify-between items-center text-xs text-ink-500 dark:text-ink-400">
-                                            <span className="font-mono">{item.outpatient_no}</span>
-                                            <span className="bg-ink-100 dark:bg-ink-800/40 px-2 py-0.5 rounded-full text-ink-600 dark:text-ink-400 flex items-center gap-1"><Clock size={10} /> {item.joined_time}</span>
-                                        </div>
-                                    </button>
+                                    </div>
                                 ))}
                             </div>
                         )}

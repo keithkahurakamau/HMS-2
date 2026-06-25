@@ -62,10 +62,23 @@ export default function Billing() {
         fetchQueue();
     }, []);
 
-    const filteredQueue = queue.filter(inv => 
-        inv.patient_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const filteredQueue = queue.filter(inv =>
+        inv.patient_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         inv.patient_opd.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const voidInvoice = async (invoiceId) => {
+        if (!window.confirm('Void this unpaid invoice? This reverses its ledger posting.')) return;
+        const reason = window.prompt('Reason for voiding:') ?? null;
+        if (reason === null) return;
+        try {
+            await apiClient.post(`/billing/invoices/${invoiceId}/void`, { reason });
+            toast.success('Invoice voided.');
+            fetchQueue();
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not void the invoice.');
+        }
+    };
 
     // Poll our OWN DB (updated by the verified Pay Hero webhook) for the
     // receipt — not Pay Hero's live API. The callback settles the invoice and
@@ -242,19 +255,27 @@ export default function Billing() {
                             {filteredQueue.map(inv => {
                                 const active = activeInvoice?.invoice_id === inv.invoice_id;
                                 return (
-                                    <button key={inv.invoice_id} type="button" onClick={() => { resetMpesa(); setActiveInvoice(inv); }}
+                                    <div key={inv.invoice_id}
                                         className={`w-full text-left card p-4 transition-all duration-150 ${active ? 'border-brand-400 ring-2 ring-brand-500/15 shadow-elevated' : 'hover:-translate-y-0.5 hover:shadow-elevated'}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className={inv.status === 'Pending M-Pesa' ? 'badge-success' : 'badge-warn'}>{inv.status}</span>
-                                            <span className="text-2xs font-mono text-ink-400">INV-{inv.invoice_id}</span>
+                                        <button type="button" className="w-full text-left" onClick={() => { resetMpesa(); setActiveInvoice(inv); }}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className={inv.status === 'Pending M-Pesa' ? 'badge-success' : 'badge-warn'}>{inv.status}</span>
+                                                <span className="text-2xs font-mono text-ink-400">INV-{inv.invoice_id}</span>
+                                            </div>
+                                            <h4 className="font-semibold text-ink-900 dark:text-ink-100 text-sm">{inv.patient_name}</h4>
+                                            <p className="text-xs text-ink-500 mb-3">{inv.patient_opd}</p>
+                                            <div className="flex justify-between items-center border-t border-ink-100 dark:border-ink-800 pt-3">
+                                                <span className="text-xs text-ink-500">Balance due</span>
+                                                <span className="font-semibold text-brand-700">KES {(inv.total_amount - inv.amount_paid).toFixed(2)}</span>
+                                            </div>
+                                        </button>
+                                        <div className="mt-2 flex justify-end">
+                                            <button type="button" onClick={() => voidInvoice(inv.invoice_id)}
+                                                className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+                                                Void
+                                            </button>
                                         </div>
-                                        <h4 className="font-semibold text-ink-900 dark:text-ink-100 text-sm">{inv.patient_name}</h4>
-                                        <p className="text-xs text-ink-500 mb-3">{inv.patient_opd}</p>
-                                        <div className="flex justify-between items-center border-t border-ink-100 dark:border-ink-800 pt-3">
-                                            <span className="text-xs text-ink-500">Balance due</span>
-                                            <span className="font-semibold text-brand-700">KES {(inv.total_amount - inv.amount_paid).toFixed(2)}</span>
-                                        </div>
-                                    </button>
+                                    </div>
                                 );
                             })}
                         </div>
