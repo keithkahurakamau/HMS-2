@@ -133,11 +133,20 @@ def get_lab_queue(db: Session = Depends(get_db)):
             LabTest.status.in_(["Pending", "Pending Collection", "In Progress"])
         ).order_by(desc(LabTest.requested_at)).all()
 
+        # Batch the per-test lookups into three IN-queries instead of 3×N
+        # round-trips. Same output, scales flat with queue size.
+        patient_ids = {t.patient_id for t in tests}
+        user_ids = {t.ordered_by for t in tests}
+        catalog_ids = {t.catalog_id for t in tests if t.catalog_id is not None}
+        patients = {p.patient_id: p for p in db.query(Patient).filter(Patient.patient_id.in_(patient_ids)).all()} if patient_ids else {}
+        doctors = {u.user_id: u for u in db.query(User).filter(User.user_id.in_(user_ids)).all()} if user_ids else {}
+        catalogs = {c.catalog_id: c for c in db.query(LabTestCatalog).filter(LabTestCatalog.catalog_id.in_(catalog_ids)).all()} if catalog_ids else {}
+
         result = []
         for t in tests:
-            patient = db.query(Patient).filter(Patient.patient_id == t.patient_id).first()
-            doctor = db.query(User).filter(User.user_id == t.ordered_by).first()
-            catalog = db.query(LabTestCatalog).filter(LabTestCatalog.catalog_id == t.catalog_id).first()
+            patient = patients.get(t.patient_id)
+            doctor = doctors.get(t.ordered_by)
+            catalog = catalogs.get(t.catalog_id)
             result.append({
                 "test_id": t.test_id,
                 "test_name": t.test_name,

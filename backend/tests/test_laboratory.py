@@ -22,6 +22,12 @@ HEADERS = {"X-Tenant-ID": TENANT}
 @pytest.fixture(scope="module")
 def client():
     with httpx.Client(base_url=BASE, headers=HEADERS, follow_redirects=True) as c:
+        # Prime the double-submit CSRF cookie/header so state-changing POSTs
+        # exercise the real protected path instead of 403-ing.
+        c.get("/api/laboratory/catalog")
+        token = c.cookies.get("csrf_token")
+        if token:
+            c.headers["x-csrf-token"] = token
         yield c
 
 
@@ -243,3 +249,29 @@ class TestOrderFlow:
                         json={"reason": "auto-test rejection"})
         assert r.status_code == 200
         assert r.json()["status"] == "rejected"
+
+
+# ─── 4. Queue resolves patient/doctor (N+1 fix contract) ────────────────────
+
+class TestLabQueue:
+    def test_queue_resolves_patient_and_doctor(self, client, doctor_cookies, lab_cookies, lab_patient_id):
+        """The lab queue must resolve each test's patient + ordering doctor.
+
+        Guards the batched-lookup refactor: a regression (wrong/missing batch
+        key) would surface here as the 'Unknown' fallbacks or missing fields."""
+        catalog_id, _ = _cbc_catalog_id(client, doctor_cookies)
+        created = client.post("/api/laboratory/orders", cookies=doctor_cookies, json={
+            "patient_id": lab_patient_id,
+            "tests": [{"catalog_id": catalog_id, "priority": "Routine"}],
+        })
+        assert created.status_code == 200, created.text
+        test_id = created.json()["created"][0]["test_id"]
+
+        rows = client.get("/api/laboratory/queue", cookies=lab_cookies).json()
+        row = next((r for r in rows if r["test_id"] == test_id), None)
+        assert row is not None, "created lab test should appear in the queue"
+        for key in ("test_id", "test_name", "catalog_id", "requires_barcode",
+                    "priority", "status", "patient", "doctor", "requested_at"):
+            assert key in row, f"missing key {key} in queue row"
+        assert row["patient"] != "Unknown Patient", row
+        assert row["doctor"] != "Unknown Doctor", row
