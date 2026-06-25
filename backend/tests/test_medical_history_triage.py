@@ -67,6 +67,8 @@ def test_chart_includes_triage_history(client, receptionist_cookies, nurse_cooki
         assert latest["chief_complaint"] == "headache"
         assert latest["blood_glucose"] == 7.1
         assert latest["acuity_level"] == 2
+        # Nurse name must resolve via the batched lookup (not the "Unknown" fallback).
+        assert latest["nurse"] and latest["nurse"] != "Unknown", latest
     finally:
         client.cookies.update(receptionist_cookies)
         client.delete(f"/api/patients/{pid}")
