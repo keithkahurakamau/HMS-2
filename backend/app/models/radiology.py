@@ -31,7 +31,7 @@ class RadiologyRequest(Base):
     __tablename__ = "radiology_requests"
 
     request_id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.patient_id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.patient_id"), index=True, nullable=False)
     requested_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
 
     # Link to catalog when known; free-text exam_type stays for backward
@@ -47,7 +47,7 @@ class RadiologyRequest(Base):
     priority = Column(String(20), nullable=False, server_default="Routine")
     billed_price = Column(Numeric(10, 2), nullable=True)
 
-    status = Column(String(50), default="Pending")
+    status = Column(String(50), default="Pending", index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
