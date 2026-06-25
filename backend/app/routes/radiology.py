@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -273,3 +274,44 @@ def add_radiology_result(
     db.commit()
     db.refresh(new_result)
     return new_result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cancel endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+class RadiologyCancelRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+@router.post(
+    "/{request_id}/cancel",
+    dependencies=[Depends(RequirePermission("radiology:manage"))],
+)
+def cancel_radiology_request(
+    request_id: int,
+    payload: RadiologyCancelRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Cancel an imaging request that should not be performed."""
+    req = db.query(RadiologyRequest).filter(RadiologyRequest.request_id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Radiology request not found.")
+    if req.status not in ("Completed", "Cancelled"):
+        old = {"status": req.status}
+        req.status = "Cancelled"
+        if payload.reason:
+            req.clinical_notes = (req.clinical_notes or "") + f"\nCANCELLED: {payload.reason}"
+        log_audit(
+            db,
+            current_user["user_id"],
+            "UPDATE",
+            "RadiologyRequest",
+            str(request_id),
+            old,
+            {"status": "Cancelled", "reason": payload.reason},
+            request.client.host if request.client else None,
+        )
+        db.commit()
+    return {"message": "Radiology request cancelled.", "request_id": request_id}

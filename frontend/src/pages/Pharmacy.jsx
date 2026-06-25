@@ -198,6 +198,20 @@ export default function Pharmacy() {
         }
     };
 
+    const cancelPrescription = async (recordId) => {
+        const reason = window.prompt('Reason for cancelling this prescription:') ?? null;
+        if (reason === null) return;
+        try {
+            await apiClient.post(`/clinical/prescriptions/${recordId}/cancel`, { reason });
+            toast.success('Prescription cancelled.');
+            fetchRxQueue();
+            setActiveOrder(null);
+            setIsQueueOpen(true);
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not cancel prescription.');
+        }
+    };
+
     const handleRxDispense = async () => {
         if (!activeOrder) return;
         if (cart.length === 0) {
@@ -403,6 +417,7 @@ export default function Pharmacy() {
                                         <Printer size={15} /> Print Rx
                                     </button>
                                     <button type="button" onClick={handleReturnToDoctor} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50"><XCircle size={15} /> Return to doctor</button>
+                                    <button type="button" onClick={() => cancelPrescription(activeOrder.record_id)} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-500/10">Cancel script</button>
                                     <button type="button" onClick={handleRxDispense} disabled={isProcessing} className="btn-primary">
                                         <CheckCircle2 size={16} /> {isProcessing ? 'Processing…' : 'Dispense & close'}
                                     </button>
