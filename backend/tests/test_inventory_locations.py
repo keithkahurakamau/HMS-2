@@ -73,3 +73,20 @@ class TestExpiredView:
             row = rows[0]
             for key in ("batch_id", "item_name", "location_name", "expiry_date", "days_to_expiry", "is_expired"):
                 assert key in row
+
+
+# ─── Inventory alerts (low-stock GROUP BY contract) ─────────────────────────
+
+class TestInventoryAlerts:
+    def test_alerts_shape(self, client, admin_cookies):
+        """GET /inventory/alerts returns the expiring + low-stock contract.
+
+        Guards the grouped stock-sum refactor: low_stock rows must keep their
+        keys and current_stock must be a real number, not a fallback."""
+        r = client.get("/api/inventory/alerts", cookies=admin_cookies)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert set(body.keys()) == {"expiring_batches", "low_stock_alerts"}
+        for row in body["low_stock_alerts"]:
+            assert set(row.keys()) == {"item_name", "current_stock", "threshold"}
+            assert row["current_stock"] is not None

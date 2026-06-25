@@ -279,9 +279,6 @@ export default function Pharmacy() {
                 title="Pharmacy"
                 subtitle="Fulfil prescriptions, dispense over-the-counter sales, and track stock movements."
             />
-            {/* ── Routed patients panel ───────────────────────────────────── */}
-            <DepartmentQueue department="Pharmacy" title="Patients sent to Pharmacy" />
-
             {/* GLOBAL PHARMACY HEADER & TABS */}
             <div data-tour="pharmacy-tabs" className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Pharmacy mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
@@ -318,6 +315,8 @@ export default function Pharmacy() {
 
                         {isQueueOpen && (
                             <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
+                                {/* Triage-routed patients sit inline at the top of the queue. */}
+                                <DepartmentQueue department="Pharmacy" inline onChange={fetchRxQueue} />
                                 {isLoadingQueue ? (
                                     <div className="text-center py-8 text-ink-400">
                                         <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} />
