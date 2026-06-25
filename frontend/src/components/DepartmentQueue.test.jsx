@@ -73,4 +73,24 @@ describe('DepartmentQueue', () => {
         renderWithProviders(<DepartmentQueue department="Radiology" />);
         expect(await screen.findByText(/no patients routed here/i)).toBeInTheDocument();
     });
+
+    it('inline mode renders nothing when there are no routed patients', async () => {
+        apiClient.get.mockResolvedValueOnce({ data: [] });
+        const { container } = renderWithProviders(<DepartmentQueue department="Pharmacy" inline />);
+        await waitFor(() => expect(apiClient.get).toHaveBeenCalled());
+        // No empty-state box, no "routed from triage" header — just nothing.
+        expect(screen.queryByText(/no patients routed here/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/routed from triage/i)).not.toBeInTheDocument();
+        expect(container).toBeEmptyDOMElement();
+    });
+
+    it('inline mode tags each routed patient and shows the strip header', async () => {
+        apiClient.get.mockResolvedValueOnce({ data: [
+            { queue_id: 21, patient_id: 9, patient_name: 'Sam Otieno', department: 'Pharmacy', acuity_level: 2, status: 'Waiting', joined_at: '2026-06-25T08:00:00Z' },
+        ]});
+        renderWithProviders(<DepartmentQueue department="Pharmacy" inline />);
+        expect(await screen.findByText('Sam Otieno')).toBeInTheDocument();
+        expect(screen.getByText(/routed from triage/i)).toBeInTheDocument();
+        expect(screen.getByText('Routed')).toBeInTheDocument();
+    });
 });
