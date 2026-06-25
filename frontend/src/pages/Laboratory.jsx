@@ -274,9 +274,6 @@ export default function Laboratory() {
                 subtitle="Process orders, capture results, and publish reports — with full sample lifecycle tracking."
             />
 
-            {/* ── Routed patients panel ───────────────────────────────────── */}
-            <DepartmentQueue department="Laboratory" title="Patients sent to the Lab" />
-
             {/* Tabs */}
             <div data-tour="lab-tabs" className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" aria-label="Laboratory mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
@@ -306,6 +303,8 @@ export default function Laboratory() {
 
                         {isQueueOpen && (
                             <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
+                                {/* Triage-routed patients sit inline at the top of the queue. */}
+                                <DepartmentQueue department="Laboratory" inline />
                                 {isLoading ? (
                                     <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Syncing orders…</div>
                                 ) : queue.length === 0 ? (

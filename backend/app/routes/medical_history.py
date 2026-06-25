@@ -109,30 +109,36 @@ def get_patient_medical_chart(
         MedicalRecord.patient_id == patient_id
     ).order_by(desc(MedicalRecord.created_at)).limit(10).all()
 
+    # Fetch triage history (last 10, newest first) — pulled up so the name
+    # lookup below can batch doctors + nurses in a single query.
+    triage_rows = db.query(TriageRecord).filter(
+        TriageRecord.patient_id == patient_id
+    ).order_by(desc(TriageRecord.created_at)).limit(10).all()
+
+    # Batch the per-row doctor/nurse name lookups into one User query (was N+1).
+    person_ids = {rec.doctor_id for rec in recent_records} | {t.nurse_id for t in triage_rows}
+    names = {
+        u.user_id: u.full_name
+        for u in db.query(User).filter(User.user_id.in_(person_ids)).all()
+    } if person_ids else {}
+
     recent_visits = []
     for rec in recent_records:
-        doctor = db.query(User).filter(User.user_id == rec.doctor_id).first()
         recent_visits.append({
             "record_id": rec.record_id,
             "date": rec.created_at.isoformat() if rec.created_at else None,
-            "doctor": doctor.full_name if doctor else "Unknown",
+            "doctor": names.get(rec.doctor_id, "Unknown"),
             "chief_complaint": rec.chief_complaint,
             "diagnosis": rec.diagnosis,
             "record_status": rec.record_status
         })
 
-    # Fetch triage history (last 10, newest first)
-    triage_rows = db.query(TriageRecord).filter(
-        TriageRecord.patient_id == patient_id
-    ).order_by(desc(TriageRecord.created_at)).limit(10).all()
-
     triage_history = []
     for t in triage_rows:
-        nurse = db.query(User).filter(User.user_id == t.nurse_id).first()
         triage_history.append(TriageHistoryItem(
             triage_id=t.triage_id,
             date=t.created_at.isoformat() if t.created_at else None,
-            nurse=nurse.full_name if nurse else "Unknown",
+            nurse=names.get(t.nurse_id, "Unknown"),
             acuity_level=t.acuity_level,
             chief_complaint=t.chief_complaint,
             blood_pressure=t.blood_pressure,

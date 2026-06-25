@@ -244,8 +244,15 @@ def get_inventory_alerts(db: Session = Depends(get_db)):
 
     low_stock_items = []
     items = db.query(InventoryItem).filter(InventoryItem.is_active == True).all()
+    # One grouped stock-sum query instead of a SUM per item (N+1). Items with
+    # no batches simply won't appear in the map → treated as 0, same as before.
+    stock_by_item = dict(
+        db.query(StockBatch.item_id, func.sum(StockBatch.quantity))
+          .group_by(StockBatch.item_id)
+          .all()
+    )
     for item in items:
-        total_stock = db.query(func.sum(StockBatch.quantity)).filter(StockBatch.item_id == item.item_id).scalar() or 0
+        total_stock = stock_by_item.get(item.item_id) or 0
         if total_stock <= item.reorder_threshold:
             low_stock_items.append({"item_name": item.name, "current_stock": total_stock, "threshold": item.reorder_threshold})
 

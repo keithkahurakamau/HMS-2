@@ -542,16 +542,20 @@ def pharmacy_transactions(
 
     rows = q.order_by(DispenseLog.dispensed_at.desc()).offset(offset).limit(limit).all()
 
+    # One grouped payment count over this page's invoices, rather than a
+    # COUNT per row (N+1). Joining payments into the main query would
+    # multiply rows, so we key a single grouped count by invoice_id.
+    page_invoice_ids = {invoice.invoice_id for (_d, invoice, *_rest) in rows if invoice}
+    payment_counts = dict(
+        db.query(Payment.invoice_id, func.count(Payment.payment_id))
+          .filter(Payment.invoice_id.in_(page_invoice_ids))
+          .group_by(Payment.invoice_id)
+          .all()
+    ) if page_invoice_ids else {}
+
     out = []
     for d, invoice, item, cashier, primary_method in rows:
-        # Payment count comes from a single targeted query rather than
-        # joining payments into the main query, which would multiply rows.
-        payment_count = (
-            db.query(func.count(Payment.payment_id))
-              .filter(Payment.invoice_id == invoice.invoice_id)
-              .scalar()
-            if invoice else 0
-        )
+        payment_count = payment_counts.get(invoice.invoice_id, 0) if invoice else 0
         out.append({
             "dispense_id": d.dispense_id,
             "dispensed_at": d.dispensed_at.isoformat() if d.dispensed_at else None,

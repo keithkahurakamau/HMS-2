@@ -9,6 +9,20 @@ export default defineConfig({
     react(),
     basicSsl()
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the stable framework libs into their own long-cached chunk so an
+        // app-code change doesn't bust that (large) bundle's cache. Vite 8 /
+        // rolldown requires the function form of manualChunks.
+        manualChunks(id) {
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler|axios)[\\/]/.test(id)) {
+            return 'vendor'
+          }
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': {
