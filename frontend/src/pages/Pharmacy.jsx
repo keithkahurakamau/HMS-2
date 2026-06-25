@@ -198,6 +198,20 @@ export default function Pharmacy() {
         }
     };
 
+    const cancelPrescription = async (recordId) => {
+        const reason = window.prompt('Reason for cancelling this prescription:') ?? null;
+        if (reason === null) return;
+        try {
+            await apiClient.post(`/clinical/prescriptions/${recordId}/cancel`, { reason });
+            toast.success('Prescription cancelled.');
+            fetchRxQueue();
+            setActiveOrder(null);
+            setIsQueueOpen(true);
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not cancel prescription.');
+        }
+    };
+
     const handleRxDispense = async () => {
         if (!activeOrder) return;
         if (cart.length === 0) {
@@ -265,9 +279,6 @@ export default function Pharmacy() {
                 title="Pharmacy"
                 subtitle="Fulfil prescriptions, dispense over-the-counter sales, and track stock movements."
             />
-            {/* ── Routed patients panel ───────────────────────────────────── */}
-            <DepartmentQueue department="Pharmacy" title="Patients sent to Pharmacy" />
-
             {/* GLOBAL PHARMACY HEADER & TABS */}
             <div data-tour="pharmacy-tabs" className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Pharmacy mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
@@ -304,6 +315,8 @@ export default function Pharmacy() {
 
                         {isQueueOpen && (
                             <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
+                                {/* Triage-routed patients sit inline at the top of the queue. */}
+                                <DepartmentQueue department="Pharmacy" inline onChange={fetchRxQueue} />
                                 {isLoadingQueue ? (
                                     <div className="text-center py-8 text-ink-400">
                                         <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} />
@@ -403,6 +416,7 @@ export default function Pharmacy() {
                                         <Printer size={15} /> Print Rx
                                     </button>
                                     <button type="button" onClick={handleReturnToDoctor} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50"><XCircle size={15} /> Return to doctor</button>
+                                    <button type="button" onClick={() => cancelPrescription(activeOrder.record_id)} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-500/10">Cancel script</button>
                                     <button type="button" onClick={handleRxDispense} disabled={isProcessing} className="btn-primary">
                                         <CheckCircle2 size={16} /> {isProcessing ? 'Processing…' : 'Dispense & close'}
                                     </button>

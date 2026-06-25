@@ -247,9 +247,14 @@ def portal_appointments(
         .order_by(Appointment.appointment_date.desc())
         .all()
     )
+    doctor_ids = {a.doctor_id for a in appts}
+    doctors = {
+        u.user_id: u
+        for u in db.query(User).filter(User.user_id.in_(doctor_ids)).all()
+    } if doctor_ids else {}
     out = []
     for a in appts:
-        doc = db.query(User).filter(User.user_id == a.doctor_id).first()
+        doc = doctors.get(a.doctor_id)
         out.append({
             "appointment_id": a.appointment_id,
             "doctor_name": doc.full_name if doc else "Clinician",

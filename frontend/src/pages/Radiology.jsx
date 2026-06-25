@@ -101,6 +101,20 @@ export default function Radiology() {
         }
     };
 
+    const cancelRequest = async (requestId) => {
+        const reason = window.prompt('Reason for cancelling this imaging request:') ?? null;
+        if (reason === null) return;
+        try {
+            await apiClient.post(`/radiology/${requestId}/cancel`, { reason });
+            toast.success('Request cancelled.');
+            setActiveRequest(null);
+            setIsQueueOpen(true);
+            fetchData();
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not cancel the request.');
+        }
+    };
+
     /* ── Catalog editor ─────────────────────────────────────────────────── */
 
     const startCreate = () => { setEditing(null); setForm(EMPTY_CATALOG); setEditorOpen(true); };
@@ -146,9 +160,6 @@ export default function Radiology() {
                 title="Radiology"
                 subtitle="Acquire imaging requests, run studies, and publish reports."
             />
-            {/* ── Routed patients panel ───────────────────────────────────── */}
-            <DepartmentQueue department="Radiology" title="Patients sent to Radiology" />
-
             <div data-tour="radio-tabs" className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" className="flex bg-ink-100/70 dark:bg-ink-800/40 p-1 rounded-xl w-full max-w-md">
                     <button type="button" role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
@@ -177,6 +188,8 @@ export default function Radiology() {
 
                         {isQueueOpen && (
                             <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
+                                {/* Triage-routed patients sit inline at the top of the queue. */}
+                                <DepartmentQueue department="Radiology" inline />
                                 {isLoading ? (
                                     <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Syncing queue…</div>
                                 ) : queue.length === 0 ? (
@@ -272,7 +285,10 @@ export default function Radiology() {
                                             )}
 
                                             <div className="flex flex-wrap justify-center gap-3">
-                                                <button type="button" onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Cancel</button>
+                                                <button type="button" onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Close</button>
+                                                <button type="button" onClick={() => cancelRequest(activeRequest.request_id)} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+                                                    Cancel request
+                                                </button>
                                                 <button type="button" data-tour="radio-acknowledge" onClick={handleAcknowledge} className="btn-primary">
                                                     <CheckCircle2 size={16} /> Acknowledge & begin exam
                                                 </button>
@@ -324,6 +340,9 @@ export default function Radiology() {
                                 {activeRequest.status === 'In Progress' && (
                                     <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0 z-10">
                                         <button type="button" onClick={() => { setActiveRequest(null); setIsQueueOpen(true); }} className="btn-secondary">Close</button>
+                                        <button type="button" onClick={() => cancelRequest(activeRequest.request_id)} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+                                            Cancel request
+                                        </button>
                                         <button type="button" data-tour="radio-publish" onClick={handleRelease} className="btn-success">
                                             <Send size={16} /> Sign & publish report
                                         </button>

@@ -4,8 +4,9 @@ from typing import List, Optional
 from decimal import Decimal, InvalidOperation
 
 from app.config.database import get_db
-from app.models.accounting import PriceListItem
+from app.models.accounting import PriceListItem, JournalEntry
 from app.models.billing import Invoice, InvoiceItem, Payment
+from app.services.accounting import reverse_entry
 from app.core.idempotency import idempotent_guard
 from app.schemas.billing import PaymentRequest, InvoiceResponse
 from app.core.dependencies import get_current_user, RequirePermission
@@ -404,3 +405,56 @@ def get_billing_mpesa_transactions(db: Session = Depends(get_db)):
         }
         for txn in transactions
     ]
+
+
+class VoidInvoiceRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+@router.post("/invoices/{invoice_id}/void", dependencies=[Depends(RequirePermission("billing:manage"))])
+def void_invoice(
+    invoice_id: int,
+    payload: VoidInvoiceRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Void a fully-unpaid Pending invoice and reverse its ledger posting.
+
+    Only Pending (nothing collected) invoices are voidable — Paid / Partially
+    Paid involve collected money and need a refund/credit-note flow instead."""
+    invoice = db.query(Invoice).with_for_update().filter(Invoice.invoice_id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found.")
+    if invoice.status != "Pending":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only fully-unpaid Pending invoices can be voided; this one is '{invoice.status}'.",
+        )
+
+    # Reverse every posted GL entry for this invoice's items so A/R + revenue
+    # net to zero. reverse_entry requires status='posted', so already-reversed
+    # entries are skipped — keeping the void idempotent at the ledger level.
+    item_ids = [it.id for it in invoice.items]
+    if item_ids:
+        posted = (
+            db.query(JournalEntry)
+            .filter(
+                JournalEntry.source_type == "billing.invoice.created",
+                JournalEntry.source_id.in_(item_ids),
+                JournalEntry.status == "posted",
+            )
+            .all()
+        )
+        for entry in posted:
+            reverse_entry(db, entry.entry_id, current_user["user_id"], payload.reason or "Invoice voided")
+
+    old = {"status": invoice.status}
+    invoice.status = "Cancelled"
+    log_audit(
+        db, current_user["user_id"], "UPDATE", "Invoice", str(invoice_id),
+        old, {"status": "Cancelled", "reason": payload.reason},
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return {"message": "Invoice voided.", "invoice_id": invoice_id}
