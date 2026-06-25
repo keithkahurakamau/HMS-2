@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
 
 from app.config.database import get_db
@@ -307,6 +307,43 @@ def return_prescription(
 
     db.commit()
     return {"message": "Prescription returned to doctor.", "record_id": record_id}
+
+
+# ==========================================
+# 5b. CANCEL PRESCRIPTION
+# ==========================================
+
+class CancelPrescriptionRequest(_BM):
+    reason: Optional[str] = None
+
+
+@router.post("/prescriptions/{record_id}/cancel", dependencies=[Depends(RequirePermission("pharmacy:manage"))])
+def cancel_prescription(
+    record_id: int,
+    payload: CancelPrescriptionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Pharmacist cancels a pending prescription (e.g. duplicate/erroneous).
+
+    Soft: flips the record off the Pharmacy worklist while keeping the
+    encounter row. Distinct from 'return to doctor' (which bounces it back)."""
+    record = db.query(MedicalRecord).filter(MedicalRecord.record_id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Prescription not found.")
+    if record.record_status == "Pharmacy":
+        old = {"record_status": "Pharmacy"}
+        record.record_status = "Cancelled"
+        record.internal_notes = (record.internal_notes or "") + \
+            f"\nCANCELLED BY PHARMACY ({datetime.now(timezone.utc).isoformat()}): {payload.reason or ''}"
+        log_audit(
+            db, current_user["user_id"], "UPDATE", "MedicalRecord", str(record_id),
+            old, {"record_status": "Cancelled", "reason": payload.reason},
+            request.client.host if request.client else None,
+        )
+        db.commit()
+    return {"message": "Prescription cancelled.", "record_id": record_id}
 
 
 # ==========================================
