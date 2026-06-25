@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, field_validator
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.config.database import get_db
 from app.models.user import User
@@ -196,7 +196,11 @@ def _serialize_user(db: Session, user: User) -> dict:
 @router.get("/", response_model=List[UserResponse], dependencies=[Depends(RequirePermission("users:manage"))])
 def list_users(db: Session = Depends(get_db)):
     """Lists all system users."""
-    return [_serialize_user(db, u) for u in db.query(User).all()]
+    # Eager-load the role to drop the per-user role lazy-load. Effective
+    # permission resolution stays per-user (it reads the same role graph and
+    # would need a shared-helper refactor to batch); staff lists are small.
+    users = db.query(User).options(joinedload(User.role)).all()
+    return [_serialize_user(db, u) for u in users]
 
 @router.post("/", response_model=UserResponse, dependencies=[Depends(RequirePermission("users:manage"))])
 def create_user(
