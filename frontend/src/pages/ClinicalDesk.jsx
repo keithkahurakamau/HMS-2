@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
 import IcdDiagnosisPicker from '../components/IcdDiagnosisPicker';
+import ReferralModal from '../components/ReferralModal';
 import { useActivePatient } from '../context/PatientContext';
 
 // Prescription pick-lists — kept at module scope so the dropdowns are stable.
@@ -64,6 +65,7 @@ export default function ClinicalDesk() {
     const [isLabModalOpen, setIsLabModalOpen] = useState(false);
     const [isImagingModalOpen, setIsImagingModalOpen] = useState(false);
     const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
+    const [isReferModalOpen, setIsReferModalOpen] = useState(false);
     // Holds the most recent appointment we booked from this consultation so
     // the doctor sees confirmation in-line and the button updates from
     // "Select date…" to the scheduled date/time.
@@ -762,7 +764,7 @@ export default function ClinicalDesk() {
                         <div data-tour="clinical-submit" className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap justify-between items-center gap-3 shrink-0 z-10">
                             <div className="flex gap-2">
                                 <button type="button" data-tour="clinical-save-draft" onClick={() => handleClinicalSubmit('Draft')} disabled={isSubmitting} className="btn-secondary"><Save size={15} /> Save draft</button>
-                                <button type="button" onClick={() => handleNotImplemented('External Referrals')} className="btn-ghost"><ArrowRightLeft size={15} /> Refer patient</button>
+                                <button type="button" onClick={() => setIsReferModalOpen(true)} className="btn-ghost"><ArrowRightLeft size={15} /> Refer patient</button>
                             </div>
 
                             <div className="flex gap-2">
@@ -812,6 +814,14 @@ export default function ClinicalDesk() {
                     submitting={consentSubmitting}
                     onClose={() => setIsConsentOpen(false)}
                     onSubmit={handleConsentSubmit}
+                />
+            )}
+
+            {isReferModalOpen && activePatient && (
+                <ReferralModal
+                    patient={activePatient}
+                    initialSummary={clinicalNotes.diagnosis || icdCodes.map((c) => c.description).join('; ')}
+                    onClose={() => setIsReferModalOpen(false)}
                 />
             )}
 
