@@ -92,6 +92,15 @@ def get_clinical_queue(db: Session = Depends(get_db), current_user: dict = Depen
 @router.post("/submit", dependencies=[Depends(RequirePermission("clinical:write"))])
 def submit_consultation(record_in: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Saves vitals, SOAP notes, and updates the patient's queue status."""
+    # Multiple diagnoses arrive comma-separated in one string (schema-compatible
+    # multi-ICD). Guard the column limit with a readable error instead of a
+    # DataError from the driver.
+    icd = record_in.get("icd10_code")
+    if icd and len(icd) > 255:
+        raise HTTPException(
+            status_code=400,
+            detail="Too many ICD-10 diagnoses — the combined code list exceeds 255 characters (about 10 codes).",
+        )
     try:
         # Extract queue_id as it doesn't belong in the MedicalRecord table
         queue_id = record_in.pop("queue_id", None)

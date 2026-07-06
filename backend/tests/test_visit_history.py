@@ -136,3 +136,51 @@ class TestVisitDetail:
         client.cookies.update(doctor_cookies)
         r = client.get("/api/clinical/record/99999999")
         assert r.status_code == 404
+
+
+class TestMultiIcdGuard:
+    def test_oversize_icd_list_rejected(self, client, receptionist_cookies, doctor_cookies):
+        patient = _new_patient(client, receptionist_cookies)
+        pid = patient["patient_id"]
+        try:
+            _consent(client, doctor_cookies, pid)
+            client.cookies.update(doctor_cookies)
+            too_long = ", ".join(f"Z{i:02d}.{i%10}XX" for i in range(40))  # > 255 chars
+            r = client.post("/api/clinical/submit", json={
+                "patient_id": pid, "record_status": "Draft",
+                "icd10_code": too_long, "diagnosis": "x",
+            })
+            assert r.status_code == 400, r.text
+            assert "ICD-10" in r.json()["detail"]
+        finally:
+            client.cookies.update(receptionist_cookies)
+            client.delete(f"/api/patients/{pid}")
+
+
+class TestReferralApi:
+    """Sanity checks on the existing referrals API the new modal depends on."""
+
+    def test_create_requires_specialty_and_reason(self, client, doctor_cookies):
+        client.cookies.update(doctor_cookies)
+        r = client.post("/api/referrals/", json={"patient_id": 1, "specialty": "", "reason": ""})
+        assert r.status_code == 422  # Pydantic min_length=1
+
+    def test_create_and_serialize(self, client, receptionist_cookies, doctor_cookies):
+        patient = _new_patient(client, receptionist_cookies)
+        pid = patient["patient_id"]
+        try:
+            client.cookies.update(doctor_cookies)
+            r = client.post("/api/referrals/", json={
+                "patient_id": pid, "specialty": "Cardiology",
+                "reason": "Suspected arrhythmia", "urgency": "Urgent",
+                "target_facility": "KNH",
+            })
+            assert r.status_code == 200, r.text
+            body = r.json()
+            assert body["specialty"] == "Cardiology"
+            assert body["status"] == "Pending"
+            assert body["doctor_name"], body
+            assert body["patient_opd"], body
+        finally:
+            client.cookies.update(receptionist_cookies)
+            client.delete(f"/api/patients/{pid}")
