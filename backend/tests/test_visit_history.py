@@ -84,3 +84,55 @@ class TestChartAllVisits:
         finally:
             client.cookies.update(receptionist_cookies)
             client.delete(f"/api/patients/{pid}")
+
+
+class TestVisitDetail:
+    def _make_visit(self, client, receptionist_cookies, doctor_cookies):
+        patient = _new_patient(client, receptionist_cookies)
+        pid = patient["patient_id"]
+        _consent(client, doctor_cookies, pid)
+        _submit_visit(
+            client, doctor_cookies, pid,
+            icd10_code="J20.9, E11.9",
+            diagnosis="Acute bronchitis; Type 2 diabetes",
+            history_of_present_illness="Productive cough for 3 days",
+            blood_pressure="120/80", heart_rate=72,
+            treatment_plan='[{"drug":"Amoxicillin","formulation":"caps","dosage":"500mg","frequency":"8h","duration":"5d"}]',
+            internal_notes="internal only",
+        )
+        client.cookies.update(doctor_cookies)
+        chart = client.get(f"/api/medical-history/{pid}/chart")
+        record_id = chart.json()["recent_visits"][0]["record_id"]
+        return pid, record_id
+
+    def test_requires_auth(self):
+        # Fresh anonymous client — do NOT clear cookies on the shared module
+        # client, that would drop its csrf_token and break later POSTs.
+        with httpx.Client(base_url=BASE, headers=HEADERS) as anon:
+            r = anon.get("/api/clinical/record/1")
+            assert r.status_code == 401
+
+    def test_full_detail(self, client, receptionist_cookies, doctor_cookies):
+        pid, record_id = self._make_visit(client, receptionist_cookies, doctor_cookies)
+        try:
+            r = client.get(f"/api/clinical/record/{record_id}")
+            assert r.status_code == 200, r.text
+            d = r.json()
+            assert d["icd10_codes"] == ["J20.9", "E11.9"]
+            assert d["vitals"]["blood_pressure"] == "120/80"
+            assert d["vitals"]["heart_rate"] == 72
+            assert d["history_of_present_illness"] == "Productive cough for 3 days"
+            assert d["prescriptions"][0]["drug"] == "Amoxicillin"
+            assert d["doctor"] and d["doctor"] != "Unknown"
+            assert isinstance(d["lab_tests"], list)
+            assert isinstance(d["radiology"], list)
+            # doctor is a clinical role → sees internal notes
+            assert d["internal_notes"] == "internal only"
+        finally:
+            client.cookies.update(receptionist_cookies)
+            client.delete(f"/api/patients/{pid}")
+
+    def test_not_found(self, client, doctor_cookies):
+        client.cookies.update(doctor_cookies)
+        r = client.get("/api/clinical/record/99999999")
+        assert r.status_code == 404
