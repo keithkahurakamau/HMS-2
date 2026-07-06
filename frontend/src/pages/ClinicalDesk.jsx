@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
+import IcdDiagnosisPicker from '../components/IcdDiagnosisPicker';
+import ReferralModal from '../components/ReferralModal';
 import { useActivePatient } from '../context/PatientContext';
 
 // Prescription pick-lists — kept at module scope so the dropdowns are stable.
@@ -48,11 +50,10 @@ export default function ClinicalDesk() {
     const [examInput, setExamInput] = useState('');
     // Structured, numbered prescription rows routed to Pharmacy.
     const [medications, setMedications] = useState([]);
-    const [icdSearch, setIcdSearch] = useState('');
-    const [showIcdDropdown, setShowIcdDropdown] = useState(false);
-    // Server-side ICD-10 type-ahead results — the full CMS ICD-10-CM
-    // catalogue (~74k codes) lives in the backend, not in the bundle.
-    const [icdResults, setIcdResults] = useState([]);
+    // Multi-diagnosis chips — [{code, description}], first entry is primary.
+    // Type-ahead against the ~74k-row CMS ICD-10-CM catalogue lives in
+    // IcdDiagnosisPicker, which owns its own search/dropdown state.
+    const [icdCodes, setIcdCodes] = useState([]);
     const [chargeConsultation, setChargeConsultation] = useState(false);
     // The logged-in doctor's own consultation fee (per-doctor price-list row
     // server-side). Null until loaded; the charge endpoint resolves the fee
@@ -64,6 +65,7 @@ export default function ClinicalDesk() {
     const [isLabModalOpen, setIsLabModalOpen] = useState(false);
     const [isImagingModalOpen, setIsImagingModalOpen] = useState(false);
     const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
+    const [isReferModalOpen, setIsReferModalOpen] = useState(false);
     // Holds the most recent appointment we booked from this consultation so
     // the doctor sees confirmation in-line and the button updates from
     // "Select date…" to the scheduled date/time.
@@ -92,25 +94,6 @@ export default function ClinicalDesk() {
         fetchQueue();
         fetchMyFee();
     }, []);
-
-    // Debounced ICD-10 type-ahead against /clinical/icd10/search. Cleared
-    // when the dropdown closes (e.g. right after picking a code) so a stale
-    // result list can't flash open on the next focus.
-    useEffect(() => {
-        if (!showIcdDropdown || icdSearch.trim().length < 2) {
-            setIcdResults([]);
-            return undefined;
-        }
-        const timer = setTimeout(async () => {
-            try {
-                const res = await apiClient.get('/clinical/icd10/search', { params: { q: icdSearch } });
-                setIcdResults(res.data || []);
-            } catch {
-                setIcdResults([]);
-            }
-        }, 250);
-        return () => clearTimeout(timer);
-    }, [icdSearch, showIcdDropdown]);
 
     const fetchMyFee = async () => {
         try {
@@ -201,7 +184,7 @@ export default function ClinicalDesk() {
         setPhysicalExams([]);
         setExamInput('');
         setMedications([]);
-        setIcdSearch('');
+        setIcdCodes([]);
         // Pre-fill from the nurse's triage so the doctor doesn't re-key vitals.
         // Fire-and-forget — a missing/absent triage just leaves the form blank.
         prefillFromTriage(patientItem.patient_id);
@@ -287,7 +270,7 @@ export default function ClinicalDesk() {
     const validateForSubmit = (targetStatus) => {
         if (!activePatient) return 'Select a patient from the queue first.';
         if (targetStatus === 'Draft') return null;                    // drafts are intentionally permissive
-        const hasDx = (clinicalNotes.diagnosis || icdSearch || '').trim().length > 0;
+        const hasDx = ((clinicalNotes.diagnosis || '').trim().length > 0) || icdCodes.length > 0;
         const hasCc = complaints.length > 0;
         if (targetStatus === 'Pharmacy') {
             if (!medications.some((m) => m.drug.trim())) {
@@ -346,8 +329,8 @@ export default function ClinicalDesk() {
             chief_complaint: complaints.join('; '),
             history_of_present_illness: clinicalNotes.hpi,
             physical_examination: physicalExams.join('; '),
-            diagnosis: clinicalNotes.diagnosis || icdSearch,
-            icd10_code: icdSearch,
+            diagnosis: clinicalNotes.diagnosis || icdCodes.map((c) => c.description).join('; '),
+            icd10_code: icdCodes.map((c) => c.code).join(', '),
             // Structured prescriptions serialise to JSON in treatment_plan —
             // this is what the Pharmacy queue parses back into rows.
             treatment_plan: medications.some((m) => m.drug.trim())
@@ -650,21 +633,11 @@ export default function ClinicalDesk() {
                             <div data-tour="clinical-diagnoses" className="card-flush p-5 border-l-4 border-l-accent-500 space-y-4">
                                 <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><Pill size={16} className="text-accent-600 dark:text-accent-400" /> Diagnosis &amp; orders</h3>
 
-                                <div className="relative">
-                                    <label htmlFor="clinic-final-diagnosis-icd-10" className="label">Final diagnosis (ICD-10)</label>
-                                    <input id="clinic-final-diagnosis-icd-10" type="text" value={icdSearch} onChange={(e) => { setIcdSearch(e.target.value); setShowIcdDropdown(true); }} onFocus={() => setShowIcdDropdown(true)} className="input" placeholder="Type to search ICD-10 codes…" />
-                                    {showIcdDropdown && icdSearch.trim().length >= 2 && (
-                                        <div className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-elevated max-h-48 overflow-y-auto custom-scrollbar">
-                                            {icdResults.length > 0 ? icdResults.map((r) => {
-                                                const display = `${r.code} - ${r.description}`;
-                                                return (
-                                                    <button type="button" key={r.code} onClick={() => { setIcdSearch(display); setShowIcdDropdown(false); }} className="block w-full text-left px-4 py-2 hover:bg-brand-50 dark:hover:bg-brand-500/15 text-sm dark:text-ink-200">
-                                                        <span className="font-mono font-semibold">{r.code}</span> — {r.description}
-                                                    </button>
-                                                );
-                                            }) : <div className="px-4 py-3 text-sm text-ink-500 dark:text-ink-400">No codes found.</div>}
-                                        </div>
-                                    )}
+                                <IcdDiagnosisPicker codes={icdCodes} onChange={setIcdCodes} />
+
+                                <div>
+                                    <label htmlFor="clinic-diagnosis-free-text" className="label">Diagnosis notes (free text)</label>
+                                    <input id="clinic-diagnosis-free-text" type="text" value={clinicalNotes.diagnosis} onChange={(e) => setClinicalNotes({ ...clinicalNotes, diagnosis: e.target.value })} className="input" placeholder="Working / descriptive diagnosis if not using ICD-10 codes…" />
                                 </div>
 
                                 <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
@@ -796,7 +769,7 @@ export default function ClinicalDesk() {
                         <div data-tour="clinical-submit" className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap justify-between items-center gap-3 shrink-0 z-10">
                             <div className="flex gap-2">
                                 <button type="button" data-tour="clinical-save-draft" onClick={() => handleClinicalSubmit('Draft')} disabled={isSubmitting} className="btn-secondary"><Save size={15} /> Save draft</button>
-                                <button type="button" onClick={() => handleNotImplemented('External Referrals')} className="btn-ghost"><ArrowRightLeft size={15} /> Refer patient</button>
+                                <button type="button" onClick={() => setIsReferModalOpen(true)} className="btn-ghost"><ArrowRightLeft size={15} /> Refer patient</button>
                             </div>
 
                             <div className="flex gap-2">
@@ -846,6 +819,14 @@ export default function ClinicalDesk() {
                     submitting={consentSubmitting}
                     onClose={() => setIsConsentOpen(false)}
                     onSubmit={handleConsentSubmit}
+                />
+            )}
+
+            {isReferModalOpen && activePatient && (
+                <ReferralModal
+                    patient={activePatient}
+                    initialSummary={clinicalNotes.diagnosis || icdCodes.map((c) => c.description).join('; ')}
+                    onClose={() => setIsReferModalOpen(false)}
                 />
             )}
 

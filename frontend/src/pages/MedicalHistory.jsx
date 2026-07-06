@@ -9,6 +9,7 @@ import {
     Trash2, Edit, Save, Lock, Printer
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import VisitHistoryList from '../components/VisitHistoryList';
 import { printMedicalHistory } from '../utils/printTemplates';
 
 const ENTRY_TYPES = [
@@ -414,29 +415,8 @@ export default function MedicalHistory() {
                             );
                         })}
 
-                        {/* Recent Clinical Visits */}
-                        <div className="bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl shadow-sm overflow-hidden">
-                            <div className="p-4 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40">
-                                <h3 className="font-bold text-slate-800 dark:text-ink-200 flex items-center gap-2"><Clock size={16} /> Recent Clinical Visits</h3>
-                            </div>
-                            <div className="p-4 space-y-3">
-                                {(chart.recent_visits || []).length === 0 ? (
-                                    <p className="text-sm text-slate-400 dark:text-ink-400 italic text-center py-4">No clinical visits recorded.</p>
-                                ) : chart.recent_visits.map(visit => (
-                                    <div key={visit.record_id} className="flex gap-4 p-3 bg-slate-50 dark:bg-ink-800/40 rounded-xl border border-slate-100 dark:border-ink-800">
-                                        <div className="w-1 rounded-full bg-brand-500 shrink-0" />
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-start">
-                                                <p className="font-bold text-sm text-slate-800 dark:text-ink-200">{visit.diagnosis || 'No diagnosis recorded'}</p>
-                                                <span className="text-xs text-slate-400 dark:text-ink-400">{visit.date ? new Date(visit.date).toLocaleDateString() : '—'}</span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 dark:text-ink-400 mt-0.5"><span className="font-medium">Complaint:</span> {visit.chief_complaint || '—'}</p>
-                                            <p className="text-xs text-slate-500 dark:text-ink-400"><span className="font-medium">Dr:</span> {visit.doctor}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        {/* Full visit history — every consultation, expandable to full detail */}
+                        <VisitHistoryList visits={chart.recent_visits || []} />
 
                         {/* Triage History */}
                         <div className="card p-4">
