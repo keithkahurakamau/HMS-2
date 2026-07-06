@@ -104,10 +104,12 @@ def get_patient_medical_chart(
     def filter_by_type(type_key: str):
         return [e for e in all_entries if e.entry_type == type_key]
 
-    # Fetch recent clinical visits (last 10)
+    # Fetch all clinical visits (client requirement: doctors need the full
+    # visit history, not a recent slice). Rows are summary-weight; full
+    # detail loads lazily via GET /api/clinical/record/{record_id}.
     recent_records = db.query(MedicalRecord).filter(
         MedicalRecord.patient_id == patient_id
-    ).order_by(desc(MedicalRecord.created_at)).limit(10).all()
+    ).order_by(desc(MedicalRecord.created_at)).all()
 
     # Fetch triage history (last 10, newest first) — pulled up so the name
     # lookup below can batch doctors + nurses in a single query.
@@ -130,6 +132,7 @@ def get_patient_medical_chart(
             "doctor": names.get(rec.doctor_id, "Unknown"),
             "chief_complaint": rec.chief_complaint,
             "diagnosis": rec.diagnosis,
+            "icd10_code": rec.icd10_code,
             "record_status": rec.record_status
         })
 
