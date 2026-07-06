@@ -23,10 +23,10 @@ const DETAIL = {
     vitals: { blood_pressure: '120/80', heart_rate: 72, respiratory_rate: null, temperature: 36.8,
               spo2: 98, weight_kg: 70, height_cm: 175, calculated_bmi: 22.9, blood_glucose: null },
     chief_complaint: 'cough', history_of_present_illness: 'Productive cough for 3 days',
-    review_of_systems: null, physical_examination: 'Chest clear',
+    review_of_systems: { Cardiovascular: 'No chest pain', Respiratory: 'Clear' }, physical_examination: 'Chest clear',
     icd10_codes: ['J20.9', 'E11.9'], diagnosis: 'Acute bronchitis; T2DM',
     prescriptions: [{ drug: 'Amoxicillin', formulation: 'caps', dosage: '500mg', frequency: '8h', duration: '5d' }],
-    prescription_notes: null, follow_up_date: null, internal_notes: 'watch sugar',
+    prescription_notes: 'Take after meals', follow_up_date: null, internal_notes: 'watch sugar',
     lab_tests: [{ test_id: 1, test_name: 'FBC', status: 'Completed', result_summary: 'Normal' }],
     radiology: [{ request_id: 3, exam_type: 'Chest X-Ray', status: 'Completed', conclusion: 'Clear' }],
 };
@@ -53,6 +53,9 @@ describe('VisitHistoryList', () => {
         expect(screen.getByText('FBC')).toBeInTheDocument();
         expect(screen.getByText('Chest X-Ray')).toBeInTheDocument();
         expect(screen.getByText('E11.9')).toBeInTheDocument();
+        expect(screen.getByText(/No chest pain/)).toBeInTheDocument();
+        expect(screen.getByText('Take after meals')).toBeInTheDocument();
+        expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
         // collapse + re-expand must not refetch
         await user.click(screen.getByRole('button', { name: /acute bronchitis/i }));
         await user.click(screen.getByRole('button', { name: /acute bronchitis/i }));

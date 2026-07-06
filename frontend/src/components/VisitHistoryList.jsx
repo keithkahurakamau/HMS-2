@@ -72,7 +72,14 @@ export default function VisitHistoryList({ visits }) {
                                 <span className="flex-1 min-w-0">
                                     <span className="flex justify-between items-start gap-2">
                                         <span className="font-bold text-sm text-slate-800 dark:text-ink-200 truncate">{visit.diagnosis || 'No diagnosis recorded'}</span>
-                                        <span className="text-xs text-slate-400 dark:text-ink-400 shrink-0">{visit.date ? new Date(visit.date).toLocaleDateString() : '—'}</span>
+                                        <span className="flex items-center gap-2 shrink-0">
+                                            {visit.record_status && (
+                                                <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-ink-800 border border-slate-200 dark:border-ink-700 text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-ink-400">
+                                                    {visit.record_status}
+                                                </span>
+                                            )}
+                                            <span className="text-xs text-slate-400 dark:text-ink-400">{visit.date ? new Date(visit.date).toLocaleDateString() : '—'}</span>
+                                        </span>
                                     </span>
                                     <span className="block text-xs text-slate-500 dark:text-ink-400 mt-0.5">
                                         <span className="font-medium">Complaint:</span> {visit.chief_complaint || '—'} · <span className="font-medium">Dr:</span> {visit.doctor}
@@ -108,6 +115,19 @@ export default function VisitHistoryList({ visits }) {
                                                     <p className="text-sm text-slate-700 dark:text-ink-300 whitespace-pre-wrap">{detail.history_of_present_illness}</p>
                                                 </Section>
                                             )}
+                                            {detail.review_of_systems && Object.keys(detail.review_of_systems).length > 0 && (
+                                                <Section title="Review of systems">
+                                                    <ul className="space-y-0.5">
+                                                        {Object.entries(detail.review_of_systems)
+                                                            .filter(([, finding]) => finding)
+                                                            .map(([system, finding]) => (
+                                                                <li key={system} className="text-sm text-slate-700 dark:text-ink-300">
+                                                                    <span className="font-semibold">{system}:</span> {finding}
+                                                                </li>
+                                                            ))}
+                                                    </ul>
+                                                </Section>
+                                            )}
                                             {detail.physical_examination && (
                                                 <Section title="Physical examination">
                                                     <p className="text-sm text-slate-700 dark:text-ink-300 whitespace-pre-wrap">{detail.physical_examination}</p>
@@ -133,6 +153,14 @@ export default function VisitHistoryList({ visits }) {
                                                             </li>
                                                         ))}
                                                     </ul>
+                                                    {detail.prescription_notes && (
+                                                        <p className="text-sm text-slate-500 dark:text-ink-400 italic mt-1.5">{detail.prescription_notes}</p>
+                                                    )}
+                                                </Section>
+                                            )}
+                                            {!(detail.prescriptions?.length > 0) && detail.prescription_notes && (
+                                                <Section title="Prescription notes">
+                                                    <p className="text-sm text-slate-500 dark:text-ink-400 italic">{detail.prescription_notes}</p>
                                                 </Section>
                                             )}
                                             {detail.lab_tests?.length > 0 && (
