@@ -137,6 +137,42 @@ class TestVisitDetail:
         r = client.get("/api/clinical/record/99999999")
         assert r.status_code == 404
 
+    def test_admin_can_read_but_not_internal_notes(self, client, receptionist_cookies, doctor_cookies, admin_cookies):
+        # Admin is in SENSITIVE_DATA_RESTRICTED_ROLES but still holds
+        # history:read, so the endpoint must succeed — just without the
+        # internal_notes key.
+        pid, record_id = self._make_visit(client, receptionist_cookies, doctor_cookies)
+        try:
+            client.cookies.update(admin_cookies)
+            r = client.get(f"/api/clinical/record/{record_id}")
+            assert r.status_code == 200, r.text
+            assert "internal_notes" not in r.json()
+        finally:
+            client.cookies.update(receptionist_cookies)
+            client.delete(f"/api/patients/{pid}")
+
+    def test_legacy_display_string_icd10_kept_as_single_entry(self, client, receptionist_cookies, doctor_cookies):
+        # Legacy records store a display string (with a comma) in icd10_code
+        # rather than a modern comma-separated code list. Naive comma-split
+        # would wrongly produce two chips here — it must stay one entry.
+        patient = _new_patient(client, receptionist_cookies)
+        pid = patient["patient_id"]
+        try:
+            _consent(client, doctor_cookies, pid)
+            _submit_visit(
+                client, doctor_cookies, pid,
+                icd10_code="Type 2 diabetes mellitus, unspecified",
+            )
+            client.cookies.update(doctor_cookies)
+            chart = client.get(f"/api/medical-history/{pid}/chart")
+            record_id = chart.json()["recent_visits"][0]["record_id"]
+            r = client.get(f"/api/clinical/record/{record_id}")
+            assert r.status_code == 200, r.text
+            assert r.json()["icd10_codes"] == ["Type 2 diabetes mellitus, unspecified"]
+        finally:
+            client.cookies.update(receptionist_cookies)
+            client.delete(f"/api/patients/{pid}")
+
 
 class TestMultiIcdGuard:
     def test_oversize_icd_list_rejected(self, client, receptionist_cookies, doctor_cookies):
