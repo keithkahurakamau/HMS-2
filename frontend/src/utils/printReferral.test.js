@@ -12,7 +12,7 @@ vi.mock('./printDocument', () => ({
 }));
 
 import { printDocument } from './printDocument';
-import { printReferralLetter } from './printTemplates';
+import { printReferralLetter } from './printReferral';
 
 const PATIENT = { patient_name: 'Asha Mwangi', age: 34, gender: 'F', outpatient_no: 'OP-2025-0001' };
 const REFERRAL = {
@@ -57,5 +57,12 @@ describe('printReferralLetter', () => {
             referral: { ...REFERRAL, reason: '<script>alert(1)</script>' },
         });
         expect(lastBody()).not.toContain('<script>');
+    });
+
+    it('treats age 0 as a valid value, not blank (falsy-valid regression)', () => {
+        printReferralLetter({ mode: 'blank-patient', referral: {}, patient: { ...PATIENT, age: 0 }, doctorName: '' });
+        const body = lastBody();
+        // Age field should render the literal "0", not a blank ruled line for that field.
+        expect(body).toMatch(/<div class="value">0<\/div>/);
     });
 });

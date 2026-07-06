@@ -8,14 +8,14 @@ vi.mock('../api/client', () => ({
     isTenantRedirect: vi.fn(() => false),
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('../utils/printTemplates', () => ({ printReferralLetter: vi.fn() }));
+vi.mock('../utils/printReferral', () => ({ printReferralLetter: vi.fn() }));
 vi.mock('../context/AuthContext', () => ({
     useAuth: () => ({ user: { full_name: 'Dr. Otieno' } }),
 }));
 
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
-import { printReferralLetter } from '../utils/printTemplates';
+import { printReferralLetter } from '../utils/printReferral';
 import ReferralModal from './ReferralModal';
 
 const PATIENT = { patient_id: 11, patient_name: 'Asha Mwangi', age: 34, gender: 'F', outpatient_no: 'OP-2025-0001' };

@@ -635,6 +635,11 @@ export default function ClinicalDesk() {
 
                                 <IcdDiagnosisPicker codes={icdCodes} onChange={setIcdCodes} />
 
+                                <div>
+                                    <label htmlFor="clinic-diagnosis-free-text" className="label">Diagnosis notes (free text)</label>
+                                    <input id="clinic-diagnosis-free-text" type="text" value={clinicalNotes.diagnosis} onChange={(e) => setClinicalNotes({ ...clinicalNotes, diagnosis: e.target.value })} className="input" placeholder="Working / descriptive diagnosis if not using ICD-10 codes…" />
+                                </div>
+
                                 <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
                                     <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><TestTube size={13} /> Investigations</h4>
                                     <div className="flex gap-2">

@@ -3,7 +3,7 @@ import { X, Printer, Save, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { printReferralLetter } from '../utils/printTemplates';
+import { printReferralLetter } from '../utils/printReferral';
 
 const URGENCIES = ['Routine', 'Urgent', 'Emergency'];
 
