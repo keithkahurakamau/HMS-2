@@ -25,7 +25,7 @@ Client feedback drives three changes to the clinical workflow:
   - SOAP: `chief_complaint`, `history_of_present_illness`, `review_of_systems`, `physical_examination`
   - Vitals: BP, HR, RR, temp, SpO2, weight, height, BMI, blood glucose
   - Diagnosis & plan: `icd10_code` (may contain multiple comma-separated codes), `diagnosis`, `treatment_plan`, `prescription_notes`, parsed prescriptions (reuse `_parse_prescriptions`), `follow_up_date`
-  - Linked orders: lab tests (`LabTest.record_id`) and radiology requests for this record — name, status, and result summary each
+  - Linked orders: lab tests (`LabTest.record_id`) for this record — name, status, result summary; radiology requests matched best-effort by patient + same calendar day (`RadiologyRequest` has no record FK, and adding one would be a schema change)
   - Meta: visit date, doctor name, `record_status`
   - `internal_notes` are included only for clinical roles (same sensitivity posture as the chart's `SENSITIVE_DATA_RESTRICTED_ROLES`).
 - KDPA: the chart access is already logged via `_log_data_access`; the record-detail endpoint logs an equivalent access entry.
@@ -80,7 +80,7 @@ A JSON column or child table is more normalized but forces an alembic migration 
 2. **Blank + patient info** — letterhead, date, patient identity block, and referring doctor pre-filled; specialty/reason/summary printed as ruled blank sections for handwriting. Does **not** create a referral record.
 3. **Fully blank** — letterhead + form structure only; every field including patient identity is a ruled blank. No record created.
 
-**Print mechanism:** same pattern as `printPharmacyReceipt` in `Pharmacy.jsx` — `window.open` + inline A4 print CSS + `window.print()`, with `escapeHtml` on all interpolated values. Extracted as a shared helper so Pharmacy and referrals don't duplicate `escapeHtml`. Hospital name/branding sourced the same way the receipt gets it (tenant branding/settings already available to the frontend).
+**Print mechanism:** the app already has centralized print infrastructure — `frontend/src/utils/printDocument.js` (`printDocument()` + `printUtils.{esc, header, footer}`, shared A4 stylesheet, letterhead from tenant branding) with document templates in `frontend/src/utils/printTemplates.js`. The referral letter is a new template (`printReferralLetter`) in that file; all interpolated values go through `esc()`.
 
 ### Non-goals
 - No referral worklist/management page in this iteration — creation + printing from Clinical Desk only. Status transitions remain available via the existing API for later UI.
