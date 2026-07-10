@@ -54,7 +54,11 @@ jobs:
         # of 3.5.0; mitigated by pinning HS256 (core/security.py). TODO: migrate
         # JWT handling to PyJWT (drops the ecdsa transitive dep) and remove this
         # ignore entirely — tracked separately, it's a cross-cutting swap.
-        run: pip-audit -r backend/requirements.txt --strict --ignore-vuln PYSEC-2025-185
+        # PYSEC-2026-1325 (ecdsa, CVE-2024-23342): Minerva timing attack on
+        # P-256; upstream declares side channels out of scope, no fix exists.
+        # Same mitigation — HS256 pin means the ES* path in python-jose never
+        # calls ecdsa (see core/security.py). Removed by the same PyJWT swap.
+        run: pip-audit -r backend/requirements.txt --strict --ignore-vuln PYSEC-2025-185 --ignore-vuln PYSEC-2026-1325
 
   npm-audit:
     name: npm audit (frontend deps)
