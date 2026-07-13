@@ -44,6 +44,7 @@ from app.models import laboratory as _laboratory  # noqa: F401
 from app.models import clinical as _clinical  # noqa: F401
 from app.models import billing as _billing  # noqa: F401
 from app.models import audit as _audit  # noqa: F401
+from app.models import maternity as _maternity  # noqa: F401
 from app.models import medical_history as _medical_history  # noqa: F401
 from app.models import radiology as _radiology  # noqa: F401
 from app.models import auth_tokens as _auth_tokens  # noqa: F401
