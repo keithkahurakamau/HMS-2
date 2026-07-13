@@ -45,6 +45,7 @@ import app.routes.notifications as notifications_module
 import app.routes.patient_portal as patient_portal_module
 import app.routes.messaging as messaging_module
 import app.routes.referrals as referrals_module
+import app.routes.maternity as maternity_module
 import app.routes.settings as settings_module
 import app.routes.cheques as cheques_module
 import app.routes.support as support_module
@@ -297,6 +298,7 @@ app.include_router(notifications_module.router)
 app.include_router(patient_portal_module.router)
 app.include_router(messaging_module.router)
 app.include_router(referrals_module.router)
+app.include_router(maternity_module.router)
 app.include_router(settings_module.router)
 app.include_router(cheques_module.router)
 app.include_router(support_module.tenant_router)
