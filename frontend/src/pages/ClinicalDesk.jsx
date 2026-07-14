@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
@@ -13,16 +13,13 @@ import IcdDiagnosisPicker from '../components/IcdDiagnosisPicker';
 import ReferralModal from '../components/ReferralModal';
 import VitalsTrendsModal from '../components/VitalsTrendsModal';
 import { buildDiagnosisFields } from '../utils/diagnosisMapping';
+import { recordToFormState, splitComplaints } from '../utils/encounterResume';
 import { useActivePatient } from '../context/PatientContext';
 
 // Prescription pick-lists — kept at module scope so the dropdowns are stable.
 const FORMULATIONS = ["Tablet", "Capsule", "Syrup", "Suspension", "Injection", "Cream / Ointment", "Drops", "Inhaler", "Suppository", "Other"];
 const FREQUENCIES = ["OD (once daily)", "BD (twice daily)", "TDS (three times daily)", "QDS (four times daily)", "PRN (as needed)", "STAT (immediately)", "Nocte (at night)"];
 const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tablet', dosage: '', frequency: '', duration: '' });
-
-// Split a stored chief-complaint string back into discrete complaints. Newer
-// records join with "; "; older free-text ones become a single complaint.
-const splitComplaints = (s) => (s || '').split(/\s*;\s*|\n+/).flatMap((c) => { const t = c.trim(); return t ? [t] : []; });
 
 export default function ClinicalDesk() {
     const navigate = useNavigate();
@@ -65,6 +62,17 @@ export default function ClinicalDesk() {
     const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
     const [isReferModalOpen, setIsReferModalOpen] = useState(false);
     const [isTrendsOpen, setIsTrendsOpen] = useState(false);
+
+    // --- DRAFT / RETURNED ENCOUNTER RESUME ---
+    // `resumable` holds the doctor's latest unfinished record for the active
+    // patient (drives the banner); `resumeRecordId` is set once the doctor
+    // resumes it — or saves any draft — so /clinical/submit updates that row
+    // in place instead of inserting a duplicate per save.
+    const [resumable, setResumable] = useState(null);
+    const [resumeRecordId, setResumeRecordId] = useState(null);
+    // Blocks the async triage prefill from clobbering a form the doctor has
+    // already re-hydrated from a resumed encounter.
+    const resumeAppliedRef = useRef(false);
     // Holds the most recent appointment we booked from this consultation so
     // the doctor sees confirmation in-line and the button updates from
     // "Select date…" to the scheduled date/time.
@@ -120,6 +128,9 @@ export default function ClinicalDesk() {
     const clearWorkspace = () => {
         setActivePatient(null);
         setGlobalActivePatient(null);
+        setResumable(null);
+        setResumeRecordId(null);
+        resumeAppliedRef.current = false;
     };
 
     // Remove a single patient from the queue without charting them — e.g. they
@@ -184,9 +195,15 @@ export default function ClinicalDesk() {
         setExamInput('');
         setMedications([]);
         setIcdCodes([]);
+        setResumable(null);
+        setResumeRecordId(null);
+        resumeAppliedRef.current = false;
         // Pre-fill from the nurse's triage so the doctor doesn't re-key vitals.
         // Fire-and-forget — a missing/absent triage just leaves the form blank.
         prefillFromTriage(patientItem.patient_id);
+        // Surface any unfinished Draft/Returned encounter for this patient so
+        // the doctor can pick up where they left off instead of re-charting.
+        fetchResumable(patientItem.patient_id);
         // Default to ON — a consultation that ends at "Send to billing" with
         // no fee posts no invoice and the patient never surfaces in the
         // cashier's queue, which is the most common bug report from
@@ -206,6 +223,9 @@ export default function ClinicalDesk() {
             const res = await apiClient.get(`/triage/patients/${patientId}/latest`);
             const t = res.data;
             if (!t) return; // never triaged — leave the form blank
+            // The doctor resumed an unfinished encounter while this fetch was
+            // in flight — that form state wins over the triage prefill.
+            if (resumeAppliedRef.current) return;
             setVitals({
                 weight: t.weight_kg ?? '',
                 height: t.height_cm ?? '',
@@ -224,6 +244,34 @@ export default function ClinicalDesk() {
             // Triage is a convenience prefill, not a hard dependency — stay quiet
             // on failure (e.g. doctor's role lacks triage:read on an old tenant).
         }
+    };
+
+    // Looks up the doctor's own latest Draft/Returned record for the patient.
+    // Only feeds the banner — nothing is applied until the doctor clicks Resume.
+    const fetchResumable = async (patientId) => {
+        try {
+            const res = await apiClient.get(`/clinical/patients/${patientId}/resumable`);
+            if (res.data?.record) setResumable(res.data.record);
+        } catch {
+            // Non-blocking — the doctor just charts a fresh encounter.
+        }
+    };
+
+    // Re-hydrates the whole form from the unfinished record and locks
+    // subsequent saves onto it (update-in-place via record_id).
+    const applyResume = () => {
+        if (!resumable) return;
+        const fs = recordToFormState(resumable);
+        setVitals(fs.vitals);
+        setComplaints(fs.complaints);
+        setPhysicalExams(fs.physicalExams);
+        setMedications(fs.medications);
+        setIcdCodes(fs.icdCodes);
+        setClinicalNotes({ hpi: fs.hpi, diagnosis: fs.diagnosisText, internal_notes: fs.internalNotes });
+        setResumeRecordId(resumable.record_id);
+        resumeAppliedRef.current = true;
+        setResumable(null);
+        toast.success('Unfinished encounter loaded — saving will update it in place.', { icon: '📋' });
     };
 
     // --- ACTION HANDLERS ---
@@ -312,6 +360,9 @@ export default function ClinicalDesk() {
             patient_id: activePatient.patient_id,
             queue_id: activePatient.queue_id,
             record_status: targetStatus, // "Draft", "Pharmacy", "Billed", or "Completed"
+            // Present after a draft save or an explicit resume: the backend
+            // updates this record in place instead of inserting a new row.
+            ...(resumeRecordId ? { record_id: resumeRecordId } : {}),
 
             // Vitals (Convert strings to numbers where appropriate, or leave null)
             blood_pressure: vitals.bp || null,
@@ -340,7 +391,7 @@ export default function ClinicalDesk() {
         };
 
         try {
-            await apiClient.post('/clinical/submit', payload);
+            const res = await apiClient.post('/clinical/submit', payload);
 
             // Consultation fee posts on Billed/Pharmacy/Completed only — never
             // on Draft. For Pharmacy + Completed the checkbox still gates it
@@ -356,13 +407,23 @@ export default function ClinicalDesk() {
 
             if (targetStatus === 'Pharmacy') toast.success('Record saved and routed to Pharmacy.');
             else if (targetStatus === 'Billed') toast.success('Record saved — patient is now in the Billing queue.');
-            else if (targetStatus === 'Draft') toast.success('Draft saved.');
+            else if (targetStatus === 'Draft') {
+                toast.success('Draft saved.');
+                // Lock further saves onto this row so repeated "Save draft"
+                // updates in place instead of inserting duplicates, and drop
+                // any older-draft banner to avoid resuming over fresh work.
+                if (res.data?.record_id) setResumeRecordId(res.data.record_id);
+                setResumable(null);
+            }
             else toast.success('Consultation finalised and signed.');
 
             // If not a draft, clear the workspace and refresh the queue
             if (targetStatus !== 'Draft') {
                 setActivePatient(null);
                 setIsQueueOpen(true);
+                setResumable(null);
+                setResumeRecordId(null);
+                resumeAppliedRef.current = false;
                 fetchQueue();
             }
         } catch (error) {
@@ -553,6 +614,43 @@ export default function ClinicalDesk() {
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
+
+                            {/* Unfinished-encounter banner — offers to re-hydrate
+                                the form from the doctor's own Draft/Returned
+                                record instead of charting from scratch. */}
+                            {resumable && (
+                                <div className="rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-4 flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <FileText size={18} className="text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                                {resumable.record_status === 'Returned'
+                                                    ? 'A prescription for this patient was returned by pharmacy.'
+                                                    : 'You have an unfinished draft for this patient.'}
+                                            </p>
+                                            <p className="text-xs text-amber-800 dark:text-amber-300 truncate">
+                                                {resumable.created_at
+                                                    ? `Started ${new Date(resumable.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
+                                                    : 'Saved earlier'}
+                                                {resumable.chief_complaint ? ` · ${resumable.chief_complaint}` : ''}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <button type="button" onClick={applyResume} className="btn-primary py-1.5 px-3 text-xs">
+                                            Resume encounter
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setResumable(null)}
+                                            aria-label="Dismiss unfinished encounter banner"
+                                            className="p-1.5 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20"
+                                        >
+                                            <X size={15} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Vitals Entry */}
                             <div data-tour="clinical-vitals" className="card-flush p-5 border-l-4 border-l-brand-500">
