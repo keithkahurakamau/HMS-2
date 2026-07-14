@@ -11,6 +11,8 @@ import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
 import IcdDiagnosisPicker from '../components/IcdDiagnosisPicker';
 import ReferralModal from '../components/ReferralModal';
+import VitalsTrendsModal from '../components/VitalsTrendsModal';
+import { buildDiagnosisFields } from '../utils/diagnosisMapping';
 import { useActivePatient } from '../context/PatientContext';
 
 // Prescription pick-lists — kept at module scope so the dropdowns are stable.
@@ -21,11 +23,6 @@ const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tab
 // Split a stored chief-complaint string back into discrete complaints. Newer
 // records join with "; "; older free-text ones become a single complaint.
 const splitComplaints = (s) => (s || '').split(/\s*;\s*|\n+/).flatMap((c) => { const t = c.trim(); return t ? [t] : []; });
-
-// Pure helper — hoisted to module scope (uses no component state).
-const handleNotImplemented = (moduleName) => {
-    toast(`The ${moduleName} module is currently under development.`, { icon: '🚧' });
-};
 
 export default function ClinicalDesk() {
     const navigate = useNavigate();
@@ -50,9 +47,10 @@ export default function ClinicalDesk() {
     const [examInput, setExamInput] = useState('');
     // Structured, numbered prescription rows routed to Pharmacy.
     const [medications, setMedications] = useState([]);
-    // Multi-diagnosis chips — [{code, description}], first entry is primary.
-    // Type-ahead against the ~74k-row CMS ICD-10-CM catalogue lives in
-    // IcdDiagnosisPicker, which owns its own search/dropdown state.
+    // Multi-diagnosis chips — [{code, description}] for catalogue picks or
+    // {code: null, description, custom: true} for custom (note) diagnoses;
+    // first entry is primary. Type-ahead against the ~74k-row CMS ICD-10-CM
+    // catalogue lives in IcdDiagnosisPicker, which owns its own state.
     const [icdCodes, setIcdCodes] = useState([]);
     const [chargeConsultation, setChargeConsultation] = useState(false);
     // The logged-in doctor's own consultation fee (per-doctor price-list row
@@ -66,6 +64,7 @@ export default function ClinicalDesk() {
     const [isImagingModalOpen, setIsImagingModalOpen] = useState(false);
     const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
     const [isReferModalOpen, setIsReferModalOpen] = useState(false);
+    const [isTrendsOpen, setIsTrendsOpen] = useState(false);
     // Holds the most recent appointment we booked from this consultation so
     // the doctor sees confirmation in-line and the button updates from
     // "Select date…" to the scheduled date/time.
@@ -329,8 +328,9 @@ export default function ClinicalDesk() {
             chief_complaint: complaints.join('; '),
             history_of_present_illness: clinicalNotes.hpi,
             physical_examination: physicalExams.join('; '),
-            diagnosis: clinicalNotes.diagnosis || icdCodes.map((c) => c.description).join('; '),
-            icd10_code: icdCodes.map((c) => c.code).join(', '),
+            // Catalogue codes → icd10_code; custom (note) entries + the
+            // free-text field → diagnosis. See utils/diagnosisMapping.js.
+            ...buildDiagnosisFields(icdCodes, clinicalNotes.diagnosis),
             // Structured prescriptions serialise to JSON in treatment_plan —
             // this is what the Pharmacy queue parses back into rows.
             treatment_plan: medications.some((m) => m.drug.trim())
@@ -558,7 +558,7 @@ export default function ClinicalDesk() {
                             <div data-tour="clinical-vitals" className="card-flush p-5 border-l-4 border-l-brand-500">
                                 <div className="flex justify-between items-center mb-4 border-b border-ink-100 dark:border-ink-800 pb-3">
                                     <h3 className="section-eyebrow flex items-center gap-2"><Activity size={16} className="text-brand-500" /> Vital signs</h3>
-                                    <button type="button" onClick={() => handleNotImplemented('Vitals Trends')} className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1"><Activity size={13} /> View trends</button>
+                                    <button type="button" onClick={() => setIsTrendsOpen(true)} className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1"><Activity size={13} /> View trends</button>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
                                     <div><label htmlFor="clinic-bp-mmhg" className="label">BP (mmHg)</label><input id="clinic-bp-mmhg" type="text" value={vitals.bp} onChange={(e) => setVitals({...vitals, bp: e.target.value})} placeholder="120/80" className="input" /></div>
@@ -822,10 +822,17 @@ export default function ClinicalDesk() {
                 />
             )}
 
+            {activePatient && isTrendsOpen && (
+                <VitalsTrendsModal
+                    patient={activePatient}
+                    onClose={() => setIsTrendsOpen(false)}
+                />
+            )}
+
             {isReferModalOpen && activePatient && (
                 <ReferralModal
                     patient={activePatient}
-                    initialSummary={clinicalNotes.diagnosis || icdCodes.map((c) => c.description).join('; ')}
+                    initialSummary={buildDiagnosisFields(icdCodes, clinicalNotes.diagnosis).diagnosis}
                     onClose={() => setIsReferModalOpen(false)}
                 />
             )}
