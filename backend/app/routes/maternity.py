@@ -18,6 +18,7 @@ from app.models.maternity import (
     PncVisit, PregnancyEpisode,
 )
 from app.models.patient import Patient
+from app.services.maternity_billing import raise_maternity_charge
 from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/maternity", tags=["Maternity"])
@@ -195,3 +196,102 @@ def close_episode(episode_id: int, req: EpisodeClose, request: Request,
     db.commit()
     db.refresh(ep)
     return _episode_dict(db, ep)
+
+
+class AncVisitCreate(BaseModel):
+    visit_date: date
+    bp_systolic: Optional[int] = Field(default=None, ge=40, le=300)
+    bp_diastolic: Optional[int] = Field(default=None, ge=20, le=200)
+    weight_kg: Optional[float] = Field(default=None, ge=20, le=300)
+    fundal_height_cm: Optional[float] = Field(default=None, ge=4, le=60)
+    fetal_heart_rate: Optional[int] = Field(default=None, ge=60, le=220)
+    urine_dip: Optional[str] = Field(default=None, max_length=40)
+    notes: Optional[str] = None
+
+
+class PncVisitCreate(BaseModel):
+    visit_date: date
+    newborn_id: Optional[int] = None
+    bp_systolic: Optional[int] = Field(default=None, ge=40, le=300)
+    bp_diastolic: Optional[int] = Field(default=None, ge=20, le=200)
+    weight_kg: Optional[float] = Field(default=None, ge=20, le=300)
+    involution: Optional[str] = Field(default=None, max_length=40)
+    lochia: Optional[str] = Field(default=None, max_length=40)
+    feeding: Optional[str] = Field(default=None, max_length=40)
+    cord_status: Optional[str] = Field(default=None, max_length=40)
+    baby_weight_g: Optional[int] = Field(default=None, ge=200, le=9000)
+    urine_dip: Optional[str] = Field(default=None, max_length=40)
+    notes: Optional[str] = None
+
+
+@router.post("/episodes/{episode_id}/anc-visits", dependencies=[Depends(RequirePermission("maternity:manage"))])
+def create_anc_visit(episode_id: int, req: AncVisitCreate, request: Request,
+                     db: Session = Depends(get_db),
+                     current_user: dict = Depends(get_current_user)):
+    ep = _get_episode_or_404(db, episode_id)
+    if ep.status != "Active":
+        raise HTTPException(status_code=400, detail=f"Episode is {ep.status}; ANC visits need an Active episode.")
+    count = db.query(AncVisit).filter(AncVisit.episode_id == episode_id).count()
+    gestation = None
+    if ep.lmp:
+        gestation = max(0, (req.visit_date - ep.lmp).days // 7)
+    visit = AncVisit(
+        episode_id=episode_id, visit_number=count + 1, visit_date=req.visit_date,
+        gestation_weeks=gestation, bp_systolic=req.bp_systolic,
+        bp_diastolic=req.bp_diastolic, weight_kg=req.weight_kg,
+        fundal_height_cm=req.fundal_height_cm, fetal_heart_rate=req.fetal_heart_rate,
+        urine_dip=req.urine_dip, notes=req.notes,
+        recorded_by=current_user["user_id"],
+    )
+    db.add(visit)
+    db.flush()
+    raise_maternity_charge(
+        db, patient_id=ep.patient_id, service_code="MAT-ANC-VISIT",
+        clinician_name=current_user.get("full_name") or "Clinician",
+        user_id=current_user["user_id"],
+    )
+    log_audit(db, current_user["user_id"], "CREATE", "AncVisit", visit.visit_id,
+              None, {"episode_id": episode_id, "visit_date": req.visit_date.isoformat()},
+              request.client.host)
+    db.commit()
+    return {
+        "visit_id": visit.visit_id, "visit_number": visit.visit_number,
+        "visit_date": visit.visit_date.isoformat(),
+        "gestation_weeks": visit.gestation_weeks,
+    }
+
+
+@router.post("/episodes/{episode_id}/pnc-visits", dependencies=[Depends(RequirePermission("maternity:manage"))])
+def create_pnc_visit(episode_id: int, req: PncVisitCreate, request: Request,
+                     db: Session = Depends(get_db),
+                     current_user: dict = Depends(get_current_user)):
+    ep = _get_episode_or_404(db, episode_id)
+    if req.newborn_id is not None:
+        nb = db.query(NewbornRecord).filter(NewbornRecord.newborn_id == req.newborn_id).first()
+        if not nb:
+            raise HTTPException(status_code=404, detail="Newborn record not found")
+    count = db.query(PncVisit).filter(PncVisit.episode_id == episode_id).count()
+    visit = PncVisit(
+        episode_id=episode_id, newborn_id=req.newborn_id,
+        visit_number=count + 1, visit_date=req.visit_date,
+        bp_systolic=req.bp_systolic, bp_diastolic=req.bp_diastolic,
+        weight_kg=req.weight_kg, involution=req.involution, lochia=req.lochia,
+        feeding=req.feeding, cord_status=req.cord_status,
+        baby_weight_g=req.baby_weight_g, urine_dip=req.urine_dip,
+        notes=req.notes, recorded_by=current_user["user_id"],
+    )
+    db.add(visit)
+    db.flush()
+    raise_maternity_charge(
+        db, patient_id=ep.patient_id, service_code="MAT-PNC-VISIT",
+        clinician_name=current_user.get("full_name") or "Clinician",
+        user_id=current_user["user_id"],
+    )
+    log_audit(db, current_user["user_id"], "CREATE", "PncVisit", visit.visit_id,
+              None, {"episode_id": episode_id, "visit_date": req.visit_date.isoformat()},
+              request.client.host)
+    db.commit()
+    return {
+        "visit_id": visit.visit_id, "visit_number": visit.visit_number,
+        "visit_date": visit.visit_date.isoformat(),
+    }
