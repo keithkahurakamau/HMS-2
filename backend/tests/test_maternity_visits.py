@@ -87,13 +87,37 @@ class TestAncVisit:
             assert r.status_code == 200, r.text
             db = _db()
             try:
+                # Query invoice item with its ID
                 row = db.execute(text(
-                    "SELECT ii.amount FROM invoice_items ii "
+                    "SELECT ii.id, ii.amount FROM invoice_items ii "
                     "JOIN invoices i ON i.invoice_id = ii.invoice_id "
                     "WHERE i.patient_id = :pid AND ii.item_type = 'Maternity' "
                     "ORDER BY ii.id DESC LIMIT 1"
                 ), {"pid": episode["patient_id"]}).first()
-                assert row is not None and float(row[0]) == 500.0
+                assert row is not None
+                ii_id = row[0]
+                assert float(row[1]) == 500.0
+
+                # Assert GL journal entry exists for this invoice item
+                je_row = db.execute(text(
+                    "SELECT entry_id FROM acc_journal_entries "
+                    "WHERE source_type = 'billing.invoice.created' "
+                    "AND source_id = :ii_id AND status = 'posted'"
+                ), {"ii_id": ii_id}).first()
+                assert je_row is not None, f"No journal entry found for invoice item {ii_id}"
+                entry_id = je_row[0]
+
+                # Verify journal lines debit and credit total 500.00 each
+                debit_row = db.execute(text(
+                    "SELECT COALESCE(SUM(debit_base), 0) FROM acc_journal_lines "
+                    "WHERE entry_id = :entry_id"
+                ), {"entry_id": entry_id}).scalar()
+                credit_row = db.execute(text(
+                    "SELECT COALESCE(SUM(credit_base), 0) FROM acc_journal_lines "
+                    "WHERE entry_id = :entry_id"
+                ), {"entry_id": entry_id}).scalar()
+                assert float(debit_row) == 500.0, f"Total debit was {debit_row}, expected 500.0"
+                assert float(credit_row) == 500.0, f"Total credit was {credit_row}, expected 500.0"
             finally:
                 db.close()
         finally:
