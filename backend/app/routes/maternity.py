@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
@@ -86,12 +87,18 @@ def create_episode(req: EpisodeCreate, request: Request, db: Session = Depends(g
         lmp=req.lmp, edd=edd, blood_group=req.blood_group, rhesus=req.rhesus,
         risk_flags=req.risk_flags, created_by=current_user["user_id"],
     )
-    db.add(ep)
-    db.flush()
-    log_audit(db, current_user["user_id"], "CREATE", "PregnancyEpisode", ep.episode_id,
-              None, {"patient_id": req.patient_id, "gravida": req.gravida},
-              request.client.host)
-    db.commit()
+    try:
+        db.add(ep)
+        db.flush()
+        log_audit(db, current_user["user_id"], "CREATE", "PregnancyEpisode", ep.episode_id,
+                  None, {"patient_id": req.patient_id, "gravida": req.gravida},
+                  request.client.host)
+        db.commit()
+    except IntegrityError:
+        # Race: concurrent POST passed the pre-check SELECT; the unique index caught the duplicate.
+        db.rollback()
+        raise HTTPException(status_code=409,
+                            detail="Patient already has an Active pregnancy episode.")
     db.refresh(ep)
     return _episode_dict(db, ep)
 
