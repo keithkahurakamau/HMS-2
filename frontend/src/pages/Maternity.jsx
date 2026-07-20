@@ -18,6 +18,7 @@ export default function Maternity() {
         {TABS.map((t) => (
           <button
             key={t.key}
+            type="button"
             role="tab"
             aria-selected={tab === t.key}
             onClick={() => setTab(t.key)}
