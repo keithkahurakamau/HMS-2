@@ -343,7 +343,14 @@ def record_delivery(episode_id: int, req: DeliveryCreate, request: Request,
         if nb.outcome not in VALID_OUTCOME:
             raise HTTPException(status_code=400,
                                 detail=f"newborn outcome must be one of {sorted(VALID_OUTCOME)}")
-    ep = _get_episode_or_404(db, episode_id)
+    ep = (
+        db.query(PregnancyEpisode)
+        .with_for_update()
+        .filter(PregnancyEpisode.episode_id == episode_id)
+        .first()
+    )
+    if not ep:
+        raise HTTPException(status_code=404, detail="Pregnancy episode not found")
     existing = db.query(DeliveryRecord).filter(DeliveryRecord.episode_id == episode_id).first()
     if existing:
         raise HTTPException(status_code=409,
@@ -411,7 +418,12 @@ def record_delivery(episode_id: int, req: DeliveryCreate, request: Request,
 def register_newborn_as_patient(newborn_id: int, request: Request,
                                 db: Session = Depends(get_db),
                                 current_user: dict = Depends(get_current_user)):
-    nb = db.query(NewbornRecord).filter(NewbornRecord.newborn_id == newborn_id).first()
+    nb = (
+        db.query(NewbornRecord)
+        .with_for_update()
+        .filter(NewbornRecord.newborn_id == newborn_id)
+        .first()
+    )
     if not nb:
         raise HTTPException(status_code=404, detail="Newborn record not found")
     if nb.registered_patient_id:
