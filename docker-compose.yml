@@ -66,7 +66,13 @@ services:
     environment:
       # DATABASE_URL points at the postgres service over the compose network.
       # The app derives hms_master + per-tenant DB URLs from this base.
+      # To rehearse the production connection-pooling topology, point this at a
+      # PgBouncer (transaction mode, port 6432) instead — see docs/DEPLOYMENT.md
+      # §1 for the wildcard-database PgBouncer recipe.
       DATABASE_URL: postgresql://${POSTGRES_USER:-medifleet}:${POSTGRES_PASSWORD:-medifleet}@postgres:5432/${POSTGRES_DB:-hms_master}
+      # Per-worker concurrency knobs (see backend/app/config/settings.py).
+      WEB_CONCURRENCY:   ${WEB_CONCURRENCY:-1}
+      THREADPOOL_TOKENS: ${THREADPOOL_TOKENS:-40}
       REDIS_URL:    redis://redis:6379/0
       SECRET_KEY:        ${SECRET_KEY:?set SECRET_KEY in .env}
       ENCRYPTION_KEY:    ${ENCRYPTION_KEY:-00000000000000000000000000000000}

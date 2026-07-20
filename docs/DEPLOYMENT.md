@@ -95,18 +95,40 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 ## 6. Worker model
 
+`backend/render-start.sh` now launches **gunicorn managing uvicorn workers**
+directly — no manual command needed. The worker count is driven by the
+`WEB_CONCURRENCY` env var (default `1`, so the out-of-the-box deploy is a single
+worker). To scale a worker up:
+
 ```bash
-gunicorn app.main:app \
-  --workers 4 \
-  --worker-class uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:8000 \
-  --timeout 60 \
-  --max-requests 1000 \
-  --max-requests-jitter 100
+# Set on the host / Render dashboard:
+WEB_CONCURRENCY=4          # ~2 × vCPU
+REDIS_URL=redis://…        # REQUIRED for >1 worker (cross-worker WS fan-out)
+GUNICORN_TIMEOUT=120       # optional override (default 120s)
+GUNICORN_MAX_REQUESTS=2000 # optional; recycles workers to cap memory
 ```
 
-`--max-requests` periodically recycles workers, capping the long-lived memory
-footprint of the tenant engine cache.
+The script refuses nothing but prints a loud warning if `WEB_CONCURRENCY > 1`
+while `REDIS_URL` is unset — without Redis, a notification or payment event
+published on one worker never reaches a socket living on another.
+
+`--max-requests` (+ jitter) periodically recycles each worker, capping the
+long-lived memory footprint of the per-worker tenant-engine LRU cache.
+
+### Per-worker concurrency (thread pool)
+
+~245 of the API handlers are synchronous `def`, which FastAPI runs in AnyIO's
+thread pool (default 40 threads = the ceiling on concurrent in-flight DB-bound
+requests per worker). `THREADPOOL_TOKENS` (default 40) lifts that ceiling — but
+each busy thread can hold one DB connection, so only raise it in step with the
+database's connection budget (i.e. behind PgBouncer).
+
+### Response speed
+
+The API returns `ORJSONResponse` by default (3–5× faster JSON encoding than the
+stdlib) and GZip-compresses responses above `GZIP_MIN_SIZE` bytes (default 500),
+which is the dominant latency term for large payloads (charts, statements,
+queues) on slower hospital links.
 
 ## 7. Append-only audit triggers
 
