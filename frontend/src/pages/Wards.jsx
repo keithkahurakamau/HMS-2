@@ -8,6 +8,8 @@ import toast from 'react-hot-toast';
 import { printAdmissionSlip } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
 import DepartmentQueue from '../components/DepartmentQueue';
+import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
+import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 
 export default function Wards() {
     const [wards, setWards] = useState([]);
@@ -114,6 +116,22 @@ export default function Wards() {
     const [clinicalNote, setClinicalNote] = useState('');
     const [isSavingNote, setIsSavingNote] = useState(false);
 
+    // Local draft safety net — a shift handover mid-observation shouldn't
+    // cost the nurse what they'd already typed. Keyed by admission_id so a
+    // note started for one patient's bed can never surface on another's.
+    const clinicalNoteDraftKey = activeBed?.admission_id ? `wardsLog:${activeBed.admission_id}` : null;
+    const {
+        hasSavedDraft: hasNoteDraft,
+        savedAt: noteDraftSavedAt,
+        applyDraft: applyNoteDraft,
+        discardDraft: discardNoteDraft,
+        clearDraft: clearNoteDraft,
+    } = useDraftSafetyNet({
+        storageKey: clinicalNoteDraftKey,
+        value: clinicalNote,
+        enabled: !!activeBed,
+    });
+
     const handleSaveClinicalNote = async () => {
         if (!activeBed?.admission_id || !clinicalNote.trim()) {
             toast.error('Type an observation first.');
@@ -126,6 +144,7 @@ export default function Wards() {
             });
             toast.success('Observation logged to audit trail.');
             setClinicalNote('');
+            clearNoteDraft();
         } catch (error) {
             toast.error(error.response?.data?.detail || 'Could not save observation.');
         } finally {
@@ -238,9 +257,17 @@ export default function Wards() {
                                 }[bed.status] || 'text-amber-700';
                                 return (
                                     <button key={bed.id} type="button"
-                                        onClick={() => bed.status === 'Occupied'
-                                            ? setActiveBed({ ...bed, wardName: ward.name })
-                                            : setSetupBed({ ...bed, wardName: ward.name })}
+                                        onClick={() => {
+                                            if (bed.status === 'Occupied') {
+                                                // Reset the clinical-log draft so a note typed for
+                                                // the previously open bed can never bleed onto this
+                                                // admission's form.
+                                                setClinicalNote('');
+                                                setActiveBed({ ...bed, wardName: ward.name });
+                                            } else {
+                                                setSetupBed({ ...bed, wardName: ward.name });
+                                            }
+                                        }}
                                         className={`relative text-left flex flex-col p-3.5 rounded-xl border transition-all duration-150 ${variantBg}`}>
                                         <span className={`absolute top-3 right-3 size-2 rounded-full ${dotBg}`} />
                                         <div className="flex items-center gap-2 mb-2">
@@ -393,6 +420,16 @@ export default function Wards() {
 
                             <div className="card-flush p-5">
                                 <h3 className="section-eyebrow mb-4 border-b border-ink-100 pb-3">Clinical log</h3>
+                                {hasNoteDraft && (
+                                    <div className="mb-3">
+                                        <DraftRecoveryBanner
+                                            savedAt={noteDraftSavedAt}
+                                            label="observation"
+                                            onRestore={() => setClinicalNote(applyNoteDraft() || '')}
+                                            onDiscard={discardNoteDraft}
+                                        />
+                                    </div>
+                                )}
                                 <textarea
                                     rows="3"
                                     aria-label="Clinical log"
