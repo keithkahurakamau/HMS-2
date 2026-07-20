@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getLaborBoard, getPartograph } from './api';
 import PartographChart from './PartographChart';
 import PartographEntryForm from './PartographEntryForm';
@@ -15,19 +15,35 @@ export default function LaborBoardTab() {
   const [chart, setChart] = useState(null);
   const [showEntry, setShowEntry] = useState(false);
   const [error, setError] = useState('');
+  // Tracks the labor_admission_id of the most recently requested partograph so
+  // that a late-resolving (out-of-order) fetch for a since-abandoned selection
+  // can never overwrite the chart for whichever labor is selected now.
+  const requestedLaborIdRef = useRef(null);
 
   const refreshBoard = useCallback(() => {
     Promise.resolve(getLaborBoard())
-      .then((rows) => setBoard(rows || []))
+      .then((rows) => { setBoard(rows || []); setError(''); })
       .catch(() => setError('Failed to load labor board'));
   }, []);
   useEffect(() => { refreshBoard(); }, [refreshBoard]);
 
   const open = useCallback((row) => {
     setSelected(row);
+    setChart(null); // clear stale chart immediately so it can never render under the new name
+    requestedLaborIdRef.current = row.labor_admission_id;
     Promise.resolve(getPartograph(row.labor_admission_id))
-      .then((data) => setChart(data || null))
-      .catch(() => setError('Failed to load partograph'));
+      .then((data) => {
+        // Ignore out-of-order responses: only apply if this is still the
+        // latest requested labor, and the payload actually matches it.
+        if (requestedLaborIdRef.current !== row.labor_admission_id) return;
+        if (data && data.labor_admission_id !== row.labor_admission_id) return;
+        setChart(data || null);
+        setError('');
+      })
+      .catch(() => {
+        if (requestedLaborIdRef.current !== row.labor_admission_id) return;
+        setError('Failed to load partograph');
+      });
   }, []);
 
   return (
@@ -59,7 +75,7 @@ export default function LaborBoardTab() {
         </ul>
       </section>
 
-      {selected && chart && (
+      {selected && (
         <section aria-label="Partograph"
                  className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4">
           <div className="flex items-center justify-between">
@@ -83,9 +99,13 @@ export default function LaborBoardTab() {
               </button>
             </div>
           </div>
-          <div className="mt-3 overflow-x-auto">
-            <PartographChart entries={chart.entries} activeStart={chart.active_labor_started_at} />
-          </div>
+          {chart && chart.labor_admission_id === selected.labor_admission_id ? (
+            <div className="mt-3 overflow-x-auto">
+              <PartographChart entries={chart.entries} activeStart={chart.active_labor_started_at} />
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-ink-500 dark:text-ink-400">Loading…</p>
+          )}
         </section>
       )}
 
