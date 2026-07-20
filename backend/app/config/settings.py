@@ -144,9 +144,29 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE_SECONDS: int = 1800  # recycle every 30 min to dodge idle-killers
     TENANT_ENGINE_CACHE_SIZE: int = 32   # LRU cap on the in-process tenant engine cache
 
+    # Concurrency / throughput tuning (per worker).
+    #
+    # ~245 of the API handlers are synchronous `def`, which FastAPI runs in
+    # AnyIO's thread pool. Its default cap is 40 threads; that's also the ceiling
+    # on concurrent in-flight DB-bound requests per worker. Raising it lets one
+    # worker serve more simultaneous requests, but each busy thread can hold one
+    # DB connection — so keep THREADPOOL_TOKENS in sane proportion to the
+    # database's connection budget (front Postgres with PgBouncer before pushing
+    # this high across multiple workers). Default keeps the historical 40.
+    THREADPOOL_TOKENS: int = 40
+
+    # Minimum response size (bytes) before GZip compression kicks in. Small
+    # bodies aren't worth the CPU; large JSON (charts, lists, reports) benefit a
+    # lot over the wire. 0 disables compression entirely.
+    GZIP_MIN_SIZE: int = 500
+
     # Redis (optional) — when set, WebSocket broadcasts use Redis pub/sub so they
     # work across multiple workers / load-balanced replicas. When unset, we fall
     # back to the in-process dictionary and log a warning at boot.
+    #
+    # NOTE: running more than one web worker (WEB_CONCURRENCY > 1, see
+    # render-start.sh) REQUIRES this — without it, a notification or payment
+    # event published on worker-A never reaches a socket living on worker-B.
     REDIS_URL: str = ""
 
     # Infrastructure / orchestration values consumed by docker-compose from the
@@ -160,6 +180,10 @@ class Settings(BaseSettings):
     BACKEND_HOST_PORT: str = ""
     FRONTEND_HOST_PORT: str = ""
     MIGRATE_ON_BOOT: str = ""
+    # Consumed by render-start.sh / docker-compose (gunicorn worker count), not
+    # by the app itself — declared so its presence in .env doesn't trip
+    # extra="forbid".
+    WEB_CONCURRENCY: str = ""
     SEED_SUPERADMIN_EMAIL: str = ""
     SEED_SUPERADMIN_PASSWORD: str = ""
 
