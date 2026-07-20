@@ -27,28 +27,33 @@ export default function useNotificationSocket(enabled, userId, role, onEvent) {
     useEffect(() => { cbRef.current = onEvent; });
 
     useEffect(() => {
-        if (!enabled || !userId) return undefined;
+        // A single cleanup function owns whatever this effect allocates —
+        // `socket` stays null on any bailout path (disabled, no userId,
+        // constructor throws) so cleanup is unconditional and guaranteed
+        // rather than living behind an early `return undefined`.
+        let socket = null;
 
-        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const query = role ? `?role=${encodeURIComponent(role)}` : '';
-        const url = `${proto}//${window.location.host}/ws/notifications/${encodeURIComponent(userId)}${query}`;
+        if (enabled && userId) {
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const query = role ? `?role=${encodeURIComponent(role)}` : '';
+            const url = `${proto}//${window.location.host}/ws/notifications/${encodeURIComponent(userId)}${query}`;
 
-        let socket;
-        try {
-            socket = new WebSocket(url);
-        } catch {
-            return undefined; // fall back to polling
+            try {
+                socket = new WebSocket(url);
+                socket.onmessage = (evt) => {
+                    let data;
+                    try { data = JSON.parse(evt.data); } catch { return; }
+                    if (data && data.type === 'notification') cbRef.current?.(data);
+                };
+                // Swallow errors — polling is the safety net.
+                socket.onerror = () => {};
+            } catch {
+                socket = null; // fall back to polling
+            }
         }
 
-        socket.onmessage = (evt) => {
-            let data;
-            try { data = JSON.parse(evt.data); } catch { return; }
-            if (data && data.type === 'notification') cbRef.current?.(data);
-        };
-        // Swallow errors — polling is the safety net.
-        socket.onerror = () => {};
-
         return () => {
+            if (!socket) return;
             try {
                 if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
                     socket.close();
