@@ -6,7 +6,9 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
+import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
 import { useActivePatient } from '../context/PatientContext';
+import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 
 // Acuity scale shown to the nurse. 1 = most urgent. Mirrors the 1–5 range the
 // backend clamps to and the doctor's queue sorts by.
@@ -38,6 +40,23 @@ export default function Triage() {
     const [triageNotes, setTriageNotes] = useState('');
     const [acuity, setAcuity] = useState(3);
     const [disposition, setDisposition] = useState('Consultation');
+
+    // Local draft safety net for the notes field — protects a nurse's typed
+    // observations from an interruption (shift handover, accidental
+    // navigation) before "Save & send to doctor" is clicked. Keyed by
+    // queue_id so one patient's notes can never surface on another's form.
+    const triageDraftKey = activePatient?.queue_id ? `triageNotes:${activePatient.queue_id}` : null;
+    const {
+        hasSavedDraft: hasNotesDraft,
+        savedAt: notesDraftSavedAt,
+        applyDraft: applyNotesDraft,
+        discardDraft: discardNotesDraft,
+        clearDraft: clearNotesDraft,
+    } = useDraftSafetyNet({
+        storageKey: triageDraftKey,
+        value: triageNotes,
+        enabled: !!activePatient,
+    });
 
     const { setActivePatient: setGlobalActivePatient } = useActivePatient();
 
@@ -154,6 +173,7 @@ export default function Triage() {
         try {
             const res = await apiClient.post('/triage/submit', payload);
             toast.success(res.data?.message || 'Triage saved — patient sent to the doctor.');
+            clearNotesDraft();
             setActivePatient(null);
             setIsQueueOpen(true);
             fetchQueue();
@@ -305,6 +325,16 @@ export default function Triage() {
                                 </div>
                                 <div>
                                     <label htmlFor="triage-triage-notes" className="label">Triage notes</label>
+                                    {hasNotesDraft && (
+                                        <div className="mb-2">
+                                            <DraftRecoveryBanner
+                                                savedAt={notesDraftSavedAt}
+                                                label="triage notes"
+                                                onRestore={() => setTriageNotes(applyNotesDraft() || '')}
+                                                onDiscard={discardNotesDraft}
+                                            />
+                                        </div>
+                                    )}
                                     <textarea id="triage-triage-notes" value={triageNotes} onChange={(e) => setTriageNotes(e.target.value)} rows={3} placeholder="Observations, mobility, anything the doctor should know." className="input" />
                                 </div>
                             </section>

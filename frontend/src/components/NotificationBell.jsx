@@ -1,30 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, CheckCheck, Info, AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Bell, Check, CheckCheck } from 'lucide-react';
 import { apiClient } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import useNotificationSocket from '../hooks/useNotificationSocket';
+import NotificationToast from './NotificationToast';
+import { NOTIFICATION_CATEGORY_ICONS as CATEGORY_ICONS, NOTIFICATION_CATEGORY_STYLE as CATEGORY_STYLE } from '../constants/notificationCategories';
 
 const POLL_INTERVAL_MS = 30_000;
-
-const CATEGORY_ICONS = {
-    info: Info,
-    success: CheckCircle2,
-    warning: AlertTriangle,
-    critical: AlertCircle,
-};
-
-// Map each category to a tinted icon container — the rail/icon colour is the
-// only place categories should differ. Cards themselves stay neutral so the
-// overall inbox doesn't feel like a Christmas tree.
-const CATEGORY_STYLE = {
-    info:     { ring: 'bg-blue-50 ring-blue-100 text-blue-600',
-                rail: 'bg-blue-500',     label: 'text-blue-700' },
-    success:  { ring: 'bg-accent-50 ring-accent-100 text-accent-600',
-                rail: 'bg-accent-500',   label: 'text-accent-700' },
-    warning:  { ring: 'bg-amber-50 ring-amber-100 text-amber-600',
-                rail: 'bg-amber-500',    label: 'text-amber-700' },
-    critical: { ring: 'bg-rose-50 ring-rose-100 text-rose-600',
-                rail: 'bg-rose-500',     label: 'text-rose-700' },
-};
+// How long the live sneak-peek popup stays up before settling into the bell
+// (which already has it — see handleLiveNotification).
+const TOAST_DURATION_MS = 6_000;
 
 export default function NotificationBell() {
     const [open, setOpen] = useState(false);
@@ -32,6 +19,7 @@ export default function NotificationBell() {
     const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
+    const { user } = useAuth();
 
     const fetchNotifications = useCallback(async () => {
         try {
@@ -81,6 +69,42 @@ export default function NotificationBell() {
             setOpen(false);
         }
     };
+
+    // Live push from useNotificationSocket — notify() (backend) fires this the
+    // instant a notification is created. Put it in the bell's list right away
+    // (don't wait for the next 30s poll) and surface a sneak-peek toast that
+    // auto-dismisses on its own; the notification is already sitting in the
+    // bell underneath, so nothing is lost when the toast times out. Passed
+    // fresh each render — useNotificationSocket keeps the latest callback in
+    // a ref internally, so this doesn't need to be memoized.
+    const handleLiveNotification = (payload) => {
+        const n = {
+            notification_id: payload.notification_id,
+            category: payload.category,
+            title: payload.title,
+            body: payload.body,
+            link: payload.link,
+            created_at: payload.created_at,
+            is_read: false,
+        };
+        setNotifications((prev) => (
+            prev.some((existing) => existing.notification_id === n.notification_id)
+                ? prev
+                : [n, ...prev]
+        ));
+        setUnreadCount((c) => c + 1);
+
+        toast.custom((t) => (
+            <NotificationToast
+                notification={n}
+                visible={t.visible}
+                onClick={() => { handleClick(n); toast.dismiss(t.id); }}
+                onDismiss={() => toast.dismiss(t.id)}
+            />
+        ), { duration: TOAST_DURATION_MS, id: `notif-${n.notification_id}` });
+    };
+
+    useNotificationSocket(true, user?.user_id, user?.role, handleLiveNotification);
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -146,7 +170,7 @@ export default function NotificationBell() {
                         ) : (
                             <ul className="divide-y divide-ink-100 dark:divide-ink-800">
                                 {notifications.map((n) => {
-                                    const Icon = CATEGORY_ICONS[n.category] || Info;
+                                    const Icon = CATEGORY_ICONS[n.category] || CATEGORY_ICONS.info;
                                     const style = CATEGORY_STYLE[n.category] || CATEGORY_STYLE.info;
                                     return (
                                         <li

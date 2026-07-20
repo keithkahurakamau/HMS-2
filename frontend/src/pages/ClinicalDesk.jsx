@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
     Search, User, Activity, FileText, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable,
-    X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus, Trash2,
+    X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus, Trash2, Maximize2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
 import IcdDiagnosisPicker from '../components/IcdDiagnosisPicker';
 import ReferralModal from '../components/ReferralModal';
 import VitalsTrendsModal from '../components/VitalsTrendsModal';
+import PatientHistoryModal from '../components/PatientHistoryModal';
+import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
 import { buildDiagnosisFields } from '../utils/diagnosisMapping';
 import { recordToFormState, splitComplaints } from '../utils/encounterResume';
 import { useActivePatient } from '../context/PatientContext';
+import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 
 // Prescription pick-lists — kept at module scope so the dropdowns are stable.
 const FORMULATIONS = ["Tablet", "Capsule", "Syrup", "Suspension", "Injection", "Cream / Ointment", "Drops", "Inhaler", "Suppository", "Other"];
@@ -22,7 +24,6 @@ const FREQUENCIES = ["OD (once daily)", "BD (twice daily)", "TDS (three times da
 const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tablet', dosage: '', frequency: '', duration: '' });
 
 export default function ClinicalDesk() {
-    const navigate = useNavigate();
     // --- DYNAMIC QUEUE STATE ---
     const [queue, setQueue] = useState([]);
     const [isLoadingQueue, setIsLoadingQueue] = useState(true);
@@ -77,6 +78,43 @@ export default function ClinicalDesk() {
     // the doctor sees confirmation in-line and the button updates from
     // "Select date…" to the scheduled date/time.
     const [pendingFollowUp, setPendingFollowUp] = useState(null);
+
+    // Inline patient-history popup — { entry_type } | null. entry_type null
+    // means "full chart". Lets the doctor glance at history without leaving
+    // this in-progress encounter.
+    const [historyModal, setHistoryModal] = useState(null);
+
+    // --- LOCAL DRAFT SAFETY NET ---
+    // Client-side companion to the server-side draft/resume above: that one
+    // covers "doctor explicitly saved a draft and comes back later, any
+    // device"; this covers the gap before that first explicit save — an
+    // accidental navigation, a browser crash, a closed tab — on this device.
+    // Keyed by queue_id so one patient's unsaved text can never surface on
+    // another patient's form.
+    const encounterDraftKey = activePatient?.queue_id ? `clinicalDesk:${activePatient.queue_id}` : null;
+    const {
+        hasSavedDraft: hasLocalDraft,
+        savedAt: localDraftSavedAt,
+        applyDraft: applyLocalDraft,
+        discardDraft: discardLocalDraft,
+        clearDraft: clearLocalDraft,
+    } = useDraftSafetyNet({
+        storageKey: encounterDraftKey,
+        value: { vitals, clinicalNotes, complaints, physicalExams, medications, icdCodes },
+        enabled: !!activePatient,
+    });
+
+    const handleRestoreLocalDraft = () => {
+        const draft = applyLocalDraft();
+        if (!draft) return;
+        if (draft.vitals) setVitals(draft.vitals);
+        if (draft.clinicalNotes) setClinicalNotes(draft.clinicalNotes);
+        if (draft.complaints) setComplaints(draft.complaints);
+        if (draft.physicalExams) setPhysicalExams(draft.physicalExams);
+        if (draft.medications) setMedications(draft.medications);
+        if (draft.icdCodes) setIcdCodes(draft.icdCodes);
+        toast.success('Unsaved notes restored.', { icon: '📝' });
+    };
 
     // --- KDPA TREATMENT CONSENT MODAL ---
     // Doctors can record consent without leaving the desk, so the clinical
@@ -393,6 +431,10 @@ export default function ClinicalDesk() {
         try {
             const res = await apiClient.post('/clinical/submit', payload);
 
+            // The record is now durably saved server-side (or finalised) —
+            // the local safety net for this queue_id has done its job.
+            clearLocalDraft();
+
             // Consultation fee posts on Billed/Pharmacy/Completed only — never
             // on Draft. For Pharmacy + Completed the checkbox still gates it
             // (a follow-up encounter might not warrant a new fee). For Billed
@@ -562,6 +604,17 @@ export default function ClinicalDesk() {
                                             </div>
                                         </div>
                                     )}
+                                    {/* Expand icon — opens the read-only history popup on top of
+                                        this in-progress encounter, full chart (no section filter). */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setHistoryModal({ entry_type: null })}
+                                        title="View medical history without leaving this encounter"
+                                        aria-label="View patient medical history"
+                                        className="p-2.5 rounded-xl text-ink-500 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-500/10 ring-1 ring-ink-200 dark:ring-ink-800 transition-colors cursor-pointer"
+                                    >
+                                        <Maximize2 size={16} />
+                                    </button>
                                     {/* KDPA S.30 consent capture — visible at all times so the
                                         doctor can record verbal/written consent without leaving
                                         the desk. Turns into a confirmed pill once recorded for
@@ -585,11 +638,12 @@ export default function ClinicalDesk() {
                                 </div>
                             </div>
 
-                            {/* History toolbar — each button deep-links to the
-                                Medical History page with the active patient
-                                pre-selected and the relevant section auto-expanded.
-                                The first item lands on the full chart (no entry_type
-                                filter) so the doctor sees everything at a glance. */}
+                            {/* History toolbar — each button expands the read-only
+                                history popup over this encounter, pre-focused to the
+                                relevant section, instead of navigating away. The first
+                                item opens the full chart (no entry_type filter). A
+                                doctor who needs to add/edit/print still has "Open full
+                                record" inside the popup. */}
                             <div className="bg-ink-50/40 dark:bg-ink-800/40 border-b border-ink-100 dark:border-ink-800 p-2 flex gap-1.5 overflow-x-auto custom-scrollbar">
                                 {[
                                     { icon: History,   label: 'Medical Hx',    entry_type: null },
@@ -600,11 +654,7 @@ export default function ClinicalDesk() {
                                 ].map(({ icon: Icon, label, entry_type }) => (
                                     <button type="button"
                                         key={label}
-                                        onClick={() => {
-                                            const params = new URLSearchParams({ patient_id: String(activePatient.patient_id) });
-                                            if (entry_type) params.set('entry_type', entry_type);
-                                            navigate(`/app/medical-history?${params.toString()}`);
-                                        }}
+                                        onClick={() => setHistoryModal({ entry_type })}
                                         className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-400 rounded-lg text-xs font-medium hover:border-brand-300 dark:hover:border-brand-500/40 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                     >
                                         <Icon size={13} /> {label}
@@ -650,6 +700,19 @@ export default function ClinicalDesk() {
                                         </button>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Local draft safety net — unsaved typing recovered from this
+                                device (see useDraftSafetyNet). Independent of the
+                                server-side banner above: this covers the interval before
+                                the first explicit save. */}
+                            {hasLocalDraft && (
+                                <DraftRecoveryBanner
+                                    savedAt={localDraftSavedAt}
+                                    label="clinical notes"
+                                    onRestore={handleRestoreLocalDraft}
+                                    onDiscard={discardLocalDraft}
+                                />
                             )}
 
                             {/* Vitals Entry */}
@@ -940,6 +1003,14 @@ export default function ClinicalDesk() {
                     current={myFee}
                     onClose={() => setIsFeeModalOpen(false)}
                     onSaved={(fee) => { setMyFee(fee); setIsFeeModalOpen(false); }}
+                />
+            )}
+
+            {activePatient && historyModal && (
+                <PatientHistoryModal
+                    patientId={activePatient.patient_id}
+                    initialSection={historyModal.entry_type}
+                    onClose={() => setHistoryModal(null)}
                 />
             )}
         </div>
