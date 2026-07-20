@@ -89,7 +89,14 @@ def get_clinical_queue(db: Session = Depends(get_db), current_user: dict = Depen
 # ==========================================
 @router.post("/submit", dependencies=[Depends(RequirePermission("clinical:write"))])
 def submit_consultation(record_in: dict, request: Request, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    """Saves vitals, SOAP notes, and updates the patient's queue status."""
+    """Saves vitals, SOAP notes, and updates the patient's queue status.
+
+    With a ``record_id`` in the payload this updates that record in place
+    instead of inserting — that's how "Save draft" avoids piling up a new
+    row per save and how a resumed Draft/Returned encounter is completed.
+    Only the authoring doctor can update, and only while the record is
+    still Draft or Returned; finalised records are immutable here.
+    """
     # Multiple diagnoses arrive comma-separated in one string (schema-compatible
     # multi-ICD). Guard the column limit with a readable error instead of a
     # DataError from the driver.
@@ -100,18 +107,36 @@ def submit_consultation(record_in: dict, request: Request, db: Session = Depends
             detail="Too many ICD-10 diagnoses — the combined code list exceeds 255 characters (about 10 codes).",
         )
     try:
-        # Extract queue_id as it doesn't belong in the MedicalRecord table
+        # Extract keys that don't belong in the MedicalRecord table
         queue_id = record_in.pop("queue_id", None)
+        record_id = record_in.pop("record_id", None)
 
         # KDPA S.30: cannot record clinical findings without active patient consent.
         patient_id = record_in.get("patient_id")
         if patient_id is not None:
             require_active_consent(db, patient_id, consent_type="Treatment")
 
-        # Create the record using the remaining dictionary items
-        new_record = MedicalRecord(**record_in, doctor_id=current_user["user_id"])
-        db.add(new_record)
-        db.flush() 
+        if record_id:
+            new_record = db.query(MedicalRecord).filter(MedicalRecord.record_id == record_id).first()
+            if not new_record:
+                raise HTTPException(status_code=404, detail="Medical record not found.")
+            if new_record.doctor_id != current_user["user_id"]:
+                raise HTTPException(status_code=403, detail="Only the authoring doctor can update this record.")
+            if new_record.record_status not in ("Draft", "Returned"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="This record has been finalised — only Draft or Returned records can be updated.",
+                )
+            audit_action, old_status = "UPDATE", {"record_status": new_record.record_status}
+            for key, value in record_in.items():
+                if key != "patient_id" and hasattr(new_record, key):
+                    setattr(new_record, key, value)
+        else:
+            # Create the record using the remaining dictionary items
+            new_record = MedicalRecord(**record_in, doctor_id=current_user["user_id"])
+            db.add(new_record)
+            audit_action, old_status = "CREATE", None
+        db.flush()
 
         # Handle Queue Status dynamically based on doctor's action.
         # An unclaimed row gets claimed here — by saving anything against
@@ -131,7 +156,7 @@ def submit_consultation(record_in: dict, request: Request, db: Session = Depends
                     queue_entry.completed_at = datetime.now(timezone.utc)
 
         # Log the action to the Immutable Audit Ledger
-        log_audit(db, current_user["user_id"], "CREATE", "MedicalRecord", str(new_record.record_id), None, record_in, request.client.host)
+        log_audit(db, current_user["user_id"], audit_action, "MedicalRecord", str(new_record.record_id), old_status, record_in, request.client.host)
 
         # Hand-off notifications: tell the next station in the workflow.
         status = record_in.get("record_status")
@@ -158,9 +183,15 @@ def submit_consultation(record_in: dict, request: Request, db: Session = Depends
         db.commit()
         return {
             "message": "Record saved successfully.",
+            "record_id": new_record.record_id,
             "blood_glucose": new_record.blood_glucose,
         }
 
+    except HTTPException:
+        # Guard failures (missing record, wrong author, finalised, consent)
+        # keep their own status codes instead of being wrapped as 400s.
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Failed to save clinical record: {str(e)}")
@@ -465,3 +496,70 @@ def search_icd10(q: str = "", limit: int = 30):
         {"code": r["code"], "description": r["description"]}
         for r in (prefix_hits + text_hits)[:limit]
     ]
+
+
+def _resolve_icd10(codes: List[str]) -> List[dict]:
+    """Resolve dotted ICD-10 codes to {code, description} pairs from the
+    in-memory catalogue; unknown codes echo the code as their description."""
+    wanted = set(codes)
+    found: dict = {}
+    for row in _icd10_catalog():
+        if row["code"] in wanted:
+            found[row["code"]] = row["description"]
+            if len(found) == len(wanted):
+                break
+    return [{"code": c, "description": found.get(c, c)} for c in codes]
+
+
+# ==========================================
+# 8. RESUMABLE ENCOUNTER (Draft / Returned)
+# ==========================================
+@router.get("/patients/{patient_id}/resumable", dependencies=[Depends(RequirePermission("clinical:write"))])
+def get_resumable_record(patient_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """The doctor's own most recent Draft or Returned record for a patient.
+
+    Backs the "resume draft" banner on the Clinical Desk: the form re-hydrates
+    from this payload and subsequent /submit calls carry record_id so the
+    encounter updates in place instead of inserting a duplicate. Scoped to the
+    authoring doctor — another doctor picking up the same patient starts their
+    own encounter.
+
+    ICD-10 codes come back resolved to {code, description} so the diagnosis
+    chips can be rebuilt (only codes are persisted on the record).
+    """
+    rec = (
+        db.query(MedicalRecord)
+        .filter(
+            MedicalRecord.patient_id == patient_id,
+            MedicalRecord.doctor_id == current_user["user_id"],
+            MedicalRecord.record_status.in_(["Draft", "Returned"]),
+        )
+        .order_by(MedicalRecord.created_at.desc())
+        .first()
+    )
+    if not rec:
+        return {"record": None}
+
+    codes = [c.strip() for c in (rec.icd10_code or "").split(",") if c.strip()]
+    return {"record": {
+        "record_id": rec.record_id,
+        "record_status": rec.record_status,
+        "created_at": rec.created_at.isoformat() if rec.created_at else None,
+        "updated_at": rec.updated_at.isoformat() if rec.updated_at else None,
+        "blood_pressure": rec.blood_pressure,
+        "heart_rate": rec.heart_rate,
+        "respiratory_rate": rec.respiratory_rate,
+        "temperature": rec.temperature,
+        "spo2": rec.spo2,
+        "weight_kg": rec.weight_kg,
+        "height_cm": rec.height_cm,
+        "blood_glucose": rec.blood_glucose,
+        "chief_complaint": rec.chief_complaint,
+        "history_of_present_illness": rec.history_of_present_illness,
+        "physical_examination": rec.physical_examination,
+        "diagnosis": rec.diagnosis,
+        "icd10_codes": _resolve_icd10(codes),
+        "treatment_plan": rec.treatment_plan,
+        "prescription_notes": rec.prescription_notes,
+        "internal_notes": rec.internal_notes,
+    }}
