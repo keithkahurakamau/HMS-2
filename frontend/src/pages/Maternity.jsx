@@ -13,8 +13,8 @@ export default function Maternity() {
   const [tab, setTab] = useState('anc');
   return (
     <div className="p-4 md:p-6">
-      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Maternity</h1>
-      <div className="mt-4 flex gap-2 border-b border-gray-200 dark:border-gray-700" role="tablist">
+      <h1 className="text-xl font-semibold text-ink-900 dark:text-white">Maternity</h1>
+      <div className="mt-4 flex gap-2 border-b border-ink-200/70 dark:border-ink-800" role="tablist">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -24,8 +24,8 @@ export default function Maternity() {
             onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium rounded-t-md ${
               tab === t.key
-                ? 'bg-white dark:bg-gray-800 border border-b-0 border-gray-200 dark:border-gray-700 text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                ? 'bg-white dark:bg-ink-900 border border-b-0 border-ink-200/70 dark:border-ink-800 text-blue-600 dark:text-blue-400'
+                : 'text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-ink-200'
             }`}
           >
             {t.label}
