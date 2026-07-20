@@ -85,9 +85,24 @@ services:
       # when needed; dashboard-set values still win against the blueprint.
       - key: CORS_ORIGINS
         value: "https://www.medifleet.app,https://medifleet.app,https://hms-2-psi.vercel.app"
-      # Optional: Redis URL for WebSocket pub/sub fan-out across workers.
+      # Redis URL for WebSocket pub/sub fan-out across workers. OPTIONAL for a
+      # single worker, REQUIRED once WEB_CONCURRENCY > 1 (otherwise real-time
+      # notifications/payments don't span workers). Provision a Render Key Value
+      # (Redis) instance and paste its URL here.
       - key: REDIS_URL
         sync: false
+      # ── Horizontal scale-up knobs ─────────────────────────────────────────
+      # Number of gunicorn worker processes (render-start.sh). Left at 1 so the
+      # default deploy is unchanged. To serve many hospitals concurrently:
+      #   1. Bump this service's `plan` above (starter = 0.5 CPU / 512MB; a
+      #      worker wants ~0.5–1 CPU, so 4 workers ≈ a 2–4 CPU plan).
+      #   2. Set REDIS_URL (above).
+      #   3. Front Postgres with PgBouncer in transaction mode and point
+      #      DATABASE_URL at it — see docs/DEPLOYMENT.md §1.
+      #   4. Set WEB_CONCURRENCY to roughly (2 × vCPU) and, if the DB budget
+      #      allows, raise THREADPOOL_TOKENS in step with PgBouncer's pool.
+      - key: WEB_CONCURRENCY
+        value: "1"
       - key: SEED_SUPERADMIN_EMAIL
         sync: false
       - key: SEED_SUPERADMIN_PASSWORD
