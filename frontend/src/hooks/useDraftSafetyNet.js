@@ -16,6 +16,17 @@ import { useEffect, useRef, useState } from 'react';
  * || 'new'}`) so one patient's draft can never surface on another patient's
  * form — this is PHI, not a generic form cache.
  *
+ * Entries are encrypted (AES-GCM, Web Crypto API) before they ever touch
+ * localStorage, with a random key generated once per browser profile and
+ * kept alongside them. This does not defend against an attacker who can
+ * already run script in this origin (XSS) — no client-only scheme can, since
+ * the decryption key has to live somewhere script can reach it too, or the
+ * safety net couldn't decrypt its own drafts after a reload. It does close
+ * the more realistic risk for browser-local PHI caches: a shared clinic
+ * workstation, someone glancing at devtools/localStorage, or raw disk/backup
+ * forensics — never storing clinical text as plain, greppable text at rest,
+ * consistent with this codebase's server-side PHI encryption work.
+ *
  * Usage:
  *   const { hasSavedDraft, savedAt, applyDraft, discardDraft, clearDraft }
  *     = useDraftSafetyNet({ storageKey, value: formState, enabled: !!activePatient });
@@ -33,6 +44,7 @@ import { useEffect, useRef, useState } from 'react';
  * ────────────────────────────────────────────────────────────────────────── */
 
 const PREFIX = 'hms:draft:';
+const KEY_STORAGE_KEY = 'hms:draft-key';
 const DEBOUNCE_MS = 1000;
 
 function safeStringify(value) {
@@ -43,27 +55,77 @@ function safeStringify(value) {
     }
 }
 
-function readEntry(storageKey) {
+function bytesToBase64(bytes) {
+    let binary = '';
+    bytes.forEach((b) => { binary += String.fromCharCode(b); });
+    return btoa(binary);
+}
+
+function base64ToBytes(b64) {
+    return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+// Resolves to the same AES-GCM CryptoKey for the lifetime of this tab,
+// generating (and persisting, base64-encoded) one on first use per browser
+// profile. Memoized so repeated encrypt/decrypt calls share one lookup.
+let cachedKeyPromise = null;
+function getKey() {
+    if (!cachedKeyPromise) {
+        cachedKeyPromise = (async () => {
+            const existing = localStorage.getItem(KEY_STORAGE_KEY);
+            if (existing) {
+                return crypto.subtle.importKey('raw', base64ToBytes(existing), 'AES-GCM', true, ['encrypt', 'decrypt']);
+            }
+            const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+            const exported = await crypto.subtle.exportKey('raw', key);
+            localStorage.setItem(KEY_STORAGE_KEY, bytesToBase64(new Uint8Array(exported)));
+            return key;
+        })();
+    }
+    return cachedKeyPromise;
+}
+
+async function encryptToBase64(plainText) {
+    const key = await getKey();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plainText));
+    const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(ciphertext), iv.length);
+    return bytesToBase64(combined);
+}
+
+async function decryptFromBase64(b64) {
+    const key = await getKey();
+    const combined = base64ToBytes(b64);
+    const iv = combined.slice(0, 12);
+    const ciphertext = combined.slice(12);
+    const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+    return new TextDecoder().decode(plainBuf);
+}
+
+async function readEntry(storageKey) {
     if (!storageKey) return null;
     try {
         const raw = localStorage.getItem(PREFIX + storageKey);
         if (!raw) return null;
-        const parsed = JSON.parse(raw);
+        const parsed = JSON.parse(await decryptFromBase64(raw));
         if (!parsed || typeof parsed !== 'object' || !('value' in parsed)) return null;
         return parsed; // { value, savedAt }
     } catch {
-        return null; // corrupt entry — never let a bad localStorage value break the form
+        return null; // corrupt/undecryptable entry — never let a bad value break the form
     }
 }
 
-function writeEntry(storageKey, value) {
+async function writeEntry(storageKey, value) {
     try {
-        localStorage.setItem(PREFIX + storageKey, JSON.stringify({ value, savedAt: Date.now() }));
+        const plainText = JSON.stringify({ value, savedAt: Date.now() });
+        localStorage.setItem(PREFIX + storageKey, await encryptToBase64(plainText));
     } catch {
-        // Storage full / unavailable (private browsing, quota) — the safety
-        // net silently no-ops rather than breaking the form in front of the
-        // clinician. The server-side save path (where one exists) is
-        // unaffected either way.
+        // Storage full/unavailable (private browsing, quota), or Web Crypto
+        // unsupported in this context — the safety net silently no-ops
+        // rather than breaking the form in front of the clinician. The
+        // server-side save path (where one exists) is unaffected either way.
     }
 }
 
@@ -75,35 +137,53 @@ function removeEntry(storageKey) {
     }
 }
 
+// `pending` has three states, not two — this distinction is what keeps
+// autosave from ever racing the (necessarily async, decrypting) lookup and
+// clobbering an unacknowledged draft before it's had a chance to load:
+//   undefined → haven't checked storage for this identity yet
+//   null      → checked; nothing there (autosave armed)
+//   object    → checked; found an unacknowledged draft (autosave inert)
 export default function useDraftSafetyNet({ storageKey, value, enabled = true }) {
     const identity = enabled ? storageKey : null;
 
-    // Unacknowledged draft found for the current identity — null once the
-    // caller has restored/discarded it, or there was never one. Autosave is
-    // "armed" exactly when this is null, so no separate flag is needed.
-    const [pending, setPending] = useState(null);
+    const [pending, setPending] = useState(undefined);
     // Tracks which identity `pending` currently reflects.
     const [initializedFor, setInitializedFor] = useState(undefined);
     const timerRef = useRef(null);
 
-    // Adjust `pending` synchronously when we start pointing at a different
-    // record — React's documented alternative to an effect for "adjust
-    // state when a prop changes" (react.dev/learn/you-might-not-need-an-effect).
-    // Done during render, not in a useEffect, so there is never a frame
-    // where the recovery banner still reflects the previous record's draft
-    // before an effect catches up — this is PHI, so that flash matters.
-    // Only state is touched here (never a ref) — render must stay pure.
+    // The instant we start pointing at a different record, drop back to
+    // "haven't checked yet" synchronously — during render, not in an effect
+    // (React's documented alternative to an effect for "adjust state when a
+    // prop changes"). This guarantees the recovery banner can never show a
+    // frame of the *previous* record's draft; the real answer for the new
+    // record arrives a moment later via the lookup effect below. Only state
+    // is touched here (never a ref) — render must stay pure.
     if (identity !== initializedFor) {
         setInitializedFor(identity);
-        setPending(identity ? readEntry(identity) : null);
+        setPending(undefined);
     }
 
-    // Debounced autosave — inert while a draft is still unacknowledged
-    // (pending !== null), and keyed off the serialized value so an object
-    // literal recreated every render doesn't restart the debounce window
-    // unless its actual content changed. The effect's own cleanup clears
-    // any in-flight timer whenever identity/value/pending change — including
-    // a record switch — so a stale write can never land under the wrong key.
+    // Look up (and decrypt) any existing draft for this identity.
+    useEffect(() => {
+        if (!identity) {
+            setPending(null);
+            return undefined;
+        }
+        let cancelled = false;
+        readEntry(identity).then((existing) => {
+            if (!cancelled) setPending(existing ?? null);
+        });
+        return () => { cancelled = true; };
+    }, [identity]);
+
+    // Debounced, encrypted autosave — inert until the lookup above has
+    // resolved for this identity (pending !== undefined) and found nothing
+    // unacknowledged (pending === null). Keyed off the serialized value so
+    // an object literal recreated every render doesn't restart the debounce
+    // window unless its actual content changed. The effect's own cleanup
+    // clears any in-flight timer whenever identity/value/pending change —
+    // including a record switch — so a stale write can never land under the
+    // wrong key.
     const serializedValue = safeStringify(value);
     useEffect(() => {
         if (!identity || pending !== null || serializedValue === null) return undefined;

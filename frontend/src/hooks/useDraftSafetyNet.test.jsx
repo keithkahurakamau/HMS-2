@@ -1,96 +1,129 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import useDraftSafetyNet from './useDraftSafetyNet';
 
 // A tiny host component so we exercise the hook the way real callers do —
-// through renders and explicit user actions — rather than calling it in
-// isolation.
-function Host({ storageKey, value, enabled = true }) {
-    const { hasSavedDraft, savedAt, applyDraft, discardDraft, clearDraft } = useDraftSafetyNet({ storageKey, value, enabled });
+// through mounts/rerenders/clicks — rather than calling it in isolation.
+// Entries are encrypted at rest, so tests verify behavior entirely through
+// this public interface (mount a fresh Host for the same key and see what
+// it finds) rather than by inspecting raw localStorage content.
+function Host({ storageKey, value, enabled = true, onApplied }) {
+    const { hasSavedDraft, applyDraft, discardDraft, clearDraft } = useDraftSafetyNet({ storageKey, value, enabled });
     return (
         <div>
             <span data-testid="has-draft">{String(hasSavedDraft)}</span>
-            <span data-testid="saved-at">{savedAt ? savedAt.getTime() : ''}</span>
-            <button type="button" onClick={() => applyDraft()}>apply</button>
+            <button type="button" onClick={() => onApplied?.(applyDraft())}>apply</button>
             <button type="button" onClick={discardDraft}>discard</button>
             <button type="button" onClick={clearDraft}>clear</button>
         </div>
     );
 }
 
+// Real timers throughout — encryption is real async Web Crypto work, so
+// mixing it with fake timers just to speed up the ~1s debounce isn't worth
+// the added fragility. Generous waitFor timeouts absorb the real delay.
+const DEBOUNCE_WAIT = { timeout: 3000 };
+const settle = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
 beforeEach(() => {
     localStorage.clear();
-    vi.useFakeTimers();
-});
-
-afterEach(() => {
-    vi.useRealTimers();
 });
 
 describe('useDraftSafetyNet', () => {
-    it('debounce-saves the value to localStorage after the caller stops changing it', () => {
-        const { rerender } = render(<Host storageKey="k1" value={{ text: 'a' }} />);
-        expect(localStorage.getItem('hms:draft:k1')).toBeNull();
-
+    it('debounce-saves the value, and a later mount for the same key restores it verbatim', async () => {
+        const { rerender, unmount } = render(<Host storageKey="k1" value={{ text: 'a' }} />);
         rerender(<Host storageKey="k1" value={{ text: 'ab' }} />);
-        act(() => { vi.advanceTimersByTime(999); });
-        expect(localStorage.getItem('hms:draft:k1')).toBeNull(); // not yet — still inside the debounce window
+        await settle(1200); // past the debounce window, long enough for the encrypt round trip
+        unmount();
 
-        act(() => { vi.advanceTimersByTime(50); });
-        const stored = JSON.parse(localStorage.getItem('hms:draft:k1'));
-        expect(stored.value).toEqual({ text: 'ab' });
+        const applied = vi.fn();
+        render(<Host storageKey="k1" value={{ text: '' }} onApplied={applied} />);
+        await waitFor(() => expect(screen.getByTestId('has-draft').textContent).toBe('true'), DEBOUNCE_WAIT);
+        fireEvent.click(screen.getByText('apply'));
+        expect(applied).toHaveBeenCalledWith({ text: 'ab' });
     });
 
-    it('surfaces an existing draft as unacknowledged instead of overwriting it', () => {
-        localStorage.setItem('hms:draft:k2', JSON.stringify({ value: { text: 'old draft' }, savedAt: Date.now() - 5000 }));
-        render(<Host storageKey="k2" value={{ text: '' }} />);
-        expect(screen.getByTestId('has-draft').textContent).toBe('true');
+    it('surfaces an existing draft as unacknowledged and never lets autosave overwrite it while unresolved', async () => {
+        const { unmount: unmountA } = render(<Host storageKey="k2" value={{ text: 'old draft' }} />);
+        await settle(1200);
+        unmountA();
 
-        // The blank freshly-mounted value must not clobber the stored draft
-        // while it's unacknowledged.
-        act(() => { vi.advanceTimersByTime(5000); });
-        const stored = JSON.parse(localStorage.getItem('hms:draft:k2'));
-        expect(stored.value).toEqual({ text: 'old draft' });
+        // A fresh mount with different (blank) current-form content must not
+        // clobber the stored draft just because the debounce window elapses
+        // — it's still unacknowledged.
+        const { unmount: unmountB } = render(<Host storageKey="k2" value={{ text: '' }} />);
+        await waitFor(() => expect(screen.getByTestId('has-draft').textContent).toBe('true'), DEBOUNCE_WAIT);
+        await settle(1200);
+        unmountB();
+
+        const applied = vi.fn();
+        render(<Host storageKey="k2" value={{ text: '' }} onApplied={applied} />);
+        await waitFor(() => expect(screen.getByTestId('has-draft').textContent).toBe('true'), DEBOUNCE_WAIT);
+        fireEvent.click(screen.getByText('apply'));
+        expect(applied).toHaveBeenCalledWith({ text: 'old draft' });
     });
 
-    it('discardDraft clears storage and arms autosave for further edits', () => {
-        localStorage.setItem('hms:draft:k3', JSON.stringify({ value: { text: 'old' }, savedAt: Date.now() }));
-        const { rerender } = render(<Host storageKey="k3" value={{ text: 'old' }} />);
-        expect(screen.getByTestId('has-draft').textContent).toBe('true');
+    it('discardDraft clears the old entry and arms autosave for further edits', async () => {
+        const { unmount: unmountA } = render(<Host storageKey="k3" value={{ text: 'old' }} />);
+        await settle(1200);
+        unmountA();
 
-        act(() => { screen.getByText('discard').click(); });
-        expect(localStorage.getItem('hms:draft:k3')).toBeNull();
+        const { rerender, unmount: unmountB } = render(<Host storageKey="k3" value={{ text: 'old' }} />);
+        await waitFor(() => expect(screen.getByTestId('has-draft').textContent).toBe('true'), DEBOUNCE_WAIT);
+        fireEvent.click(screen.getByText('discard'));
         expect(screen.getByTestId('has-draft').textContent).toBe('false');
 
         rerender(<Host storageKey="k3" value={{ text: 'fresh' }} />);
-        act(() => { vi.advanceTimersByTime(1050); });
-        const stored = JSON.parse(localStorage.getItem('hms:draft:k3'));
-        expect(stored.value).toEqual({ text: 'fresh' });
+        await settle(1200);
+        unmountB();
+
+        const applied = vi.fn();
+        render(<Host storageKey="k3" value={{ text: 'fresh' }} onApplied={applied} />);
+        await waitFor(() => expect(screen.getByTestId('has-draft').textContent).toBe('true'), DEBOUNCE_WAIT);
+        fireEvent.click(screen.getByText('apply'));
+        expect(applied).toHaveBeenCalledWith({ text: 'fresh' });
     });
 
-    it('clearDraft removes the entry after a successful save', () => {
-        const { rerender } = render(<Host storageKey="k4" value={{ text: 'x' }} />);
+    it('clearDraft removes the entry after a successful save', async () => {
+        const { rerender, unmount } = render(<Host storageKey="k4" value={{ text: 'x' }} />);
         rerender(<Host storageKey="k4" value={{ text: 'xy' }} />);
-        act(() => { vi.advanceTimersByTime(1050); });
-        expect(localStorage.getItem('hms:draft:k4')).not.toBeNull();
+        await settle(1200);
+        fireEvent.click(screen.getByText('clear'));
+        unmount();
 
-        act(() => { screen.getByText('clear').click(); });
-        expect(localStorage.getItem('hms:draft:k4')).toBeNull();
-    });
-
-    it('never lets one storageKey read or write another key\'s draft (PHI isolation)', () => {
-        localStorage.setItem('hms:draft:patientA', JSON.stringify({ value: { text: 'A only' }, savedAt: Date.now() }));
-        render(<Host storageKey="patientB" value={{ text: '' }} />);
-        // A brand-new key with nothing saved for it must not surface patient A's draft.
+        render(<Host storageKey="k4" value={{ text: '' }} />);
+        await settle(1200);
         expect(screen.getByTestId('has-draft').textContent).toBe('false');
-        expect(JSON.parse(localStorage.getItem('hms:draft:patientA')).value).toEqual({ text: 'A only' });
     });
 
-    it('does nothing while disabled', () => {
-        const { rerender } = render(<Host storageKey="k5" value={{ text: 'a' }} enabled={false} />);
+    it('never lets one storageKey read or write another key\'s draft (PHI isolation)', async () => {
+        const { unmount: unmountA } = render(<Host storageKey="patientA" value={{ text: 'A only' }} />);
+        await settle(1200);
+        unmountA();
+
+        // A different patient's key must not see patient A's draft.
+        const { unmount: unmountB } = render(<Host storageKey="patientB" value={{ text: '' }} />);
+        await settle(1200);
+        expect(screen.getByTestId('has-draft').textContent).toBe('false');
+        unmountB();
+
+        // Patient A's own draft must still be there, untouched by B mounting.
+        const applied = vi.fn();
+        render(<Host storageKey="patientA" value={{ text: '' }} onApplied={applied} />);
+        await waitFor(() => expect(screen.getByTestId('has-draft').textContent).toBe('true'), DEBOUNCE_WAIT);
+        fireEvent.click(screen.getByText('apply'));
+        expect(applied).toHaveBeenCalledWith({ text: 'A only' });
+    });
+
+    it('does nothing while disabled', async () => {
+        const { rerender, unmount } = render(<Host storageKey="k5" value={{ text: 'a' }} enabled={false} />);
         rerender(<Host storageKey="k5" value={{ text: 'ab' }} enabled={false} />);
-        act(() => { vi.advanceTimersByTime(2000); });
-        expect(localStorage.getItem('hms:draft:k5')).toBeNull();
+        await settle(1200);
+        unmount();
+
+        render(<Host storageKey="k5" value={{ text: '' }} enabled />);
+        await settle(1200);
+        expect(screen.getByTestId('has-draft').textContent).toBe('false');
     });
 });
