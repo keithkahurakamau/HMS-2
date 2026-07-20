@@ -14,11 +14,11 @@ MediFleet ships as a set of toggleable **modules**. Some are always on; most can
 - **Patient Registry** — register, search, and manage patient records and demographics.
 - **Appointments** — booking, scheduling, and live department queues (real-time via WebSocket).
 - **Dashboard** — role-based home page and per-worker agenda.
-- **Internal Messaging & Notifications** — staff-to-staff messaging plus system/clinical alerts.
+- **Internal Messaging & Notifications** — staff-to-staff messaging plus system/clinical alerts, pushed live via WebSocket (with polling as a fallback) into a persistent, per-user notification inbox.
 - **Settings & Support** — account, branding, security settings, and an in-app helpdesk to the MediFleet team.
 
 **Optional (toggle per hospital)**
-- **Clinical Desk** — encounters, diagnoses, prescriptions, triage.
+- **Clinical Desk** — encounters, diagnoses, prescriptions, triage, with a patient's medical history available inline (no navigating away mid-encounter) and clinical notes protected against interruption before they're saved.
 - **Laboratory & Radiology** — orders, results/reports, billing integration.
 - **Pharmacy** — dispensing, stock movement, alerts.
 - **Inventory** — stores, suppliers, purchase orders.
