@@ -158,3 +158,16 @@ class TestPartograph:
                               "recorded_at": "2026-07-13T09:00:00"})
         assert r.status_code == 200, r.text
         assert r.json()["hours_since_active"] is not None
+
+
+class TestLaborBoard:
+    def test_board_lists_active_labor_with_latest_entry(self, client, nurse_cookies, labor):
+        lid = labor["labor_admission_id"]
+        client.post(f"/api/maternity/labor/{lid}/partograph", cookies=nurse_cookies,
+                    json={"cervical_dilation_cm": 7.0, "fetal_heart_rate": 142})
+        r = client.get("/api/maternity/board", cookies=nurse_cookies)
+        assert r.status_code == 200
+        rows = [x for x in r.json() if x["labor_admission_id"] == lid]
+        assert rows, "labor not on the board"
+        assert rows[0]["latest"]["cervical_dilation_cm"] == 7.0
+        assert rows[0]["patient_name"]

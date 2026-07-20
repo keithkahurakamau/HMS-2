@@ -229,3 +229,66 @@ def list_partograph(labor_admission_id: int, db: Session = Depends(get_db)):
         "active_labor_started_at": la.active_labor_started_at.isoformat() if la.active_labor_started_at else None,
         "entries": out,
     }
+
+
+@router.get("/board", dependencies=[Depends(RequirePermission("maternity:read"))])
+def labor_board(db: Session = Depends(get_db)):
+    from app.models.maternity import DeliveryRecord
+
+    rows = (
+        db.query(LaborAdmission, PregnancyEpisode, AdmissionRecord)
+        .join(PregnancyEpisode, PregnancyEpisode.episode_id == LaborAdmission.episode_id)
+        .join(AdmissionRecord, AdmissionRecord.admission_id == LaborAdmission.admission_id)
+        .filter(AdmissionRecord.status == "Active")
+        .all()
+    )
+    if not rows:
+        return []
+
+    episode_ids = [ep.episode_id for _, ep, _ in rows]
+    delivered = {
+        eid for (eid,) in db.query(DeliveryRecord.episode_id)
+        .filter(DeliveryRecord.episode_id.in_(episode_ids)).all()
+    }
+    patient_ids = [ep.patient_id for _, ep, _ in rows]
+    patients = {
+        p.patient_id: p for p in
+        db.query(Patient).filter(Patient.patient_id.in_(patient_ids)).all()
+    }
+    labor_ids = [la.labor_admission_id for la, _, _ in rows]
+    latest_by_labor = {}
+    for e in (
+        db.query(PartographEntry)
+        .filter(PartographEntry.labor_admission_id.in_(labor_ids))
+        .order_by(PartographEntry.labor_admission_id,
+                  PartographEntry.recorded_at.desc(),
+                  PartographEntry.entry_id.desc())
+        .all()
+    ):
+        latest_by_labor.setdefault(e.labor_admission_id, e)
+
+    out = []
+    for la, ep, adm in rows:
+        if ep.episode_id in delivered:
+            continue
+        p = patients.get(ep.patient_id)
+        latest = latest_by_labor.get(la.labor_admission_id)
+        latest_dict = None
+        if latest:
+            d = _entry_dict(latest, la.active_labor_started_at)
+            latest_dict = {
+                "recorded_at": d["recorded_at"],
+                "cervical_dilation_cm": d["cervical_dilation_cm"],
+                "fetal_heart_rate": d["fetal_heart_rate"],
+                "alert_status": d["alert_status"],
+            }
+        out.append({
+            "labor_admission_id": la.labor_admission_id,
+            "episode_id": ep.episode_id,
+            "patient_id": ep.patient_id,
+            "patient_name": f"{p.surname}, {p.other_names}" if p else None,
+            "admission_id": adm.admission_id,
+            "active_labor_started_at": la.active_labor_started_at.isoformat() if la.active_labor_started_at else None,
+            "latest": latest_dict,
+        })
+    return out
