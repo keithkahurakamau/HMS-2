@@ -30,6 +30,36 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 
 # =====================================================================
+# Lockout time helpers
+# =====================================================================
+# The lockout columns are DateTime(timezone=True), so a stored ``locked_until``
+# comes back timezone-aware. Comparing it against a naive ``datetime.utcnow()``
+# raises "can't compare offset-naive and offset-aware datetimes" — which turned
+# every login on a locked account (even one whose lock had already expired)
+# into an HTTP 500 instead of a clean 403/401. Always compare aware-to-aware.
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _as_aware(dt):
+    """Coerce a stored lockout timestamp to tz-aware UTC.
+
+    The column is DateTime(timezone=True) so reads are already aware, but a
+    legacy row written by the pre-fix naive code path may be naive — treat it
+    as UTC so downstream comparisons never mix naive and aware datetimes.
+    """
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _lock_active(locked_until, now: datetime) -> bool:
+    """True iff ``locked_until`` is set and still in the future."""
+    locked_until = _as_aware(locked_until)
+    return locked_until is not None and locked_until > now
+
+
+# =====================================================================
 # Cookie helpers
 # =====================================================================
 def _cookie_params():
@@ -187,8 +217,9 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
         raise generic_failure
 
     # Lockout check
-    if user.locked_until and user.locked_until > datetime.utcnow():
-        remaining = int((user.locked_until - datetime.utcnow()).total_seconds() / 60)
+    now = _now_utc()
+    if _lock_active(user.locked_until, now):
+        remaining = max(1, int((_as_aware(user.locked_until) - now).total_seconds() / 60))
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Account locked. Try again in {remaining} minutes."
@@ -198,7 +229,7 @@ async def login(request: Request, response: Response, payload: LoginRequest, db:
     if not verify_password(payload.password, user.hashed_password):
         user.failed_login_attempts += 1
         if user.failed_login_attempts >= 5:
-            user.locked_until = datetime.utcnow() + timedelta(minutes=15)
+            user.locked_until = _now_utc() + timedelta(minutes=15)
         db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
@@ -407,7 +438,7 @@ async def change_password(request: Request, payload: ChangePasswordRequest, db: 
 
     # Honour the same lockout policy as /login so this endpoint can't be used
     # as an unrate-limited side channel against a locked account.
-    if user.locked_until and user.locked_until > datetime.utcnow():
+    if _lock_active(user.locked_until, _now_utc()):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account locked. Try again later.",
@@ -416,7 +447,7 @@ async def change_password(request: Request, payload: ChangePasswordRequest, db: 
     if not verify_password(payload.current_password, user.hashed_password):
         user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
         if user.failed_login_attempts >= 5:
-            user.locked_until = datetime.utcnow() + timedelta(minutes=15)
+            user.locked_until = _now_utc() + timedelta(minutes=15)
         db.commit()
         raise generic_failure
 
