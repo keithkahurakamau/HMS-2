@@ -76,65 +76,58 @@ function removeEntry(storageKey) {
 }
 
 export default function useDraftSafetyNet({ storageKey, value, enabled = true }) {
-    // Unacknowledged draft found for the current storageKey — null once the
-    // caller has restored or discarded it (or there was never one).
+    const identity = enabled ? storageKey : null;
+
+    // Unacknowledged draft found for the current identity — null once the
+    // caller has restored/discarded it, or there was never one. Autosave is
+    // "armed" exactly when this is null, so no separate flag is needed.
     const [pending, setPending] = useState(null);
-    // Autosave only runs once "armed" for the current key — either there was
-    // nothing to protect on mount, or the caller resolved the banner.
-    const armedRef = useRef(false);
+    // Tracks which identity `pending` currently reflects.
+    const [initializedFor, setInitializedFor] = useState(undefined);
     const timerRef = useRef(null);
 
-    // (Re)initialise whenever we point at a different record.
-    useEffect(() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        if (!enabled || !storageKey) {
-            armedRef.current = false;
-            setPending(null);
-            return;
-        }
-        const existing = readEntry(storageKey);
-        if (existing) {
-            armedRef.current = false;
-            setPending(existing);
-        } else {
-            armedRef.current = true;
-            setPending(null);
-        }
-        // Only re-run when we start looking at a genuinely different record.
-    }, [storageKey, enabled]);
+    // Adjust `pending` synchronously when we start pointing at a different
+    // record — React's documented alternative to an effect for "adjust
+    // state when a prop changes" (react.dev/learn/you-might-not-need-an-effect).
+    // Done during render, not in a useEffect, so there is never a frame
+    // where the recovery banner still reflects the previous record's draft
+    // before an effect catches up — this is PHI, so that flash matters.
+    // Only state is touched here (never a ref) — render must stay pure.
+    if (identity !== initializedFor) {
+        setInitializedFor(identity);
+        setPending(identity ? readEntry(identity) : null);
+    }
 
-    // Debounced autosave — inert until armed, and keyed off the serialized
-    // value so an object literal recreated every render doesn't restart the
-    // debounce window unless its actual content changed.
+    // Debounced autosave — inert while a draft is still unacknowledged
+    // (pending !== null), and keyed off the serialized value so an object
+    // literal recreated every render doesn't restart the debounce window
+    // unless its actual content changed. The effect's own cleanup clears
+    // any in-flight timer whenever identity/value/pending change — including
+    // a record switch — so a stale write can never land under the wrong key.
     const serializedValue = safeStringify(value);
     useEffect(() => {
-        if (!enabled || !storageKey || !armedRef.current || serializedValue === null) return undefined;
-        if (timerRef.current) clearTimeout(timerRef.current);
+        if (!identity || pending !== null || serializedValue === null) return undefined;
         timerRef.current = setTimeout(() => {
-            writeEntry(storageKey, value);
+            writeEntry(identity, value);
         }, DEBOUNCE_MS);
         return () => clearTimeout(timerRef.current);
-        // `pending` is included so resolving the banner (which flips
-        // armedRef without itself changing `value`) still kicks off a save.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [serializedValue, enabled, storageKey, pending]);
+    }, [serializedValue, identity, pending]);
 
     const applyDraft = () => {
         const draftValue = pending?.value;
-        armedRef.current = true;
         setPending(null);
         return draftValue;
     };
 
     const discardDraft = () => {
-        removeEntry(storageKey);
-        armedRef.current = true;
+        removeEntry(identity);
         setPending(null);
     };
 
     const clearDraft = () => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        removeEntry(storageKey);
+        clearTimeout(timerRef.current);
+        removeEntry(identity);
     };
 
     return {
