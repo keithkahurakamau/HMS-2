@@ -140,3 +140,21 @@ class TestPartograph:
                         cookies=nurse_cookies,
                         json={"admission_id": labor["admission_id"]})
         assert r.status_code == 409
+
+    def test_naive_recorded_at_after_active_labor_started(self, client, nurse_cookies, labor):
+        """A client-supplied naive datetime-local value (no offset) must not
+        crash when subtracted against the tz-aware active_labor_started_at
+        reloaded from the TIMESTAMPTZ column. Before the fix this 500'd."""
+        lid = labor["labor_admission_id"]
+        # First >=4cm entry anchors active_labor_started_at (tz-aware, from the DB).
+        r = client.post(f"/api/maternity/labor/{lid}/partograph", cookies=nurse_cookies,
+                        json={"cervical_dilation_cm": 4.0, "fetal_heart_rate": 140})
+        assert r.status_code == 200, r.text
+
+        # Second entry supplies a naive recorded_at (as an HTML datetime-local
+        # input would), timed after active labor started.
+        r = client.post(f"/api/maternity/labor/{lid}/partograph", cookies=nurse_cookies,
+                        json={"cervical_dilation_cm": 5.0, "fetal_heart_rate": 138,
+                              "recorded_at": "2026-07-13T09:00:00"})
+        assert r.status_code == 200, r.text
+        assert r.json()["hours_since_active"] is not None

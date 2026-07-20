@@ -12,6 +12,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
@@ -106,14 +107,24 @@ def link_labor(episode_id: int, req: LaborLink, request: Request,
     if db.query(LaborAdmission).filter(LaborAdmission.admission_id == req.admission_id).first():
         raise HTTPException(status_code=409, detail="Admission is already linked to a labor record")
 
+    active_labor_started_at = req.active_labor_started_at
+    if active_labor_started_at is not None and active_labor_started_at.tzinfo is None:
+        active_labor_started_at = active_labor_started_at.replace(tzinfo=timezone.utc)
+
     la = LaborAdmission(episode_id=episode_id, admission_id=req.admission_id,
-                        active_labor_started_at=req.active_labor_started_at)
-    db.add(la)
-    db.flush()
-    log_audit(db, current_user["user_id"], "CREATE", "LaborAdmission", la.labor_admission_id,
-              None, {"episode_id": episode_id, "admission_id": req.admission_id},
-              request.client.host)
-    db.commit()
+                        active_labor_started_at=active_labor_started_at)
+    try:
+        db.add(la)
+        db.flush()
+        log_audit(db, current_user["user_id"], "CREATE", "LaborAdmission", la.labor_admission_id,
+                  None, {"episode_id": episode_id, "admission_id": req.admission_id},
+                  request.client.host)
+        db.commit()
+    except IntegrityError:
+        # Race: concurrent POST passed the pre-check SELECT; the unique index caught the duplicate.
+        db.rollback()
+        raise HTTPException(status_code=409,
+                            detail="Admission is already linked to a labor record.")
     return {
         "labor_admission_id": la.labor_admission_id,
         "episode_id": episode_id,
@@ -145,6 +156,8 @@ def append_partograph_entry(labor_admission_id: int, req: PartographCreate, requ
             raise HTTPException(status_code=404, detail="Entry to correct not found on this labor record")
 
     recorded_at = req.recorded_at or datetime.now(timezone.utc)
+    if recorded_at.tzinfo is None:
+        recorded_at = recorded_at.replace(tzinfo=timezone.utc)
     entry = PartographEntry(
         labor_admission_id=labor_admission_id,
         recorded_at=recorded_at,
@@ -184,7 +197,7 @@ def append_partograph_entry(labor_admission_id: int, req: PartographCreate, requ
         for uid in users_with_permission(db, "wards:manage", exclude_roles=("Admin",)):
             notify(
                 db, user_id=uid, category="warning",
-                title=f"Partograph {status}-line crossing — {pname}",
+                title=f"Partograph {status}-line crossing — {pname}"[:255],
                 body=f"Dilation {req.cervical_dilation_cm} cm at {round(hours or 0, 1)} h of active labor.",
                 link="/app/maternity",
             )
