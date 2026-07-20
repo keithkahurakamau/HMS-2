@@ -171,3 +171,33 @@ class TestLaborBoard:
         assert rows, "labor not on the board"
         assert rows[0]["latest"]["cervical_dilation_cm"] == 7.0
         assert rows[0]["patient_name"]
+
+    def test_board_skips_superseded_entries_with_earlier_recorded_at(self, client, nurse_cookies, labor):
+        """Regression test: when a correction has an earlier recorded_at than
+        the row it supersedes, the board must still show the correction as latest,
+        not the (stale) superseded entry."""
+        lid = labor["labor_admission_id"]
+        # Post entry A at 09:00 with 4 cm dilation (anchors active_labor_started_at).
+        r = client.post(f"/api/maternity/labor/{lid}/partograph", cookies=nurse_cookies,
+                        json={"recorded_at": "2026-07-13T09:00:00Z",
+                              "cervical_dilation_cm": 4.0, "fetal_heart_rate": 140})
+        assert r.status_code == 200, r.text
+        entry_a = r.json()
+
+        # Post correction B at 08:30 (EARLIER than A) that corrects entry A.
+        # B has a different dilation (5 cm) so the assertion is unambiguous.
+        r = client.post(f"/api/maternity/labor/{lid}/partograph", cookies=nurse_cookies,
+                        json={"recorded_at": "2026-07-13T08:30:00Z",
+                              "cervical_dilation_cm": 5.0, "fetal_heart_rate": 138,
+                              "corrects_entry_id": entry_a["entry_id"]})
+        assert r.status_code == 200, r.text
+        entry_b = r.json()
+
+        # Get the board and check that the latest entry is B (with 5 cm), not A (with 4 cm).
+        r = client.get("/api/maternity/board", cookies=nurse_cookies)
+        assert r.status_code == 200
+        rows = [x for x in r.json() if x["labor_admission_id"] == lid]
+        assert rows, "labor not on the board"
+        board_latest = rows[0]["latest"]
+        assert board_latest["cervical_dilation_cm"] == 5.0, \
+            f"board should show correction B (5 cm), not superseded A (4 cm); got {board_latest['cervical_dilation_cm']}"

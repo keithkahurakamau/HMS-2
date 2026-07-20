@@ -256,16 +256,21 @@ def labor_board(db: Session = Depends(get_db)):
         db.query(Patient).filter(Patient.patient_id.in_(patient_ids)).all()
     }
     labor_ids = [la.labor_admission_id for la, _, _ in rows]
-    latest_by_labor = {}
-    for e in (
+    entries = (
         db.query(PartographEntry)
         .filter(PartographEntry.labor_admission_id.in_(labor_ids))
         .order_by(PartographEntry.labor_admission_id,
                   PartographEntry.recorded_at.desc(),
                   PartographEntry.entry_id.desc())
         .all()
-    ):
-        latest_by_labor.setdefault(e.labor_admission_id, e)
+    )
+    # Build the set of superseded entry IDs (entries that are corrected by other entries).
+    superseded_ids = {e.corrects_entry_id for e in entries if e.corrects_entry_id}
+    latest_by_labor = {}
+    for e in entries:
+        # Skip superseded entries; the newest non-superseded entry wins.
+        if e.entry_id not in superseded_ids:
+            latest_by_labor.setdefault(e.labor_admission_id, e)
 
     out = []
     for la, ep, adm in rows:
