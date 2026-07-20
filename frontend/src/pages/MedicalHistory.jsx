@@ -3,40 +3,19 @@ import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import {
-    Search, ShieldCheck, AlertCircle, Clock, Activity,
+    Search, ShieldCheck, Activity,
     Plus, X, ChevronDown, ChevronRight, FileText,
-    Syringe, Users, Heart, Brain, Baby, Cigarette,
     Trash2, Edit, Save, Lock, Printer
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import VisitHistoryList from '../components/VisitHistoryList';
+import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
 import { printMedicalHistory } from '../utils/printTemplates';
-
-const ENTRY_TYPES = [
-    { key: 'SURGICAL_HISTORY', label: 'Surgical History', icon: <FileText size={16} />, color: 'blue' },
-    { key: 'FAMILY_HISTORY', label: 'Family History', icon: <Users size={16} />, color: 'purple' },
-    { key: 'SOCIAL_HISTORY', label: 'Social History', icon: <Cigarette size={16} />, color: 'amber' },
-    { key: 'IMMUNIZATION', label: 'Immunizations', icon: <Syringe size={16} />, color: 'green' },
-    { key: 'ALLERGY', label: 'Allergies', icon: <AlertCircle size={16} />, color: 'red' },
-    { key: 'CHRONIC_CONDITION', label: 'Chronic Conditions', icon: <Heart size={16} />, color: 'rose' },
-    { key: 'PAST_MEDICAL_EVENT', label: 'Past Medical Events', icon: <Clock size={16} />, color: 'slate' },
-    { key: 'OBSTETRIC_HISTORY', label: 'Obstetric History', icon: <Baby size={16} />, color: 'pink' },
-    { key: 'MENTAL_HEALTH', label: 'Mental Health', icon: <Brain size={16} />, color: 'indigo' },
-];
+import { ENTRY_TYPES, ENTRY_TYPE_COLOR_CLASSES, ENTRY_TYPE_TO_CHART_FIELD } from '../constants/medicalHistoryEntryTypes';
+import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 
 const SEVERITY_LEVELS = ['Mild', 'Moderate', 'Severe', 'Life-threatening', 'N/A'];
 const STATUSES = ['Active', 'Resolved', 'Managed', 'Remission'];
-const colorMap = {
-    blue: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/20',
-    purple: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/20',
-    amber: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/20',
-    green: 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-300 border-green-200 dark:border-green-500/20',
-    red: 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/20',
-    rose: 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/20',
-    slate: 'bg-slate-100 dark:bg-ink-800/40 text-slate-700 dark:text-ink-200 border-slate-200 dark:border-ink-800',
-    pink: 'bg-pink-50 dark:bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-500/20',
-    indigo: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/20',
-};
 
 const defaultForm = {
     patient_id: '', entry_type: 'PAST_MEDICAL_EVENT', title: '',
@@ -61,6 +40,25 @@ export default function MedicalHistory() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [form, setForm] = useState(defaultForm);
     const [editEntry, setEditEntry] = useState(null);
+
+    // Local draft safety net for the add/edit entry form — an interruption
+    // while writing a description shouldn't cost the clinician the entry.
+    // Keyed by patient + which entry is being edited ('new' when adding) so
+    // one patient's/entry's draft can never surface on another's form.
+    const entryDraftKey = (chart?.patient_id && isAddModalOpen)
+        ? `medicalHistoryEntry:${chart.patient_id}:${editEntry?.entry_id ?? 'new'}`
+        : null;
+    const {
+        hasSavedDraft: hasEntryDraft,
+        savedAt: entryDraftSavedAt,
+        applyDraft: applyEntryDraft,
+        discardDraft: discardEntryDraft,
+        clearDraft: clearEntryDraft,
+    } = useDraftSafetyNet({
+        storageKey: entryDraftKey,
+        value: form,
+        enabled: isAddModalOpen,
+    });
 
     useEffect(() => {
         const urlPatientId = searchParams.get('patient_id');
@@ -148,6 +146,7 @@ export default function MedicalHistory() {
                 await apiClient.post('/medical-history/entries', payload);
                 toast.success('History entry added successfully.');
             }
+            clearEntryDraft();
             setIsAddModalOpen(false);
             setEditEntry(null);
             setForm(defaultForm);
@@ -200,16 +199,7 @@ export default function MedicalHistory() {
 
     const toggleSection = (key) => setExpandedSections(p => ({ ...p, [key]: !p[key] }));
 
-    const getEntriesForType = (typeKey) => {
-        const map = {
-            SURGICAL_HISTORY: 'surgical_history', FAMILY_HISTORY: 'family_history',
-            SOCIAL_HISTORY: 'social_history', IMMUNIZATION: 'immunizations',
-            ALLERGY: 'allergies', CHRONIC_CONDITION: 'chronic_conditions',
-            PAST_MEDICAL_EVENT: 'past_medical_events', OBSTETRIC_HISTORY: 'obstetric_history',
-            MENTAL_HEALTH: 'mental_health',
-        };
-        return chart?.[map[typeKey]] || [];
-    };
+    const getEntriesForType = (typeKey) => chart?.[ENTRY_TYPE_TO_CHART_FIELD[typeKey]] || [];
 
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
@@ -348,7 +338,7 @@ export default function MedicalHistory() {
                         {ENTRY_TYPES.map(type => {
                             const entries = getEntriesForType(type.key);
                             const isOpen = expandedSections[type.key];
-                            const colorClass = colorMap[type.color];
+                            const colorClass = ENTRY_TYPE_COLOR_CLASSES[type.color];
                             return (
                                 <div key={type.key} id={`mh-section-${type.key}`} data-tour={type.key === ENTRY_TYPES[0].key ? 'mh-entry-section' : undefined} className="card overflow-hidden scroll-mt-20">
                                     <button type="button"
@@ -460,6 +450,14 @@ export default function MedicalHistory() {
                         </div>
 
                         <form id="historyForm" onSubmit={handleAddEntry} className="p-5 space-y-4 overflow-y-auto">
+                            {hasEntryDraft && (
+                                <DraftRecoveryBanner
+                                    savedAt={entryDraftSavedAt}
+                                    label="entry"
+                                    onRestore={() => setForm((f) => ({ ...f, ...applyEntryDraft() }))}
+                                    onDiscard={discardEntryDraft}
+                                />
+                            )}
                             <div>
                                 <label htmlFor="medica-entry-type" className="block text-xs font-bold text-slate-700 dark:text-ink-200 mb-1.5">Entry Type <span className="text-red-500">*</span></label>
                                 <select id="medica-entry-type" value={form.entry_type} onChange={e => setForm({ ...form, entry_type: e.target.value })} className="w-full px-3 py-2 border border-slate-200 dark:border-ink-800 rounded-lg text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-ink-900 dark:text-white">

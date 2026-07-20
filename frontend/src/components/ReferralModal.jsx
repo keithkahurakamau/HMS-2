@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { printReferralLetter } from '../utils/printReferral';
+import DraftRecoveryBanner from './DraftRecoveryBanner';
+import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 
 const URGENCIES = ['Routine', 'Urgent', 'Emergency'];
 
@@ -20,6 +22,23 @@ export default function ReferralModal({ patient, recordId = null, initialSummary
         urgency: 'Routine', reason: '', clinical_summary: initialSummary,
     });
     const [isSaving, setIsSaving] = useState(false);
+
+    // Local draft safety net — the letter is only recorded on Save; closing
+    // the modal early (backdrop click, Escape, a browser interruption)
+    // would otherwise lose everything typed. Keyed by patient so reopening
+    // this modal for the same patient later offers the letter back.
+    const referralDraftKey = patient?.patient_id ? `referral:${patient.patient_id}` : null;
+    const {
+        hasSavedDraft: hasReferralDraft,
+        savedAt: referralDraftSavedAt,
+        applyDraft: applyReferralDraft,
+        discardDraft: discardReferralDraft,
+        clearDraft: clearReferralDraft,
+    } = useDraftSafetyNet({
+        storageKey: referralDraftKey,
+        value: form,
+        enabled: true,
+    });
 
     const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -41,6 +60,7 @@ export default function ReferralModal({ patient, recordId = null, initialSummary
                 clinical_summary: form.clinical_summary.trim() || null,
             });
             toast.success('Referral recorded.');
+            clearReferralDraft();
             return res.data;
         } catch (err) {
             toast.error(err.response?.data?.detail || 'Could not save the referral.');
@@ -73,6 +93,14 @@ export default function ReferralModal({ patient, recordId = null, initialSummary
                 </div>
 
                 <div className="p-4 space-y-3">
+                    {hasReferralDraft && (
+                        <DraftRecoveryBanner
+                            savedAt={referralDraftSavedAt}
+                            label="referral letter"
+                            onRestore={() => setForm((f) => ({ ...f, ...applyReferralDraft() }))}
+                            onDiscard={discardReferralDraft}
+                        />
+                    )}
                     <div>
                         <label htmlFor="referral-specialty" className="label">Specialty *</label>
                         <input id="referral-specialty" type="text" value={form.specialty} onChange={set('specialty')} className="input" placeholder="e.g. Cardiology" />
