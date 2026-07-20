@@ -14,8 +14,9 @@
 #      Legacy tenants (provisioned before Alembic was wired in) are
 #      auto-bootstrapped on first contact, and the safety-net passes in the
 #      script also backfill any missing tables/columns from model drift.
-#   4. Exec uvicorn so it inherits PID 1 and Render can deliver SIGTERM
-#      cleanly on rollouts.
+#   4. Exec gunicorn (managing uvicorn workers) so it inherits PID 1 and Render
+#      can deliver SIGTERM cleanly on rollouts. Worker count is WEB_CONCURRENCY
+#      (default 1); see the launch block below for the scale-up prerequisites.
 #
 # Skipping migrations: set MIGRATE_ON_BOOT=0 to short-circuit step 3 (e.g.
 # during incident response when you need the API up before chasing a
@@ -74,5 +75,42 @@ else
 fi
 
 PORT="${PORT:-8000}"
-echo ">> launching uvicorn on 0.0.0.0:${PORT}"
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT}"
+
+# ── Web server: gunicorn managing uvicorn workers ─────────────────────────
+# WEB_CONCURRENCY controls the number of worker processes. It defaults to 1 so
+# behaviour is unchanged from the old single-uvicorn command until an operator
+# deliberately scales up — because running >1 worker safely has prerequisites:
+#
+#   * REDIS_URL MUST be set, or a notification/payment event published on one
+#     worker never reaches a WebSocket living on another (see docs/DEPLOYMENT.md
+#     §2 and app/core/websocket.py).
+#   * Postgres should sit behind PgBouncer (transaction mode) before pushing the
+#     worker count up on a large tenant fleet, or the workers' pooled
+#     connections will exhaust the database (§1).
+#
+# --max-requests recycles each worker after N requests (+ jitter so they don't
+# all recycle at once), which caps the long-lived memory footprint of the
+# per-worker tenant-engine LRU cache.
+WEB_CONCURRENCY="${WEB_CONCURRENCY:-1}"
+GUNICORN_TIMEOUT="${GUNICORN_TIMEOUT:-120}"
+GUNICORN_MAX_REQUESTS="${GUNICORN_MAX_REQUESTS:-2000}"
+GUNICORN_MAX_REQUESTS_JITTER="${GUNICORN_MAX_REQUESTS_JITTER:-200}"
+
+if [[ "${WEB_CONCURRENCY}" -gt 1 && -z "${REDIS_URL:-}" ]]; then
+    echo "!! WEB_CONCURRENCY=${WEB_CONCURRENCY} but REDIS_URL is unset — real-time" >&2
+    echo "!! features (notifications, payment sockets) will NOT span workers." >&2
+    echo "!! Set REDIS_URL, or run a single worker. Continuing anyway." >&2
+fi
+
+echo ">> launching gunicorn (${WEB_CONCURRENCY} worker(s)) on 0.0.0.0:${PORT}"
+exec gunicorn app.main:app \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --workers "${WEB_CONCURRENCY}" \
+    --bind "0.0.0.0:${PORT}" \
+    --timeout "${GUNICORN_TIMEOUT}" \
+    --graceful-timeout 30 \
+    --keep-alive 5 \
+    --max-requests "${GUNICORN_MAX_REQUESTS}" \
+    --max-requests-jitter "${GUNICORN_MAX_REQUESTS_JITTER}" \
+    --access-logfile - \
+    --error-logfile -
