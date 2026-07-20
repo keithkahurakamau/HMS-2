@@ -75,6 +75,47 @@ def _normalize_blanks(data: dict) -> dict:
             data[k] = None
     return data
 
+
+# Allowlist of columns any create path is permitted to set. Anything not in
+# this set (patient_id, outpatient_no, inpatient_no, registered_on,
+# is_active, registered_by) is server-controlled. Shared by register_patient
+# and create_patient_record so both write paths honor the same boundary.
+_PATIENT_ALLOWED = {
+    "surname", "other_names", "sex", "date_of_birth",
+    "marital_status", "religion", "primary_language",
+    "blood_group", "allergies", "chronic_conditions",
+    "id_type", "id_number", "nationality",
+    "telephone_1", "telephone_2", "email",
+    "postal_address", "postal_code", "residence", "town",
+    "occupation", "employer_name", "reference_number",
+    "nok_name", "nok_relationship", "nok_contact", "notes",
+    "insurance_provider", "insurance_policy_number",
+}
+
+
+def create_patient_record(db: Session, *, created_by: int, **fields) -> Patient:
+    """Core patient-row creation: mints the next OP number (under the
+    per-year advisory lock in ``generate_op_number``) and writes the row
+    through the ``_PATIENT_ALLOWED`` write-surface allowlist.
+
+    Does NOT commit and does NOT audit-log — the caller owns the
+    transaction and the audit trail. This also means it does NOT run
+    ``register_patient``'s blind-index duplicate-phone/ID check: callers
+    that mint records sharing an identifier with an existing patient on
+    purpose (e.g. a newborn reusing its mother's phone number) need that
+    check skipped, not tripped.
+    """
+    op_number = generate_op_number(db)
+    safe_fields = {k: v for k, v in fields.items() if k in _PATIENT_ALLOWED}
+    new_patient = Patient(
+        outpatient_no=op_number,
+        registered_by=created_by,
+        **safe_fields,
+    )
+    db.add(new_patient)
+    db.flush()
+    return new_patient
+
 # ==========================================
 # 1. SEARCH & LIST PATIENTS
 # ==========================================
@@ -150,35 +191,13 @@ def register_patient(patient_in: PatientCreate, request: Request, db: Session = 
         if existing_patient:
             raise HTTPException(status_code=400, detail="A patient with this Phone Number or ID already exists.")
 
-        op_number = generate_op_number(db)
-
-        # Allowlist of columns the create path is permitted to set. Anything
-        # not in this set (patient_id, outpatient_no, inpatient_no,
-        # registered_on, is_active, registered_by) is server-controlled.
-        _ALLOWED = {
-            "surname", "other_names", "sex", "date_of_birth",
-            "marital_status", "religion", "primary_language",
-            "blood_group", "allergies", "chronic_conditions",
-            "id_type", "id_number", "nationality",
-            "telephone_1", "telephone_2", "email",
-            "postal_address", "postal_code", "residence", "town",
-            "occupation", "employer_name", "reference_number",
-            "nok_name", "nok_relationship", "nok_contact", "notes",
-            "insurance_provider", "insurance_policy_number",
-        }
-        safe_fields = {k: v for k, v in patient_data.items() if k in _ALLOWED}
-        new_patient = Patient(
-            outpatient_no=op_number,
-            registered_by=current_user["user_id"],
-            **safe_fields,
+        new_patient = create_patient_record(
+            db, created_by=current_user["user_id"], **patient_data
         )
-        
-        db.add(new_patient)
-        db.flush()
-        
+
         log_audit(
             db=db, user_id=current_user["user_id"], action="CREATE", 
-            entity_type="Patient", entity_id=op_number, 
+            entity_type="Patient", entity_id=new_patient.outpatient_no,
             old_value=None, new_value={"name": f"{new_patient.other_names} {new_patient.surname}"}, 
             ip_address=request.client.host
         )

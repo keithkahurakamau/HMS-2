@@ -3,7 +3,7 @@
 Labor + partograph endpoints live in maternity_labor.py (same module key).
 Every write is audit-logged. Charges ride app.services.maternity_billing.
 """
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -295,3 +295,157 @@ def create_pnc_visit(episode_id: int, req: PncVisitCreate, request: Request,
         "visit_id": visit.visit_id, "visit_number": visit.visit_number,
         "visit_date": visit.visit_date.isoformat(),
     }
+
+
+VALID_DELIVERY_MODES = {"SVD": "MAT-DEL-SVD", "Assisted": "MAT-DEL-ASSISTED",
+                        "CSection": "MAT-DEL-CS", "Breech": "MAT-DEL-BREECH"}
+VALID_MOTHER_STATUS = {"Stable", "Referred", "Deceased"}
+VALID_OUTCOME = {"Live", "FSB", "MSB"}
+
+
+class NewbornCreate(BaseModel):
+    birth_order: int = Field(1, ge=1, le=8)
+    sex: str = Field(..., max_length=10)
+    weight_g: Optional[int] = Field(default=None, ge=200, le=9000)
+    apgar_1: Optional[int] = Field(default=None, ge=0, le=10)
+    apgar_5: Optional[int] = Field(default=None, ge=0, le=10)
+    apgar_10: Optional[int] = Field(default=None, ge=0, le=10)
+    outcome: str = "Live"
+    resuscitated: bool = False
+    notes: Optional[str] = None
+
+
+class DeliveryCreate(BaseModel):
+    delivered_at: datetime
+    mode: str
+    labor_admission_id: Optional[int] = None
+    placenta_complete: Optional[bool] = None
+    blood_loss_ml: Optional[int] = Field(default=None, ge=0, le=10000)
+    perineum: Optional[str] = Field(default=None, max_length=40)
+    complications: Optional[str] = None
+    mother_status: str = "Stable"
+    newborns: List[NewbornCreate]
+
+
+@router.post("/episodes/{episode_id}/delivery", dependencies=[Depends(RequirePermission("maternity:manage"))])
+def record_delivery(episode_id: int, req: DeliveryCreate, request: Request,
+                    db: Session = Depends(get_db),
+                    current_user: dict = Depends(get_current_user)):
+    if req.mode not in VALID_DELIVERY_MODES:
+        raise HTTPException(status_code=400,
+                            detail=f"mode must be one of {sorted(VALID_DELIVERY_MODES)}")
+    if req.mother_status not in VALID_MOTHER_STATUS:
+        raise HTTPException(status_code=400,
+                            detail=f"mother_status must be one of {sorted(VALID_MOTHER_STATUS)}")
+    if not req.newborns:
+        raise HTTPException(status_code=400, detail="At least one newborn record is required")
+    for nb in req.newborns:
+        if nb.outcome not in VALID_OUTCOME:
+            raise HTTPException(status_code=400,
+                                detail=f"newborn outcome must be one of {sorted(VALID_OUTCOME)}")
+    ep = _get_episode_or_404(db, episode_id)
+    existing = db.query(DeliveryRecord).filter(DeliveryRecord.episode_id == episode_id).first()
+    if existing:
+        raise HTTPException(status_code=409,
+                            detail=f"Episode already has delivery #{existing.delivery_id}")
+    if req.labor_admission_id is not None:
+        la = (
+            db.query(LaborAdmission)
+            .filter(LaborAdmission.labor_admission_id == req.labor_admission_id,
+                    LaborAdmission.episode_id == episode_id)
+            .first()
+        )
+        if not la:
+            raise HTTPException(status_code=404, detail="Labor record not found on this episode")
+
+    delivery = DeliveryRecord(
+        episode_id=episode_id, labor_admission_id=req.labor_admission_id,
+        delivered_at=req.delivered_at, mode=req.mode,
+        placenta_complete=req.placenta_complete, blood_loss_ml=req.blood_loss_ml,
+        perineum=req.perineum, complications=req.complications,
+        mother_status=req.mother_status, conducted_by=current_user["user_id"],
+    )
+    db.add(delivery)
+    db.flush()
+    newborn_rows = []
+    for i, nb in enumerate(req.newborns, start=1):
+        row = NewbornRecord(
+            delivery_id=delivery.delivery_id,
+            birth_order=nb.birth_order if nb.birth_order else i,
+            sex=nb.sex, weight_g=nb.weight_g,
+            apgar_1=nb.apgar_1, apgar_5=nb.apgar_5, apgar_10=nb.apgar_10,
+            outcome=nb.outcome, resuscitated=nb.resuscitated, notes=nb.notes,
+        )
+        db.add(row)
+        newborn_rows.append(row)
+    ep.status = "Delivered"
+    db.flush()
+
+    raise_maternity_charge(
+        db, patient_id=ep.patient_id,
+        service_code=VALID_DELIVERY_MODES[req.mode],
+        clinician_name=current_user.get("full_name") or "Clinician",
+        user_id=current_user["user_id"],
+    )
+    log_audit(db, current_user["user_id"], "CREATE", "DeliveryRecord", delivery.delivery_id,
+              None, {"episode_id": episode_id, "mode": req.mode,
+                     "newborns": len(newborn_rows)},
+              request.client.host)
+    db.commit()
+    return {
+        "delivery_id": delivery.delivery_id,
+        "episode_id": episode_id,
+        "mode": delivery.mode,
+        "delivered_at": delivery.delivered_at.isoformat(),
+        "newborns": [
+            {"newborn_id": n.newborn_id, "birth_order": n.birth_order,
+             "sex": n.sex, "outcome": n.outcome}
+            for n in newborn_rows
+        ],
+    }
+
+
+@router.post("/newborns/{newborn_id}/register-patient",
+             dependencies=[Depends(RequirePermission("maternity:manage")),
+                           Depends(RequirePermission("patients:write"))])
+def register_newborn_as_patient(newborn_id: int, request: Request,
+                                db: Session = Depends(get_db),
+                                current_user: dict = Depends(get_current_user)):
+    nb = db.query(NewbornRecord).filter(NewbornRecord.newborn_id == newborn_id).first()
+    if not nb:
+        raise HTTPException(status_code=404, detail="Newborn record not found")
+    if nb.registered_patient_id:
+        raise HTTPException(status_code=409,
+                            detail=f"Newborn is already registered as patient #{nb.registered_patient_id}")
+    if nb.outcome != "Live":
+        raise HTTPException(status_code=400, detail="Only live newborns can be registered as patients")
+
+    delivery = db.query(DeliveryRecord).filter(DeliveryRecord.delivery_id == nb.delivery_id).first()
+    ep = _get_episode_or_404(db, delivery.episode_id)
+    mother = db.query(Patient).filter(Patient.patient_id == ep.patient_id).first()
+    if not mother:
+        raise HTTPException(status_code=404, detail="Mother's patient record not found")
+
+    # Reuse the canonical creation path (OP-number generation + write-surface
+    # allowlist) — NOT register_patient's endpoint logic, since its phone
+    # blind-index dup-check would match the mother (the newborn reuses her
+    # telephone_1) and wrongly 400. create_patient_record skips dup-checking
+    # by design; this caller owns the transaction and the audit entry below.
+    from app.routes.patients import create_patient_record
+    baby = create_patient_record(
+        db,
+        created_by=current_user["user_id"],
+        surname=mother.surname,
+        other_names=f"Baby of {mother.other_names}".strip()[:150],
+        sex=nb.sex,
+        date_of_birth=delivery.delivered_at.date(),
+        telephone_1=mother.telephone_1,
+        nok_name=f"{mother.surname}, {mother.other_names}"[:150],
+        nok_contact=mother.telephone_1,
+    )
+    nb.registered_patient_id = baby.patient_id
+    log_audit(db, current_user["user_id"], "CREATE", "Patient", baby.patient_id,
+              None, {"source": "newborn_registration", "newborn_id": newborn_id},
+              request.client.host)
+    db.commit()
+    return {"patient_id": baby.patient_id}
