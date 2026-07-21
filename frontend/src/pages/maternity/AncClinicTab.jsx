@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { listEpisodes, getEpisode, getMaternityQueue } from './api';
 import EpisodeForm from './EpisodeForm';
 import AncVisitForm from './AncVisitForm';
+import CloseEpisodeForm from './CloseEpisodeForm';
 
 export default function AncClinicTab() {
   const [episodes, setEpisodes] = useState([]);
@@ -9,6 +10,7 @@ export default function AncClinicTab() {
   const [selected, setSelected] = useState(null);
   const [showEnroll, setShowEnroll] = useState(null);
   const [showVisit, setShowVisit] = useState(false);
+  const [showClose, setShowClose] = useState(false);
   const [error, setError] = useState('');
 
   const refresh = useCallback(() => {
@@ -25,6 +27,15 @@ export default function AncClinicTab() {
     Promise.resolve(getEpisode(id))
       .then((ep) => setSelected(ep || null))
       .catch(() => setError('Failed to load episode'));
+
+  // The closed/transferred episode drops out of the "Active pregnancies"
+  // list on refresh, so its detail panel is cleared rather than re-fetched —
+  // there's nothing left in this view for the user to look at.
+  const handleClosed = () => {
+    setShowClose(false);
+    setSelected(null);
+    refresh();
+  };
 
   const ancVisits = selected?.anc_visits || [];
 
@@ -96,13 +107,22 @@ export default function AncClinicTab() {
           <>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-ink-900 dark:text-white">{selected.patient_name}</h2>
-              <button
-                type="button"
-                onClick={() => setShowVisit(true)}
-                className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
-              >
-                New ANC visit
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowClose(true)}
+                  className="rounded-lg border border-ink-200 dark:border-ink-800 px-3 py-1.5 text-sm font-medium text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50"
+                >
+                  Close episode
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowVisit(true)}
+                  className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+                >
+                  New ANC visit
+                </button>
+              </div>
             </div>
             <table className="mt-3 w-full text-sm">
               <thead>
@@ -147,6 +167,14 @@ export default function AncClinicTab() {
           episodeId={selected.episode_id}
           onClose={() => setShowVisit(false)}
           onSaved={() => { setShowVisit(false); openEpisode(selected.episode_id); }}
+        />
+      )}
+      {showClose && selected && (
+        <CloseEpisodeForm
+          episodeId={selected.episode_id}
+          patientName={selected.patient_name}
+          onClose={() => setShowClose(false)}
+          onClosed={handleClosed}
         />
       )}
     </div>

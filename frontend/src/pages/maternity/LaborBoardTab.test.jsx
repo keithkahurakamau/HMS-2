@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LaborBoardTab from './LaborBoardTab';
@@ -65,5 +65,71 @@ describe('LaborBoardTab', () => {
       expect(screen.getByRole('img', { name: /partograph chart/i })).toBeInTheDocument()
     );
     expect(screen.getByText(/Partograph — Mwangi, Joy/)).toBeInTheDocument();
+  });
+
+  it('start labor: lists active episodes in the modal and submits linkLabor with the chosen episode + admission', async () => {
+    api.listEpisodes.mockResolvedValue([
+      { episode_id: 5, patient_name: 'Achieng, Faith', gravida: 2, para: 1, status: 'Active' },
+    ]);
+    api.getWardBoard.mockResolvedValue([
+      {
+        name: 'Maternity Ward',
+        beds: [
+          { id: 10, number: 'M-1', status: 'Occupied', patient: 'Achieng, Faith',
+            admission_date: '2026-07-20', admission_id: 77 },
+        ],
+      },
+    ]);
+    api.linkLabor.mockResolvedValue({ labor_admission_id: 42, episode_id: 5, admission_id: 77 });
+
+    const user = userEvent.setup();
+    render(<LaborBoardTab />);
+
+    await user.click(await screen.findByRole('button', { name: /start labor/i }));
+    const dialog = await screen.findByRole('dialog', { name: /start labor/i });
+    expect(within(dialog).getByText(/Achieng, Faith/)).toBeInTheDocument();
+
+    await user.selectOptions(within(dialog).getByLabelText(/pregnancy episode/i), '5');
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText(/ward admission/i)).not.toBeDisabled()
+    );
+    await user.selectOptions(within(dialog).getByLabelText(/ward admission/i), '77');
+    await user.click(within(dialog).getByRole('button', { name: /start labor/i }));
+
+    await waitFor(() =>
+      expect(api.linkLabor).toHaveBeenCalledWith(5, expect.objectContaining({ admission_id: 77 }))
+    );
+  });
+
+  it('start labor: renders a legible error when the backend rejects an already-linked admission (409)', async () => {
+    api.listEpisodes.mockResolvedValue([
+      { episode_id: 5, patient_name: 'Achieng, Faith', gravida: 2, para: 1, status: 'Active' },
+    ]);
+    api.getWardBoard.mockResolvedValue([
+      {
+        name: 'Maternity Ward',
+        beds: [
+          { id: 10, number: 'M-1', status: 'Occupied', patient: 'Achieng, Faith',
+            admission_date: '2026-07-20', admission_id: 77 },
+        ],
+      },
+    ]);
+    api.linkLabor.mockRejectedValue({
+      response: { data: { detail: 'Admission is already linked to a labor record.' } },
+    });
+
+    const user = userEvent.setup();
+    render(<LaborBoardTab />);
+
+    await user.click(await screen.findByRole('button', { name: /start labor/i }));
+    const dialog = await screen.findByRole('dialog', { name: /start labor/i });
+    await user.selectOptions(within(dialog).getByLabelText(/pregnancy episode/i), '5');
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText(/ward admission/i)).not.toBeDisabled()
+    );
+    await user.selectOptions(within(dialog).getByLabelText(/ward admission/i), '77');
+    await user.click(within(dialog).getByRole('button', { name: /start labor/i }));
+
+    expect(await within(dialog).findByText(/already linked to a labor record/i)).toBeInTheDocument();
   });
 });

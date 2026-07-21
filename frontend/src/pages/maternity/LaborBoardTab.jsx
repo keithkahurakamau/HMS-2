@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getLaborBoard, getPartograph } from './api';
 import PartographChart from './PartographChart';
 import PartographEntryForm from './PartographEntryForm';
+import StartLaborForm from './StartLaborForm';
 
 const ALERT_BADGE = {
   ok: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
@@ -14,6 +15,7 @@ export default function LaborBoardTab() {
   const [selected, setSelected] = useState(null);
   const [chart, setChart] = useState(null);
   const [showEntry, setShowEntry] = useState(false);
+  const [showStartLabor, setShowStartLabor] = useState(false);
   const [error, setError] = useState('');
   // Tracks the labor_admission_id of the most recently requested partograph so
   // that a late-resolving (out-of-order) fetch for a since-abandoned selection
@@ -46,12 +48,31 @@ export default function LaborBoardTab() {
       });
   }, []);
 
+  // Fires after StartLaborForm's linkLabor() call succeeds: refresh the
+  // board and immediately select the newly-started labor so the midwife
+  // lands straight on its (still-empty) partograph rather than back on the
+  // bare board list.
+  const handleStarted = useCallback((result, episode) => {
+    setShowStartLabor(false);
+    refreshBoard();
+    open({ labor_admission_id: result.labor_admission_id, patient_name: episode?.patient_name || '' });
+  }, [refreshBoard, open]);
+
   return (
     <div className="space-y-4">
       {error && <p className="print:hidden text-sm text-rose-600 dark:text-rose-400">{error}</p>}
       <section aria-label="Labor board"
                className="print:hidden rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4">
-        <h2 className="text-sm font-semibold text-ink-900 dark:text-white">In labor</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink-900 dark:text-white">In labor</h2>
+          <button
+            type="button"
+            onClick={() => setShowStartLabor(true)}
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            Start labor
+          </button>
+        </div>
         <ul className="mt-3 divide-y divide-ink-100 dark:divide-ink-800">
           {board.map((row) => (
             <li key={row.labor_admission_id}>
@@ -114,6 +135,13 @@ export default function LaborBoardTab() {
           laborId={selected.labor_admission_id}
           onClose={() => setShowEntry(false)}
           onSaved={() => { setShowEntry(false); open(selected); refreshBoard(); }}
+        />
+      )}
+
+      {showStartLabor && (
+        <StartLaborForm
+          onClose={() => setShowStartLabor(false)}
+          onStarted={handleStarted}
         />
       )}
     </div>
