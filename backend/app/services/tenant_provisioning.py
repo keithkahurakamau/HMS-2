@@ -44,6 +44,7 @@ from app.models import laboratory as _laboratory  # noqa: F401
 from app.models import clinical as _clinical  # noqa: F401
 from app.models import billing as _billing  # noqa: F401
 from app.models import audit as _audit  # noqa: F401
+from app.models import maternity as _maternity  # noqa: F401
 from app.models import medical_history as _medical_history  # noqa: F401
 from app.models import radiology as _radiology  # noqa: F401
 from app.models import auth_tokens as _auth_tokens  # noqa: F401
@@ -168,6 +169,10 @@ PERMISSION_CATALOG: tuple[tuple[str, str], ...] = (
     ("referrals:read",         "View incoming and outgoing referrals"),
     ("referrals:manage",       "Issue and update specialist referrals"),
 
+    # ── Maternity ────────────────────────────────────────────────────────
+    ("maternity:read",         "View maternity episodes, partographs, and deliveries"),
+    ("maternity:manage",       "Record ANC/PNC visits, partograph entries, and deliveries"),
+
     # ── Hospital settings ────────────────────────────────────────────────
     ("settings:read",          "Read hospital configuration"),
     ("settings:manage",        "Edit hospital configuration and security settings"),
@@ -212,11 +217,13 @@ ROLE_GRANTS = {
                "inventory:read", "wards:read",
                "appointments:manage",
                "referrals:read", "referrals:manage",
+               "maternity:read", "maternity:manage",
                "cheques:read", *_BASE],
     "Nurse": ["triage:write", "triage:read", "clinical:read", "patients:read",
               "wards:read", "wards:manage",
               "pharmacy:read", "history:read", "inventory:read",
               "appointments:manage",
+              "maternity:read", "maternity:manage",
               "cheques:read", *_BASE],
     "Pharmacist": ["pharmacy:manage", "pharmacy:read", "patients:read",
                    "inventory:read", "inventory:manage", *_BASE],

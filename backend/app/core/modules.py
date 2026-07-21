@@ -71,6 +71,7 @@ MODULES: Tuple[ModuleDef, ...] = (
     ModuleDef("referrals",    "Referrals",          "Out-bound and in-bound referrals.",        False),
     ModuleDef("privacy",      "Privacy",            "Consent, DSAR, audit logs.",               False),
     ModuleDef("accounting",   "Managerial Accounting","Chart of accounts, journals, financial statements.", False),
+    ModuleDef("maternity",    "Maternity",          "ANC/PNC clinics, labor partograph, deliveries, newborns.", False),
 )
 
 # Convenience lookups.
@@ -120,6 +121,7 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/referrals/",                   "referrals"),
     ("/api/privacy/",                     "privacy"),
     ("/api/accounting/",                  "accounting"),
+    ("/api/maternity/",                   "maternity"),
 )
 
 
