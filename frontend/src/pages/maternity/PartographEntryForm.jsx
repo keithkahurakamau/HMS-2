@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { appendPartograph } from './api';
+import { errorText } from './errors';
 
 const NUMBER_FIELDS = [
   'cervical_dilation_cm', 'descent_fifths', 'contractions_per_10min',
@@ -34,7 +35,7 @@ export default function PartographEntryForm({ laborId, onClose, onSaved }) {
       await appendPartograph(laborId, payload);
       onSaved();
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to save entry');
+      setError(errorText(err, 'Failed to save entry'));
     } finally {
       setSaving(false);
     }

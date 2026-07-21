@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createAncVisit } from './api';
+import { errorText } from './errors';
 
 const NUMBER_FIELDS = ['bp_systolic', 'bp_diastolic', 'fetal_heart_rate'];
 const DECIMAL_FIELDS = ['weight_kg', 'fundal_height_cm'];
@@ -30,7 +31,7 @@ export default function AncVisitForm({ episodeId, onClose, onSaved }) {
       await createAncVisit(episodeId, payload);
       onSaved();
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to save visit');
+      setError(errorText(err, 'Failed to save visit'));
     } finally {
       setSaving(false);
     }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { listEpisodes, getEpisode, registerNewborn } from './api';
 import DeliveryForm from './DeliveryForm';
 import PncVisitForm from './PncVisitForm';
+import { errorText } from './errors';
 
 export default function DeliveriesTab() {
   const [active, setActive] = useState([]);
@@ -10,6 +11,10 @@ export default function DeliveriesTab() {
   const [showDelivery, setShowDelivery] = useState(null);
   const [showPnc, setShowPnc] = useState(false);
   const [error, setError] = useState('');
+  // Errors from actions taken inside the "Delivery detail" section (e.g.
+  // registering a newborn as a patient) are shown next to that section
+  // rather than in the far-away "Active pregnancies" panel.
+  const [detailError, setDetailError] = useState('');
   // Tracks the episode_id of the most recently requested detail so that a
   // late-resolving (out-of-order) fetch for a since-abandoned selection can
   // never overwrite the deliveries/newborns shown for whichever episode is
@@ -38,6 +43,7 @@ export default function DeliveriesTab() {
         if (ep && ep.episode_id !== id) return;
         setSelected(ep || null);
         setError('');
+        setDetailError('');
       })
       .catch(() => {
         if (requestedEpisodeIdRef.current !== id) return;
@@ -45,10 +51,21 @@ export default function DeliveriesTab() {
       });
   }, []);
 
-  const handleRegisterNewborn = (newbornId) => {
+  // `episodeId` is captured at click time (see call site) rather than read
+  // from `selected` inside .then — if the user switches to viewing a
+  // different episode while this request is in flight, `selected` (and
+  // requestedEpisodeIdRef) will have moved on by the time this resolves.
+  // Re-opening the now-stale `episodeId` here would discard whatever
+  // episode the user has since navigated to (defeating the out-of-order
+  // guard in openEpisode) and silently snap the view back. So only refresh
+  // if the captured id still matches the currently-requested episode;
+  // otherwise skip the refresh without re-navigating the user.
+  const handleRegisterNewborn = (newbornId, episodeId) => {
     Promise.resolve(registerNewborn(newbornId))
-      .then(() => { if (selected) openEpisode(selected.episode_id); })
-      .catch(() => setError('Failed to register newborn'));
+      .then(() => {
+        if (requestedEpisodeIdRef.current === episodeId) openEpisode(episodeId);
+      })
+      .catch((err) => setDetailError(errorText(err, 'Failed to register newborn')));
   };
 
   const deliveries = selected?.deliveries || [];
@@ -119,6 +136,7 @@ export default function DeliveriesTab() {
               New PNC visit
             </button>
           </div>
+          {detailError && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{detailError}</p>}
 
           {deliveries.map((d) => (
             <div key={d.delivery_id} className="mt-3">
@@ -152,7 +170,7 @@ export default function DeliveriesTab() {
                           <button
                             type="button"
                             disabled={n.outcome !== 'Live'}
-                            onClick={() => handleRegisterNewborn(n.newborn_id)}
+                            onClick={() => handleRegisterNewborn(n.newborn_id, selected.episode_id)}
                             className="rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-1 text-xs font-medium text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-60"
                           >
                             Register as patient

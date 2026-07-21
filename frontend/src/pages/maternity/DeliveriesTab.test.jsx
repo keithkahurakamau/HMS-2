@@ -66,4 +66,24 @@ describe('DeliveriesTab', () => {
         newborns: [expect.objectContaining({ sex: 'Male', birth_order: 1 })],
       })));
   });
+
+  it('submits a PNC visit for the selected delivered episode, omitting empty optional numeric fields', async () => {
+    api.createPncVisit.mockResolvedValue({ visit_id: 3, visit_number: 1 });
+    api.getEpisode.mockResolvedValue({
+      episode_id: 2, patient_name: 'Atieno, Mary', status: 'Delivered',
+      anc_visits: [], pnc_visits: [], labor: [], deliveries: [],
+    });
+    const user = userEvent.setup();
+    render(<DeliveriesTab />);
+    await user.click(await screen.findByText(/Atieno, Mary/));
+    await user.click(await screen.findByRole('button', { name: /new pnc visit/i }));
+    await user.type(screen.getByLabelText(/visit date/i), '2026-07-15');
+    await user.click(screen.getByRole('button', { name: /save visit/i }));
+    await waitFor(() => expect(api.createPncVisit).toHaveBeenCalledWith(2,
+      expect.objectContaining({ visit_date: '2026-07-15' })));
+    const [, payload] = api.createPncVisit.mock.calls[0];
+    expect(payload).not.toHaveProperty('bp_systolic');
+    expect(payload).not.toHaveProperty('bp_diastolic');
+    expect(payload).not.toHaveProperty('baby_weight_g');
+  });
 });

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { recordDelivery } from './api';
+import { errorText } from './errors';
 
 const MODES = ['SVD', 'Assisted', 'CSection', 'Breech'];
 const MOTHER_STATUSES = ['Stable', 'Referred', 'Deceased'];
@@ -56,7 +57,7 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
       await recordDelivery(episodeId, payload);
       onSaved();
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to save delivery');
+      setError(errorText(err, 'Failed to save delivery'));
     } finally {
       setSaving(false);
     }
@@ -97,7 +98,7 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
           </label>
           <label className="block text-sm text-ink-700 dark:text-ink-300">
             Blood loss (ml)
-            <input type="number" value={bloodLossMl} onChange={(e) => setBloodLossMl(e.target.value)} className="input mt-1 w-full" />
+            <input type="number" min="0" max="10000" value={bloodLossMl} onChange={(e) => setBloodLossMl(e.target.value)} className="input mt-1 w-full" />
           </label>
           <label className="mt-6 flex items-center gap-2 text-sm text-ink-700 dark:text-ink-300">
             <input type="checkbox" checked={placentaComplete} onChange={(e) => setPlacentaComplete(e.target.checked)} />
@@ -147,7 +148,7 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
                 </label>
                 <label className="block text-sm text-ink-700 dark:text-ink-300">
                   Weight (g)
-                  <input type="number" value={n.weight_g} onChange={setNewbornField(n.id, 'weight_g')} className="input mt-1 w-full" />
+                  <input type="number" min="200" max="9000" value={n.weight_g} onChange={setNewbornField(n.id, 'weight_g')} className="input mt-1 w-full" />
                 </label>
                 <label className="block text-sm text-ink-700 dark:text-ink-300">
                   APGAR 1 min

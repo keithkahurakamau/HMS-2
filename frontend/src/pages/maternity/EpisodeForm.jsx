@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createEpisode } from './api';
+import { errorText } from './errors';
 
 export default function EpisodeForm({ initialPatientId, onClose, onSaved }) {
   const [form, setForm] = useState({
@@ -28,7 +29,7 @@ export default function EpisodeForm({ initialPatientId, onClose, onSaved }) {
       await createEpisode(payload);
       onSaved();
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to enroll patient');
+      setError(errorText(err, 'Failed to enroll patient'));
     } finally {
       setSaving(false);
     }

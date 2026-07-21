@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createPncVisit } from './api';
+import { errorText } from './errors';
 
 const NUMBER_FIELDS = ['baby_weight_g', 'bp_systolic', 'bp_diastolic'];
 const TEXT_FIELDS = ['involution', 'lochia', 'feeding', 'cord_status'];
@@ -29,7 +30,7 @@ export default function PncVisitForm({ episodeId, onClose, onSaved }) {
       await createPncVisit(episodeId, payload);
       onSaved();
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to save visit');
+      setError(errorText(err, 'Failed to save visit'));
     } finally {
       setSaving(false);
     }
@@ -58,15 +59,15 @@ export default function PncVisitForm({ episodeId, onClose, onSaved }) {
         <div className="mt-3 grid grid-cols-2 gap-3">
           <label className="block text-sm text-ink-700 dark:text-ink-300">
             BP systolic
-            <input type="number" value={form.bp_systolic} onChange={set('bp_systolic')} className="input mt-1 w-full" />
+            <input type="number" min="40" max="300" value={form.bp_systolic} onChange={set('bp_systolic')} className="input mt-1 w-full" />
           </label>
           <label className="block text-sm text-ink-700 dark:text-ink-300">
             BP diastolic
-            <input type="number" value={form.bp_diastolic} onChange={set('bp_diastolic')} className="input mt-1 w-full" />
+            <input type="number" min="20" max="200" value={form.bp_diastolic} onChange={set('bp_diastolic')} className="input mt-1 w-full" />
           </label>
           <label className="block text-sm text-ink-700 dark:text-ink-300">
             Baby weight (g)
-            <input type="number" value={form.baby_weight_g} onChange={set('baby_weight_g')} className="input mt-1 w-full" />
+            <input type="number" min="200" max="9000" value={form.baby_weight_g} onChange={set('baby_weight_g')} className="input mt-1 w-full" />
           </label>
           <label className="block text-sm text-ink-700 dark:text-ink-300">
             Involution
