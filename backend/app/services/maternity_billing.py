@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.accounting import PriceListItem
 from app.models.billing import Invoice, InvoiceItem
 from app.services.accounting_posting import post_from_event
+from app.utils.audit import log_audit
 
 
 def raise_maternity_charge(
@@ -64,4 +65,11 @@ def raise_maternity_charge(
         reference=f"INV-{invoice.invoice_id}",
         user_id=user_id,
     )
+
+    # Same audit-log contract as charge_consultation_fee's InvoiceItem
+    # (backend/app/routes/billing.py) — money must never be written without
+    # an audit row. This helper doesn't own the transaction (caller commits)
+    # and has no Request, so ip_address is None rather than invented.
+    log_audit(db, user_id, "CREATE", "InvoiceItem", item.id, None,
+              {"amount": float(amt), "type": "Maternity", "service_code": service_code}, None)
     return item

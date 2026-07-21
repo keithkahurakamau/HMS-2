@@ -69,6 +69,30 @@ class TestDelivery:
                         })
         assert r.status_code == 409
 
+    def test_delivery_on_closed_episode_rejected(self, client, nurse_cookies, episode):
+        """Regression (I3): a delivery must never resurrect a Closed/
+        Transferred episode. Without the guard this would flip the stale
+        episode back to Delivered, charge the mother, and leave two open
+        pregnancy records if she'd since enrolled a fresh Active one."""
+        r = client.patch(
+            f"/api/maternity/episodes/{episode['episode_id']}/close",
+            cookies=nurse_cookies, json={"status": "Transferred", "reason": "test"},
+        )
+        assert r.status_code == 200, r.text
+
+        r = client.post(f"/api/maternity/episodes/{episode['episode_id']}/delivery",
+                        cookies=nurse_cookies, json={
+                            "delivered_at": "2026-07-10T08:30:00Z",
+                            "mode": "SVD",
+                            "newborns": [{"sex": "Male", "outcome": "Live"}],
+                        })
+        assert r.status_code == 400, r.text
+
+        ep = client.get(f"/api/maternity/episodes/{episode['episode_id']}",
+                        cookies=nurse_cookies).json()
+        assert ep["status"] == "Transferred"
+        assert ep["deliveries"] == []
+
     def test_invalid_mode_400(self, client, nurse_cookies, episode):
         r = client.post(f"/api/maternity/episodes/{episode['episode_id']}/delivery",
                         cookies=nurse_cookies, json={

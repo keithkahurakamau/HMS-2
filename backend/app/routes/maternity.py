@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 
 from app.config.database import get_db
 from app.core.dependencies import get_current_user, RequirePermission
@@ -187,9 +188,8 @@ def close_episode(episode_id: int, req: EpisodeClose, request: Request,
                             detail=f"status must be one of {sorted(VALID_CLOSE_STATUS)}")
     ep = _get_episode_or_404(db, episode_id)
     old = ep.status
-    from sqlalchemy.sql import func as _func
     ep.status = req.status
-    ep.closed_at = _func.now()
+    ep.closed_at = func.now()
     log_audit(db, current_user["user_id"], "UPDATE", "PregnancyEpisode", ep.episode_id,
               {"status": old}, {"status": req.status, "reason": req.reason},
               request.client.host)
@@ -266,10 +266,22 @@ def create_pnc_visit(episode_id: int, req: PncVisitCreate, request: Request,
                      db: Session = Depends(get_db),
                      current_user: dict = Depends(get_current_user)):
     ep = _get_episode_or_404(db, episode_id)
+    if ep.status != "Delivered":
+        raise HTTPException(status_code=400,
+                            detail=f"Episode is {ep.status}; PNC visits need a Delivered episode.")
     if req.newborn_id is not None:
-        nb = db.query(NewbornRecord).filter(NewbornRecord.newborn_id == req.newborn_id).first()
+        # Scope the newborn lookup through its delivery to THIS episode —
+        # a bare newborn_id lookup would let any newborn in the tenant be
+        # attached to any mother's PNC visit.
+        nb = (
+            db.query(NewbornRecord)
+            .join(DeliveryRecord, DeliveryRecord.delivery_id == NewbornRecord.delivery_id)
+            .filter(NewbornRecord.newborn_id == req.newborn_id,
+                    DeliveryRecord.episode_id == episode_id)
+            .first()
+        )
         if not nb:
-            raise HTTPException(status_code=404, detail="Newborn record not found")
+            raise HTTPException(status_code=404, detail="Newborn record not found on this episode")
     count = db.query(PncVisit).filter(PncVisit.episode_id == episode_id).count()
     visit = PncVisit(
         episode_id=episode_id, newborn_id=req.newborn_id,
@@ -355,6 +367,9 @@ def record_delivery(episode_id: int, req: DeliveryCreate, request: Request,
     if existing:
         raise HTTPException(status_code=409,
                             detail=f"Episode already has delivery #{existing.delivery_id}")
+    if ep.status != "Active":
+        raise HTTPException(status_code=400,
+                            detail=f"Episode is {ep.status}; a delivery needs an Active episode.")
     if req.labor_admission_id is not None:
         la = (
             db.query(LaborAdmission)

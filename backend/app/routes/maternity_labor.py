@@ -31,8 +31,11 @@ def alert_status(dilation_cm: Optional[float], hours_since_active: Optional[floa
     lines, 'action' right of the action line (alert + 4h)."""
     if dilation_cm is None or hours_since_active is None or hours_since_active < 0:
         return "ok"
-    expected_alert = 4.0 + hours_since_active
-    expected_action = 4.0 + max(0.0, hours_since_active - 4.0)
+    # Both lines are clamped to 10 cm (full dilation) — the chart terminates
+    # there too, so a fully dilated mother in a normal second stage must never
+    # extrapolate into "alert"/"action" just because more hours have passed.
+    expected_alert = min(10.0, 4.0 + hours_since_active)
+    expected_action = min(10.0, 4.0 + max(0.0, hours_since_active - 4.0))
     if dilation_cm >= expected_alert:
         return "ok"
     if dilation_cm >= expected_action:

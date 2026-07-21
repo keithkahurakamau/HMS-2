@@ -5,7 +5,11 @@ the codes too (same convention as lab_catalog_seed). All services seed at
 unit_price=0 — zero-priced services raise no charge until the hospital sets
 real prices in Admin → Pricing.
 """
+from typing import Union
+
 from sqlalchemy import text
+from sqlalchemy.engine import Connection
+from sqlalchemy.orm import Session
 
 MATERNITY_SERVICES = (
     ("MAT-ANC-VISIT",    "Antenatal Clinic Visit"),
@@ -17,7 +21,7 @@ MATERNITY_SERVICES = (
 )
 
 
-def seed_maternity_price_list(db) -> int:
+def seed_maternity_price_list(db: Union[Session, Connection]) -> int:
     """Insert missing MAT-* price-list rows. Returns number inserted.
 
     Works with SQLAlchemy Session or Connection objects.

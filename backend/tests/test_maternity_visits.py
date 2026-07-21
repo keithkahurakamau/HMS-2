@@ -142,8 +142,30 @@ class TestAncVisit:
             db.close()
 
 
+def _deliver(client, cookies, episode_id: int, *, sex: str = "Female") -> dict:
+    r = client.post(
+        f"/api/maternity/episodes/{episode_id}/delivery",
+        cookies=cookies,
+        json={"delivered_at": "2026-07-11T10:00:00Z", "mode": "SVD",
+              "newborns": [{"sex": sex, "weight_g": 3100, "outcome": "Live"}]},
+    )
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
 class TestPncVisit:
+    def test_pnc_visit_requires_delivered_episode(self, client, nurse_cookies, episode):
+        """Regression (I4): PNC visits must not be recordable/billable
+        against an episode that hasn't been delivered yet."""
+        r = client.post(
+            f"/api/maternity/episodes/{episode['episode_id']}/pnc-visits",
+            cookies=nurse_cookies,
+            json={"visit_date": "2026-07-12", "involution": "Well contracted"},
+        )
+        assert r.status_code == 400, r.text
+
     def test_pnc_visit_records(self, client, nurse_cookies, episode):
+        _deliver(client, nurse_cookies, episode["episode_id"])
         r = client.post(
             f"/api/maternity/episodes/{episode['episode_id']}/pnc-visits",
             cookies=nurse_cookies,
@@ -152,3 +174,43 @@ class TestPncVisit:
         )
         assert r.status_code == 200, r.text
         assert r.json()["visit_number"] == 1
+
+    def test_pnc_visit_newborn_must_belong_to_episode(self, client, nurse_cookies, admin_cookies, episode):
+        """Regression (I4): a newborn_id that exists in the tenant but belongs
+        to a DIFFERENT mother's delivery must be rejected (404), not silently
+        attached to this PNC visit."""
+        delivery = _deliver(client, nurse_cookies, episode["episode_id"])
+        own_newborn_id = delivery["newborns"][0]["newborn_id"]
+
+        # A second, unrelated mother + episode + delivery gives us a
+        # newborn_id that is valid in the tenant but belongs elsewhere.
+        suffix = uuid.uuid4().hex[:8]
+        r = client.post("/api/patients/", cookies=admin_cookies, json={
+            "surname": f"Other{suffix}", "other_names": "Other Mother",
+            "sex": "Female", "date_of_birth": "1990-01-01",
+            "telephone_1": f"+2547{suffix[:8]}",
+        })
+        assert r.status_code in (200, 201), r.text
+        other_pid = r.json()["patient_id"]
+        r = client.post("/api/maternity/episodes", cookies=nurse_cookies, json={
+            "patient_id": other_pid, "gravida": 1, "para": 0,
+        })
+        assert r.status_code == 200, r.text
+        other_delivery = _deliver(client, nurse_cookies, r.json()["episode_id"])
+        other_newborn_id = other_delivery["newborns"][0]["newborn_id"]
+
+        # The other mother's newborn_id on THIS episode's PNC visit → 404.
+        r = client.post(
+            f"/api/maternity/episodes/{episode['episode_id']}/pnc-visits",
+            cookies=nurse_cookies,
+            json={"visit_date": "2026-07-12", "newborn_id": other_newborn_id},
+        )
+        assert r.status_code == 404, r.text
+
+        # The episode's own newborn_id is accepted.
+        r = client.post(
+            f"/api/maternity/episodes/{episode['episode_id']}/pnc-visits",
+            cookies=nurse_cookies,
+            json={"visit_date": "2026-07-13", "newborn_id": own_newborn_id},
+        )
+        assert r.status_code == 200, r.text

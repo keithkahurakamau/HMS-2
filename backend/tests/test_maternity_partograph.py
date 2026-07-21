@@ -29,6 +29,13 @@ def test_alert_status_math():
     assert alert_status(4.0, 8.5) == "action"  # below 4 + (8.5-4) = 8.5 → past action line
     assert alert_status(None, 3.0) == "ok"     # nothing to judge
 
+    # Regression (I6): the alert/action lines must clamp at 10 cm (full
+    # dilation), matching where the frontend chart terminates them. Without
+    # the clamp, 4.0 + hours keeps climbing past 10 cm and a fully dilated
+    # mother in a normal second stage gets a false "alert"/"action" reading.
+    assert alert_status(10.0, 6.5) == "ok"     # unclamped would expect 10.5
+    assert alert_status(10.0, 11.0) == "ok"    # unclamped would expect 15.0
+
 
 def _find_available_bed(board):
     """Board is a flat list of ward dicts (app/routes/wards.py get_bed_board),
