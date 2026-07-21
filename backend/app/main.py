@@ -3,7 +3,8 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse, ORJSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -91,6 +92,21 @@ def _auto_migrate_on_boot() -> None:
 async def lifespan(app: FastAPI):
     # Boot: optionally bring schemas up to head, then warm up WebSocket pubsub.
     _auto_migrate_on_boot()
+
+    # Size AnyIO's thread pool — the pool that runs every synchronous `def`
+    # route handler. Its default is 40; THREADPOOL_TOKENS lets an operator lift
+    # the per-worker concurrency ceiling in step with the database's connection
+    # budget (see settings + docs/DEPLOYMENT.md). Guarded so a bad value can
+    # never crash boot.
+    try:
+        from anyio import to_thread
+
+        tokens = max(1, int(settings.THREADPOOL_TOKENS))
+        to_thread.current_default_thread_limiter().total_tokens = tokens
+        logger.info("AnyIO thread pool sized to %d tokens.", tokens)
+    except Exception as exc:  # noqa: BLE001 — never let tuning sink startup
+        logger.warning("Could not set thread-pool size: %s", exc)
+
     ws_manager.bind_loop()
     await ws_manager.init_redis()
     if not settings.REDIS_URL:
@@ -106,6 +122,11 @@ app = FastAPI(
     version=settings.VERSION,
     description="Enterprise Hospital Management System API",
     lifespan=lifespan,
+    # orjson serializes 3–5x faster than the stdlib json FastAPI uses by
+    # default — a real win on the payload-heavy endpoints (patient charts,
+    # visit history, financial statements). Individual routes can still
+    # override response_class where they need bespoke behaviour.
+    default_response_class=ORJSONResponse,
 )
 
 # 4. Attach Rate Limiter to App.
@@ -146,6 +167,15 @@ app.add_middleware(
     expose_headers=[] if settings.is_production else ["X-Process-Time"],
     max_age=600,
 )
+
+# Response compression. Large JSON payloads (patient charts, visit history,
+# financial statements, long queues) shrink dramatically over the wire, which
+# is the dominant latency term for clients on slower hospital links. Small
+# bodies fall below GZIP_MIN_SIZE and are sent uncompressed (the CPU isn't
+# worth it). Header-only middlewares layered outside this one only set headers,
+# so compressing here is safe. Set GZIP_MIN_SIZE=0 in settings to disable.
+if settings.GZIP_MIN_SIZE > 0:
+    app.add_middleware(GZipMiddleware, minimum_size=settings.GZIP_MIN_SIZE)
 
 # 6. Global Middleware: Process Time (Removed Exception Catcher from here)
 @app.middleware("http")
