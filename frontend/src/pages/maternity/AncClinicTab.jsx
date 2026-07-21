@@ -15,7 +15,7 @@ export default function AncClinicTab() {
 
   const refresh = useCallback(() => {
     Promise.resolve(listEpisodes({ status: 'Active' }))
-      .then((rows) => setEpisodes(rows || []))
+      .then((rows) => { setEpisodes(rows || []); setError(''); })
       .catch(() => setError('Failed to load episodes'));
     Promise.resolve(getMaternityQueue())
       .then((rows) => setQueue(rows || []))
@@ -25,8 +25,23 @@ export default function AncClinicTab() {
 
   const openEpisode = (id) =>
     Promise.resolve(getEpisode(id))
-      .then((ep) => setSelected(ep || null))
+      .then((ep) => { setSelected(ep || null); setError(''); })
       .catch(() => setError('Failed to load episode'));
+
+  // A queue row's patient may already have an Active episode (e.g. routed
+  // back to Maternity for a follow-up ANC visit) — opening the enroll form
+  // for them would just 409. Match on patient_id against the already-loaded
+  // Active episode list (listEpisodes carries patient_id — see
+  // app/routes/maternity.py _episode_dict) and jump straight to their
+  // episode; only fall back to the enroll form when they have none.
+  const enrollOrOpenFromQueue = (patientId) => {
+    const existing = episodes.find((ep) => ep.patient_id === patientId);
+    if (existing) {
+      openEpisode(existing.episode_id);
+    } else {
+      setShowEnroll({ patientId });
+    }
+  };
 
   // The closed/transferred episode drops out of the "Active pregnancies"
   // list on refresh, so its detail panel is cleared rather than re-fetched —
@@ -50,7 +65,7 @@ export default function AncClinicTab() {
                 <span>{q.patient_name}</span>
                 <button
                   type="button"
-                  onClick={() => setShowEnroll({ patientId: q.patient_id })}
+                  onClick={() => enrollOrOpenFromQueue(q.patient_id)}
                   className="text-brand-700 dark:text-brand-300 hover:underline"
                 >
                   Enroll / open
@@ -69,6 +84,7 @@ export default function AncClinicTab() {
           <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Active pregnancies</h2>
           <button
             type="button"
+            data-tour="mat-enroll"
             onClick={() => setShowEnroll({})}
             className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
           >
@@ -110,6 +126,7 @@ export default function AncClinicTab() {
               <div className="flex gap-2">
                 <button
                   type="button"
+                  data-tour="mat-close-episode"
                   onClick={() => setShowClose(true)}
                   className="rounded-lg border border-ink-200 dark:border-ink-800 px-3 py-1.5 text-sm font-medium text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50"
                 >
@@ -117,6 +134,7 @@ export default function AncClinicTab() {
                 </button>
                 <button
                   type="button"
+                  data-tour="mat-anc-visit"
                   onClick={() => setShowVisit(true)}
                   className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
                 >

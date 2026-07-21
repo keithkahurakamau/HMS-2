@@ -75,10 +75,14 @@ export default function PartographChart({ entries = [], activeStart = null }) {
                 stroke="#2563eb" strokeWidth="1.5" />
       ))}
 
-      {/* FHR strip (320–400 y-band, 60–200 bpm) */}
+      {/* FHR strip (340–400 y-band; the backend accepts 40–240 bpm on partograph
+          entries, wider than the 60–200 this formula maps into the band, so
+          the plotted y is clamped to [340, 400] below — an extreme value sits
+          at the band edge instead of drifting past it) */}
       <text x={PLOT.x0} y={334} fontSize="10" className="fill-ink-500 dark:fill-ink-400">FHR</text>
       {fhr.map((e) => {
-        const y = 400 - ((e.fetal_heart_rate - 60) / 140) * 60;
+        const rawY = 400 - ((e.fetal_heart_rate - 60) / 140) * 60;
+        const y = Math.min(400, Math.max(340, rawY));
         return <circle key={`fhr${e.entry_id}`} data-kind="fhr"
                        cx={xForHours(e.h)} cy={y} r="3" fill="#16a34a" />;
       })}

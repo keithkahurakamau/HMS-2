@@ -10,6 +10,7 @@ from app.models.billing import Invoice
 from app.models.clinical import PatientQueue
 from app.core.dependencies import RequirePermission
 from app.core import cache
+from app.routes.patients import CANONICAL_DEPARTMENTS
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics & Dashboard"])
 
@@ -40,13 +41,13 @@ def get_dashboard_metrics(request: Request, db: Session = Depends(get_db)):
     waiting_patients = db.query(PatientQueue).filter(PatientQueue.status != "Completed").all()
     total_waiting = len(waiting_patients)
     
-    queue_breakdown = {
-        "Triage": len([p for p in waiting_patients if p.department == "Triage"]),
-        "Consultation": len([p for p in waiting_patients if p.department == "Consultation"]),
-        "Laboratory": len([p for p in waiting_patients if p.department == "Laboratory"]),
-        "Pharmacy": len([p for p in waiting_patients if p.department == "Pharmacy"]),
-        "Billing": len([p for p in waiting_patients if p.department == "Billing"])
-    }
+    # Derived from the canonical department list rather than hardcoded, so a
+    # new routable department (Maternity, and previously Reception/Radiology/
+    # Wards) can't silently go missing from the Command Center. One pass.
+    queue_breakdown = {name: 0 for name in sorted(CANONICAL_DEPARTMENTS)}
+    for p in waiting_patients:
+        if p.department in queue_breakdown:
+            queue_breakdown[p.department] += 1
 
     return {
         "total_patients": total_patients,

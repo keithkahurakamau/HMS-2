@@ -207,6 +207,55 @@ export const JOURNEYS = {
     ],
 
     /* ──────────────────────────────────────────────────────────────
+       Maternity — Midwife's ANC → labor → delivery → PNC flow
+       ────────────────────────────────────────────────────────────── */
+    maternity: [
+        { title: 'Maternity walk-through — one pregnancy, start to finish',
+          body: "We'll follow a single patient through the whole journey: enroll her pregnancy, chart an ANC visit, start labor, work the partograph, record the delivery, register the newborn, then PNC visits and closing the episode out. Same order you'll use every day.",
+          placement: 'center' },
+        { selector: '[data-tour="mat-tabs"]',
+          title: 'Step 1 — the three stages',
+          body: "ANC Clinic is antenatal care before birth. Labor Board is the delivery room — the live partograph. Deliveries & PNC is everything after: the birth record, newborns, and postnatal visits. A pregnancy moves left to right across these tabs as it progresses.",
+          placement: 'bottom' },
+        { selector: '[data-tour="mat-enroll"]',
+          title: 'Step 2 — enroll the pregnancy',
+          body: "In ANC Clinic, click \"Enroll patient\". Enter her patient ID, gravida/para, LMP (EDD calculates automatically from it), blood group, and any risk flags. This opens the pregnancy episode everything else in this module hangs off.",
+          placement: 'left',
+          tip: 'A patient can only have one Active episode at a time — enrolling a second returns a clear "already has an Active pregnancy" error instead of creating a duplicate.' },
+        { selector: '[data-tour="mat-anc-visit"]',
+          title: 'Step 3 — record an ANC visit',
+          body: "Select her episode, then click \"New ANC visit\". Gestation weeks calculate from her LMP automatically — you just log BP, weight, fundal height, and fetal heart rate for today. Repeat this every antenatal appointment.",
+          placement: 'left' },
+        { selector: '[data-tour="mat-start-labor"]',
+          title: 'Step 4 — start labor',
+          body: "When she's admitted in labor, switch to Labor Board and click \"Start labor\". This LINKS her episode to an existing ward admission — it doesn't create one — so admit her to a bed in Wards first, then come back here and pick that admission from the list.",
+          placement: 'left',
+          tip: 'Leave "Active labor started at" blank and the alert line anchors itself to her first ≥4 cm reading instead — useful when you weren\'t there for the exact onset.' },
+        { selector: '[data-tour="mat-partograph"]',
+          title: 'Step 5 — read and record the partograph',
+          body: "Click \"New entry\" every 30 minutes to 4 hours to log dilation, descent, contractions, FHR, and maternal vitals. The amber Alert line and red Action line are the WHO thresholds — a reading that plots past either one automatically notifies ward staff, so you don't have to page anyone.",
+          placement: 'top',
+          tip: 'Entries are permanent — there\'s no edit or delete. If a reading was wrong, don\'t fix it in place: save a fresh entry with the correct numbers. A correction supersedes the old reading rather than rewriting history.' },
+        { selector: '[data-tour="mat-delivery"]',
+          title: 'Step 6 — record the delivery',
+          body: "Once she delivers, go to Deliveries & PNC and click \"Record delivery\". Fill in the mode, blood loss, and mother's status, then the newborn's sex, weight, and APGAR scores. Click \"Add twin\" to add another newborn row for a multiple birth — one row per baby.",
+          placement: 'left' },
+        { selector: '[data-tour="mat-register-newborn"]',
+          title: 'Step 7 — register the newborn as a patient',
+          body: "Every live newborn gets its own \"Register as patient\" button on the delivery record. Click it to open a full patient file for the baby, so the next visit — immunisation, a sick-child consult, PNC — has somewhere to chart against.",
+          placement: 'left',
+          tip: 'Only "Live" outcomes can be registered — a stillbirth stays in the delivery record without a patient file.' },
+        { selector: '[data-tour="mat-pnc-visit"]',
+          title: 'Step 8 — postnatal visits',
+          body: "Back on the same delivered episode, click \"New PNC visit\" to chart mother and baby together: BP, uterine involution, lochia, feeding, cord status, and the baby's weight. Log one at each postnatal check.",
+          placement: 'left' },
+        { selector: '[data-tour="mat-close-episode"]',
+          title: 'Step 9 — close the episode when it\'s done',
+          body: "When there's nothing left to chart for this pregnancy, select it in ANC Clinic and click \"Close episode\" — pick Closed or Transferred, with an optional reason. It can't be reopened here, but closing immediately frees her to be enrolled in a brand new pregnancy episode later.",
+          placement: 'left' },
+    ],
+
+    /* ──────────────────────────────────────────────────────────────
        Medical History — Doctor / Nurse longitudinal chart
        ────────────────────────────────────────────────────────────── */
     medical_history: [

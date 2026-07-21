@@ -15,6 +15,9 @@ export default function LaborBoardTab() {
   const [selected, setSelected] = useState(null);
   const [chart, setChart] = useState(null);
   const [showEntry, setShowEntry] = useState(false);
+  // The entry being corrected (prefills PartographEntryForm and sets
+  // corrects_entry_id on submit); null means the plain "New entry" path.
+  const [correctingEntry, setCorrectingEntry] = useState(null);
   const [showStartLabor, setShowStartLabor] = useState(false);
   const [error, setError] = useState('');
   // Tracks the labor_admission_id of the most recently requested partograph so
@@ -67,6 +70,7 @@ export default function LaborBoardTab() {
           <h2 className="text-sm font-semibold text-ink-900 dark:text-white">In labor</h2>
           <button
             type="button"
+            data-tour="mat-start-labor"
             onClick={() => setShowStartLabor(true)}
             className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
           >
@@ -97,7 +101,7 @@ export default function LaborBoardTab() {
       </section>
 
       {selected && (
-        <section aria-label="Partograph"
+        <section aria-label="Partograph" data-tour="mat-partograph"
                  className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-900 dark:text-white">
@@ -113,7 +117,7 @@ export default function LaborBoardTab() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowEntry(true)}
+                onClick={() => { setCorrectingEntry(null); setShowEntry(true); }}
                 className="print:hidden rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
               >
                 New entry
@@ -121,9 +125,76 @@ export default function LaborBoardTab() {
             </div>
           </div>
           {chart && chart.labor_admission_id === selected.labor_admission_id ? (
-            <div className="mt-3 overflow-x-auto">
-              <PartographChart entries={chart.entries} activeStart={chart.active_labor_started_at} />
-            </div>
+            <>
+              <div className="mt-3 overflow-x-auto">
+                <PartographChart entries={chart.entries} activeStart={chart.active_labor_started_at} />
+              </div>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-ink-500 dark:text-ink-400">
+                      <th className="py-1 pr-2 font-medium">Time</th>
+                      <th className="py-1 pr-2 font-medium">Dilation</th>
+                      <th className="py-1 pr-2 font-medium">Descent</th>
+                      <th className="py-1 pr-2 font-medium">Contractions</th>
+                      <th className="py-1 pr-2 font-medium">FHR</th>
+                      <th className="py-1 pr-2 font-medium">Liquor</th>
+                      <th className="py-1 pr-2 font-medium">BP</th>
+                      <th className="py-1 pr-2 font-medium">Pulse</th>
+                      <th className="py-1 pr-2 font-medium">Temp</th>
+                      <th className="print:hidden py-1 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(chart.entries || []).map((e) => (
+                      <tr
+                        key={e.entry_id}
+                        className={`border-t border-ink-100 dark:border-ink-800 ${
+                          e.superseded
+                            ? 'line-through text-ink-400 dark:text-ink-600'
+                            : 'text-ink-900 dark:text-white'
+                        }`}
+                      >
+                        <td className="py-1 pr-2">
+                          {new Date(e.recorded_at).toLocaleString()}
+                          {e.superseded && (
+                            <span className="no-underline ml-2 inline-block rounded-full bg-ink-100 dark:bg-ink-800 px-1.5 py-0.5 text-[10px] font-medium text-ink-600 dark:text-ink-400">
+                              Superseded
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1 pr-2">{e.cervical_dilation_cm ?? '—'}</td>
+                        <td className="py-1 pr-2">{e.descent_fifths ?? '—'}</td>
+                        <td className="py-1 pr-2">{e.contractions_per_10min ?? '—'}</td>
+                        <td className="py-1 pr-2">{e.fetal_heart_rate ?? '—'}</td>
+                        <td className="py-1 pr-2">{e.liquor ?? '—'}</td>
+                        <td className="py-1 pr-2">
+                          {e.maternal_bp_systolic != null ? `${e.maternal_bp_systolic}/${e.maternal_bp_diastolic ?? '—'}` : '—'}
+                        </td>
+                        <td className="py-1 pr-2">{e.maternal_pulse ?? '—'}</td>
+                        <td className="py-1 pr-2">{e.temperature_c ?? '—'}</td>
+                        <td className="print:hidden py-1">
+                          {!e.superseded && (
+                            <button
+                              type="button"
+                              className="no-underline rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-1 text-xs font-medium text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50"
+                              onClick={() => { setCorrectingEntry(e); setShowEntry(true); }}
+                            >
+                              Correct
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {(chart.entries || []).length === 0 && (
+                      <tr>
+                        <td colSpan={10} className="py-2 text-ink-500 dark:text-ink-400">No entries recorded yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <p className="mt-3 text-sm text-ink-500 dark:text-ink-400">Loading…</p>
           )}
@@ -133,8 +204,9 @@ export default function LaborBoardTab() {
       {showEntry && selected && (
         <PartographEntryForm
           laborId={selected.labor_admission_id}
-          onClose={() => setShowEntry(false)}
-          onSaved={() => { setShowEntry(false); open(selected); refreshBoard(); }}
+          correctingEntry={correctingEntry}
+          onClose={() => { setShowEntry(false); setCorrectingEntry(null); }}
+          onSaved={() => { setShowEntry(false); setCorrectingEntry(null); open(selected); refreshBoard(); }}
         />
       )}
 

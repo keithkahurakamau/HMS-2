@@ -43,8 +43,13 @@ class EpisodeClose(BaseModel):
     reason: Optional[str] = None
 
 
-def _episode_dict(db: Session, ep: PregnancyEpisode) -> dict:
-    patient = db.query(Patient).filter(Patient.patient_id == ep.patient_id).first()
+def _episode_dict(db: Session, ep: PregnancyEpisode, patient: Optional[Patient] = None) -> dict:
+    # `patient` lets callers that already batched a page of patients (see
+    # list_episodes) pass theirs in and skip a redundant per-row query;
+    # single-episode callers (create_episode, get_episode) omit it and get
+    # the same one-off lookup as before.
+    if patient is None:
+        patient = db.query(Patient).filter(Patient.patient_id == ep.patient_id).first()
     return {
         "episode_id": ep.episode_id,
         "patient_id": ep.patient_id,
@@ -114,7 +119,16 @@ def list_episodes(status: Optional[str] = None, patient_id: Optional[int] = None
     if patient_id:
         q = q.filter(PregnancyEpisode.patient_id == patient_id)
     eps = q.order_by(PregnancyEpisode.created_at.desc()).limit(200).all()
-    return [_episode_dict(db, ep) for ep in eps]
+    # Batch the patient lookup for the whole page in one query instead of
+    # one SELECT per episode (was up to 200 extra round-trips per request).
+    patients_by_id = {}
+    if eps:
+        patient_ids = {ep.patient_id for ep in eps}
+        patients_by_id = {
+            p.patient_id: p
+            for p in db.query(Patient).filter(Patient.patient_id.in_(patient_ids)).all()
+        }
+    return [_episode_dict(db, ep, patients_by_id.get(ep.patient_id)) for ep in eps]
 
 
 @router.get("/episodes/{episode_id}", dependencies=[Depends(RequirePermission("maternity:read"))])
