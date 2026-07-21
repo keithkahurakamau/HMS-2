@@ -85,6 +85,47 @@ class TestDelivery:
                         })
         assert r.status_code == 400
 
+    def test_birth_order_sequential_fallback_for_multiples(self, client, nurse_cookies, episode):
+        """Regression: omitting birth_order should auto-assign 1, 2, 3... (not all 1s)."""
+        r = client.post(f"/api/maternity/episodes/{episode['episode_id']}/delivery",
+                        cookies=nurse_cookies, json={
+                            "delivered_at": "2026-07-10T08:30:00Z",
+                            "mode": "SVD",
+                            "newborns": [
+                                {"sex": "Male", "weight_g": 3100, "outcome": "Live"},
+                                {"sex": "Female", "weight_g": 3000, "outcome": "Live"},
+                            ],
+                        })
+        assert r.status_code == 200, r.text
+        body = r.json()
+        newborns = body["newborns"]
+        assert len(newborns) == 2
+        # Extract birth_orders; order in response isn't guaranteed, so check the set
+        birth_orders = {n["birth_order"] for n in newborns}
+        assert birth_orders == {1, 2}, f"Expected {{1, 2}}, got {birth_orders}"
+
+    def test_birth_order_explicit_values_preserved(self, client, nurse_cookies, episode):
+        """When birth_order is explicitly supplied, those values should be preserved."""
+        r = client.post(f"/api/maternity/episodes/{episode['episode_id']}/delivery",
+                        cookies=nurse_cookies, json={
+                            "delivered_at": "2026-07-10T08:30:00Z",
+                            "mode": "SVD",
+                            "newborns": [
+                                {"sex": "Female", "weight_g": 3200, "outcome": "Live", "birth_order": 2},
+                                {"sex": "Male", "weight_g": 3100, "outcome": "Live", "birth_order": 1},
+                            ],
+                        })
+        assert r.status_code == 200, r.text
+        body = r.json()
+        newborns = body["newborns"]
+        assert len(newborns) == 2
+        birth_orders = {n["birth_order"] for n in newborns}
+        assert birth_orders == {1, 2}
+        # Verify the explicit orders are present (order 2 should be paired with Female, etc.)
+        by_order = {n["birth_order"]: n for n in newborns}
+        assert by_order[1]["sex"] == "Male"
+        assert by_order[2]["sex"] == "Female"
+
 
 class TestNewbornRegistration:
     def test_register_then_conflict(self, client, nurse_cookies, admin_cookies, episode):

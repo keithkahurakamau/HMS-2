@@ -304,7 +304,7 @@ VALID_OUTCOME = {"Live", "FSB", "MSB"}
 
 
 class NewbornCreate(BaseModel):
-    birth_order: int = Field(1, ge=1, le=8)
+    birth_order: Optional[int] = Field(None, ge=1, le=8)
     sex: str = Field(..., max_length=10)
     weight_g: Optional[int] = Field(default=None, ge=200, le=9000)
     apgar_1: Optional[int] = Field(default=None, ge=0, le=10)
@@ -378,7 +378,7 @@ def record_delivery(episode_id: int, req: DeliveryCreate, request: Request,
     for i, nb in enumerate(req.newborns, start=1):
         row = NewbornRecord(
             delivery_id=delivery.delivery_id,
-            birth_order=nb.birth_order if nb.birth_order else i,
+            birth_order=nb.birth_order if nb.birth_order is not None else i,
             sex=nb.sex, weight_g=nb.weight_g,
             apgar_1=nb.apgar_1, apgar_5=nb.apgar_5, apgar_10=nb.apgar_10,
             outcome=nb.outcome, resuscitated=nb.resuscitated, notes=nb.notes,
