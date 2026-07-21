@@ -82,11 +82,16 @@ export default function StartLaborForm({ onClose, onStarted }) {
     if (!admissionId) { setError('Select an active ward admission'); return; }
     setSaving(true);
     setError('');
-    const payload = { admission_id: Number(admissionId) };
-    if (activeLaborStartedAt) {
-      payload.active_labor_started_at = new Date(activeLaborStartedAt).toISOString();
-    }
     try {
+      const payload = { admission_id: Number(admissionId) };
+      if (activeLaborStartedAt) {
+        const d = new Date(activeLaborStartedAt);
+        if (Number.isNaN(d.getTime())) {
+          setError('Enter a valid start date and time.');
+          return;
+        }
+        payload.active_labor_started_at = d.toISOString();
+      }
       const result = await linkLabor(Number(episodeId), payload);
       const episode = episodes.find((ep) => ep.episode_id === Number(episodeId));
       onStarted(result, episode);

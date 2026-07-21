@@ -38,22 +38,27 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
     if (newborns.length === 0) { setError('At least one newborn record is required'); return; }
     setSaving(true);
     setError('');
-    const payload = {
-      delivered_at: new Date(deliveredAt).toISOString(),
-      mode,
-      mother_status: motherStatus,
-      placenta_complete: placentaComplete,
-    };
-    if (bloodLossMl !== '') payload.blood_loss_ml = Number(bloodLossMl);
-    if (complications) payload.complications = complications;
-    payload.newborns = newborns.map((n, idx) => {
-      const row = { sex: n.sex, outcome: n.outcome, birth_order: idx + 1 };
-      if (n.weight_g !== '') row.weight_g = Number(n.weight_g);
-      if (n.apgar_1 !== '') row.apgar_1 = Number(n.apgar_1);
-      if (n.apgar_5 !== '') row.apgar_5 = Number(n.apgar_5);
-      return row;
-    });
     try {
+      const d = new Date(deliveredAt);
+      if (Number.isNaN(d.getTime())) {
+        setError('Enter a valid delivery date and time.');
+        return;
+      }
+      const payload = {
+        delivered_at: d.toISOString(),
+        mode,
+        mother_status: motherStatus,
+        placenta_complete: placentaComplete,
+      };
+      if (bloodLossMl !== '') payload.blood_loss_ml = Number(bloodLossMl);
+      if (complications) payload.complications = complications;
+      payload.newborns = newborns.map((n, idx) => {
+        const row = { sex: n.sex, outcome: n.outcome, birth_order: idx + 1 };
+        if (n.weight_g !== '') row.weight_g = Number(n.weight_g);
+        if (n.apgar_1 !== '') row.apgar_1 = Number(n.apgar_1);
+        if (n.apgar_5 !== '') row.apgar_5 = Number(n.apgar_5);
+        return row;
+      });
       await recordDelivery(episodeId, payload);
       onSaved();
     } catch (err) {
