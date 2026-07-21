@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { recordDelivery } from './api';
 
 const MODES = ['SVD', 'Assisted', 'CSection', 'Breech'];
@@ -6,7 +6,11 @@ const MOTHER_STATUSES = ['Stable', 'Referred', 'Deceased'];
 const SEXES = ['Male', 'Female'];
 const OUTCOMES = ['Live', 'FSB', 'MSB'];
 
-const emptyNewborn = () => ({ sex: 'Male', weight_g: '', apgar_1: '', apgar_5: '', outcome: 'Live' });
+// Each newborn row carries a stable `id` (independent of its position in the
+// array) so React can key rows correctly across add/remove — using the array
+// index as the key would let a row's DOM/focus state get reattached to the
+// wrong newborn's data when a row in the middle is removed.
+const emptyNewborn = (id) => ({ id, sex: 'Male', weight_g: '', apgar_1: '', apgar_5: '', outcome: 'Live' });
 
 export default function DeliveryForm({ episodeId, onClose, onSaved }) {
   const [deliveredAt, setDeliveredAt] = useState('');
@@ -15,16 +19,17 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
   const [placentaComplete, setPlacentaComplete] = useState(false);
   const [complications, setComplications] = useState('');
   const [motherStatus, setMotherStatus] = useState('Stable');
-  const [newborns, setNewborns] = useState([emptyNewborn()]);
+  const nextRowIdRef = useRef(1);
+  const [newborns, setNewborns] = useState([emptyNewborn(0)]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const setNewbornField = (idx, key) => (e) => {
+  const setNewbornField = (id, key) => (e) => {
     const { value } = e.target;
-    setNewborns((rows) => rows.map((row, i) => (i === idx ? { ...row, [key]: value } : row)));
+    setNewborns((rows) => rows.map((row) => (row.id === id ? { ...row, [key]: value } : row)));
   };
-  const addTwin = () => setNewborns((rows) => [...rows, emptyNewborn()]);
-  const removeNewborn = (idx) => setNewborns((rows) => rows.filter((_, i) => i !== idx));
+  const addTwin = () => setNewborns((rows) => [...rows, emptyNewborn(nextRowIdRef.current++)]);
+  const removeNewborn = (id) => setNewborns((rows) => rows.filter((row) => row.id !== id));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -116,12 +121,12 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
             </button>
           </div>
           {newborns.map((n, idx) => (
-            <div key={idx} className="mt-2 rounded-lg border border-ink-200/70 dark:border-ink-800 p-3">
+            <div key={n.id} className="mt-2 rounded-lg border border-ink-200/70 dark:border-ink-800 p-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-ink-500 dark:text-ink-400">Newborn {idx + 1}</span>
                 <button
                   type="button"
-                  onClick={() => removeNewborn(idx)}
+                  onClick={() => removeNewborn(n.id)}
                   className="text-xs font-medium text-rose-600 dark:text-rose-400 hover:underline"
                 >
                   Remove
@@ -130,27 +135,27 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
               <div className="mt-2 grid grid-cols-2 gap-3">
                 <label className="block text-sm text-ink-700 dark:text-ink-300">
                   Sex
-                  <select value={n.sex} onChange={setNewbornField(idx, 'sex')} className="input mt-1 w-full">
+                  <select value={n.sex} onChange={setNewbornField(n.id, 'sex')} className="input mt-1 w-full">
                     {SEXES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
                 <label className="block text-sm text-ink-700 dark:text-ink-300">
                   Outcome
-                  <select value={n.outcome} onChange={setNewbornField(idx, 'outcome')} className="input mt-1 w-full">
+                  <select value={n.outcome} onChange={setNewbornField(n.id, 'outcome')} className="input mt-1 w-full">
                     {OUTCOMES.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </label>
                 <label className="block text-sm text-ink-700 dark:text-ink-300">
                   Weight (g)
-                  <input type="number" value={n.weight_g} onChange={setNewbornField(idx, 'weight_g')} className="input mt-1 w-full" />
+                  <input type="number" value={n.weight_g} onChange={setNewbornField(n.id, 'weight_g')} className="input mt-1 w-full" />
                 </label>
                 <label className="block text-sm text-ink-700 dark:text-ink-300">
                   APGAR 1 min
-                  <input type="number" min="0" max="10" value={n.apgar_1} onChange={setNewbornField(idx, 'apgar_1')} className="input mt-1 w-full" />
+                  <input type="number" min="0" max="10" value={n.apgar_1} onChange={setNewbornField(n.id, 'apgar_1')} className="input mt-1 w-full" />
                 </label>
                 <label className="block text-sm text-ink-700 dark:text-ink-300">
                   APGAR 5 min
-                  <input type="number" min="0" max="10" value={n.apgar_5} onChange={setNewbornField(idx, 'apgar_5')} className="input mt-1 w-full" />
+                  <input type="number" min="0" max="10" value={n.apgar_5} onChange={setNewbornField(n.id, 'apgar_5')} className="input mt-1 w-full" />
                 </label>
               </div>
             </div>
