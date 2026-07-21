@@ -69,13 +69,13 @@ describe('LaborBoardTab', () => {
 
   it('start labor: lists active episodes in the modal and submits linkLabor with the chosen episode + admission', async () => {
     api.listEpisodes.mockResolvedValue([
-      { episode_id: 5, patient_name: 'Achieng, Faith', gravida: 2, para: 1, status: 'Active' },
+      { episode_id: 5, patient_id: 900, patient_name: 'Achieng, Faith', gravida: 2, para: 1, status: 'Active' },
     ]);
     api.getWardBoard.mockResolvedValue([
       {
         name: 'Maternity Ward',
         beds: [
-          { id: 10, number: 'M-1', status: 'Occupied', patient: 'Achieng, Faith',
+          { id: 10, number: 'M-1', status: 'Occupied', patient: 'Achieng, Faith', patient_id: 900,
             admission_date: '2026-07-20', admission_id: 77 },
         ],
       },
@@ -103,13 +103,13 @@ describe('LaborBoardTab', () => {
 
   it('start labor: renders a legible error when the backend rejects an already-linked admission (409)', async () => {
     api.listEpisodes.mockResolvedValue([
-      { episode_id: 5, patient_name: 'Achieng, Faith', gravida: 2, para: 1, status: 'Active' },
+      { episode_id: 5, patient_id: 900, patient_name: 'Achieng, Faith', gravida: 2, para: 1, status: 'Active' },
     ]);
     api.getWardBoard.mockResolvedValue([
       {
         name: 'Maternity Ward',
         beds: [
-          { id: 10, number: 'M-1', status: 'Occupied', patient: 'Achieng, Faith',
+          { id: 10, number: 'M-1', status: 'Occupied', patient: 'Achieng, Faith', patient_id: 900,
             admission_date: '2026-07-20', admission_id: 77 },
         ],
       },

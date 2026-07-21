@@ -29,8 +29,8 @@ export const getLaborBoard = () =>
 export const getMaternityQueue = () =>
   apiClient.get('/queue/', { params: { department: 'Maternity' } }).then((r) => r.data);
 // Wards board (app/routes/wards.py get_bed_board) already attaches
-// admission_id to each Occupied bed — reused here (read-only) to find a
-// patient's active ward admission for the "Start labor" flow, instead of
-// adding a new backend endpoint.
+// admission_id and patient_id to each Occupied bed — reused here (read-only)
+// to find a patient's active ward admission by patient_id for the "Start
+// labor" flow, instead of adding a new backend endpoint.
 export const getWardBoard = () =>
   apiClient.get('/wards/board').then((r) => r.data);

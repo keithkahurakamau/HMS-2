@@ -2,19 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { listEpisodes, getWardBoard, linkLabor } from './api';
 import { errorText } from './errors';
 
-// The wards board (GET /wards/board) already attaches admission_id to every
-// Occupied bed, but it only carries a formatted display name ("Surname,
-// Other names") for the occupant — not a raw patient_id. That formatted
-// name is produced the same way ep.patient_name is (see
-// app/routes/maternity.py _episode_dict), so matching on it here finds the
-// right admission(s) without a backend change. Ward/bed/admission-date are
-// shown alongside so a rare same-name collision can still be told apart by
-// the person starting labor.
-function findAdmissionsForPatient(wards, patientName) {
+// The wards board (GET /wards/board) attaches both admission_id and
+// patient_id to every Occupied bed, so a patient's active ward admission(s)
+// can be found by exact patient_id match — the same id carried on episode
+// objects from listEpisodes (see app/routes/maternity.py _episode_dict).
+// Ward/bed/admission-date are shown alongside so multiple active admissions
+// for the same patient can still be told apart by the person starting labor.
+function findAdmissionsForPatient(wards, patientId) {
   const matches = [];
   for (const ward of wards || []) {
     for (const bed of ward.beds || []) {
-      if (bed.status === 'Occupied' && bed.admission_id && bed.patient === patientName) {
+      if (bed.status === 'Occupied' && bed.admission_id && bed.patient_id === patientId) {
         matches.push({
           admission_id: bed.admission_id,
           ward_name: ward.name,
@@ -66,7 +64,7 @@ export default function StartLaborForm({ onClose, onStarted }) {
         // Ignore out-of-order responses: only apply if this is still the
         // latest requested episode.
         if (requestedEpisodeIdRef.current !== id) return;
-        const matches = findAdmissionsForPatient(wards, episode?.patient_name);
+        const matches = findAdmissionsForPatient(wards, episode?.patient_id);
         setAdmissions(matches);
         if (matches.length === 1) setAdmissionId(String(matches[0].admission_id));
         setAdmissionsLoading(false);
