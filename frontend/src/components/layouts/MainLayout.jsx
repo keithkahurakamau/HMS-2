@@ -8,7 +8,7 @@ import {
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
     ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy,
     BookOpen, Smartphone, HelpCircle, HeartPulse, PanelLeftClose, PanelLeftOpen,
-    CalendarClock, Home, UserCog,
+    CalendarClock, Home, UserCog, Baby,
 } from 'lucide-react';
 import WhatsNew from '../WhatsNew';
 import NotificationBell from '../NotificationBell';
@@ -31,6 +31,7 @@ const ROUTE_TO_JOURNEY = [
     ['/app/wards',           'wards'],
     ['/app/billing',         'billing'],
     ['/app/cheques',         'cheques'],
+    ['/app/maternity',       'maternity'],
     ['/app/medical-history', 'medical_history'],
     ['/app/appointments',    'appointments'],
     ['/app/calendar',        'appointments'],
@@ -61,6 +62,7 @@ const NAVIGATION = [
     { name: 'Radiology',         path: '/app/radiology',       icon: <Radio size={18} />,           allowedRoles: ['Admin', 'Radiologist', 'Doctor'],                 requiredPermission: 'radiology:manage', moduleKey: 'radiology' },
     { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={18} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'],                  requiredPermission: 'pharmacy:read',    moduleKey: 'pharmacy' },
     { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={18} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'wards:manage',     moduleKey: 'wards' },
+    { name: 'Maternity',         path: '/app/maternity',       icon: <Baby size={18} />,            allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'maternity:read',   moduleKey: 'maternity' },
     { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'appointments:read',moduleKey: 'appointments' },
     // Calendar carries each user's personal events (every role gets one) plus
     // the appointments overlay for roles that can see appointments. No

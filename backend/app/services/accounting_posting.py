@@ -29,6 +29,7 @@ from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.models.accounting import (
+    Account,
     JournalEntry,
     JournalLine,
     LedgerMapping,
@@ -59,8 +60,18 @@ def post_from_event(
     reference: Optional[str] = None,
     user_id: Optional[int] = None,
     ignore_go_live: bool = False,
+    credit_account_id: Optional[int] = None,
 ) -> Optional[JournalEntry]:
     """Post a 2-line journal entry derived from `source_key`'s mapping.
+
+    `credit_account_id` overrides the mapping's credit leg for this one
+    posting. That's how a service credits its own revenue account instead
+    of the generic bucket the source_key maps to — the price list carries
+    `revenue_account_id` per service for exactly this (see the
+    "override per service via price list" note on the seeded mapping).
+    The debit leg (Accounts Receivable) always comes from the mapping.
+    An unknown/None override falls back to the mapping, so a service with
+    no revenue account configured still posts.
 
     Returns the posted entry on success, the existing entry on idempotent
     hit, or None when posting was deliberately skipped (no mapping, before
@@ -143,6 +154,25 @@ def post_from_event(
                 sp.rollback()
             return None
 
+        # Per-service revenue override. Validated against the CoA so a stale
+        # or cross-tenant id can never silently steer revenue at an account
+        # that doesn't exist — we fall back to the mapping instead.
+        credit_leg_account_id = mapping.credit_account_id
+        if credit_account_id:
+            override = (
+                db.query(Account)
+                .filter(Account.account_id == credit_account_id)
+                .first()
+            )
+            if override is not None:
+                credit_leg_account_id = override.account_id
+            else:
+                LOG.warning(
+                    "accounting: credit override %s not found for source_key=%s — "
+                    "falling back to the mapping's credit account",
+                    credit_account_id, source_key,
+                )
+
         cur = currency_code or settings.base_currency_code or "KES"
         base = get_base_currency_code(db)
         rate = Decimal("1") if cur == base else resolve_fx_rate(db, cur, base, on)
@@ -178,7 +208,7 @@ def post_from_event(
         db.add(JournalLine(
             entry_id=entry.entry_id,
             line_number=2,
-            account_id=mapping.credit_account_id,
+            account_id=credit_leg_account_id,
             debit=ZERO, credit=amt,
             debit_base=ZERO, credit_base=base_amt,
             description=memo,

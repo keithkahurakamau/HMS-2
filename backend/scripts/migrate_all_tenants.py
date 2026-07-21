@@ -58,8 +58,8 @@ from app.config.database import Base, DATABASE_URL  # noqa: E402,F401
 # Keep this list in sync with app/models/ — every .py file there belongs here.
 from app.models import (  # noqa: E402,F401
     accounting, audit, auth_tokens, billing, breach, calendar, cheque, clinical,
-    email_events, idempotency, inventory, laboratory, master, medical_history,
-    messaging, notification, patient, payhero, radiology, referral,
+    email_events, idempotency, inventory, laboratory, master, maternity as _maternity,
+    medical_history, messaging, notification, patient, payhero, radiology, referral,
     settings as _settings, support, user, wards,
 )
 
@@ -740,6 +740,28 @@ def _seed_standard_lab_catalog(tenant_url: str) -> None:
         engine.dispose()
 
 
+def _seed_maternity_price_list(tenant_url: str) -> None:
+    """Maternity MAT-* service codes (idempotent; zero-priced until set)."""
+    from app.services.maternity_seed import seed_maternity_price_list
+
+    engine = create_engine(tenant_url)
+    safe_label = tenant_url.rsplit("@", 1)[-1]
+    try:
+        with engine.begin() as conn:
+            insp = inspect(conn)
+            if not insp.has_table("acc_price_list"):
+                LOG.error(
+                    "[%s] acc_price_list missing after migrate — skipping maternity seed",
+                    safe_label,
+                )
+                return
+            n = seed_maternity_price_list(conn)
+            if n:
+                LOG.warning("[%s] seeded %d maternity price-list row(s)", safe_label, n)
+    finally:
+        engine.dispose()
+
+
 def migrate_one(tenant_db_name: str, default_url: str) -> None:
     tenant_url = _tenant_db_url(default_url, tenant_db_name)
     safe_label = tenant_url.rsplit("@", 1)[-1]  # hide creds in logs
@@ -776,6 +798,8 @@ def migrate_one(tenant_db_name: str, default_url: str) -> None:
     # Preload the standard lab-test catalogue + price-list mirror so every
     # tenant ships with the full test menu out of the box (idempotent).
     _seed_standard_lab_catalog(tenant_url)
+    # Maternity service codes so ANC/PNC/delivery charges can price (idempotent).
+    _seed_maternity_price_list(tenant_url)
 
 
 def main() -> int:
