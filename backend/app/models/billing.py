@@ -30,7 +30,7 @@ class InvoiceItem(Base):
     invoice_id = Column(Integer, ForeignKey("invoices.invoice_id", ondelete="CASCADE"), index=True, nullable=False)
     description = Column(String(255), nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
-    item_type = Column(String(50), nullable=False) # Laboratory/Pharmacy/Consultation/Procedure
+    item_type = Column(String(50), nullable=False) # Laboratory/Pharmacy/Consultation/Procedure/Maternity
     reference_id = Column(Integer, nullable=True) # Links to specific test/drug
 
 class Payment(Base):

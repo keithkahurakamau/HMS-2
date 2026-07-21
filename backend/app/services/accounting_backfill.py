@@ -120,14 +120,15 @@ def backfill_payments(db: Session, *, user_id: Optional[int] = None) -> dict:
 
 
 def backfill_invoice_charges(db: Session, *, user_id: Optional[int] = None) -> dict:
-    """Consultation invoice items → ``billing.invoice.created`` (keyed on the
-    invoice-item id). Only Consultation items are posted live via this key;
+    """Consultation + Maternity invoice items → ``billing.invoice.created``
+    (keyed on the invoice-item id). Only these item types are posted live via
+    this key (``charge_consultation_fee`` / ``raise_maternity_charge``);
     pharmacy revenue rides the dispense pass and other item types never post."""
     stats = _tally()
     rows = (
         db.query(InvoiceItem, Invoice.billing_date)
         .join(Invoice, Invoice.invoice_id == InvoiceItem.invoice_id)
-        .filter(InvoiceItem.item_type == "Consultation")
+        .filter(InvoiceItem.item_type.in_(("Consultation", "Maternity")))
         .all()
     )
     for item, billing_date in rows:
@@ -137,7 +138,7 @@ def backfill_invoice_charges(db: Session, *, user_id: Optional[int] = None) -> d
             source_id=item.id,
             amount=item.amount,
             on_date=_as_date(billing_date),
-            memo=f"Consultation fee · Invoice #{item.invoice_id}",
+            memo=f"{item.description or item.item_type} · Invoice #{item.invoice_id}",
             reference=f"INV-{item.invoice_id}",
             user_id=user_id,
             ignore_go_live=True,

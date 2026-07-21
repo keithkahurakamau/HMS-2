@@ -34,6 +34,7 @@ const MODULE_LABELS = {
     privacy: 'Privacy',
     clinical: 'Clinical Desk',
     accounting: 'Managerial Accounting',
+    maternity: 'Maternity',
 };
 
 export default function ModuleGuard({ moduleKey, children }) {

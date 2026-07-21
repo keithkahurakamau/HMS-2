@@ -65,6 +65,7 @@ def get_bed_board(db: Session = Depends(get_db)):
                     bed_info["admission_date"] = active_admission.admitted_at.strftime("%Y-%m-%d")
                     bed_info["diagnosis"] = active_admission.primary_diagnosis
                     bed_info["admission_id"] = active_admission.admission_id
+                    bed_info["patient_id"] = active_admission.patient_id
                     
             ward_data["beds"].append(bed_info)
         board.append(ward_data)
