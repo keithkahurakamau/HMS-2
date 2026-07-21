@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { listEpisodes, getEpisode, registerNewborn } from './api';
 import DeliveryForm from './DeliveryForm';
 import PncVisitForm from './PncVisitForm';
+import CloseEpisodeForm from './CloseEpisodeForm';
 import { errorText } from './errors';
 
 export default function DeliveriesTab() {
@@ -10,6 +11,10 @@ export default function DeliveriesTab() {
   const [selected, setSelected] = useState(null);
   const [showDelivery, setShowDelivery] = useState(null);
   const [showPnc, setShowPnc] = useState(false);
+  // A Delivered episode is closed from here, not the ANC tab — the ANC tab
+  // only lists Active episodes, so without this the lifecycle after delivery
+  // (PNC visits → discharge) would never terminate.
+  const [showClose, setShowClose] = useState(false);
   const [error, setError] = useState('');
   // Errors from actions taken inside the "Delivery detail" section (e.g.
   // registering a newborn as a patient) are shown next to that section
@@ -85,6 +90,7 @@ export default function DeliveriesTab() {
               <span className="font-medium text-ink-900 dark:text-white">{ep.patient_name}</span>
               <button
                 type="button"
+                data-tour="mat-delivery"
                 onClick={() => setShowDelivery(ep.episode_id)}
                 className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
               >
@@ -128,13 +134,26 @@ export default function DeliveriesTab() {
         >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-900 dark:text-white">{selected.patient_name}</h2>
-            <button
-              type="button"
-              onClick={() => setShowPnc(true)}
-              className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
-            >
-              New PNC visit
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-tour="mat-pnc-visit"
+                onClick={() => setShowPnc(true)}
+                className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+              >
+                New PNC visit
+              </button>
+              {selected.status === 'Delivered' && (
+                <button
+                  type="button"
+                  data-tour="mat-close-episode"
+                  onClick={() => setShowClose(true)}
+                  className="rounded-lg border border-rose-300 dark:border-rose-900/60 px-3 py-1.5 text-sm font-medium text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                >
+                  Close episode
+                </button>
+              )}
+            </div>
           </div>
           {detailError && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{detailError}</p>}
 
@@ -169,6 +188,7 @@ export default function DeliveriesTab() {
                         ) : (
                           <button
                             type="button"
+                            data-tour="mat-register-newborn"
                             disabled={n.outcome !== 'Live'}
                             onClick={() => handleRegisterNewborn(n.newborn_id, selected.episode_id)}
                             className="rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-1 text-xs font-medium text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-60"
@@ -230,6 +250,22 @@ export default function DeliveriesTab() {
           episodeId={selected.episode_id}
           onClose={() => setShowPnc(false)}
           onSaved={() => { setShowPnc(false); openEpisode(selected.episode_id); }}
+        />
+      )}
+      {showClose && selected && (
+        <CloseEpisodeForm
+          episodeId={selected.episode_id}
+          patientName={selected.patient_name}
+          onClose={() => setShowClose(false)}
+          onClosed={() => {
+            // A closed episode is neither Active nor Delivered, so it drops
+            // out of both lists — clear the detail rather than re-fetching an
+            // episode the user can no longer act on.
+            setShowClose(false);
+            setSelected(null);
+            requestedEpisodeIdRef.current = null;
+            refresh();
+          }}
         />
       )}
     </div>

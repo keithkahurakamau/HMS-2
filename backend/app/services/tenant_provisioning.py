@@ -219,7 +219,12 @@ ROLE_GRANTS = {
                "referrals:read", "referrals:manage",
                "maternity:read", "maternity:manage",
                "cheques:read", *_BASE],
-    "Nurse": ["triage:write", "triage:read", "clinical:read", "patients:read",
+    # patients:write is granted so a midwife can complete the delivery she
+    # just conducted — the one-click newborn→patient registration needs it.
+    # Nurses are present at the birth; routing that click through an admin
+    # is what gets newborns registered late or not at all.
+    "Nurse": ["triage:write", "triage:read", "clinical:read",
+              "patients:read", "patients:write",
               "wards:read", "wards:manage",
               "pharmacy:read", "history:read", "inventory:read",
               "appointments:manage",

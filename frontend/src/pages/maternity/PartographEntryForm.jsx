@@ -9,12 +9,25 @@ const NUMBER_FIELDS = [
 ];
 const TEXT_FIELDS = ['liquor', 'moulding', 'drugs_note'];
 
-export default function PartographEntryForm({ laborId, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    cervical_dilation_cm: '', descent_fifths: '', contractions_per_10min: '',
-    contraction_duration_sec: '', fetal_heart_rate: '', maternal_bp_systolic: '',
-    maternal_bp_diastolic: '', maternal_pulse: '', temperature_c: '',
-    liquor: '', moulding: '', drugs_note: '',
+const EMPTY_FORM = {
+  cervical_dilation_cm: '', descent_fifths: '', contractions_per_10min: '',
+  contraction_duration_sec: '', fetal_heart_rate: '', maternal_bp_systolic: '',
+  maternal_bp_diastolic: '', maternal_pulse: '', temperature_c: '',
+  liquor: '', moulding: '', drugs_note: '',
+};
+
+// The partograph is append-only by design: this same form both creates a
+// fresh entry and — when `correctingEntry` is supplied — appends a NEW entry
+// carrying `corrects_entry_id` that supersedes it. Nothing is ever mutated
+// or deleted; see maternity_labor.py module docstring.
+export default function PartographEntryForm({ laborId, correctingEntry = null, onClose, onSaved }) {
+  const [form, setForm] = useState(() => {
+    if (!correctingEntry) return EMPTY_FORM;
+    const prefilled = { ...EMPTY_FORM };
+    for (const k of [...NUMBER_FIELDS, ...TEXT_FIELDS]) {
+      if (correctingEntry[k] != null) prefilled[k] = correctingEntry[k];
+    }
+    return prefilled;
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +44,7 @@ export default function PartographEntryForm({ laborId, onClose, onSaved }) {
     for (const k of TEXT_FIELDS) {
       if (form[k]) payload[k] = form[k];
     }
+    if (correctingEntry) payload.corrects_entry_id = correctingEntry.entry_id;
     try {
       await appendPartograph(laborId, payload);
       onSaved();
@@ -41,15 +55,25 @@ export default function PartographEntryForm({ laborId, onClose, onSaved }) {
     }
   };
 
+  const heading = correctingEntry
+    ? `Correct entry — originally recorded ${new Date(correctingEntry.recorded_at).toLocaleString()}`
+    : 'New partograph entry';
+
   return (
     <div
       className="print:hidden fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="New partograph entry"
+      aria-label={correctingEntry ? 'Correct partograph entry' : 'New partograph entry'}
     >
       <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated max-h-[90vh] overflow-y-auto">
-        <h3 className="text-sm font-semibold text-ink-900 dark:text-white">New partograph entry</h3>
+        <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{heading}</h3>
+        {correctingEntry && (
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            This saves a NEW entry that supersedes the one above — the original stays on the
+            chart, shown struck through.
+          </p>
+        )}
         {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         <div className="mt-3 grid grid-cols-2 gap-3">
           <label className="block text-sm text-ink-700 dark:text-ink-300">
@@ -126,7 +150,7 @@ export default function PartographEntryForm({ laborId, onClose, onSaved }) {
             disabled={saving}
             className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
           >
-            {saving ? 'Saving…' : 'Save entry'}
+            {saving ? 'Saving…' : correctingEntry ? 'Save correction' : 'Save entry'}
           </button>
         </div>
       </form>

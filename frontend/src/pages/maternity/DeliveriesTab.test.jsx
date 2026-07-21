@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import DeliveriesTab from './DeliveriesTab';
@@ -85,5 +85,45 @@ describe('DeliveriesTab', () => {
     expect(payload).not.toHaveProperty('bp_systolic');
     expect(payload).not.toHaveProperty('bp_diastolic');
     expect(payload).not.toHaveProperty('baby_weight_g');
+  });
+
+  // Regression: the ANC tab only lists Active episodes, so a Delivered
+  // episode was previously unclosable from anywhere in the UI — the
+  // lifecycle never terminated after delivery.
+  it('closes a delivered episode from the delivery detail panel', async () => {
+    api.getEpisode.mockResolvedValue({
+      episode_id: 2, patient_name: 'Atieno, Mary', status: 'Delivered',
+      anc_visits: [], pnc_visits: [], labor: [], deliveries: [],
+    });
+    api.closeEpisode.mockResolvedValue({ episode_id: 2, status: 'Closed' });
+    const user = userEvent.setup();
+    render(<DeliveriesTab />);
+    await user.click(await screen.findByText(/Atieno, Mary/));
+    await user.click(await screen.findByRole('button', { name: /close episode/i }));
+    const dialog = await screen.findByRole('dialog', { name: /close episode/i });
+    await user.click(within(dialog).getByRole('button', { name: /confirm close/i }));
+    await waitFor(() =>
+      expect(api.closeEpisode).toHaveBeenCalledWith(2, expect.objectContaining({ status: 'Closed' }))
+    );
+    // The closed episode is neither Active nor Delivered, so the detail
+    // panel must clear rather than linger on an episode nobody can act on.
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: /delivery detail/i })).not.toBeInTheDocument()
+    );
+  });
+
+  it('offers no close control when the fetched episode is not Delivered', async () => {
+    // A stale Delivered list can hand us an episode whose status has since
+    // moved on. The Close control keys off the freshly-fetched status, not
+    // the list the row came from.
+    api.getEpisode.mockResolvedValue({
+      episode_id: 2, patient_name: 'Atieno, Mary', status: 'Active',
+      anc_visits: [], pnc_visits: [], labor: [], deliveries: [],
+    });
+    const user = userEvent.setup();
+    render(<DeliveriesTab />);
+    await user.click(await screen.findByText(/Atieno, Mary/));
+    await screen.findByRole('button', { name: /new pnc visit/i });
+    expect(screen.queryByRole('button', { name: /close episode/i })).not.toBeInTheDocument();
   });
 });

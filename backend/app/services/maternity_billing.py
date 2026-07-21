@@ -64,6 +64,11 @@ def raise_maternity_charge(
         memo=f"{price.name} · Invoice #{invoice.invoice_id}",
         reference=f"INV-{invoice.invoice_id}",
         user_id=user_id,
+        # Credit Maternity Revenue (4700) rather than the generic
+        # consultation bucket the source_key maps to. The seed puts 4700 on
+        # every MAT-* price row; if a tenant clears it, posting falls back
+        # to the mapping instead of failing.
+        credit_account_id=price.revenue_account_id,
     )
 
     # Same audit-log contract as charge_consultation_fee's InvoiceItem

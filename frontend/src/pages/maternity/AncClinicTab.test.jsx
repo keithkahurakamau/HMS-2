@@ -59,4 +59,37 @@ describe('AncClinicTab', () => {
     // The now-closed episode's detail panel clears rather than re-showing stale data.
     expect(await screen.findByText(/select an episode to view visits/i)).toBeInTheDocument();
   });
+
+  it('"Enroll / open" opens the existing episode directly for a routed patient who already has an Active episode', async () => {
+    api.listEpisodes.mockResolvedValue([
+      { episode_id: 1, patient_id: 55, patient_name: 'Wanjiku, Grace', gravida: 2, para: 1,
+        edd: '2026-12-06', status: 'Active' },
+    ]);
+    api.getMaternityQueue.mockResolvedValue([
+      { queue_id: 1, patient_id: 55, patient_name: 'Wanjiku, Grace' },
+    ]);
+    api.getEpisode.mockResolvedValue({
+      episode_id: 1, patient_name: 'Wanjiku, Grace', gravida: 2, para: 1,
+      status: 'Active', anc_visits: [], pnc_visits: [], deliveries: [], labor: [],
+    });
+    const user = userEvent.setup();
+    render(<AncClinicTab />);
+    await user.click(await screen.findByRole('button', { name: /enroll \/ open/i }));
+    await waitFor(() => expect(api.getEpisode).toHaveBeenCalledWith(1));
+    // No enroll form, no attempt to create a duplicate episode (which would 409).
+    expect(api.createEpisode).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: /enroll patient/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /new anc visit/i })).toBeInTheDocument();
+  });
+
+  it('"Enroll / open" opens the enroll form for a routed patient with no Active episode', async () => {
+    api.getMaternityQueue.mockResolvedValue([
+      { queue_id: 2, patient_id: 99, patient_name: 'Otieno, John' },
+    ]);
+    const user = userEvent.setup();
+    render(<AncClinicTab />);
+    await user.click(await screen.findByRole('button', { name: /enroll \/ open/i }));
+    const dialog = await screen.findByRole('dialog', { name: /enroll patient/i });
+    expect(within(dialog).getByLabelText(/patient id/i)).toHaveValue(99);
+  });
 });
