@@ -67,6 +67,7 @@ export default function LaborBoardTab() {
           <h2 className="text-sm font-semibold text-ink-900 dark:text-white">In labor</h2>
           <button
             type="button"
+            data-tour="mat-start-labor"
             onClick={() => setShowStartLabor(true)}
             className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
           >
@@ -97,7 +98,7 @@ export default function LaborBoardTab() {
       </section>
 
       {selected && (
-        <section aria-label="Partograph"
+        <section aria-label="Partograph" data-tour="mat-partograph"
                  className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-900 dark:text-white">

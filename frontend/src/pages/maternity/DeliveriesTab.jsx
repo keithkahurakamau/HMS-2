@@ -85,6 +85,7 @@ export default function DeliveriesTab() {
               <span className="font-medium text-ink-900 dark:text-white">{ep.patient_name}</span>
               <button
                 type="button"
+                data-tour="mat-delivery"
                 onClick={() => setShowDelivery(ep.episode_id)}
                 className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
               >
@@ -130,6 +131,7 @@ export default function DeliveriesTab() {
             <h2 className="text-sm font-semibold text-ink-900 dark:text-white">{selected.patient_name}</h2>
             <button
               type="button"
+              data-tour="mat-pnc-visit"
               onClick={() => setShowPnc(true)}
               className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
             >
@@ -169,6 +171,7 @@ export default function DeliveriesTab() {
                         ) : (
                           <button
                             type="button"
+                            data-tour="mat-register-newborn"
                             disabled={n.outcome !== 'Live'}
                             onClick={() => handleRegisterNewborn(n.newborn_id, selected.episode_id)}
                             className="rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-1 text-xs font-medium text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-60"

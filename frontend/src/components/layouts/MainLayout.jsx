@@ -31,6 +31,7 @@ const ROUTE_TO_JOURNEY = [
     ['/app/wards',           'wards'],
     ['/app/billing',         'billing'],
     ['/app/cheques',         'cheques'],
+    ['/app/maternity',       'maternity'],
     ['/app/medical-history', 'medical_history'],
     ['/app/appointments',    'appointments'],
     ['/app/calendar',        'appointments'],

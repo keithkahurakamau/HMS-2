@@ -127,6 +127,7 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
             <h4 className="text-sm font-semibold text-ink-900 dark:text-white">Newborns</h4>
             <button
               type="button"
+              data-tour="mat-add-twin"
               onClick={addTwin}
               className="text-sm font-medium text-brand-700 dark:text-brand-300 hover:underline"
             >

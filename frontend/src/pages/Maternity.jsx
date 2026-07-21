@@ -14,7 +14,7 @@ export default function Maternity() {
   return (
     <div className="p-4 md:p-6">
       <h1 className="text-xl font-semibold text-ink-900 dark:text-white">Maternity</h1>
-      <div className="mt-4 flex gap-2 border-b border-ink-200/70 dark:border-ink-800" role="tablist">
+      <div data-tour="mat-tabs" className="mt-4 flex gap-2 border-b border-ink-200/70 dark:border-ink-800" role="tablist">
         {TABS.map((t) => (
           <button
             key={t.key}
