@@ -132,4 +132,54 @@ describe('LaborBoardTab', () => {
 
     expect(await within(dialog).findByText(/already linked to a labor record/i)).toBeInTheDocument();
   });
+
+  // Regression: the backend has handled corrects_entry_id since day one and
+  // the chart already drew superseded points hollow, but no UI ever sent the
+  // field — so the append-only correction path was unreachable.
+  it('corrects a partograph entry by appending a new one carrying corrects_entry_id', async () => {
+    api.getPartograph.mockResolvedValue({
+      labor_admission_id: 1,
+      active_labor_started_at: '2026-07-21T06:00:00Z',
+      entries: [
+        { entry_id: 11, recorded_at: '2026-07-21T06:30:00Z', cervical_dilation_cm: 4,
+          fetal_heart_rate: 140, superseded: false },
+      ],
+    });
+    api.appendPartograph.mockResolvedValue({ entry_id: 12 });
+
+    const user = userEvent.setup();
+    render(<LaborBoardTab />);
+    await user.click(await screen.findByText('Achieng, Faith'));
+    await user.click(await screen.findByRole('button', { name: /^correct$/i }));
+
+    const dialog = await screen.findByRole('dialog', { name: /correct partograph entry/i });
+    // The form prefills from the entry being corrected so the midwife edits
+    // rather than re-keys the whole observation.
+    expect(within(dialog).getByLabelText(/cervical dilation/i)).toHaveValue(4);
+    await user.clear(within(dialog).getByLabelText(/cervical dilation/i));
+    await user.type(within(dialog).getByLabelText(/cervical dilation/i), '5');
+    await user.click(within(dialog).getByRole('button', { name: /save correction/i }));
+
+    await waitFor(() =>
+      expect(api.appendPartograph).toHaveBeenCalledWith(1, expect.objectContaining({
+        corrects_entry_id: 11,
+        cervical_dilation_cm: 5,
+      }))
+    );
+  });
+
+  it('offers no Correct action on an already-superseded entry', async () => {
+    api.getPartograph.mockResolvedValue({
+      labor_admission_id: 1,
+      active_labor_started_at: '2026-07-21T06:00:00Z',
+      entries: [
+        { entry_id: 11, recorded_at: '2026-07-21T06:30:00Z', cervical_dilation_cm: 4, superseded: true },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<LaborBoardTab />);
+    await user.click(await screen.findByText('Achieng, Faith'));
+    expect(await screen.findByText(/superseded/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^correct$/i })).not.toBeInTheDocument();
+  });
 });
