@@ -29,7 +29,14 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
     const { value } = e.target;
     setNewborns((rows) => rows.map((row) => (row.id === id ? { ...row, [key]: value } : row)));
   };
-  const addTwin = () => setNewborns((rows) => [...rows, emptyNewborn(nextRowIdRef.current++)]);
+  // The id is minted OUTSIDE the state updater: React may invoke an updater
+  // more than once (StrictMode, concurrent re-render), and incrementing the
+  // ref inside it would burn ids or hand two rows the same key.
+  const addTwin = () => {
+    const id = nextRowIdRef.current;
+    nextRowIdRef.current += 1;
+    setNewborns((rows) => [...rows, emptyNewborn(id)]);
+  };
   const removeNewborn = (id) => setNewborns((rows) => rows.filter((row) => row.id !== id));
 
   const submit = async (e) => {
