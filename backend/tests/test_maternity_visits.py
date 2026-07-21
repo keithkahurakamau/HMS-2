@@ -118,6 +118,18 @@ class TestAncVisit:
                 ), {"entry_id": entry_id}).scalar()
                 assert float(debit_row) == 500.0, f"Total debit was {debit_row}, expected 500.0"
                 assert float(credit_row) == 500.0, f"Total credit was {credit_row}, expected 500.0"
+
+                # The credit leg must land on Maternity Revenue (4700), not
+                # the generic consultation bucket the source_key maps to.
+                # This is what the per-service revenue_account_id override buys.
+                credit_code = db.execute(text(
+                    "SELECT a.code FROM acc_journal_lines l "
+                    "JOIN acc_accounts a ON a.account_id = l.account_id "
+                    "WHERE l.entry_id = :entry_id AND l.credit_base > 0"
+                ), {"entry_id": entry_id}).scalar()
+                assert credit_code == "4700", (
+                    f"Maternity revenue credited {credit_code}, expected 4700"
+                )
             finally:
                 db.close()
         finally:
