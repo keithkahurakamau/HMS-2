@@ -48,6 +48,7 @@ const Support = lazy(() => import('./pages/Support'));
 const Branding = lazy(() => import('./pages/Branding'));
 const Accounting = lazy(() => import('./pages/Accounting'));
 const Maternity = lazy(() => import('./pages/Maternity'));
+const Dialysis = lazy(() => import('./pages/Dialysis'));
 
 // Layout + superadmin pages — also lazy (the back-office is rarely the first load).
 const MainLayout = lazy(() => import('./components/layouts/MainLayout'));
@@ -226,6 +227,7 @@ export default function App() {
             <Route path="cheques" element={<ModuleGuard moduleKey="cheques"><Cheques /></ModuleGuard>} />
             <Route path="accounting" element={<ModuleGuard moduleKey="accounting"><Accounting /></ModuleGuard>} />
             <Route path="maternity" element={<ModuleGuard moduleKey="maternity"><Maternity /></ModuleGuard>} />
+            <Route path="dialysis" element={<ModuleGuard moduleKey="dialysis"><Dialysis /></ModuleGuard>} />
             {/* Support is always-on — never wrap it; that's the escape hatch. */}
             <Route path="support" element={<Support />} />
           </Route>
