@@ -49,7 +49,7 @@ Priority — *clinical necessity, then revenue*: **P1** = revenue leaking / SHA-
 | 9 | Configuration | [09-configuration.md](09-configuration.md) | 🟡 Partial | Spine exists; **granular per-branch billing toggles**, report templates, service-point rules |
 | 10 | Communication | [10-communication.md](10-communication.md) | 🟡 Partial | Internal msg + email have; **patient SMS gateway + templated reminders** missing |
 | 11 | Diary | [11-diary.md](11-diary.md) | ❌ Missing | Personal staff diary (patient calendar exists, staff diary doesn't) |
-| 12 | Reports | [12-reports.md](12-reports.md) | 🟡 Partial* | Dashboards have; **financial statements + debtors aging + statutory returns** gap *(screens not captured)* |
+| 12 | Reports | [12-reports.md](12-reports.md) | 🟡 Partial | Dashboards have; **financial statements + debtors aging + statutory returns** gap — *purpose-built creative design* |
 | 13 | Home / global chrome | [13-home-global.md](13-home-global.md) | ✅ Have (ahead) | Shell + dark-mode ahead; gap = active-room header/Queue, command palette, live chat |
 
 ## Executive summary
@@ -121,6 +121,7 @@ then take **Epic A (Insurance Revenue Cycle)** as the flagship revenue programme
 
 ## Coverage note
 
-Element-level detail is complete for Modules 1–11 and 13. **Module 12 (Reports)** is feature-level
-only — its screens weren't in the capture (the walkthrough ended at Diary); capture them before
-building Reports parity.
+Element-level detail is complete for Modules 1–11 and 13 (from the screenshots). **Module 12
+(Reports)** is a **purpose-built creative design** — no MedicentreV3 Reports screens were in the
+capture (the walkthrough ended at Diary), so §12 designs the reporting suite from first principles
+per the user's direction ("be creative, build up something for all the reports").
