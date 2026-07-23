@@ -1,29 +1,25 @@
 import { useState } from 'react';
-import { Droplets } from 'lucide-react';
+import { Scissors } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
-import OrdersTab from './dialysis/OrdersTab';
-import RenalProfileTab from './dialysis/RenalProfileTab';
-import RosterTab from './dialysis/RosterTab';
-import MachinesTab from './dialysis/MachinesTab';
-import ChecklistsConfigTab from './dialysis/ChecklistsConfigTab';
+import CasesTab from './theatre/CasesTab';
+import RoomsTab from './theatre/RoomsTab';
+import ChecklistsConfigTab from './theatre/ChecklistsConfigTab';
 
 const TABS = [
-  { key: 'sessions', label: 'Sessions' },
-  { key: 'profile', label: 'Renal Profile' },
-  { key: 'roster', label: 'Roster' },
-  { key: 'machines', label: 'Machines' },
+  { key: 'cases', label: 'Cases' },
+  { key: 'rooms', label: 'Rooms' },
   { key: 'checklists', label: 'Checklists' },
 ];
 
-export default function Dialysis() {
-  const [tab, setTab] = useState('sessions');
+export default function Theatre() {
+  const [tab, setTab] = useState('cases');
   return (
     <div className="p-4 md:p-6">
       <PageHeader
-        eyebrow="Renal"
-        icon={Droplets}
-        title="Dialysis"
-        subtitle="Run haemodialysis sessions, safety checklists, adequacy (Kt/V), and the renal unit roster."
+        eyebrow="Surgery"
+        icon={Scissors}
+        title="Theatre & Surgery"
+        subtitle="Schedule cases, run the WHO safety checklist, and record operative notes, anaesthesia and billing."
       />
       <div className="flex gap-2 border-b border-ink-200/70 dark:border-ink-800" role="tablist">
         {TABS.map((t) => (
@@ -44,10 +40,8 @@ export default function Dialysis() {
         ))}
       </div>
       <div className="mt-4">
-        {tab === 'sessions' && <OrdersTab />}
-        {tab === 'profile' && <RenalProfileTab />}
-        {tab === 'roster' && <RosterTab />}
-        {tab === 'machines' && <MachinesTab />}
+        {tab === 'cases' && <CasesTab />}
+        {tab === 'rooms' && <RoomsTab />}
         {tab === 'checklists' && <ChecklistsConfigTab />}
       </div>
     </div>
