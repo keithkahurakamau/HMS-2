@@ -8,7 +8,7 @@ import {
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
     ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy,
     BookOpen, Smartphone, HelpCircle, HeartPulse, PanelLeftClose, PanelLeftOpen,
-    CalendarClock, Home, UserCog, Baby,
+    CalendarClock, Home, UserCog, Baby, Droplets, Scissors,
 } from 'lucide-react';
 import WhatsNew from '../WhatsNew';
 import NotificationBell from '../NotificationBell';
@@ -32,6 +32,8 @@ const ROUTE_TO_JOURNEY = [
     ['/app/billing',         'billing'],
     ['/app/cheques',         'cheques'],
     ['/app/maternity',       'maternity'],
+    ['/app/dialysis',        'dialysis'],
+    ['/app/theatre',         'theatre'],
     ['/app/medical-history', 'medical_history'],
     ['/app/appointments',    'appointments'],
     ['/app/calendar',        'appointments'],
@@ -63,6 +65,8 @@ const NAVIGATION = [
     { name: 'Pharmacy',          path: '/app/pharmacy',        icon: <Pill size={18} />,            allowedRoles: ['Admin', 'Pharmacist', 'Doctor'],                  requiredPermission: 'pharmacy:read',    moduleKey: 'pharmacy' },
     { name: 'Wards & Admissions',path: '/app/wards',           icon: <Bed size={18} />,             allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'wards:manage',     moduleKey: 'wards' },
     { name: 'Maternity',         path: '/app/maternity',       icon: <Baby size={18} />,            allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'maternity:read',   moduleKey: 'maternity' },
+    { name: 'Dialysis',          path: '/app/dialysis',        icon: <Droplets size={18} />,        allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'dialysis:read',    moduleKey: 'dialysis' },
+    { name: 'Theatre & Surgery', path: '/app/theatre',         icon: <Scissors size={18} />,        allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'theatre:read',     moduleKey: 'theatre' },
     { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'appointments:read',moduleKey: 'appointments' },
     // Calendar carries each user's personal events (every role gets one) plus
     // the appointments overlay for roles that can see appointments. No
