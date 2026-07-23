@@ -35,3 +35,32 @@ export const updateChecklist = (checklistId, payload) =>
 
 export const getDialysisQueue = () =>
   apiClient.get('/queue/', { params: { department: 'Dialysis' } }).then((r) => r.data);
+
+// ── Phase 2: unit management ────────────────────────────────────────────────
+export const listVascularAccesses = (patientId) =>
+  apiClient.get('/dialysis/vascular-accesses', { params: patientId ? { patient_id: patientId } : {} }).then((r) => r.data);
+export const createVascularAccess = (payload) =>
+  apiClient.post('/dialysis/vascular-accesses', payload).then((r) => r.data);
+export const updateVascularAccess = (accessId, payload) =>
+  apiClient.put(`/dialysis/vascular-accesses/${accessId}`, payload).then((r) => r.data);
+
+export const listMachines = () =>
+  apiClient.get('/dialysis/machines').then((r) => r.data);
+export const createMachine = (payload) =>
+  apiClient.post('/dialysis/machines', payload).then((r) => r.data);
+export const updateMachine = (machineId, payload) =>
+  apiClient.put(`/dialysis/machines/${machineId}`, payload).then((r) => r.data);
+
+export const listSchedules = (patientId) =>
+  apiClient.get('/dialysis/schedules', { params: patientId ? { patient_id: patientId } : {} }).then((r) => r.data);
+export const createSchedule = (payload) =>
+  apiClient.post('/dialysis/schedules', payload).then((r) => r.data);
+export const updateSchedule = (scheduleId, payload) =>
+  apiClient.put(`/dialysis/schedules/${scheduleId}`, payload).then((r) => r.data);
+
+export const getRoster = (dateStr) =>
+  apiClient.get('/dialysis/roster', { params: dateStr ? { date_str: dateStr } : {} }).then((r) => r.data);
+export const getRenalProfile = (patientId) =>
+  apiClient.get(`/dialysis/patients/${patientId}/renal-profile`).then((r) => r.data);
+export const addConsumable = (orderId, payload) =>
+  apiClient.post(`/dialysis/orders/${orderId}/consumables`, payload).then((r) => r.data);

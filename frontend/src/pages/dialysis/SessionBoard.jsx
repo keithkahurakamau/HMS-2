@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  addChecklistRun, addComplication, cancelOrder, completeOrder,
+  addChecklistRun, addComplication, addConsumable, cancelOrder, completeOrder,
   connectOrder, disconnectOrder, getOrder,
 } from './api';
 import { errorText } from './errors';
@@ -37,6 +37,7 @@ export default function SessionBoard({ order, onChanged }) {
   const [error, setError] = useState('');
   const [showObs, setShowObs] = useState(false);
   const [comp, setComp] = useState({ type: 'Hypotension', intervention: '' });
+  const [cons, setCons] = useState({ item_name: '', qty: '', dialyzer_reuse_count: '' });
 
   const passedChecklist = (order.checklist_runs || []).some((r) => r.passed);
   const isTerminal = order.status === 'Completed' || order.status === 'Cancelled';
@@ -66,6 +67,16 @@ export default function SessionBoard({ order, onChanged }) {
     run(() => addComplication(order.order_id, {
       type: comp.type, intervention: comp.intervention || undefined,
     })).then(() => setComp({ type: 'Hypotension', intervention: '' }));
+  };
+
+  const submitConsumable = (e) => {
+    e.preventDefault();
+    if (!cons.item_name.trim()) return;
+    run(() => addConsumable(order.order_id, {
+      item_name: cons.item_name.trim(),
+      qty: cons.qty !== '' ? Number(cons.qty) : undefined,
+      dialyzer_reuse_count: cons.dialyzer_reuse_count !== '' ? Number(cons.dialyzer_reuse_count) : undefined,
+    })).then(() => setCons({ item_name: '', qty: '', dialyzer_reuse_count: '' }));
   };
 
   return (
@@ -170,6 +181,33 @@ export default function SessionBoard({ order, onChanged }) {
                     className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60">
               Add
             </button>
+          </form>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-ink-200/70 dark:border-ink-800 p-4" aria-label="Consumables">
+        <h4 className="text-sm font-semibold text-ink-900 dark:text-white">Consumables</h4>
+        <ul className="mt-2 space-y-1 text-sm text-ink-700 dark:text-ink-300">
+          {(order.consumables || []).map((c) => (
+            <li key={c.consumable_id}>• {c.item_name}{c.qty ? ` ×${c.qty}` : ''}{c.dialyzer_reuse_count != null ? ` (reuse ${c.dialyzer_reuse_count})` : ''}</li>
+          ))}
+          {(order.consumables || []).length === 0 && <li className="text-ink-400">None recorded.</li>}
+        </ul>
+        {!isTerminal && (
+          <form onSubmit={submitConsumable} className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="block flex-1 text-sm text-ink-700 dark:text-ink-300">
+              Item
+              <input type="text" value={cons.item_name} onChange={(e) => setCons((c) => ({ ...c, item_name: e.target.value }))} className="input mt-1 w-full" />
+            </label>
+            <label className="block text-sm text-ink-700 dark:text-ink-300">
+              Qty
+              <input type="number" step="0.01" value={cons.qty} onChange={(e) => setCons((c) => ({ ...c, qty: e.target.value }))} className="input mt-1 w-20" />
+            </label>
+            <label className="block text-sm text-ink-700 dark:text-ink-300">
+              Reuse #
+              <input type="number" value={cons.dialyzer_reuse_count} onChange={(e) => setCons((c) => ({ ...c, dialyzer_reuse_count: e.target.value }))} className="input mt-1 w-20" />
+            </label>
+            <button type="submit" disabled={busy} className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60">Add</button>
           </form>
         )}
       </section>

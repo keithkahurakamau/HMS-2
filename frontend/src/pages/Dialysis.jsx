@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import OrdersTab from './dialysis/OrdersTab';
+import RenalProfileTab from './dialysis/RenalProfileTab';
+import RosterTab from './dialysis/RosterTab';
+import MachinesTab from './dialysis/MachinesTab';
 import ChecklistsConfigTab from './dialysis/ChecklistsConfigTab';
 
 const TABS = [
   { key: 'sessions', label: 'Sessions' },
+  { key: 'profile', label: 'Renal Profile' },
+  { key: 'roster', label: 'Roster' },
+  { key: 'machines', label: 'Machines' },
   { key: 'checklists', label: 'Checklists' },
 ];
 
@@ -32,6 +38,9 @@ export default function Dialysis() {
       </div>
       <div className="mt-4">
         {tab === 'sessions' && <OrdersTab />}
+        {tab === 'profile' && <RenalProfileTab />}
+        {tab === 'roster' && <RosterTab />}
+        {tab === 'machines' && <MachinesTab />}
         {tab === 'checklists' && <ChecklistsConfigTab />}
       </div>
     </div>
