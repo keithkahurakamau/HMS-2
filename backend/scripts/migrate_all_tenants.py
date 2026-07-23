@@ -763,23 +763,27 @@ def _seed_maternity_price_list(tenant_url: str) -> None:
 
 
 def _seed_dialysis(tenant_url: str) -> None:
-    """Dialysis machine-safety checklists + a demo machine (idempotent)."""
-    from app.services.dialysis_seed import seed_dialysis_checklists
+    """Dialysis checklists + demo machine + DIA-* price codes (idempotent)."""
+    from app.services.dialysis_seed import seed_dialysis_checklists, seed_dialysis_price_list
 
     engine = create_engine(tenant_url)
     safe_label = tenant_url.rsplit("@", 1)[-1]
     try:
         with engine.begin() as conn:
             insp = inspect(conn)
-            if not insp.has_table("dialysis_checklists"):
+            if insp.has_table("dialysis_checklists"):
+                n = seed_dialysis_checklists(conn)
+                if n:
+                    LOG.warning("[%s] seeded %d dialysis reference row(s)", safe_label, n)
+            else:
                 LOG.error(
                     "[%s] dialysis_checklists missing after migrate — skipping dialysis seed",
                     safe_label,
                 )
-                return
-            n = seed_dialysis_checklists(conn)
-            if n:
-                LOG.warning("[%s] seeded %d dialysis reference row(s)", safe_label, n)
+            if insp.has_table("acc_price_list"):
+                p = seed_dialysis_price_list(conn)
+                if p:
+                    LOG.warning("[%s] seeded %d dialysis price-list row(s)", safe_label, p)
     finally:
         engine.dispose()
 

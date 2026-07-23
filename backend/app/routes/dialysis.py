@@ -18,10 +18,11 @@ from app.config.database import get_db
 from app.core.dependencies import get_current_user, RequirePermission
 from app.models.dialysis import (
     DialysisAdequacy, DialysisChecklist, DialysisChecklistRun,
-    DialysisComplication, DialysisObservation, DialysisOrder,
+    DialysisComplication, DialysisConsumable, DialysisObservation, DialysisOrder,
 )
 from app.models.patient import Patient
 from app.services.dialysis_adequacy import compute_adequacy
+from app.services.dialysis_billing import raise_dialysis_charge
 from app.utils.audit import log_audit
 
 router = APIRouter(prefix="/api/dialysis", tags=["Dialysis"])
@@ -173,6 +174,13 @@ def _run_dict(r: DialysisChecklistRun) -> dict:
     }
 
 
+def _consumable_dict(c: DialysisConsumable) -> dict:
+    return {
+        "consumable_id": c.consumable_id, "item_id": c.item_id, "item_name": c.item_name,
+        "qty": _f(c.qty), "dialyzer_reuse_count": c.dialyzer_reuse_count,
+    }
+
+
 def _order_dict(o: DialysisOrder, patient: Optional[Patient] = None, deep: bool = False) -> dict:
     d = {
         "order_id": o.order_id, "patient_id": o.patient_id,
@@ -203,7 +211,7 @@ def _order_dict(o: DialysisOrder, patient: Optional[Patient] = None, deep: bool 
         d["complications"] = [_comp_dict(x) for x in sorted(o.complications, key=lambda x: (x.occurred_at, x.complication_id))]
         d["adequacy"] = _adeq_dict(o.adequacy) if o.adequacy else None
         d["checklist_runs"] = [_run_dict(x) for x in o.checklist_runs]
-        d["consumables"] = []  # Phase 2
+        d["consumables"] = [_consumable_dict(x) for x in o.consumables]
     return d
 
 
@@ -290,6 +298,14 @@ def _transition(db: Session, request: Request, current_user: dict, order_id: int
         setattr(o, ts_field, _now())
     if action == "cancel":
         o.cancel_reason = reason
+    if action == "complete":
+        # Recurring session revenue — zero-priced DIA-HD-SESSION is a no-op
+        # until the hospital sets a price (mirrors maternity charge-on-visit).
+        raise_dialysis_charge(
+            db, patient_id=o.patient_id, service_code="DIA-HD-SESSION",
+            clinician_name=current_user.get("full_name") or "Clinician",
+            user_id=current_user["user_id"],
+        )
     log_audit(db, current_user["user_id"], "UPDATE", "DialysisOrder", o.order_id,
               {"status": old_status}, {"status": o.status}, request.client.host)
     db.commit()

@@ -53,3 +53,37 @@ def seed_dialysis_checklists(db: Union[Session, Connection]) -> int:
             inserted += 1
 
     return inserted
+
+
+DIALYSIS_SERVICES = (
+    ("DIA-HD-SESSION", "Haemodialysis Session"),
+    ("DIA-HDF-SESSION", "Haemodiafiltration Session"),
+)
+
+
+def seed_dialysis_price_list(db: Union[Session, Connection]) -> int:
+    """Insert missing DIA-* price-list rows (zero-priced until the hospital sets
+    real prices in Admin → Pricing). Returns number inserted."""
+    result = db.execute(text("SELECT account_id FROM acc_accounts WHERE code = '4700'")).first()
+    revenue_account_id = result[0] if result else None
+
+    codes = [c for c, _ in DIALYSIS_SERVICES]
+    placeholders = ", ".join(f":{i}" for i in range(len(codes)))
+    existing = {
+        row[0]
+        for row in db.execute(text(
+            f"SELECT service_code FROM acc_price_list WHERE service_code IN ({placeholders})"
+        ), {str(i): c for i, c in enumerate(codes)})
+    }
+
+    inserted = 0
+    for code, name in DIALYSIS_SERVICES:
+        if code in existing:
+            continue
+        db.execute(text(
+            "INSERT INTO acc_price_list "
+            "(service_code, name, category, unit_price, revenue_account_id, tax_rate_pct, is_active) "
+            "VALUES (:code, :name, :cat, 0, :rev_id, 0, TRUE)"
+        ), {"code": code, "name": name, "cat": "Dialysis", "rev_id": revenue_account_id})
+        inserted += 1
+    return inserted
