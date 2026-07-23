@@ -31,6 +31,18 @@ export const createChecklist = (payload) =>
 export const updateChecklist = (checklistId, payload) =>
   apiClient.put(`/theatre/checklists/${checklistId}`, payload).then((r) => r.data);
 
+// ── Phase 2: team, consumables, recovery, board ────────────────────────────
+export const addTeamMember = (caseId, payload) =>
+  apiClient.post(`/theatre/cases/${caseId}/team-members`, payload).then((r) => r.data);
+export const removeTeamMember = (caseId, memberId) =>
+  apiClient.delete(`/theatre/cases/${caseId}/team-members/${memberId}`).then((r) => r.data);
+export const addConsumable = (caseId, payload) =>
+  apiClient.post(`/theatre/cases/${caseId}/consumables`, payload).then((r) => r.data);
+export const addRecoveryObs = (caseId, payload) =>
+  apiClient.post(`/theatre/cases/${caseId}/recovery-observations`, payload).then((r) => r.data);
+export const getBoard = (dateStr) =>
+  apiClient.get('/theatre/board', { params: dateStr ? { date_str: dateStr } : {} }).then((r) => r.data);
+
 export const listRooms = () =>
   apiClient.get('/theatre/rooms').then((r) => r.data);
 export const createRoom = (payload) =>

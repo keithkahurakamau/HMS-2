@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Scissors } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import CasesTab from './theatre/CasesTab';
+import ScheduleBoard from './theatre/ScheduleBoard';
 import RoomsTab from './theatre/RoomsTab';
 import ChecklistsConfigTab from './theatre/ChecklistsConfigTab';
 
 const TABS = [
   { key: 'cases', label: 'Cases' },
+  { key: 'schedule', label: 'Schedule' },
   { key: 'rooms', label: 'Rooms' },
   { key: 'checklists', label: 'Checklists' },
 ];
@@ -41,6 +43,7 @@ export default function Theatre() {
       </div>
       <div className="mt-4">
         {tab === 'cases' && <CasesTab />}
+        {tab === 'schedule' && <ScheduleBoard />}
         {tab === 'rooms' && <RoomsTab />}
         {tab === 'checklists' && <ChecklistsConfigTab />}
       </div>

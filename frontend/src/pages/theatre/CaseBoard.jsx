@@ -5,6 +5,7 @@ import {
 import { errorText } from './errors';
 import OperativeNoteForm from './OperativeNoteForm';
 import AnaesthesiaForm from './AnaesthesiaForm';
+import CaseExtras from './CaseExtras';
 
 const FLOW = ['Scheduled', 'InTheatre', 'Recovery', 'Completed'];
 const PHASES = [
@@ -122,6 +123,7 @@ export default function CaseBoard({ caseObj, onChanged }) {
 
       <OperativeNoteForm caseObj={caseObj} onSaved={() => run(() => Promise.resolve())} />
       <AnaesthesiaForm caseObj={caseObj} onSaved={() => run(() => Promise.resolve())} />
+      <CaseExtras caseObj={caseObj} onChanged={onChanged} />
     </section>
   );
 }
