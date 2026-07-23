@@ -60,7 +60,7 @@ from app.models import (  # noqa: E402,F401
     accounting, audit, auth_tokens, billing, breach, calendar, cheque, clinical,
     dialysis, email_events, idempotency, inventory, laboratory, master, maternity as _maternity,
     medical_history, messaging, notification, patient, payhero, radiology, referral,
-    settings as _settings, support, user, wards,
+    settings as _settings, support, theatre, user, wards,
 )
 
 
@@ -788,6 +788,32 @@ def _seed_dialysis(tenant_url: str) -> None:
         engine.dispose()
 
 
+def _seed_theatre(tenant_url: str) -> None:
+    """Theatre WHO checklist + demo room + THEATRE-* price codes (idempotent)."""
+    from app.services.theatre_seed import seed_theatre_reference, seed_theatre_price_list
+
+    engine = create_engine(tenant_url)
+    safe_label = tenant_url.rsplit("@", 1)[-1]
+    try:
+        with engine.begin() as conn:
+            insp = inspect(conn)
+            if insp.has_table("surgical_checklists"):
+                n = seed_theatre_reference(conn)
+                if n:
+                    LOG.warning("[%s] seeded %d theatre reference row(s)", safe_label, n)
+            else:
+                LOG.error(
+                    "[%s] surgical_checklists missing after migrate — skipping theatre seed",
+                    safe_label,
+                )
+            if insp.has_table("acc_price_list"):
+                p = seed_theatre_price_list(conn)
+                if p:
+                    LOG.warning("[%s] seeded %d theatre price-list row(s)", safe_label, p)
+    finally:
+        engine.dispose()
+
+
 def migrate_one(tenant_db_name: str, default_url: str) -> None:
     tenant_url = _tenant_db_url(default_url, tenant_db_name)
     safe_label = tenant_url.rsplit("@", 1)[-1]  # hide creds in logs
@@ -828,6 +854,8 @@ def migrate_one(tenant_db_name: str, default_url: str) -> None:
     _seed_maternity_price_list(tenant_url)
     # Dialysis machine-safety checklists + demo machine (idempotent).
     _seed_dialysis(tenant_url)
+    # Theatre WHO checklist + demo room + service codes (idempotent).
+    _seed_theatre(tenant_url)
 
 
 def main() -> int:
