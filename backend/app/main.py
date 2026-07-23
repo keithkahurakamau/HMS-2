@@ -51,6 +51,7 @@ import app.routes.maternity_labor as maternity_labor_module
 import app.routes.dialysis as dialysis_module
 import app.routes.dialysis_unit as dialysis_unit_module
 import app.routes.theatre as theatre_module
+import app.routes.theatre_unit as theatre_unit_module
 import app.routes.settings as settings_module
 import app.routes.cheques as cheques_module
 import app.routes.support as support_module
@@ -337,6 +338,7 @@ app.include_router(maternity_labor_module.router)
 app.include_router(dialysis_module.router)
 app.include_router(dialysis_unit_module.router)
 app.include_router(theatre_module.router)
+app.include_router(theatre_unit_module.router)
 app.include_router(settings_module.router)
 app.include_router(cheques_module.router)
 app.include_router(support_module.tenant_router)
