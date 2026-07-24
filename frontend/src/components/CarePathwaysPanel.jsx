@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Save, Stethoscope, BedDouble, Scissors } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
@@ -6,9 +7,10 @@ import { apiClient } from '../api/client';
 const PRIORITIES = ['Elective', 'Emergency'];
 const err = (e, fallback) => toast.error(e?.response?.data?.detail || fallback);
 
-/** Shared modal shell — matches the app's custom-modal convention. */
+/** Shared modal shell — portaled to <body> so it escapes the workspace card's
+ *  stacking context and always sits above the queue bar and page chrome. */
 function Modal({ title, icon: Icon, onClose, children, footer }) {
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 backdrop-blur-sm p-4"
             onClick={onClose} role="presentation">
             <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col"
@@ -22,7 +24,8 @@ function Modal({ title, icon: Icon, onClose, children, footer }) {
                 <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">{children}</div>
                 {footer && <div className="p-4 border-t border-ink-100 dark:border-ink-800 flex justify-end gap-2">{footer}</div>}
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }
 
