@@ -19,8 +19,10 @@ import { Users, Clock, X, UserMinus } from 'lucide-react';
  *   title       {string?}   heading override (default mode only)
  *   inline      {boolean?}  render as inline rows inside a parent list
  *   onChange    {function?} called after a successful remove or cancel
+ *   onCount     {function?} reports the routed-row count to the parent so it can
+ *                           show a single combined queue total
  */
-export default function DepartmentQueue({ department, title, inline = false, onChange }) {
+export default function DepartmentQueue({ department, title, inline = false, onChange, onCount }) {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -28,13 +30,16 @@ export default function DepartmentQueue({ department, title, inline = false, onC
         setLoading(true);
         try {
             const res = await apiClient.get(`/queue/?department=${department}`);
-            setRows(res.data || []);
+            const list = res.data || [];
+            setRows(list);
+            onCount?.(list.length);
         } catch {
             // queue read is best-effort; leave empty on failure
+            onCount?.(0);
         } finally {
             setLoading(false);
         }
-    }, [department]);
+    }, [department, onCount]);
 
     useEffect(() => { fetchRows(); }, [fetchRows]);
 

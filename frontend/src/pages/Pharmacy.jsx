@@ -24,6 +24,7 @@ export default function Pharmacy() {
 
     // --- RX FULFILLMENT STATE (DYNAMIC) ---
     const [queue, setQueue] = useState([]);
+    const [routedCount, setRoutedCount] = useState(0);
     const [isLoadingQueue, setIsLoadingQueue] = useState(true);
     const [activeOrder, setActiveOrder] = useState(null);
     const [isQueueOpen, setIsQueueOpen] = useState(true);
@@ -307,42 +308,55 @@ export default function Pharmacy() {
                         <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
                             <div className="flex items-center gap-3">
                                 <Package className="text-brand-600" size={18} />
-                                <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Pending prescriptions</h2>
-                                <span className="badge-warn">{queue.length} Awaiting</span>
+                                <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Pharmacy Queue</h2>
+                                <span className="badge-warn">{queue.length + routedCount} Waiting</span>
                             </div>
                             <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                         </button>
 
                         {isQueueOpen && (
                             <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
-                                {/* Triage-routed patients sit inline at the top of the queue. */}
-                                <DepartmentQueue department="Pharmacy" inline onChange={fetchRxQueue} />
+                                {/* Stage 1 — patients routed here from triage. */}
+                                <DepartmentQueue department="Pharmacy" inline onChange={fetchRxQueue} onCount={setRoutedCount} />
                                 {isLoadingQueue ? (
                                     <div className="text-center py-8 text-ink-400">
                                         <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} />
                                         Syncing prescription queue&hellip;
                                     </div>
                                 ) : queue.length === 0 ? (
-                                    <div className="text-center py-8 text-ink-400">No pending prescriptions at this time.</div>
+                                    <div className="text-center py-8 text-ink-400">No prescriptions awaiting dispensing.</div>
                                 ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                                        {queue.map((order) => {
-                                            const active = activeOrder?.id === order.id;
-                                            return (
-                                                <button key={order.id} type="button"
-                                                    aria-label={`Open prescription ${order.id} for ${order.patient}`}
-                                                    onClick={() => {setActiveOrder(order); setIsQueueOpen(false);}}
-                                                    className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 hover:-translate-y-0.5'}`}>
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <h3 className="font-semibold text-sm text-ink-900 dark:text-ink-100">{order.patient}</h3>
-                                                        {order.priority === 'High' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft" />}
+                                    <>
+                                        {/* Stage 2 — prescriptions awaiting dispensing. */}
+                                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 mb-2 flex items-center gap-1.5"><Package size={12} /> Awaiting dispensing &middot; {queue.length}</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                            {queue.map((order) => {
+                                                const active = activeOrder?.id === order.id;
+                                                return (
+                                                    <div key={order.id} className={`relative rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300'}`}>
+                                                        {order.record_id && (
+                                                            <button type="button" onClick={() => cancelPrescription(order.record_id)}
+                                                                    title="Remove from queue" aria-label={`Remove prescription ${order.id} from the queue`}
+                                                                    className="absolute top-1.5 right-1.5 p-1 rounded-lg text-ink-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 z-10">
+                                                                <XIcon size={13} />
+                                                            </button>
+                                                        )}
+                                                        <button type="button"
+                                                            aria-label={`Open prescription ${order.id} for ${order.patient}`}
+                                                            onClick={() => {setActiveOrder(order); setIsQueueOpen(false);}}
+                                                            className="w-full text-left p-3 pr-7">
+                                                            <div className="flex justify-between items-start mb-2 gap-1">
+                                                                <h3 className="font-semibold text-sm text-ink-900 dark:text-ink-100">{order.patient}</h3>
+                                                                {order.priority === 'High' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft shrink-0" />}
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-xs text-brand-700 font-mono mb-1"><span>{order.id}</span></div>
+                                                            <div className="flex justify-between items-center text-xs text-ink-400"><span>{order.doctor}</span><span className="bg-ink-100 dark:bg-ink-800 px-2 py-0.5 rounded-full text-ink-600 dark:text-ink-400 flex items-center gap-1"><Clock size={10} /> {order.time}</span></div>
+                                                        </button>
                                                     </div>
-                                                    <div className="flex justify-between items-center text-xs text-brand-700 font-mono mb-1"><span>{order.id}</span></div>
-                                                    <div className="flex justify-between items-center text-xs text-ink-400"><span>{order.doctor}</span><span className="bg-ink-100 dark:bg-ink-800 px-2 py-0.5 rounded-full text-ink-600 dark:text-ink-400 flex items-center gap-1"><Clock size={10} /> {order.time}</span></div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         )}

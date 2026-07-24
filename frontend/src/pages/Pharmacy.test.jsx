@@ -232,8 +232,8 @@ describe('Pharmacy — Rx fulfillment tab', () => {
         expect(await screen.findByText('Asha Mwangi')).toBeInTheDocument();
         expect(screen.getByText('Brian Kamau')).toBeInTheDocument();
         expect(screen.getByText('RX-1001')).toBeInTheDocument();
-        // Badge: "2 Awaiting"
-        expect(screen.getByText(/2 Awaiting/i)).toBeInTheDocument();
+        // Unified queue badge: combined total waiting (2 orders + 0 routed).
+        expect(screen.getByText(/2 Waiting/i)).toBeInTheDocument();
     });
 
     it('renders the empty state when the queue is empty', async () => {
@@ -241,9 +241,9 @@ describe('Pharmacy — Rx fulfillment tab', () => {
         renderWithProviders(<Pharmacy />);
 
         expect(
-            await screen.findByText(/No pending prescriptions at this time/i)
+            await screen.findByText(/No prescriptions awaiting dispensing/i)
         ).toBeInTheDocument();
-        expect(screen.getByText(/0 Awaiting/i)).toBeInTheDocument();
+        expect(screen.getByText(/0 Waiting/i)).toBeInTheDocument();
     });
 
     it('clicking a queue row sets the active order and shows the dispense panel', async () => {

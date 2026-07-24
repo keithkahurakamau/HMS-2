@@ -24,6 +24,7 @@ export default function Radiology() {
     const [isLoading, setIsLoading] = useState(true);
 
     const [queue, setQueue] = useState([]);
+    const [routedCount, setRoutedCount] = useState(0);
     const [catalog, setCatalog] = useState([]);
     const [activeRequest, setActiveRequest] = useState(null);
 
@@ -180,43 +181,53 @@ export default function Radiology() {
                         <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 dark:bg-ink-800/40 hover:bg-brand-50/40 dark:hover:bg-ink-800/50 transition-colors rounded-t-2xl">
                             <div className="flex items-center gap-3">
                                 <Activity className="text-brand-600" size={18} />
-                                <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Pending imaging requests</h2>
-                                <span className="badge-brand">{queue.length} Requests</span>
+                                <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Radiology Queue</h2>
+                                <span className="badge-brand">{queue.length + routedCount} Waiting</span>
                             </div>
                             <span className="text-ink-500 dark:text-ink-400">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                         </button>
 
                         {isQueueOpen && (
                             <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
-                                {/* Triage-routed patients sit inline at the top of the queue. */}
-                                <DepartmentQueue department="Radiology" inline />
+                                {/* Stage 1 — patients routed here from triage (awaiting a request). */}
+                                <DepartmentQueue department="Radiology" inline onCount={setRoutedCount} />
                                 {isLoading ? (
                                     <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Syncing queue…</div>
                                 ) : queue.length === 0 ? (
-                                    <div className="text-center py-6 text-ink-400">No pending imaging requests.</div>
+                                    <div className="text-center py-6 text-ink-400">No requests awaiting reading.</div>
                                 ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                                        {queue.map((req) => {
-                                            const active = activeRequest?.request_id === req.request_id;
-                                            return (
-                                                <button key={req.request_id} type="button" onClick={() => handleSelect(req)}
-                                                        className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 dark:bg-brand-500/10 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 hover:-translate-y-0.5'}`}>
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <h3 className="font-semibold text-sm text-ink-900 dark:text-white line-clamp-1">{req.exam_type}</h3>
-                                                        {req.priority === 'STAT' && <span className="badge-danger text-2xs">STAT</span>}
+                                    <>
+                                        {/* Stage 2 — imaging requests awaiting reading. */}
+                                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 mb-2 flex items-center gap-1.5"><Activity size={12} /> Awaiting reading &middot; {queue.length}</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                            {queue.map((req) => {
+                                                const active = activeRequest?.request_id === req.request_id;
+                                                return (
+                                                    <div key={req.request_id} className={`relative rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 dark:bg-brand-500/10 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300'}`}>
+                                                        <button type="button" onClick={() => cancelRequest(req.request_id)}
+                                                                title="Remove from queue" aria-label={`Remove ${req.exam_type} from the queue`}
+                                                                className="absolute top-1.5 right-1.5 p-1 rounded-lg text-ink-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 z-10">
+                                                            <X size={13} />
+                                                        </button>
+                                                        <button type="button" onClick={() => handleSelect(req)} className="w-full text-left p-3 pr-7">
+                                                            <div className="flex justify-between items-start mb-2 gap-1">
+                                                                <h3 className="font-semibold text-sm text-ink-900 dark:text-white line-clamp-1">{req.exam_type}</h3>
+                                                                {req.priority === 'STAT' && <span className="badge-danger text-2xs">STAT</span>}
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-xs text-ink-500 dark:text-ink-400 mb-2">
+                                                                <span className="font-medium text-ink-700 dark:text-ink-200 flex items-center gap-1"><User size={12} /> #{req.patient_id}</span>
+                                                                <span className="font-mono text-2xs text-ink-400">#{req.request_id}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className={req.status === 'Pending' ? 'badge-warn' : 'badge-info'}>{req.status}</span>
+                                                                <span className="text-ink-400 flex items-center gap-1"><Clock size={10} /> {new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                            </div>
+                                                        </button>
                                                     </div>
-                                                    <div className="flex justify-between items-center text-xs text-ink-500 dark:text-ink-400 mb-2">
-                                                        <span className="font-medium text-ink-700 dark:text-ink-200 flex items-center gap-1"><User size={12} /> #{req.patient_id}</span>
-                                                        <span className="font-mono text-2xs text-ink-400">#{req.request_id}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-xs">
-                                                        <span className={req.status === 'Pending' ? 'badge-warn' : 'badge-info'}>{req.status}</span>
-                                                        <span className="text-ink-400 flex items-center gap-1"><Clock size={10} /> {new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         )}
