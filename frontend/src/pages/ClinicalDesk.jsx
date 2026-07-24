@@ -13,6 +13,7 @@ import IcdDiagnosisPicker from '../components/IcdDiagnosisPicker';
 import ReferralModal from '../components/ReferralModal';
 import VitalsTrendsModal from '../components/VitalsTrendsModal';
 import PatientHistoryModal from '../components/PatientHistoryModal';
+import ClinicalExtrasPanel from '../components/ClinicalExtrasPanel';
 import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
 import { buildDiagnosisFields } from '../utils/diagnosisMapping';
 import { recordToFormState, splitComplaints } from '../utils/encounterResume';
@@ -346,6 +347,21 @@ export default function ClinicalDesk() {
     const updateMedication = (idx, field, value) =>
         setMedications((prev) => prev.map((m, i) => (i === idx ? { ...m, [field]: value } : m)));
     const removeMedication = (idx) => setMedications((prev) => prev.filter((_, i) => i !== idx));
+
+    // Apply a reusable order set at the point of care. Drug items pre-fill the
+    // medication rows; Lab/Radiology items are surfaced as a reminder to order
+    // them through the existing investigation modals.
+    const handleApplyOrderSet = (set) => {
+        const drugs = set.items.filter((i) => i.item_type === 'Drug');
+        const others = set.items.filter((i) => i.item_type !== 'Drug');
+        if (drugs.length) {
+            setMedications((prev) => [...prev, ...drugs.map((d) => ({ ...blankMed(), drug: d.name }))]);
+        }
+        toast.success(`Applied “${set.name}”${drugs.length ? ` · ${drugs.length} medication${drugs.length === 1 ? '' : 's'} added` : ''}`);
+        if (others.length) {
+            toast(`Still to order: ${others.map((o) => `${o.name} (${o.item_type})`).join(', ')}`, { icon: '📋', duration: 6000 });
+        }
+    };
 
     // Per-target validation. Returns an error message or null. We branch on
     // targetStatus so a doctor doesn't accidentally:
@@ -836,6 +852,10 @@ export default function ClinicalDesk() {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Doctor's-panel outputs: sick notes, optical Rx, external
+                                    requests, reusable order sets. */}
+                                <ClinicalExtrasPanel patient={activePatient} onApplyOrderSet={handleApplyOrderSet} />
 
                                 {/* Medications — structured, numbered rows routed to Pharmacy */}
                                 <div data-tour="clinical-prescriptions" className="rounded-xl border border-accent-200 dark:border-accent-500/20 bg-accent-50/40 dark:bg-accent-500/10 p-4">
