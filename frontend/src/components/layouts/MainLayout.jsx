@@ -288,7 +288,7 @@ export default function MainLayout() {
                 <main
                     id="main-content"
                     tabIndex={-1}
-                    className="flex-1 overflow-y-auto bg-ink-50 dark:bg-ink-950 p-4 sm:p-6 lg:p-8 custom-scrollbar"
+                    className="flex-1 overflow-y-auto bg-ink-50 dark:bg-ink-950 p-3 sm:p-4 lg:p-5 custom-scrollbar"
                 >
                     {/* Active-patient bar — pinned at the top of the main outlet so
                         every workspace page renders the patient context above its

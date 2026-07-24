@@ -551,7 +551,7 @@ export default function ClinicalDesk() {
     };
 
     return (
-        <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
+        <div className="flex flex-col gap-3 h-full md:h-[calc(100vh-6rem)] min-h-[calc(100vh-6rem)]">
             <PageHeader
                 eyebrow="Consultation"
                 icon={Stethoscope}
@@ -561,7 +561,7 @@ export default function ClinicalDesk() {
 
             {/* TOP PANEL: Collapsible Queue */}
             <div data-tour="clinical-queue" className="card shrink-0 flex flex-col z-20">
-                <div className="w-full p-4 flex justify-between items-center gap-3 bg-ink-50/60 dark:bg-ink-800/40 rounded-t-2xl">
+                <div className="w-full px-4 py-2.5 flex justify-between items-center gap-3 bg-ink-50/60 dark:bg-ink-800/40 rounded-t-2xl">
                     <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="flex items-center gap-3 min-w-0 hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded-lg">
                         <Users className="text-brand-600 dark:text-brand-400 shrink-0" size={18} />
                         <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Active Queue</h2>
@@ -597,7 +597,7 @@ export default function ClinicalDesk() {
                 </div>
 
                 {isQueueOpen && (
-                    <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
+                    <div className="border-t border-ink-100 dark:border-ink-800 p-3 bg-white dark:bg-ink-900 rounded-b-2xl">
                         {isLoadingQueue ? (
                             <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={22} /> Loading queue&hellip;</div>
                         ) : queue.length === 0 ? (

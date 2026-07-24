@@ -38,7 +38,7 @@ export default function ActivePatientBar() {
     return (
         <section
             aria-label="Active patient"
-            className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 mb-4 px-4 sm:px-6 lg:px-8 py-2.5 bg-brand-50/95 dark:bg-brand-500/10 border-b border-brand-200 dark:border-brand-500/20 backdrop-blur-md shadow-soft"
+            className="sticky top-0 z-20 -mx-3 sm:-mx-4 lg:-mx-5 mb-3 px-3 sm:px-4 lg:px-5 py-2.5 bg-brand-50/95 dark:bg-brand-500/10 border-b border-brand-200 dark:border-brand-500/20 backdrop-blur-md shadow-soft"
         >
             <div className="flex items-center gap-3 min-w-0">
                 {/* Avatar */}

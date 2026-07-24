@@ -66,11 +66,11 @@ export default function PageHeader({
     const t = tones[tone] || tones.brand;
 
     return (
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-6">
-            <div className="flex items-start gap-4 min-w-0">
+        <header className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between mb-3">
+            <div className="flex items-center gap-3 min-w-0">
                 {Icon && (
-                    <div className={`shrink-0 size-12 rounded-2xl flex items-center justify-center ring-1 ring-inset ${t.chip}`}>
-                        <Icon size={20} />
+                    <div className={`shrink-0 size-9 rounded-xl flex items-center justify-center ring-1 ring-inset ${t.chip}`}>
+                        <Icon size={17} />
                     </div>
                 )}
                 <div className="min-w-0">
@@ -79,13 +79,13 @@ export default function PageHeader({
                             {eyebrow}
                         </span>
                     )}
-                    <h1 className={`mt-0.5 text-xl sm:text-2xl font-semibold tracking-tight leading-tight ${
+                    <h1 className={`text-lg sm:text-xl font-semibold tracking-tight leading-tight ${
                         isDark ? 'text-white' : 'text-ink-900 dark:text-white'
                     }`}>
                         {title}
                     </h1>
                     {subtitle && (
-                        <p className={`mt-1 text-sm max-w-2xl leading-relaxed ${
+                        <p className={`text-xs sm:text-sm max-w-2xl leading-snug ${
                             isDark ? 'text-ink-400' : 'text-ink-500 dark:text-ink-400'
                         }`}>
                             {subtitle}
