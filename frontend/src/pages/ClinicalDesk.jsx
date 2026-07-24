@@ -14,10 +14,12 @@ import ReferralModal from '../components/ReferralModal';
 import VitalsTrendsModal from '../components/VitalsTrendsModal';
 import PatientHistoryModal from '../components/PatientHistoryModal';
 import ClinicalExtrasPanel from '../components/ClinicalExtrasPanel';
+import CarePathwaysPanel from '../components/CarePathwaysPanel';
 import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
 import { buildDiagnosisFields } from '../utils/diagnosisMapping';
 import { recordToFormState, splitComplaints } from '../utils/encounterResume';
 import { useActivePatient } from '../context/PatientContext';
+import { useAuth } from '../context/AuthContext';
 import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 
 // Prescription pick-lists — kept at module scope so the dropdowns are stable.
@@ -26,6 +28,8 @@ const FREQUENCIES = ["OD (once daily)", "BD (twice daily)", "TDS (three times da
 const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tablet', dosage: '', frequency: '', duration: '' });
 
 export default function ClinicalDesk() {
+    const { user } = useAuth();
+    const perms = useMemo(() => user?.permissions || [], [user?.permissions]);
     // --- DYNAMIC QUEUE STATE ---
     const [queue, setQueue] = useState([]);
     const [isLoadingQueue, setIsLoadingQueue] = useState(true);
@@ -856,6 +860,10 @@ export default function ClinicalDesk() {
                                 {/* Doctor's-panel outputs: sick notes, optical Rx, external
                                     requests, reusable order sets. */}
                                 <ClinicalExtrasPanel patient={activePatient} onApplyOrderSet={handleApplyOrderSet} />
+
+                                {/* Care pathways — request theatre / admit to a ward
+                                    (reuses the theatre & wards modules). */}
+                                <CarePathwaysPanel patient={activePatient} perms={perms} diagnosis={clinicalNotes.diagnosis} />
 
                                 {/* Medications — structured, numbered rows routed to Pharmacy */}
                                 <div data-tour="clinical-prescriptions" className="rounded-xl border border-accent-200 dark:border-accent-500/20 bg-accent-50/40 dark:bg-accent-500/10 p-4">
