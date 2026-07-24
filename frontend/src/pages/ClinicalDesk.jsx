@@ -4,7 +4,7 @@ import {
     Search, User, Activity, FileText, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable,
-    X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus, Trash2, Maximize2,
+    X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus, Trash2, Maximize2, Printer,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
@@ -17,6 +17,7 @@ import ClinicalExtrasPanel from '../components/ClinicalExtrasPanel';
 import CarePathwaysPanel from '../components/CarePathwaysPanel';
 import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
 import { buildDiagnosisFields } from '../utils/diagnosisMapping';
+import { printVisitSummary, printExaminationReport, printAllVisits } from '../utils/printReports';
 import { recordToFormState, splitComplaints } from '../utils/encounterResume';
 import { useActivePatient } from '../context/PatientContext';
 import { useAuth } from '../context/AuthContext';
@@ -365,6 +366,31 @@ export default function ClinicalDesk() {
         if (others.length) {
             toast(`Still to order: ${others.map((o) => `${o.name} (${o.item_type})`).join(', ')}`, { icon: '📋', duration: 6000 });
         }
+    };
+
+    // Snapshot the in-progress encounter for the printable reports.
+    const buildEncounterForPrint = () => ({
+        date: new Date(),
+        doctorName: user?.full_name,
+        vitals,
+        bmi: calculateBMI(),
+        complaints,
+        physicalExams,
+        hpi: clinicalNotes.hpi,
+        diagnosis: clinicalNotes.diagnosis,
+        icdCodes,
+        medications,
+        followUp: pendingFollowUp,
+    });
+
+    const handlePrintVisitSummary = () =>
+        printVisitSummary({ patient: activePatient, encounter: buildEncounterForPrint() });
+    const handlePrintExamination = () =>
+        printExaminationReport({ patient: activePatient, encounter: buildEncounterForPrint() });
+    const handlePrintAllVisits = () => {
+        apiClient.get(`/clinical/records/${activePatient.patient_id}`)
+            .then((r) => printAllVisits({ patient: activePatient, visits: r.data || [] }))
+            .catch(() => toast.error('Could not load visit history.'));
     };
 
     // Per-target validation. Returns an error message or null. We branch on
@@ -864,6 +890,16 @@ export default function ClinicalDesk() {
                                 {/* Care pathways — request theatre / admit to a ward
                                     (reuses the theatre & wards modules). */}
                                 <CarePathwaysPanel patient={activePatient} perms={perms} diagnosis={clinicalNotes.diagnosis} />
+
+                                {/* Printable reports over the current encounter / visit history. */}
+                                <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
+                                    <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><Printer size={13} /> Reports</h4>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button type="button" onClick={handlePrintVisitSummary} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Visit summary</button>
+                                        <button type="button" onClick={handlePrintExamination} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Examination</button>
+                                        <button type="button" onClick={handlePrintAllVisits} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> All visits</button>
+                                    </div>
+                                </div>
 
                                 {/* Medications — structured, numbered rows routed to Pharmacy */}
                                 <div data-tour="clinical-prescriptions" className="rounded-xl border border-accent-200 dark:border-accent-500/20 bg-accent-50/40 dark:bg-accent-500/10 p-4">
