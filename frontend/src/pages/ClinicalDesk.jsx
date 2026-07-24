@@ -725,7 +725,7 @@ export default function ClinicalDesk() {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
 
                             {/* Unfinished-encounter banner — offers to re-hydrate
                                 the form from the doctor's own Draft/Returned
@@ -778,12 +778,12 @@ export default function ClinicalDesk() {
                             )}
 
                             {/* Vitals Entry */}
-                            <div data-tour="clinical-vitals" className="card-flush p-5 border-l-4 border-l-brand-500">
+                            <div data-tour="clinical-vitals" className="card-flush p-6 border-l-4 border-l-brand-500">
                                 <div className="flex justify-between items-center mb-4 border-b border-ink-100 dark:border-ink-800 pb-3">
                                     <h3 className="section-eyebrow flex items-center gap-2"><Activity size={16} className="text-brand-500" /> Vital signs</h3>
                                     <button type="button" onClick={() => setIsTrendsOpen(true)} className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1"><Activity size={13} /> View trends</button>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+                                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
                                     <div><label htmlFor="clinic-bp-mmhg" className="label">BP (mmHg)</label><input id="clinic-bp-mmhg" type="text" value={vitals.bp} onChange={(e) => setVitals({...vitals, bp: e.target.value})} placeholder="120/80" className="input" /></div>
                                     <div><label htmlFor="clinic-hr-bpm" className="label">HR (bpm)</label><input id="clinic-hr-bpm" type="number" value={vitals.hr} onChange={(e) => setVitals({...vitals, hr: e.target.value})} placeholder="72" className="input" /></div>
                                     <div><label htmlFor="clinic-resp-bpm" className="label">Resp (bpm)</label><input id="clinic-resp-bpm" type="number" value={vitals.rr} onChange={(e) => setVitals({...vitals, rr: e.target.value})} placeholder="16" className="input" /></div>
@@ -797,7 +797,7 @@ export default function ClinicalDesk() {
                             </div>
 
                             {/* Clinical Documentation (SOAP) */}
-                            <div className="card-flush p-5 border-l-4 border-l-ink-700 space-y-4">
+                            <div className="card-flush p-6 border-l-4 border-l-ink-700 space-y-5">
                                 <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><FileText size={16} className="text-ink-600 dark:text-ink-400" /> Clinical documentation</h3>
                                 <div>
                                     <label htmlFor="clinic-chief-complaint-s-cc" className="label">Chief complaint(s) (CC)</label>
@@ -853,7 +853,7 @@ export default function ClinicalDesk() {
                             </div>
 
                             {/* Orders & Prescriptions */}
-                            <div data-tour="clinical-diagnoses" className="card-flush p-5 border-l-4 border-l-accent-500 space-y-4">
+                            <div data-tour="clinical-diagnoses" className="card-flush p-6 border-l-4 border-l-accent-500 space-y-5">
                                 <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><Pill size={16} className="text-accent-600 dark:text-accent-400" /> Diagnosis &amp; orders</h3>
 
                                 <IcdDiagnosisPicker codes={icdCodes} onChange={setIcdCodes} />
@@ -880,24 +880,6 @@ export default function ClinicalDesk() {
                                         >
                                             <ImageIcon size={13} aria-hidden="true" /> Order Imaging
                                         </button>
-                                    </div>
-                                </div>
-
-                                {/* Doctor's-panel outputs: sick notes, optical Rx, external
-                                    requests, reusable order sets. */}
-                                <ClinicalExtrasPanel patient={activePatient} onApplyOrderSet={handleApplyOrderSet} />
-
-                                {/* Care pathways — request theatre / admit to a ward
-                                    (reuses the theatre & wards modules). */}
-                                <CarePathwaysPanel patient={activePatient} perms={perms} diagnosis={clinicalNotes.diagnosis} />
-
-                                {/* Printable reports over the current encounter / visit history. */}
-                                <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
-                                    <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><Printer size={13} /> Reports</h4>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <button type="button" onClick={handlePrintVisitSummary} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Visit summary</button>
-                                        <button type="button" onClick={handlePrintExamination} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Examination</button>
-                                        <button type="button" onClick={handlePrintAllVisits} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> All visits</button>
                                     </div>
                                 </div>
 
@@ -1003,6 +985,22 @@ export default function ClinicalDesk() {
                                         </button>
                                     </div>
                                 </label>
+                            </div>
+
+                            {/* Ancillary actions — documents, care pathways and reports laid
+                                out as side-by-side tiles so they use the workspace width
+                                instead of stacking, keeping the encounter column airy. */}
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 items-start">
+                                <ClinicalExtrasPanel patient={activePatient} onApplyOrderSet={handleApplyOrderSet} />
+                                <CarePathwaysPanel patient={activePatient} perms={perms} diagnosis={clinicalNotes.diagnosis} />
+                                <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
+                                    <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><Printer size={13} /> Reports</h4>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button type="button" onClick={handlePrintVisitSummary} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Visit summary</button>
+                                        <button type="button" onClick={handlePrintExamination} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Examination</button>
+                                        <button type="button" onClick={handlePrintAllVisits} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> All visits</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
