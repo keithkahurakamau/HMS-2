@@ -665,6 +665,7 @@ export default function ClinicalDesk() {
                                     { icon: Scissors,  label: 'Surgical Hx',   entry_type: 'SURGICAL_HISTORY' },
                                     { icon: Cigarette, label: 'Social Hx',     entry_type: 'SOCIAL_HISTORY' },
                                     { icon: Dna,       label: 'Family Hx',     entry_type: 'FAMILY_HISTORY' },
+                                    { icon: Receipt,   label: 'Economic Hx',   entry_type: 'ECONOMIC_HISTORY' },
                                     { icon: Syringe,   label: 'Immunizations', entry_type: 'IMMUNIZATION' },
                                 ].map(({ icon: Icon, label, entry_type }) => (
                                     <button type="button"
