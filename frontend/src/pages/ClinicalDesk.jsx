@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
+import PatientSearch from '../components/PatientSearch';
 import IcdDiagnosisPicker from '../components/IcdDiagnosisPicker';
 import ReferralModal from '../components/ReferralModal';
 import VitalsTrendsModal from '../components/VitalsTrendsModal';
@@ -533,6 +534,20 @@ export default function ClinicalDesk() {
                             <span className="hidden sm:inline">End clinic day</span>
                         </button>
                     )}
+                </div>
+
+                <div className="border-t border-ink-100 dark:border-ink-800 p-3">
+                    <PatientSearch
+                        placeholder="Search any patient by name, ID, OP No or phone…"
+                        onSelect={(p) => {
+                            if (!p) return;
+                            handlePatientSelect({
+                                patient_id: p.patient_id,
+                                patient_name: `${p.surname}, ${p.other_names}`,
+                                outpatient_no: p.outpatient_no,
+                            });
+                        }}
+                    />
                 </div>
 
                 {isQueueOpen && (
