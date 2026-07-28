@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Droplets } from 'lucide-react';
 import { listOrders, getOrder } from './api';
 import { errorText } from './errors';
+import Worklist from '../../components/Worklist';
 import OrderForm from './OrderForm';
 import SessionBoard from './SessionBoard';
 
-const STATUSES = ['', 'Ordered', 'Connected', 'Disconnected', 'Completed', 'Cancelled'];
+const STATUSES = ['Ordered', 'Connected', 'Disconnected', 'Completed', 'Cancelled'];
 
 const CHIP = {
   Ordered: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
@@ -14,9 +16,14 @@ const CHIP = {
   Cancelled: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
 };
 
+const shortTime = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
 export default function OrdersTab() {
   const [orders, setOrders] = useState([]);
-  const [status, setStatus] = useState('');
   const [selected, setSelected] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [error, setError] = useState('');
@@ -24,76 +31,55 @@ export default function OrdersTab() {
   const load = useCallback(() => {
     // Promise-chain (not async/await) so the effect calling load() has no
     // setState in its synchronous path — matches the maternity tabs' convention.
-    listOrders(status ? { status } : {})
+    listOrders({})
       .then((rows) => { setOrders(rows || []); setError(''); })
       .catch((err) => setError(errorText(err, 'Failed to load dialysis sessions')));
-  }, [status]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const openOrder = async (id) => {
-    try {
-      setSelected(await getOrder(id));
-    } catch (err) {
-      setError(errorText(err, 'Failed to open session'));
-    }
+  const openOrder = (row) => {
+    getOrder(row.order_id)
+      .then(setSelected)
+      .catch((err) => setError(errorText(err, 'Failed to open session')));
   };
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="text-sm text-ink-700 dark:text-ink-300">
-          Status
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="input ml-2">
-            {STATUSES.map((s) => <option key={s} value={s}>{s || 'All'}</option>)}
-          </select>
-        </label>
-        <button type="button" onClick={() => setShowNew(true)}
-                className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">
-          New session
-        </button>
-      </div>
-      {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
-        <div className="overflow-hidden rounded-xl border border-ink-200/70 dark:border-ink-800">
-          {orders.length === 0 ? (
-            <p className="p-6 text-center text-sm text-ink-500 dark:text-ink-400">No sessions.</p>
-          ) : (
-            <ul className="divide-y divide-ink-100 dark:divide-ink-800">
-              {orders.map((o) => (
-                <li key={o.order_id}>
-                  <button type="button" onClick={() => openOrder(o.order_id)}
-                          className={`flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-ink-50 dark:hover:bg-ink-800/40 ${
-                            selected?.order_id === o.order_id ? 'bg-brand-50 dark:bg-brand-900/20' : ''
-                          }`}>
-                    <span>
-                      <span className="block text-sm font-medium text-ink-900 dark:text-white">
-                        {o.patient_name || `Patient #${o.patient_id}`}
-                      </span>
-                      <span className="block text-xs text-ink-500 dark:text-ink-400">Treatment #{o.treatment_no}</span>
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CHIP[o.status] || ''}`}>{o.status}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-ink-200/70 dark:border-ink-800 p-4">
-          {selected ? (
-            <SessionBoard order={selected} onChanged={(updated) => { setSelected(updated); load(); }} />
-          ) : (
-            <p className="py-12 text-center text-sm text-ink-500 dark:text-ink-400">Select a session to view its board.</p>
-          )}
-        </div>
-      </div>
+    <>
+      <Worklist
+        items={orders}
+        statuses={STATUSES}
+        chipClass={CHIP}
+        getKey={(o) => o.order_id}
+        getStatus={(o) => o.status}
+        primary={(o) => o.patient_name || `Patient #${o.patient_id}`}
+        secondary={(o) => `Treatment #${o.treatment_no}`}
+        meta={(o) => shortTime(o.scheduled_at)}
+        searchText={(o) => `${o.patient_name || ''} treatment ${o.treatment_no || ''}`}
+        selectedKey={selected?.order_id}
+        onSelect={openOrder}
+        onNew={() => setShowNew(true)}
+        newLabel="New session"
+        searchPlaceholder="Search sessions by patient…"
+        emptyTitle="No dialysis sessions yet."
+        emptyHint="Start one with “New session”."
+        error={error}
+      >
+        {selected ? (
+          <SessionBoard order={selected} onChanged={(updated) => { setSelected(updated); load(); }} />
+        ) : (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <Droplets size={30} className="text-ink-300 dark:text-ink-600" strokeWidth={1.5} />
+            <p className="text-sm font-medium text-ink-600 dark:text-ink-300">Select a session to open its board</p>
+            <p className="text-xs text-ink-500 dark:text-ink-400">Safety checklist, observations and adequacy (Kt/V) live here.</p>
+          </div>
+        )}
+      </Worklist>
 
       {showNew && (
         <OrderForm onClose={() => setShowNew(false)}
                    onSaved={(created) => { setShowNew(false); setSelected(created); load(); }} />
       )}
-    </div>
+    </>
   );
 }

@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Scissors } from 'lucide-react';
 import { listCases, getCase } from './api';
 import { errorText } from './errors';
+import Worklist from '../../components/Worklist';
 import CaseForm from './CaseForm';
 import CaseBoard from './CaseBoard';
 
-const STATUSES = ['', 'Scheduled', 'InTheatre', 'Recovery', 'Completed', 'Cancelled'];
+const STATUSES = ['Scheduled', 'InTheatre', 'Recovery', 'Completed', 'Cancelled'];
+const STATUS_LABELS = { InTheatre: 'In theatre' };
 
 const CHIP = {
   Scheduled: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
@@ -14,80 +17,72 @@ const CHIP = {
   Cancelled: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
 };
 
+const shortTime = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+const caseMeta = (c) => {
+  if (c.priority === 'Emergency') return <span className="font-semibold text-rose-600 dark:text-rose-400">Emergency</span>;
+  return shortTime(c.scheduled_at);
+};
+
 export default function CasesTab() {
   const [cases, setCases] = useState([]);
-  const [status, setStatus] = useState('');
   const [selected, setSelected] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(() => {
-    listCases(status ? { status } : {})
+    listCases({})
       .then((rows) => { setCases(rows || []); setError(''); })
       .catch((err) => setError(errorText(err, 'Failed to load cases')));
-  }, [status]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const openCase = (id) => {
-    getCase(id).then(setSelected).catch((err) => setError(errorText(err, 'Failed to open case')));
+  const openCase = (row) => {
+    getCase(row.case_id).then(setSelected).catch((err) => setError(errorText(err, 'Failed to open case')));
   };
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="text-sm text-ink-700 dark:text-ink-300">
-          Status
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="input ml-2">
-            {STATUSES.map((s) => <option key={s} value={s}>{s || 'All'}</option>)}
-          </select>
-        </label>
-        <button type="button" onClick={() => setShowNew(true)}
-                className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">
-          New case
-        </button>
-      </div>
-      {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
-        <div className="overflow-hidden rounded-xl border border-ink-200/70 dark:border-ink-800">
-          {cases.length === 0 ? (
-            <p className="p-6 text-center text-sm text-ink-500 dark:text-ink-400">No cases.</p>
-          ) : (
-            <ul className="divide-y divide-ink-100 dark:divide-ink-800">
-              {cases.map((c) => (
-                <li key={c.case_id}>
-                  <button type="button" onClick={() => openCase(c.case_id)}
-                          className={`flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-ink-50 dark:hover:bg-ink-800/40 ${
-                            selected?.case_id === c.case_id ? 'bg-brand-50 dark:bg-brand-900/20' : ''
-                          }`}>
-                    <span>
-                      <span className="block text-sm font-medium text-ink-900 dark:text-white">
-                        {c.patient_name || `Patient #${c.patient_id}`}
-                      </span>
-                      <span className="block text-xs text-ink-500 dark:text-ink-400">{c.procedure_name}</span>
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CHIP[c.status] || ''}`}>{c.status}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-ink-200/70 dark:border-ink-800 p-4">
-          {selected ? (
-            <CaseBoard caseObj={selected} onChanged={(updated) => { setSelected(updated); load(); }} />
-          ) : (
-            <p className="py-12 text-center text-sm text-ink-500 dark:text-ink-400">Select a case to view its board.</p>
-          )}
-        </div>
-      </div>
+    <>
+      <Worklist
+        items={cases}
+        statuses={STATUSES}
+        statusLabels={STATUS_LABELS}
+        chipClass={CHIP}
+        getKey={(c) => c.case_id}
+        getStatus={(c) => c.status}
+        primary={(c) => c.patient_name || `Patient #${c.patient_id}`}
+        secondary={(c) => c.procedure_name}
+        meta={caseMeta}
+        searchText={(c) => `${c.patient_name || ''} ${c.procedure_name || ''}`}
+        selectedKey={selected?.case_id}
+        onSelect={openCase}
+        onNew={() => setShowNew(true)}
+        newLabel="New case"
+        searchPlaceholder="Search cases by patient or procedure…"
+        emptyTitle="No surgical cases yet."
+        emptyHint="Book one with “New case”, or send a request from the Clinical Desk."
+        error={error}
+      >
+        {selected ? (
+          <CaseBoard caseObj={selected} onChanged={(updated) => { setSelected(updated); load(); }} />
+        ) : (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <Scissors size={30} className="text-ink-300 dark:text-ink-600" strokeWidth={1.5} />
+            <p className="text-sm font-medium text-ink-600 dark:text-ink-300">Select a case to open its board</p>
+            <p className="text-xs text-ink-500 dark:text-ink-400">Checklists, operative note, anaesthesia and billing live here.</p>
+          </div>
+        )}
+      </Worklist>
 
       {showNew && (
         <CaseForm onClose={() => setShowNew(false)}
                   onSaved={(created) => { setShowNew(false); setSelected(created); load(); }} />
       )}
-    </div>
+    </>
   );
 }

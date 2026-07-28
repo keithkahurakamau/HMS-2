@@ -34,11 +34,22 @@ describe('CasesTab', () => {
     expect(await screen.findByRole('region', { name: /case detail/i })).toBeInTheDocument();
   });
 
-  it('reloads with a status filter', async () => {
+  it('filters the list client-side via status chips', async () => {
     const user = userEvent.setup();
     render(<CasesTab />);
     await screen.findByText(/Otieno, Sam/);
-    await user.selectOptions(screen.getByRole('combobox'), 'Completed');
-    await waitFor(() => expect(api.listCases).toHaveBeenCalledWith({ status: 'Completed' }));
+    // The one Scheduled case shows under "All"; switching to "Completed" hides it
+    // without a per-filter server round-trip.
+    await user.click(screen.getByRole('button', { name: /^Completed/i }));
+    await waitFor(() => expect(screen.queryByText(/Otieno, Sam/)).not.toBeInTheDocument());
+    expect(api.listCases).toHaveBeenCalledWith({});
+  });
+
+  it('filters the list by search query', async () => {
+    const user = userEvent.setup();
+    render(<CasesTab />);
+    await screen.findByText(/Otieno, Sam/);
+    await user.type(screen.getByRole('searchbox'), 'zzz-no-match');
+    await waitFor(() => expect(screen.queryByText(/Otieno, Sam/)).not.toBeInTheDocument());
   });
 });
