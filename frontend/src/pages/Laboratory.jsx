@@ -9,7 +9,6 @@ import {
 import toast from 'react-hot-toast';
 import { printLabReport } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
-import DepartmentQueue from '../components/DepartmentQueue';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Laboratory                                                                */
@@ -50,7 +49,6 @@ export default function Laboratory() {
     // ── Domain state ───────────────────────────────────────────────────────
     const [catalog, setCatalog] = useState([]);
     const [queue, setQueue] = useState([]);
-    const [routedCount, setRoutedCount] = useState(0);
     const [labInventory, setLabInventory] = useState([]);
 
     // ── Workspace state ────────────────────────────────────────────────────
@@ -310,24 +308,19 @@ export default function Laboratory() {
                             <div className="flex items-center gap-3">
                                 <TestTube className="text-brand-600" size={18} />
                                 <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Laboratory Queue</h2>
-                                <span className="badge-brand">{queue.length + routedCount} Waiting</span>
+                                <span className="badge-brand">{queue.length} Waiting</span>
                             </div>
                             <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                         </button>
 
                         {isQueueOpen && (
                             <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
-                                {/* Stage 1 — patients routed here from triage (awaiting an order). */}
-                                <DepartmentQueue department="Laboratory" inline onCount={setRoutedCount} />
                                 {isLoading ? (
                                     <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Syncing orders…</div>
                                 ) : queue.length === 0 ? (
                                     <div className="text-center py-6 text-ink-400">No tests awaiting processing.</div>
                                 ) : (
-                                    <>
-                                        {/* Stage 2 — tests ordered and awaiting processing. */}
-                                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 mb-2 flex items-center gap-1.5"><TestTube size={12} /> Awaiting processing &middot; {queue.length}</p>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                             {queue.map((order) => {
                                                 const active = activeTest?.test_id === order.test_id;
                                                 return (
@@ -354,8 +347,7 @@ export default function Laboratory() {
                                                     </div>
                                                 );
                                             })}
-                                        </div>
-                                    </>
+                                    </div>
                                 )}
                             </div>
                         )}

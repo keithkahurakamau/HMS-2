@@ -9,7 +9,6 @@ import {
 import toast from 'react-hot-toast';
 import { printRadiologyReport } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
-import DepartmentQueue from '../components/DepartmentQueue';
 
 const EMPTY_CATALOG = {
     exam_name: '', modality: 'X-Ray', body_part: '', description: '',
@@ -24,7 +23,6 @@ export default function Radiology() {
     const [isLoading, setIsLoading] = useState(true);
 
     const [queue, setQueue] = useState([]);
-    const [routedCount, setRoutedCount] = useState(0);
     const [catalog, setCatalog] = useState([]);
     const [activeRequest, setActiveRequest] = useState(null);
 
@@ -182,24 +180,19 @@ export default function Radiology() {
                             <div className="flex items-center gap-3">
                                 <Activity className="text-brand-600" size={18} />
                                 <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Radiology Queue</h2>
-                                <span className="badge-brand">{queue.length + routedCount} Waiting</span>
+                                <span className="badge-brand">{queue.length} Waiting</span>
                             </div>
                             <span className="text-ink-500 dark:text-ink-400">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                         </button>
 
                         {isQueueOpen && (
                             <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
-                                {/* Stage 1 — patients routed here from triage (awaiting a request). */}
-                                <DepartmentQueue department="Radiology" inline onCount={setRoutedCount} />
                                 {isLoading ? (
                                     <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Syncing queue…</div>
                                 ) : queue.length === 0 ? (
                                     <div className="text-center py-6 text-ink-400">No requests awaiting reading.</div>
                                 ) : (
-                                    <>
-                                        {/* Stage 2 — imaging requests awaiting reading. */}
-                                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 mb-2 flex items-center gap-1.5"><Activity size={12} /> Awaiting reading &middot; {queue.length}</p>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                             {queue.map((req) => {
                                                 const active = activeRequest?.request_id === req.request_id;
                                                 return (
@@ -226,8 +219,7 @@ export default function Radiology() {
                                                     </div>
                                                 );
                                             })}
-                                        </div>
-                                    </>
+                                    </div>
                                 )}
                             </div>
                         )}

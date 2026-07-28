@@ -9,7 +9,6 @@ import {
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
-import DepartmentQueue from '../components/DepartmentQueue';
 import MpesaStkProgress from '../components/MpesaStkProgress';
 import usePaymentSocket from '../hooks/usePaymentSocket';
 
@@ -24,7 +23,6 @@ export default function Pharmacy() {
 
     // --- RX FULFILLMENT STATE (DYNAMIC) ---
     const [queue, setQueue] = useState([]);
-    const [routedCount, setRoutedCount] = useState(0);
     const [isLoadingQueue, setIsLoadingQueue] = useState(true);
     const [activeOrder, setActiveOrder] = useState(null);
     const [isQueueOpen, setIsQueueOpen] = useState(true);
@@ -309,15 +307,13 @@ export default function Pharmacy() {
                             <div className="flex items-center gap-3">
                                 <Package className="text-brand-600" size={18} />
                                 <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Pharmacy Queue</h2>
-                                <span className="badge-warn">{queue.length + routedCount} Waiting</span>
+                                <span className="badge-warn">{queue.length} Waiting</span>
                             </div>
                             <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                         </button>
 
                         {isQueueOpen && (
                             <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
-                                {/* Stage 1 — patients routed here from triage. */}
-                                <DepartmentQueue department="Pharmacy" inline onChange={fetchRxQueue} onCount={setRoutedCount} />
                                 {isLoadingQueue ? (
                                     <div className="text-center py-8 text-ink-400">
                                         <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} />
@@ -326,10 +322,7 @@ export default function Pharmacy() {
                                 ) : queue.length === 0 ? (
                                     <div className="text-center py-8 text-ink-400">No prescriptions awaiting dispensing.</div>
                                 ) : (
-                                    <>
-                                        {/* Stage 2 — prescriptions awaiting dispensing. */}
-                                        <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 mb-2 flex items-center gap-1.5"><Package size={12} /> Awaiting dispensing &middot; {queue.length}</p>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                             {queue.map((order) => {
                                                 const active = activeOrder?.id === order.id;
                                                 return (
@@ -355,8 +348,7 @@ export default function Pharmacy() {
                                                     </div>
                                                 );
                                             })}
-                                        </div>
-                                    </>
+                                    </div>
                                 )}
                             </div>
                         )}
