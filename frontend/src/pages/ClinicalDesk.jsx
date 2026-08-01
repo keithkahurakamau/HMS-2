@@ -4,18 +4,23 @@ import {
     Search, User, Activity, FileText, Pill, CheckCircle2, AlertCircle, Clock,
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable,
-    X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus, Trash2, Maximize2,
+    X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus, Trash2, Maximize2, Printer,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
+import PatientSearch from '../components/PatientSearch';
 import IcdDiagnosisPicker from '../components/IcdDiagnosisPicker';
 import ReferralModal from '../components/ReferralModal';
 import VitalsTrendsModal from '../components/VitalsTrendsModal';
 import PatientHistoryModal from '../components/PatientHistoryModal';
+import ClinicalExtrasPanel from '../components/ClinicalExtrasPanel';
+import CarePathwaysPanel from '../components/CarePathwaysPanel';
 import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
 import { buildDiagnosisFields } from '../utils/diagnosisMapping';
+import { printVisitSummary, printExaminationReport, printAllVisits } from '../utils/printReports';
 import { recordToFormState, splitComplaints } from '../utils/encounterResume';
 import { useActivePatient } from '../context/PatientContext';
+import { useAuth } from '../context/AuthContext';
 import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 
 // Prescription pick-lists — kept at module scope so the dropdowns are stable.
@@ -24,6 +29,8 @@ const FREQUENCIES = ["OD (once daily)", "BD (twice daily)", "TDS (three times da
 const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tablet', dosage: '', frequency: '', duration: '' });
 
 export default function ClinicalDesk() {
+    const { user } = useAuth();
+    const perms = useMemo(() => user?.permissions || [], [user?.permissions]);
     // --- DYNAMIC QUEUE STATE ---
     const [queue, setQueue] = useState([]);
     const [isLoadingQueue, setIsLoadingQueue] = useState(true);
@@ -346,6 +353,46 @@ export default function ClinicalDesk() {
         setMedications((prev) => prev.map((m, i) => (i === idx ? { ...m, [field]: value } : m)));
     const removeMedication = (idx) => setMedications((prev) => prev.filter((_, i) => i !== idx));
 
+    // Apply a reusable order set at the point of care. Drug items pre-fill the
+    // medication rows; Lab/Radiology items are surfaced as a reminder to order
+    // them through the existing investigation modals.
+    const handleApplyOrderSet = (set) => {
+        const drugs = set.items.filter((i) => i.item_type === 'Drug');
+        const others = set.items.filter((i) => i.item_type !== 'Drug');
+        if (drugs.length) {
+            setMedications((prev) => [...prev, ...drugs.map((d) => ({ ...blankMed(), drug: d.name }))]);
+        }
+        toast.success(`Applied “${set.name}”${drugs.length ? ` · ${drugs.length} medication${drugs.length === 1 ? '' : 's'} added` : ''}`);
+        if (others.length) {
+            toast(`Still to order: ${others.map((o) => `${o.name} (${o.item_type})`).join(', ')}`, { icon: '📋', duration: 6000 });
+        }
+    };
+
+    // Snapshot the in-progress encounter for the printable reports.
+    const buildEncounterForPrint = () => ({
+        date: new Date(),
+        doctorName: user?.full_name,
+        vitals,
+        bmi: calculateBMI(),
+        complaints,
+        physicalExams,
+        hpi: clinicalNotes.hpi,
+        diagnosis: clinicalNotes.diagnosis,
+        icdCodes,
+        medications,
+        followUp: pendingFollowUp,
+    });
+
+    const handlePrintVisitSummary = () =>
+        printVisitSummary({ patient: activePatient, encounter: buildEncounterForPrint() });
+    const handlePrintExamination = () =>
+        printExaminationReport({ patient: activePatient, encounter: buildEncounterForPrint() });
+    const handlePrintAllVisits = () => {
+        apiClient.get(`/clinical/records/${activePatient.patient_id}`)
+            .then((r) => printAllVisits({ patient: activePatient, visits: r.data || [] }))
+            .catch(() => toast.error('Could not load visit history.'));
+    };
+
     // Per-target validation. Returns an error message or null. We branch on
     // targetStatus so a doctor doesn't accidentally:
     //   - finalize an empty encounter (no diagnosis / no chief complaint)
@@ -504,7 +551,7 @@ export default function ClinicalDesk() {
     };
 
     return (
-        <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
+        <div className="flex flex-col gap-3 h-full md:h-[calc(100vh-6rem)] min-h-[calc(100vh-6rem)]">
             <PageHeader
                 eyebrow="Consultation"
                 icon={Stethoscope}
@@ -514,7 +561,7 @@ export default function ClinicalDesk() {
 
             {/* TOP PANEL: Collapsible Queue */}
             <div data-tour="clinical-queue" className="card shrink-0 flex flex-col z-20">
-                <div className="w-full p-4 flex justify-between items-center gap-3 bg-ink-50/60 dark:bg-ink-800/40 rounded-t-2xl">
+                <div className="w-full px-4 py-2.5 flex justify-between items-center gap-3 bg-ink-50/60 dark:bg-ink-800/40 rounded-t-2xl">
                     <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="flex items-center gap-3 min-w-0 hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded-lg">
                         <Users className="text-brand-600 dark:text-brand-400 shrink-0" size={18} />
                         <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Active Queue</h2>
@@ -535,8 +582,22 @@ export default function ClinicalDesk() {
                     )}
                 </div>
 
+                <div className="border-t border-ink-100 dark:border-ink-800 p-3">
+                    <PatientSearch
+                        placeholder="Search any patient by name, ID, OP No or phone…"
+                        onSelect={(p) => {
+                            if (!p) return;
+                            handlePatientSelect({
+                                patient_id: p.patient_id,
+                                patient_name: `${p.surname}, ${p.other_names}`,
+                                outpatient_no: p.outpatient_no,
+                            });
+                        }}
+                    />
+                </div>
+
                 {isQueueOpen && (
-                    <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
+                    <div className="border-t border-ink-100 dark:border-ink-800 p-3 bg-white dark:bg-ink-900 rounded-b-2xl">
                         {isLoadingQueue ? (
                             <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={22} /> Loading queue&hellip;</div>
                         ) : queue.length === 0 ? (
@@ -650,6 +711,7 @@ export default function ClinicalDesk() {
                                     { icon: Scissors,  label: 'Surgical Hx',   entry_type: 'SURGICAL_HISTORY' },
                                     { icon: Cigarette, label: 'Social Hx',     entry_type: 'SOCIAL_HISTORY' },
                                     { icon: Dna,       label: 'Family Hx',     entry_type: 'FAMILY_HISTORY' },
+                                    { icon: Receipt,   label: 'Economic Hx',   entry_type: 'ECONOMIC_HISTORY' },
                                     { icon: Syringe,   label: 'Immunizations', entry_type: 'IMMUNIZATION' },
                                 ].map(({ icon: Icon, label, entry_type }) => (
                                     <button type="button"
@@ -663,7 +725,7 @@ export default function ClinicalDesk() {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
 
                             {/* Unfinished-encounter banner — offers to re-hydrate
                                 the form from the doctor's own Draft/Returned
@@ -716,12 +778,12 @@ export default function ClinicalDesk() {
                             )}
 
                             {/* Vitals Entry */}
-                            <div data-tour="clinical-vitals" className="card-flush p-5 border-l-4 border-l-brand-500">
+                            <div data-tour="clinical-vitals" className="card-flush p-6 border-l-4 border-l-brand-500">
                                 <div className="flex justify-between items-center mb-4 border-b border-ink-100 dark:border-ink-800 pb-3">
                                     <h3 className="section-eyebrow flex items-center gap-2"><Activity size={16} className="text-brand-500" /> Vital signs</h3>
                                     <button type="button" onClick={() => setIsTrendsOpen(true)} className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1"><Activity size={13} /> View trends</button>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+                                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
                                     <div><label htmlFor="clinic-bp-mmhg" className="label">BP (mmHg)</label><input id="clinic-bp-mmhg" type="text" value={vitals.bp} onChange={(e) => setVitals({...vitals, bp: e.target.value})} placeholder="120/80" className="input" /></div>
                                     <div><label htmlFor="clinic-hr-bpm" className="label">HR (bpm)</label><input id="clinic-hr-bpm" type="number" value={vitals.hr} onChange={(e) => setVitals({...vitals, hr: e.target.value})} placeholder="72" className="input" /></div>
                                     <div><label htmlFor="clinic-resp-bpm" className="label">Resp (bpm)</label><input id="clinic-resp-bpm" type="number" value={vitals.rr} onChange={(e) => setVitals({...vitals, rr: e.target.value})} placeholder="16" className="input" /></div>
@@ -735,7 +797,7 @@ export default function ClinicalDesk() {
                             </div>
 
                             {/* Clinical Documentation (SOAP) */}
-                            <div className="card-flush p-5 border-l-4 border-l-ink-700 space-y-4">
+                            <div className="card-flush p-6 border-l-4 border-l-ink-700 space-y-5">
                                 <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><FileText size={16} className="text-ink-600 dark:text-ink-400" /> Clinical documentation</h3>
                                 <div>
                                     <label htmlFor="clinic-chief-complaint-s-cc" className="label">Chief complaint(s) (CC)</label>
@@ -791,7 +853,7 @@ export default function ClinicalDesk() {
                             </div>
 
                             {/* Orders & Prescriptions */}
-                            <div data-tour="clinical-diagnoses" className="card-flush p-5 border-l-4 border-l-accent-500 space-y-4">
+                            <div data-tour="clinical-diagnoses" className="card-flush p-6 border-l-4 border-l-accent-500 space-y-5">
                                 <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><Pill size={16} className="text-accent-600 dark:text-accent-400" /> Diagnosis &amp; orders</h3>
 
                                 <IcdDiagnosisPicker codes={icdCodes} onChange={setIcdCodes} />
@@ -923,6 +985,22 @@ export default function ClinicalDesk() {
                                         </button>
                                     </div>
                                 </label>
+                            </div>
+
+                            {/* Ancillary actions — documents, care pathways and reports laid
+                                out as side-by-side tiles so they use the workspace width
+                                instead of stacking, keeping the encounter column airy. */}
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 items-start">
+                                <ClinicalExtrasPanel patient={activePatient} onApplyOrderSet={handleApplyOrderSet} />
+                                <CarePathwaysPanel patient={activePatient} perms={perms} diagnosis={clinicalNotes.diagnosis} />
+                                <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
+                                    <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><Printer size={13} /> Reports</h4>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button type="button" onClick={handlePrintVisitSummary} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Visit summary</button>
+                                        <button type="button" onClick={handlePrintExamination} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Examination</button>
+                                        <button type="button" onClick={handlePrintAllVisits} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> All visits</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

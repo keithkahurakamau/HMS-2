@@ -185,7 +185,7 @@ export default function Triage() {
     };
 
     return (
-        <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
+        <div className="flex flex-col gap-3 h-full md:h-[calc(100vh-6rem)] min-h-[calc(100vh-6rem)]">
             <PageHeader
                 eyebrow="Nursing"
                 icon={HeartPulse}
@@ -195,7 +195,7 @@ export default function Triage() {
 
             {/* Triage queue */}
             <div data-tour="triage-queue" className="card shrink-0 flex flex-col z-20">
-                <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 dark:bg-ink-800/40 hover:bg-brand-50/40 dark:hover:bg-ink-800/50 transition-colors rounded-t-2xl focus:outline-none">
+                <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full px-4 py-2.5 flex justify-between items-center bg-ink-50/60 dark:bg-ink-800/40 hover:bg-brand-50/40 dark:hover:bg-ink-800/50 transition-colors rounded-t-2xl focus:outline-none">
                     <div className="flex items-center gap-3">
                         <Users className="text-brand-600" size={18} />
                         <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Awaiting Triage</h2>
@@ -205,7 +205,7 @@ export default function Triage() {
                 </button>
 
                 {isQueueOpen && (
-                    <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
+                    <div className="border-t border-ink-100 dark:border-ink-800 p-3 bg-white dark:bg-ink-900 rounded-b-2xl">
                         {isLoadingQueue ? (
                             <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={22} /> Loading queue&hellip;</div>
                         ) : queue.length === 0 ? (

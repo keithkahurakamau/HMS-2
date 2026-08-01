@@ -33,11 +33,20 @@ describe('OrdersTab', () => {
     expect(await screen.findByRole('region', { name: /session detail/i })).toBeInTheDocument();
   });
 
-  it('reloads with a status filter', async () => {
+  it('filters the list client-side via status chips', async () => {
     const user = userEvent.setup();
     render(<OrdersTab />);
     await screen.findByText(/Otieno, Sam/);
-    await user.selectOptions(screen.getByRole('combobox'), 'Completed');
-    await waitFor(() => expect(api.listOrders).toHaveBeenCalledWith({ status: 'Completed' }));
+    await user.click(screen.getByRole('button', { name: /^Completed/i }));
+    await waitFor(() => expect(screen.queryByText(/Otieno, Sam/)).not.toBeInTheDocument());
+    expect(api.listOrders).toHaveBeenCalledWith({});
+  });
+
+  it('filters the list by search query', async () => {
+    const user = userEvent.setup();
+    render(<OrdersTab />);
+    await screen.findByText(/Otieno, Sam/);
+    await user.type(screen.getByRole('searchbox'), 'zzz-no-match');
+    await waitFor(() => expect(screen.queryByText(/Otieno, Sam/)).not.toBeInTheDocument());
   });
 });
