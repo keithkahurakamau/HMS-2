@@ -5,7 +5,9 @@ import {
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable,
     X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus, Trash2, Maximize2, Printer,
+    BedDouble, CalendarDays, UserPlus, Paperclip, ClipboardList,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
 import PatientSearch from '../components/PatientSearch';
@@ -16,6 +18,17 @@ import PatientHistoryModal from '../components/PatientHistoryModal';
 import ClinicalExtrasPanel from '../components/ClinicalExtrasPanel';
 import CarePathwaysPanel from '../components/CarePathwaysPanel';
 import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
+import PatientDetailsHeader from './clinical/PatientDetailsHeader';
+import EncounterNotesTab from './clinical/EncounterNotesTab';
+import PatientHistoryTab from './clinical/PatientHistoryTab';
+import ActionsMenu from './clinical/ActionsMenu';
+import FilesModal from './clinical/modals/FilesModal';
+import VitalsModal from './clinical/modals/VitalsModal';
+import PrescriptionModal from './clinical/modals/PrescriptionModal';
+import AssessPlanModal from './clinical/modals/AssessPlanModal';
+import QueuePatientModal from './clinical/modals/QueuePatientModal';
+import MyAppointmentsModal from './clinical/modals/MyAppointmentsModal';
+import PickAdmissionModal from './clinical/modals/PickAdmissionModal';
 import { buildDiagnosisFields } from '../utils/diagnosisMapping';
 import { printVisitSummary, printExaminationReport, printAllVisits } from '../utils/printReports';
 import { recordToFormState, splitComplaints } from '../utils/encounterResume';
@@ -30,14 +43,24 @@ const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tab
 
 export default function ClinicalDesk() {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const perms = useMemo(() => user?.permissions || [], [user?.permissions]);
+    const hasPerm = (p) => perms.includes(p);
     // --- DYNAMIC QUEUE STATE ---
     const [queue, setQueue] = useState([]);
     const [isLoadingQueue, setIsLoadingQueue] = useState(true);
     const [activePatient, setActivePatient] = useState(null);
-    const [isQueueOpen, setIsQueueOpen] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isClosingClinic, setIsClosingClinic] = useState(false);
+    // DoctorV2 IA: which workspace tab is showing, and the Actions ▾ modals.
+    const [activeTab, setActiveTab] = useState('notes'); // 'notes' | 'history'
+    const [assessPlan, setAssessPlan] = useState(''); // serialized assessment_plan
+    const [showFiles, setShowFiles] = useState(false);
+    const [showVitalsQuick, setShowVitalsQuick] = useState(false);
+    const [showRxQuick, setShowRxQuick] = useState(false);
+    const [showAssessQuick, setShowAssessQuick] = useState(false);
+    const [showQueuePatient, setShowQueuePatient] = useState(false);
+    const [showMyAppts, setShowMyAppts] = useState(false);
+    const [showPickAdmission, setShowPickAdmission] = useState(false);
 
     // --- FORM STATE ---
     const [vitals, setVitals] = useState({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '', glucose: '' });
@@ -107,7 +130,7 @@ export default function ClinicalDesk() {
         clearDraft: clearLocalDraft,
     } = useDraftSafetyNet({
         storageKey: encounterDraftKey,
-        value: { vitals, clinicalNotes, complaints, physicalExams, medications, icdCodes },
+        value: { vitals, clinicalNotes, complaints, physicalExams, medications, icdCodes, assessPlan },
         enabled: !!activePatient,
     });
 
@@ -120,6 +143,7 @@ export default function ClinicalDesk() {
         if (draft.physicalExams) setPhysicalExams(draft.physicalExams);
         if (draft.medications) setMedications(draft.medications);
         if (draft.icdCodes) setIcdCodes(draft.icdCodes);
+        if (draft.assessPlan !== undefined) setAssessPlan(draft.assessPlan);
         toast.success('Unsaved notes restored.', { icon: '📝' });
     };
 
@@ -198,7 +222,6 @@ export default function ClinicalDesk() {
     // tomorrow's list.
     const handleEndClinicDay = async () => {
         if (!window.confirm(`End the clinic day? This checks out all ${queue.length} patient(s) still waiting in the consultation queue.`)) return;
-        setIsClosingClinic(true);
         try {
             const res = await apiClient.post('/queue/end-of-day', { department: 'Consultation' });
             const n = res.data?.checked_out ?? 0;
@@ -206,12 +229,9 @@ export default function ClinicalDesk() {
                 ? `Clinic closed — ${n} patient(s) checked out of the queue.`
                 : 'Clinic closed — the queue was already empty.');
             clearWorkspace();
-            setIsQueueOpen(true);
             fetchQueue();
         } catch (error) {
             toast.error(error.response?.data?.detail || 'Could not close the clinic day.');
-        } finally {
-            setIsClosingClinic(false);
         }
     };
 
@@ -230,7 +250,7 @@ export default function ClinicalDesk() {
         // bar + cross-module navigation stays scoped to them, and the
         // KDPA S.26 access log captures the doctor's movement.
         setGlobalActivePatient(patientItem);
-        setIsQueueOpen(false);
+        setActiveTab('notes');
         // Reset all forms for the new patient
         setVitals({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '', glucose: '' });
         setClinicalNotes({ hpi: '', diagnosis: '', internal_notes: '' });
@@ -240,6 +260,7 @@ export default function ClinicalDesk() {
         setExamInput('');
         setMedications([]);
         setIcdCodes([]);
+        setAssessPlan('');
         setResumable(null);
         setResumeRecordId(null);
         resumeAppliedRef.current = false;
@@ -313,6 +334,7 @@ export default function ClinicalDesk() {
         setMedications(fs.medications);
         setIcdCodes(fs.icdCodes);
         setClinicalNotes({ hpi: fs.hpi, diagnosis: fs.diagnosisText, internal_notes: fs.internalNotes });
+        setAssessPlan(resumable.assessment_plan || '');
         setResumeRecordId(resumable.record_id);
         resumeAppliedRef.current = true;
         setResumable(null);
@@ -472,7 +494,8 @@ export default function ClinicalDesk() {
             treatment_plan: medications.some((m) => m.drug.trim())
                 ? JSON.stringify(medications.filter((m) => m.drug.trim()).map(({ _uid, ...m }) => m))
                 : null,
-            internal_notes: clinicalNotes.internal_notes
+            internal_notes: clinicalNotes.internal_notes,
+            assessment_plan: assessPlan || null,
         };
 
         try {
@@ -509,7 +532,6 @@ export default function ClinicalDesk() {
             // If not a draft, clear the workspace and refresh the queue
             if (targetStatus !== 'Draft') {
                 setActivePatient(null);
-                setIsQueueOpen(true);
                 setResumable(null);
                 setResumeRecordId(null);
                 resumeAppliedRef.current = false;
@@ -550,6 +572,38 @@ export default function ClinicalDesk() {
         }
     };
 
+    // Consolidated Actions ▾ menu — grouped and permission-gated. Items the
+    // doctor lacks permission for are hidden; empty groups disappear.
+    const actionGroups = [
+        { label: 'Clinical', items: [
+            { label: 'Vitals', icon: Activity, perm: 'clinical:write', onClick: () => setShowVitalsQuick(true) },
+            { label: 'Prescription', icon: Pill, perm: 'clinical:write', onClick: () => setShowRxQuick(true) },
+            { label: 'Assessment & Plan', icon: ClipboardList, perm: 'clinical:write', onClick: () => setShowAssessQuick(true) },
+            { label: hasRecordedConsent ? 'Re-record consent' : 'Record consent', icon: ShieldCheck, perm: 'clinical:write', onClick: () => setIsConsentOpen(true) },
+            { label: 'Refer patient', icon: ArrowRightLeft, perm: 'clinical:write', onClick: () => setIsReferModalOpen(true) },
+        ] },
+        { label: 'Orders', items: [
+            { label: 'Order labs', icon: TestTube, perm: 'clinical:write', onClick: () => setIsLabModalOpen(true) },
+            { label: 'Order imaging', icon: ImageIcon, perm: 'clinical:write', onClick: () => setIsImagingModalOpen(true) },
+        ] },
+        { label: 'Flow', items: [
+            { label: 'Set follow-up', icon: CalendarPlus, perm: 'clinical:write', onClick: () => setIsFollowUpOpen(true) },
+            { label: 'Add patient to queue', icon: UserPlus, perm: 'patients:write', onClick: () => setShowQueuePatient(true) },
+            { label: 'My appointments', icon: CalendarDays, perm: 'patients:write', onClick: () => setShowMyAppts(true) },
+            { label: 'Admitted patients', icon: BedDouble, onClick: () => setShowPickAdmission(true) },
+            { label: 'End clinic day', icon: CalendarX, perm: 'clinical:write', onClick: handleEndClinicDay },
+        ] },
+        { label: 'Documents', items: [
+            { label: 'Attachments', icon: Paperclip, perm: 'clinical:read', onClick: () => setShowFiles(true) },
+            { label: 'Full medical history', icon: History, perm: 'history:read', onClick: () => setHistoryModal({ entry_type: null }) },
+        ] },
+        { label: 'Reports', items: [
+            { label: 'Visit summary', icon: Printer, onClick: handlePrintVisitSummary },
+            { label: 'Examination report', icon: Printer, onClick: handlePrintExamination },
+            { label: 'All visits', icon: Printer, onClick: handlePrintAllVisits },
+        ] },
+    ];
+
     return (
         <div className="flex flex-col gap-3 h-full md:h-[calc(100vh-6rem)] min-h-[calc(100vh-6rem)]">
             <PageHeader
@@ -559,79 +613,25 @@ export default function ClinicalDesk() {
                 subtitle="Run encounters end-to-end — vitals, diagnosis, prescriptions, and orders."
             />
 
-            {/* TOP PANEL: Collapsible Queue */}
-            <div data-tour="clinical-queue" className="card shrink-0 flex flex-col z-20">
-                <div className="w-full px-4 py-2.5 flex justify-between items-center gap-3 bg-ink-50/60 dark:bg-ink-800/40 rounded-t-2xl">
-                    <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="flex items-center gap-3 min-w-0 hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded-lg">
-                        <Users className="text-brand-600 dark:text-brand-400 shrink-0" size={18} />
-                        <h2 className="font-semibold text-ink-900 dark:text-white text-base tracking-tight">Active Queue</h2>
-                        <span className="badge-brand">{queue.length} Waiting</span>
-                        <span className="text-ink-500 dark:text-ink-400">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
-                    </button>
-                    {queue.length > 0 && (
-                        <button
-                            type="button"
-                            onClick={handleEndClinicDay}
-                            disabled={isClosingClinic}
-                            title="Check out every patient still waiting in the consultation queue"
-                            className="btn-secondary btn-xs gap-1.5 shrink-0"
-                        >
-                            {isClosingClinic ? <Activity className="animate-spin" size={13} /> : <CalendarX size={13} />}
-                            <span className="hidden sm:inline">End clinic day</span>
-                        </button>
-                    )}
-                </div>
-
-                <div className="border-t border-ink-100 dark:border-ink-800 p-3">
-                    <PatientSearch
-                        placeholder="Search any patient by name, ID, OP No or phone…"
-                        onSelect={(p) => {
-                            if (!p) return;
-                            handlePatientSelect({
-                                patient_id: p.patient_id,
-                                patient_name: `${p.surname}, ${p.other_names}`,
-                                outpatient_no: p.outpatient_no,
-                            });
-                        }}
-                    />
-                </div>
-
-                {isQueueOpen && (
-                    <div className="border-t border-ink-100 dark:border-ink-800 p-3 bg-white dark:bg-ink-900 rounded-b-2xl">
-                        {isLoadingQueue ? (
-                            <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={22} /> Loading queue&hellip;</div>
-                        ) : queue.length === 0 ? (
-                            <div className="text-center py-6 text-ink-400">No patients currently waiting in your queue.</div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                                {queue.map((item) => (
-                                    <div key={item.queue_id} className="relative group">
-                                        <button type="button" onClick={() => handlePatientSelect(item)}
-                                            className={`w-full text-left p-3 pr-8 rounded-xl border transition-all duration-150 ${activePatient?.queue_id === item.queue_id ? 'bg-brand-50/60 dark:bg-brand-500/15 border-brand-400 dark:border-brand-500/40 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 dark:hover:border-brand-500/40 hover:-translate-y-0.5'}`}>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h3 className="font-semibold text-sm text-ink-900 dark:text-white">{item.patient_name}</h3>
-                                                {item.priority === 'High' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft" />}
-                                            </div>
-                                            <div className="flex justify-between items-center text-xs text-ink-500 dark:text-ink-400">
-                                                <span className="font-mono">{item.outpatient_no}</span>
-                                                <span className="bg-ink-100 dark:bg-ink-800 px-2 py-0.5 rounded-full text-ink-600 dark:text-ink-300 flex items-center gap-1"><Clock size={10} /> {item.triage_time}</span>
-                                            </div>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveFromQueue(item)}
-                                            aria-label={`Remove ${item.patient_name} from queue`}
-                                            title="Remove from queue"
-                                            className="absolute top-2 right-2 p-1 rounded-md text-ink-400 hover:text-rose-600 hover:bg-rose-50 dark:text-ink-500 dark:hover:text-rose-400 dark:hover:bg-rose-500/15 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
-                                        >
-                                            <UserMinus size={14} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
+            {/* TOP PANEL: patient details + consultation queue (DoctorV2 IA) */}
+            <div data-tour="clinical-queue" className="shrink-0 z-20">
+                <PatientDetailsHeader
+                    activePatient={activePatient}
+                    queue={queue}
+                    isLoadingQueue={isLoadingQueue}
+                    onSelectPatient={(item) => {
+                        if (!item) return;
+                        // Queue rows already carry patient_name; search rows come raw.
+                        if (item.patient_name) handlePatientSelect(item);
+                        else handlePatientSelect({
+                            patient_id: item.patient_id,
+                            patient_name: `${item.surname}, ${item.other_names}`,
+                            outpatient_no: item.outpatient_no,
+                        });
+                    }}
+                    onRemoveFromQueue={handleRemoveFromQueue}
+                    onViewAllPatients={() => navigate('/app/patients')}
+                />
             </div>
 
             {/* BOTTOM PANEL: Consultation Workspace */}
@@ -644,84 +644,34 @@ export default function ClinicalDesk() {
                     </div>
                 ) : (
                     <>
-                        <div className="shrink-0 flex flex-col">
-                            <div className="p-4 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-between items-center z-10">
-                                <div className="flex items-center gap-3">
-                                    <div className="size-11 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 text-white flex items-center justify-center font-semibold text-base shadow-glow">
-                                        {activePatient.patient_name?.charAt(0) || 'P'}
-                                    </div>
-                                    <div>
-                                        <h1 className="text-lg font-semibold text-ink-900 dark:text-white tracking-tight">{activePatient.patient_name}</h1>
-                                        <p className="text-xs font-medium text-ink-500 dark:text-ink-400">{activePatient.outpatient_no} &middot; {activePatient.age} yrs &middot; {activePatient.gender}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {activePatient.allergies && activePatient.allergies.toLowerCase() !== 'none' && (
-                                        <div className="bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-100 dark:ring-rose-500/20 px-3 py-2 rounded-xl flex items-center gap-2">
-                                            <AlertCircle size={16} className="text-rose-600 dark:text-rose-400" />
-                                            <div>
-                                                <p className="text-2xs font-semibold text-rose-700 dark:text-rose-300 uppercase tracking-[0.14em]">Allergies</p>
-                                                <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">{activePatient.allergies}</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {/* Expand icon — opens the read-only history popup on top of
-                                        this in-progress encounter, full chart (no section filter). */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setHistoryModal({ entry_type: null })}
-                                        title="View medical history without leaving this encounter"
-                                        aria-label="View patient medical history"
-                                        className="p-2.5 rounded-xl text-ink-500 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-500/10 ring-1 ring-ink-200 dark:ring-ink-800 transition-colors cursor-pointer"
-                                    >
-                                        <Maximize2 size={16} />
-                                    </button>
-                                    {/* KDPA S.30 consent capture — visible at all times so the
-                                        doctor can record verbal/written consent without leaving
-                                        the desk. Turns into a confirmed pill once recorded for
-                                        the active encounter. */}
-                                    <button
-                                        type="button"
-                                        data-tour="clinical-consent"
-                                        onClick={() => setIsConsentOpen(true)}
-                                        title={hasRecordedConsent
-                                            ? 'Consent recorded for this encounter — click to re-record'
-                                            : 'Record KDPA Section 30 treatment consent'}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ring-1 ${
-                                            hasRecordedConsent
-                                                ? 'bg-emerald-50 dark:bg-emerald-500/10 ring-emerald-200 dark:ring-emerald-500/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/15'
-                                                : 'bg-brand-50 dark:bg-brand-500/10 ring-brand-200 dark:ring-brand-500/20 text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-500/15'
-                                        }`}
-                                    >
-                                        <ShieldCheck size={14} />
-                                        {hasRecordedConsent ? 'Consent recorded' : 'Record consent'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* History toolbar — each button expands the read-only
-                                history popup over this encounter, pre-focused to the
-                                relevant section, instead of navigating away. The first
-                                item opens the full chart (no entry_type filter). A
-                                doctor who needs to add/edit/print still has "Open full
-                                record" inside the popup. */}
-                            <div className="bg-ink-50/40 dark:bg-ink-800/40 border-b border-ink-100 dark:border-ink-800 p-2 flex gap-1.5 overflow-x-auto custom-scrollbar">
+                        {/* Tab bar — Encounter Notes / Patient History + consent + Actions ▾ */}
+                        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-3 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 z-10">
+                            <div className="flex gap-1 bg-ink-100/70 dark:bg-ink-800/70 p-1 rounded-xl">
                                 {[
-                                    { icon: History,   label: 'Medical Hx',    entry_type: null },
-                                    { icon: Scissors,  label: 'Surgical Hx',   entry_type: 'SURGICAL_HISTORY' },
-                                    { icon: Cigarette, label: 'Social Hx',     entry_type: 'SOCIAL_HISTORY' },
-                                    { icon: Dna,       label: 'Family Hx',     entry_type: 'FAMILY_HISTORY' },
-                                    { icon: Receipt,   label: 'Economic Hx',   entry_type: 'ECONOMIC_HISTORY' },
-                                    { icon: Syringe,   label: 'Immunizations', entry_type: 'IMMUNIZATION' },
-                                ].map(({ icon: Icon, label, entry_type }) => (
-                                    <button type="button"
-                                        key={label}
-                                        onClick={() => setHistoryModal({ entry_type })}
-                                        className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-400 rounded-lg text-xs font-medium hover:border-brand-300 dark:hover:border-brand-500/40 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
-                                    >
-                                        <Icon size={13} /> {label}
+                                    { id: 'notes', label: 'Encounter Notes' },
+                                    { id: 'history', label: 'Patient History' },
+                                ].map((t) => (
+                                    <button type="button" key={t.id} onClick={() => setActiveTab(t.id)}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === t.id ? 'bg-white dark:bg-ink-900 text-brand-700 dark:text-brand-300 shadow-soft' : 'text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200'}`}>
+                                        {t.label}
                                     </button>
                                 ))}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    data-tour="clinical-consent"
+                                    onClick={() => setIsConsentOpen(true)}
+                                    title={hasRecordedConsent ? 'Consent recorded — click to re-record' : 'Record KDPA Section 30 treatment consent'}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ring-1 ${
+                                        hasRecordedConsent
+                                            ? 'bg-emerald-50 dark:bg-emerald-500/10 ring-emerald-200 dark:ring-emerald-500/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/15'
+                                            : 'bg-brand-50 dark:bg-brand-500/10 ring-brand-200 dark:ring-brand-500/20 text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-500/15'
+                                    }`}
+                                >
+                                    <ShieldCheck size={14} /> {hasRecordedConsent ? 'Consent recorded' : 'Record consent'}
+                                </button>
+                                <ActionsMenu has={hasPerm} groups={actionGroups} />
                             </div>
                         </div>
 
@@ -777,231 +727,60 @@ export default function ClinicalDesk() {
                                 />
                             )}
 
-                            {/* Vitals Entry */}
-                            <div data-tour="clinical-vitals" className="card-flush p-6 border-l-4 border-l-brand-500">
-                                <div className="flex justify-between items-center mb-4 border-b border-ink-100 dark:border-ink-800 pb-3">
-                                    <h3 className="section-eyebrow flex items-center gap-2"><Activity size={16} className="text-brand-500" /> Vital signs</h3>
-                                    <button type="button" onClick={() => setIsTrendsOpen(true)} className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1"><Activity size={13} /> View trends</button>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
-                                    <div><label htmlFor="clinic-bp-mmhg" className="label">BP (mmHg)</label><input id="clinic-bp-mmhg" type="text" value={vitals.bp} onChange={(e) => setVitals({...vitals, bp: e.target.value})} placeholder="120/80" className="input" /></div>
-                                    <div><label htmlFor="clinic-hr-bpm" className="label">HR (bpm)</label><input id="clinic-hr-bpm" type="number" value={vitals.hr} onChange={(e) => setVitals({...vitals, hr: e.target.value})} placeholder="72" className="input" /></div>
-                                    <div><label htmlFor="clinic-resp-bpm" className="label">Resp (bpm)</label><input id="clinic-resp-bpm" type="number" value={vitals.rr} onChange={(e) => setVitals({...vitals, rr: e.target.value})} placeholder="16" className="input" /></div>
-                                    <div><label htmlFor="clinic-temp-c" className="label">Temp (°C)</label><input id="clinic-temp-c" type="number" step="0.1" value={vitals.temp} onChange={(e) => setVitals({...vitals, temp: e.target.value})} placeholder="37.2" className="input" /></div>
-                                    <div><label htmlFor="clinic-spo" className="label">SpO₂ (%)</label><input id="clinic-spo" type="number" value={vitals.spo2} onChange={(e) => setVitals({...vitals, spo2: e.target.value})} placeholder="98" className="input" /></div>
-                                    <div><label htmlFor="clinical-rbs" className="label">RBS (mmol/L)</label><input id="clinical-rbs" type="number" step="0.1" value={vitals.glucose} onChange={(e) => setVitals({...vitals, glucose: e.target.value})} placeholder="5.5" className="input" /></div>
-                                    <div><label htmlFor="clinic-weight-kg" className="label">Weight (kg)</label><input id="clinic-weight-kg" type="number" value={vitals.weight} onChange={(e) => setVitals({...vitals, weight: e.target.value})} placeholder="70" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
-                                    <div><label htmlFor="clinic-height-cm" className="label">Height (cm)</label><input id="clinic-height-cm" type="number" value={vitals.height} onChange={(e) => setVitals({...vitals, height: e.target.value})} placeholder="175" className="input bg-brand-50/40 dark:bg-brand-500/10" /></div>
-                                    <div><span className="label text-brand-700 dark:text-brand-300 block">BMI</span><div className="input bg-brand-50 dark:bg-brand-500/10 ring-1 ring-brand-200 dark:ring-brand-500/20 text-brand-800 dark:text-brand-300 font-semibold text-center">{calculateBMI()}</div></div>
-                                </div>
-                            </div>
-
-                            {/* Clinical Documentation (SOAP) */}
-                            <div className="card-flush p-6 border-l-4 border-l-ink-700 space-y-5">
-                                <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><FileText size={16} className="text-ink-600 dark:text-ink-400" /> Clinical documentation</h3>
-                                <div>
-                                    <label htmlFor="clinic-chief-complaint-s-cc" className="label">Chief complaint(s) (CC)</label>
-                                    <div className="flex gap-2">
-                                        <input id="clinic-chief-complaint-s-cc"
-                                            type="text"
-                                            value={complaintInput}
-                                            onChange={(e) => setComplaintInput(e.target.value)}
-                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addComplaint(); } }}
-                                            className="input flex-1"
-                                            placeholder="e.g. Severe headache for 3 days — press Enter to add"
-                                        />
-                                        <button type="button" onClick={addComplaint} className="btn-secondary shrink-0 px-3"><Plus size={15} /> Add</button>
+                            {activeTab === 'notes' ? (
+                                <>
+                                    <EncounterNotesTab
+                                        value={{
+                                            vitals,
+                                            bmi: calculateBMI(),
+                                            complaints,
+                                            complaintInput,
+                                            clinicalNotes,
+                                            physicalExams,
+                                            examInput,
+                                            icdCodes,
+                                            medications,
+                                            assessPlan,
+                                            pendingFollowUp,
+                                            chargeConsultation,
+                                            myFee,
+                                        }}
+                                        on={{
+                                            setVitals,
+                                            setComplaintInput,
+                                            addComplaint,
+                                            removeComplaint,
+                                            setClinicalNotes,
+                                            setExamInput,
+                                            addExam,
+                                            removeExam,
+                                            setIcdCodes,
+                                            addMedication,
+                                            updateMedication,
+                                            removeMedication,
+                                            onOrderLabs: () => setIsLabModalOpen(true),
+                                            onOrderImaging: () => setIsImagingModalOpen(true),
+                                            onPickFollowUp: () => setIsFollowUpOpen(true),
+                                            setChargeConsultation,
+                                            onChangeFee: () => setIsFeeModalOpen(true),
+                                            onViewTrends: () => setIsTrendsOpen(true),
+                                            setAssessPlan,
+                                        }}
+                                    />
+                                    {/* Documents, order sets and care pathways — kept as
+                                        contextual panels alongside the encounter. */}
+                                    <div className="grid gap-4 md:grid-cols-2 items-start">
+                                        <ClinicalExtrasPanel patient={activePatient} onApplyOrderSet={handleApplyOrderSet} />
+                                        <CarePathwaysPanel patient={activePatient} perms={perms} diagnosis={clinicalNotes.diagnosis} />
                                     </div>
-                                    {complaints.length > 0 && (
-                                        <ol className="mt-3 space-y-1.5">
-                                            {complaints.map((c, idx) => (
-                                                <li key={c} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
-                                                    <span className="font-mono text-2xs font-semibold text-ink-400 w-5 shrink-0">{idx + 1}.</span>
-                                                    <span className="flex-1 text-ink-800 dark:text-ink-200">{c}</span>
-                                                    <button type="button" onClick={() => removeComplaint(idx)} aria-label={`Remove complaint ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0"><X size={14} /></button>
-                                                </li>
-                                            ))}
-                                        </ol>
-                                    )}
-                                </div>
-                                <div><label htmlFor="clinic-history-of-present-illness-hpi" className="label">History of present illness (HPI)</label><textarea id="clinic-history-of-present-illness-hpi" rows="3" value={clinicalNotes.hpi} onChange={(e) => setClinicalNotes({...clinicalNotes, hpi: e.target.value})} className="input resize-none" placeholder="Narrative of the patient's symptoms…"></textarea></div>
-                                <div>
-                                    <label htmlFor="clinic-physical-examination-objective" className="label">Physical examination(s) (Objective)</label>
-                                    <div className="flex gap-2">
-                                        <input id="clinic-physical-examination-objective"
-                                            type="text"
-                                            value={examInput}
-                                            onChange={(e) => setExamInput(e.target.value)}
-                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addExam(); } }}
-                                            className="input flex-1"
-                                            placeholder="e.g. Chest: clear air entry bilaterally — press Enter to add"
-                                        />
-                                        <button type="button" onClick={addExam} className="btn-secondary shrink-0 px-3"><Plus size={15} /> Add</button>
-                                    </div>
-                                    {physicalExams.length > 0 && (
-                                        <ol className="mt-3 space-y-1.5">
-                                            {physicalExams.map((c, idx) => (
-                                                <li key={c} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
-                                                    <span className="font-mono text-2xs font-semibold text-ink-400 w-5 shrink-0">{idx + 1}.</span>
-                                                    <span className="flex-1 text-ink-800 dark:text-ink-200">{c}</span>
-                                                    <button type="button" onClick={() => removeExam(idx)} aria-label={`Remove examination finding ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0"><X size={14} /></button>
-                                                </li>
-                                            ))}
-                                        </ol>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Orders & Prescriptions */}
-                            <div data-tour="clinical-diagnoses" className="card-flush p-6 border-l-4 border-l-accent-500 space-y-5">
-                                <h3 className="section-eyebrow border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2"><Pill size={16} className="text-accent-600 dark:text-accent-400" /> Diagnosis &amp; orders</h3>
-
-                                <IcdDiagnosisPicker codes={icdCodes} onChange={setIcdCodes} />
-
-                                <div>
-                                    <label htmlFor="clinic-diagnosis-free-text" className="label">Diagnosis notes (free text)</label>
-                                    <input id="clinic-diagnosis-free-text" type="text" value={clinicalNotes.diagnosis} onChange={(e) => setClinicalNotes({ ...clinicalNotes, diagnosis: e.target.value })} className="input" placeholder="Working / descriptive diagnosis if not using ICD-10 codes…" />
-                                </div>
-
-                                <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
-                                    <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><TestTube size={13} /> Investigations</h4>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsLabModalOpen(true)}
-                                            className="btn-secondary flex-1 py-2 text-xs cursor-pointer"
-                                        >
-                                            <TestTube size={13} aria-hidden="true" /> Order Lab Tests
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsImagingModalOpen(true)}
-                                            className="btn-secondary flex-1 py-2 text-xs cursor-pointer"
-                                        >
-                                            <ImageIcon size={13} aria-hidden="true" /> Order Imaging
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Medications — structured, numbered rows routed to Pharmacy */}
-                                <div data-tour="clinical-prescriptions" className="rounded-xl border border-accent-200 dark:border-accent-500/20 bg-accent-50/40 dark:bg-accent-500/10 p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-700 dark:text-accent-300 flex items-center gap-2"><Pill size={13} /> Medications (routed to Pharmacy)</h4>
-                                        <button type="button" onClick={addMedication} className="btn-secondary px-3 py-1.5 text-xs shrink-0"><Plus size={13} /> Add medication</button>
-                                    </div>
-                                    {medications.length === 0 ? (
-                                        <p className="text-xs text-ink-500 dark:text-ink-400 italic">No medications yet — click “Add medication” to start prescribing.</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {medications.map((med, idx) => (
-                                                <div key={med._uid} className="rounded-lg border border-accent-200/70 dark:border-accent-500/20 bg-white dark:bg-ink-900 p-3">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="size-5 shrink-0 rounded-full bg-accent-100 dark:bg-accent-500/20 text-accent-700 dark:text-accent-300 text-2xs font-bold flex items-center justify-center">{idx + 1}</span>
-                                                        <input aria-label="Drug name (e.g. Amoxicillin)" value={med.drug} onChange={(e) => updateMedication(idx, 'drug', e.target.value)} className="input flex-1 py-1.5" placeholder="Drug name (e.g. Amoxicillin)" />
-                                                        <button type="button" onClick={() => removeMedication(idx)} aria-label={`Remove medication ${idx + 1}`} className="text-ink-400 hover:text-rose-600 shrink-0"><Trash2 size={15} /></button>
-                                                    </div>
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                                        <div>
-                                                            <label htmlFor="clinic-formulation" className="label text-2xs">Formulation</label>
-                                                            <select id="clinic-formulation" value={med.formulation} onChange={(e) => updateMedication(idx, 'formulation', e.target.value)} className="input py-1.5 text-sm">
-                                                                {FORMULATIONS.map((f) => <option key={f} value={f}>{f}</option>)}
-                                                            </select>
-                                                        </div>
-                                                        <div>
-                                                            <label htmlFor="clinic-dosage" className="label text-2xs">Dosage</label>
-                                                            <input id="clinic-dosage" value={med.dosage} onChange={(e) => updateMedication(idx, 'dosage', e.target.value)} className="input py-1.5 text-sm" placeholder="500 mg" />
-                                                        </div>
-                                                        <div>
-                                                            <label htmlFor="clinic-frequency" className="label text-2xs">Frequency</label>
-                                                            <input id="clinic-frequency" list="rx-frequencies" value={med.frequency} onChange={(e) => updateMedication(idx, 'frequency', e.target.value)} className="input py-1.5 text-sm" placeholder="TDS" />
-                                                        </div>
-                                                        <div>
-                                                            <label htmlFor="clinic-duration" className="label text-2xs">Duration</label>
-                                                            <input id="clinic-duration" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} className="input py-1.5 text-sm" placeholder="5 days" />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <datalist id="rx-frequencies">{FREQUENCIES.map((f) => <option key={f} value={f}>{f}</option>)}</datalist>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div><label htmlFor="clinic-internal-notes-nursing-ward" className="label">Internal notes (nursing / ward)</label><input id="clinic-internal-notes-nursing-ward" type="text" value={clinicalNotes.internal_notes} onChange={(e) => setClinicalNotes({...clinicalNotes, internal_notes: e.target.value})} className="input" placeholder="e.g. Please administer stat dose before discharge" /></div>
-                                    <div>
-                                        <span className="label flex items-center gap-1">
-                                            <CalendarPlus size={13} aria-hidden="true" /> Next follow-up
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsFollowUpOpen(true)}
-                                            className={`input text-left flex items-center justify-between gap-2 cursor-pointer ${
-                                                pendingFollowUp ? 'text-ink-900 dark:text-white border-brand-300 dark:border-brand-500/40 bg-brand-50/40 dark:bg-brand-500/10' : 'text-ink-400'
-                                            }`}
-                                        >
-                                            <span className="truncate">
-                                                {pendingFollowUp
-                                                    ? new Date(pendingFollowUp.appointment_date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-                                                    : 'Select date…'}
-                                            </span>
-                                            {pendingFollowUp
-                                                ? <CheckCircle2 size={13} className="text-accent-600 dark:text-accent-400 shrink-0" aria-hidden="true" />
-                                                : <CalendarPlus size={13} className="text-ink-400 shrink-0" aria-hidden="true" />}
-                                        </button>
-                                        {pendingFollowUp && (
-                                            <p className="text-2xs text-ink-500 dark:text-ink-400 mt-1">
-                                                With <span className="font-medium text-ink-700 dark:text-ink-200">{pendingFollowUp.doctor_name}</span>.{' '}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setIsFollowUpOpen(true)}
-                                                    className="text-brand-700 dark:text-brand-300 hover:text-brand-800 dark:hover:text-brand-200 cursor-pointer underline"
-                                                >
-                                                    Change
-                                                </button>
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <label htmlFor="chargeFee" className="border border-brand-200 dark:border-brand-500/20 bg-brand-50/50 dark:bg-brand-500/10 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-brand-50/80 dark:hover:bg-brand-500/15 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <input type="checkbox" id="chargeFee" checked={chargeConsultation} onChange={(e) => setChargeConsultation(e.target.checked)} className="size-5 text-brand-600 rounded border-brand-300 focus:ring-brand-500" />
-                                        <div>
-                                            <span className="text-sm font-semibold text-brand-900 dark:text-brand-200 block">Authorize consultation fee</span>
-                                            <span className="text-xs text-brand-700 dark:text-brand-300">Automatically generate a consultation invoice at the cashier.</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="text-base font-semibold text-brand-700 dark:text-brand-300 block">
-                                            KES {Number(myFee?.amount ?? 1000).toLocaleString()}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsFeeModalOpen(true); }}
-                                            className="text-xs text-brand-700 dark:text-brand-300 underline hover:text-brand-800 dark:hover:text-brand-200 cursor-pointer"
-                                        >
-                                            Change my fee
-                                        </button>
-                                    </div>
-                                </label>
-                            </div>
-
-                            {/* Ancillary actions — documents, care pathways and reports laid
-                                out as side-by-side tiles so they use the workspace width
-                                instead of stacking, keeping the encounter column airy. */}
-                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 items-start">
-                                <ClinicalExtrasPanel patient={activePatient} onApplyOrderSet={handleApplyOrderSet} />
-                                <CarePathwaysPanel patient={activePatient} perms={perms} diagnosis={clinicalNotes.diagnosis} />
-                                <div className="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
-                                    <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 mb-3 flex items-center gap-2"><Printer size={13} /> Reports</h4>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <button type="button" onClick={handlePrintVisitSummary} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Visit summary</button>
-                                        <button type="button" onClick={handlePrintExamination} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> Examination</button>
-                                        <button type="button" onClick={handlePrintAllVisits} className="btn-secondary py-2 text-xs cursor-pointer whitespace-nowrap"><Printer size={13} /> All visits</button>
-                                    </div>
-                                </div>
-                            </div>
+                                </>
+                            ) : (
+                                <PatientHistoryTab
+                                    patientId={activePatient.patient_id}
+                                    onOpenHistory={(t) => setHistoryModal({ entry_type: t })}
+                                    onPrintAllVisits={handlePrintAllVisits}
+                                />
+                            )}
                         </div>
 
                         {/* Footer actions */}
@@ -1089,6 +868,36 @@ export default function ClinicalDesk() {
                     patientId={activePatient.patient_id}
                     initialSection={historyModal.entry_type}
                     onClose={() => setHistoryModal(null)}
+                />
+            )}
+
+            {/* DoctorV2 Actions ▾ modals */}
+            {activePatient && showFiles && (
+                <FilesModal patient={activePatient} recordId={resumeRecordId} onClose={() => setShowFiles(false)} />
+            )}
+            {activePatient && showVitalsQuick && (
+                <VitalsModal vitals={vitals} onSave={setVitals} onClose={() => setShowVitalsQuick(false)} />
+            )}
+            {activePatient && showRxQuick && (
+                <PrescriptionModal medications={medications} onSave={setMedications} onClose={() => setShowRxQuick(false)} />
+            )}
+            {activePatient && showAssessQuick && (
+                <AssessPlanModal value={assessPlan} onSave={setAssessPlan} onClose={() => setShowAssessQuick(false)} />
+            )}
+            {showQueuePatient && (
+                <QueuePatientModal onQueued={fetchQueue} onClose={() => setShowQueuePatient(false)} />
+            )}
+            {showMyAppts && (
+                <MyAppointmentsModal
+                    doctorId={user?.user_id}
+                    onPick={(a) => handlePatientSelect({ patient_id: a.patient_id, patient_name: a.patient_name, outpatient_no: a.patient_opd })}
+                    onClose={() => setShowMyAppts(false)}
+                />
+            )}
+            {showPickAdmission && (
+                <PickAdmissionModal
+                    onPick={(b) => handlePatientSelect({ patient_id: b.patient_id, patient_name: b.patient, outpatient_no: null })}
+                    onClose={() => setShowPickAdmission(false)}
                 />
             )}
         </div>

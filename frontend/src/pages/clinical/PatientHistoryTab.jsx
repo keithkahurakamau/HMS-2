@@ -26,13 +26,18 @@ export default function PatientHistoryTab({ patientId, onOpenHistory, onPrintAll
     const [visits, setVisits] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // No synchronous setState in the effect body — the loader starts `true` and
+    // every update lives in the promise callbacks (react-hooks/set-state-in-effect).
+    // The tab remounts per patient (the shell resets to Notes on patient switch),
+    // so state is fresh each time.
     useEffect(() => {
-        if (!patientId) { setVisits([]); setLoading(false); return; }
-        setLoading(true);
+        let alive = true;
+        if (!patientId) return undefined;
         apiClient.get(`/clinical/records/${patientId}`)
-            .then((r) => setVisits(r.data || []))
-            .catch(() => toast.error('Could not load previous visits.'))
-            .finally(() => setLoading(false));
+            .then((r) => { if (alive) setVisits(r.data || []); })
+            .catch(() => { if (alive) toast.error('Could not load previous visits.'); })
+            .finally(() => { if (alive) setLoading(false); });
+        return () => { alive = false; };
     }, [patientId]);
 
     return (
