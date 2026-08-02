@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-    ChevronDown, ChevronUp, User, Search, Users, Clock, AlertTriangle, UserMinus,
+    ChevronDown, ChevronUp, User, Users, Clock, AlertTriangle, UserMinus,
 } from 'lucide-react';
 import PatientSearch from '../../components/PatientSearch';
 import { minutesWaiting } from '../../utils/clinicalForms';
@@ -22,39 +22,44 @@ export default function PatientDetailsHeader({
     activePatient, queue = [], isLoadingQueue = false,
     onSelectPatient, onRemoveFromQueue, onViewAllPatients,
 }) {
-    const [open, setOpen] = useState(true);
+    // Queue starts collapsed while charting (maximise the workspace) and open
+    // when idle (so the doctor can pick the next patient). The shell remounts
+    // this via `key` on patient change, so this initialiser re-runs correctly.
+    const [open, setOpen] = useState(() => !activePatient);
+    const hasAllergy = activePatient?.allergies && activePatient.allergies.toLowerCase() !== 'none';
 
     return (
         <div className="card-flush border border-ink-200 dark:border-ink-800 rounded-2xl overflow-hidden">
-            {/* Top row: active patient + search + view-all */}
-            <div className="flex flex-wrap items-center gap-3 p-3 border-b border-ink-100 dark:border-ink-800">
+            {/* Top row: patient summary (always visible, incl. allergies) + search + view-all */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 border-b border-ink-100 dark:border-ink-800">
                 <button type="button" onClick={() => setOpen((o) => !o)}
-                    className="flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white"
-                    aria-expanded={open}>
+                    className="flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white shrink-0"
+                    aria-expanded={open} title={open ? 'Hide consultation queue' : 'Show consultation queue'}>
                     <User size={16} className="text-brand-500" />
-                    {activePatient ? activePatient.patient_name : 'No patient selected'}
+                    <span className="max-w-[13rem] truncate">{activePatient ? activePatient.patient_name : 'No patient selected'}</span>
                     {open ? <ChevronUp size={15} className="text-ink-400" /> : <ChevronDown size={15} className="text-ink-400" />}
                 </button>
-                <div className="flex-1 min-w-[220px]">
+                {activePatient && (
+                    <div className="flex items-center gap-2 text-xs text-ink-500 dark:text-ink-400 min-w-0">
+                        {activePatient.outpatient_no && <span className="font-mono truncate">{activePatient.outpatient_no}</span>}
+                        <span className="text-ink-300 dark:text-ink-600">·</span>
+                        <span className="whitespace-nowrap">{activePatient.age ?? '—'} / {activePatient.gender ?? '—'}</span>
+                        {hasAllergy && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-200 dark:ring-rose-500/20 text-rose-700 dark:text-rose-300 px-2 py-0.5 font-medium max-w-[16rem] truncate">
+                                <AlertTriangle size={11} className="shrink-0" /> {activePatient.allergies}
+                            </span>
+                        )}
+                    </div>
+                )}
+                <div className="flex-1 min-w-[200px]">
                     <PatientSearch onSelect={onSelectPatient} placeholder="Search patient by name, ID, OP No or phone…" />
                 </div>
-                <button type="button" onClick={onViewAllPatients} className="btn-ghost text-xs whitespace-nowrap">
+                <button type="button" onClick={onViewAllPatients} className="btn-ghost text-xs whitespace-nowrap shrink-0">
                     <Users size={14} /> View all patients
                 </button>
             </div>
 
-            {/* Collapsible demographics for the charted patient */}
-            {open && activePatient && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 border-b border-ink-100 dark:border-ink-800 bg-ink-50/60 dark:bg-ink-800/30">
-                    <Field label="OP Number" value={activePatient.outpatient_no} />
-                    <Field label="Age / Sex" value={`${activePatient.age ?? '—'} / ${activePatient.gender ?? '—'}`} />
-                    <Field label="Allergies" value={activePatient.allergies || 'None'}
-                        danger={activePatient.allergies && activePatient.allergies !== 'None'} />
-                    <Field label="Priority" value={activePatient.priority || 'Normal'} />
-                </div>
-            )}
-
-            {/* Consultation queue table */}
+            {/* Consultation queue table (collapsible) */}
             {open && (
                 <div className="p-3">
                     <div className="flex items-center justify-between mb-2">
@@ -68,9 +73,9 @@ export default function PatientDetailsHeader({
                     ) : queue.length === 0 ? (
                         <p className="text-sm text-ink-500 dark:text-ink-400 italic">No patients waiting.</p>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <div className="overflow-auto max-h-56 custom-scrollbar">
                             <table className="w-full text-sm">
-                                <thead>
+                                <thead className="sticky top-0 bg-white dark:bg-ink-900 z-10">
                                     <tr className="text-2xs uppercase tracking-wider text-ink-500 dark:text-ink-400 text-left">
                                         <th className="py-1.5 pr-3 font-medium">Q.No</th>
                                         <th className="py-1.5 pr-3 font-medium">OPD</th>
@@ -118,17 +123,6 @@ export default function PatientDetailsHeader({
                     )}
                 </div>
             )}
-        </div>
-    );
-}
-
-function Field({ label, value, danger = false }) {
-    return (
-        <div>
-            <div className="text-2xs uppercase tracking-wider text-ink-500 dark:text-ink-400">{label}</div>
-            <div className={`text-sm font-medium flex items-center gap-1 ${danger ? 'text-rose-600 dark:text-rose-400' : 'text-ink-800 dark:text-ink-200'}`}>
-                {danger && <AlertTriangle size={13} />}{value ?? '—'}
-            </div>
         </div>
     );
 }
