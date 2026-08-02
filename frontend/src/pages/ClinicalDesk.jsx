@@ -54,13 +54,10 @@ export default function ClinicalDesk() {
     // DoctorV2 IA: which workspace tab is showing, and the Actions ▾ modals.
     const [activeTab, setActiveTab] = useState('notes'); // 'notes' | 'history'
     const [assessPlan, setAssessPlan] = useState(''); // serialized assessment_plan
-    const [showFiles, setShowFiles] = useState(false);
-    const [showVitalsQuick, setShowVitalsQuick] = useState(false);
-    const [showRxQuick, setShowRxQuick] = useState(false);
-    const [showAssessQuick, setShowAssessQuick] = useState(false);
-    const [showQueuePatient, setShowQueuePatient] = useState(false);
-    const [showMyAppts, setShowMyAppts] = useState(false);
-    const [showPickAdmission, setShowPickAdmission] = useState(false);
+    // One Actions ▾ modal at a time — 'files' | 'vitals' | 'rx' | 'assess' |
+    // 'queue' | 'appts' | 'admission' | null.
+    const [actionModal, setActionModal] = useState(null);
+    const closeActionModal = () => setActionModal(null);
 
     // --- FORM STATE ---
     const [vitals, setVitals] = useState({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '', glucose: '' });
@@ -576,9 +573,9 @@ export default function ClinicalDesk() {
     // doctor lacks permission for are hidden; empty groups disappear.
     const actionGroups = [
         { label: 'Clinical', items: [
-            { label: 'Vitals', icon: Activity, perm: 'clinical:write', onClick: () => setShowVitalsQuick(true) },
-            { label: 'Prescription', icon: Pill, perm: 'clinical:write', onClick: () => setShowRxQuick(true) },
-            { label: 'Assessment & Plan', icon: ClipboardList, perm: 'clinical:write', onClick: () => setShowAssessQuick(true) },
+            { label: 'Vitals', icon: Activity, perm: 'clinical:write', onClick: () => setActionModal('vitals') },
+            { label: 'Prescription', icon: Pill, perm: 'clinical:write', onClick: () => setActionModal('rx') },
+            { label: 'Assessment & Plan', icon: ClipboardList, perm: 'clinical:write', onClick: () => setActionModal('assess') },
             { label: hasRecordedConsent ? 'Re-record consent' : 'Record consent', icon: ShieldCheck, perm: 'clinical:write', onClick: () => setIsConsentOpen(true) },
             { label: 'Refer patient', icon: ArrowRightLeft, perm: 'clinical:write', onClick: () => setIsReferModalOpen(true) },
         ] },
@@ -588,13 +585,13 @@ export default function ClinicalDesk() {
         ] },
         { label: 'Flow', items: [
             { label: 'Set follow-up', icon: CalendarPlus, perm: 'clinical:write', onClick: () => setIsFollowUpOpen(true) },
-            { label: 'Add patient to queue', icon: UserPlus, perm: 'patients:write', onClick: () => setShowQueuePatient(true) },
-            { label: 'My appointments', icon: CalendarDays, perm: 'patients:write', onClick: () => setShowMyAppts(true) },
-            { label: 'Admitted patients', icon: BedDouble, onClick: () => setShowPickAdmission(true) },
+            { label: 'Add patient to queue', icon: UserPlus, perm: 'patients:write', onClick: () => setActionModal('queue') },
+            { label: 'My appointments', icon: CalendarDays, perm: 'patients:write', onClick: () => setActionModal('appts') },
+            { label: 'Admitted patients', icon: BedDouble, onClick: () => setActionModal('admission') },
             { label: 'End clinic day', icon: CalendarX, perm: 'clinical:write', onClick: handleEndClinicDay },
         ] },
         { label: 'Documents', items: [
-            { label: 'Attachments', icon: Paperclip, perm: 'clinical:read', onClick: () => setShowFiles(true) },
+            { label: 'Attachments', icon: Paperclip, perm: 'clinical:read', onClick: () => setActionModal('files') },
             { label: 'Full medical history', icon: History, perm: 'history:read', onClick: () => setHistoryModal({ entry_type: null }) },
         ] },
         { label: 'Reports', items: [
@@ -871,33 +868,33 @@ export default function ClinicalDesk() {
                 />
             )}
 
-            {/* DoctorV2 Actions ▾ modals */}
-            {activePatient && showFiles && (
-                <FilesModal patient={activePatient} recordId={resumeRecordId} onClose={() => setShowFiles(false)} />
+            {/* DoctorV2 Actions ▾ modals — one at a time via actionModal */}
+            {activePatient && actionModal === 'files' && (
+                <FilesModal patient={activePatient} recordId={resumeRecordId} onClose={closeActionModal} />
             )}
-            {activePatient && showVitalsQuick && (
-                <VitalsModal vitals={vitals} onSave={setVitals} onClose={() => setShowVitalsQuick(false)} />
+            {activePatient && actionModal === 'vitals' && (
+                <VitalsModal vitals={vitals} onSave={setVitals} onClose={closeActionModal} />
             )}
-            {activePatient && showRxQuick && (
-                <PrescriptionModal medications={medications} onSave={setMedications} onClose={() => setShowRxQuick(false)} />
+            {activePatient && actionModal === 'rx' && (
+                <PrescriptionModal medications={medications} onSave={setMedications} onClose={closeActionModal} />
             )}
-            {activePatient && showAssessQuick && (
-                <AssessPlanModal value={assessPlan} onSave={setAssessPlan} onClose={() => setShowAssessQuick(false)} />
+            {activePatient && actionModal === 'assess' && (
+                <AssessPlanModal value={assessPlan} onSave={setAssessPlan} onClose={closeActionModal} />
             )}
-            {showQueuePatient && (
-                <QueuePatientModal onQueued={fetchQueue} onClose={() => setShowQueuePatient(false)} />
+            {actionModal === 'queue' && (
+                <QueuePatientModal onQueued={fetchQueue} onClose={closeActionModal} />
             )}
-            {showMyAppts && (
+            {actionModal === 'appts' && (
                 <MyAppointmentsModal
                     doctorId={user?.user_id}
                     onPick={(a) => handlePatientSelect({ patient_id: a.patient_id, patient_name: a.patient_name, outpatient_no: a.patient_opd })}
-                    onClose={() => setShowMyAppts(false)}
+                    onClose={closeActionModal}
                 />
             )}
-            {showPickAdmission && (
+            {actionModal === 'admission' && (
                 <PickAdmissionModal
                     onPick={(b) => handlePatientSelect({ patient_id: b.patient_id, patient_name: b.patient, outpatient_no: null })}
-                    onClose={() => setShowPickAdmission(false)}
+                    onClose={closeActionModal}
                 />
             )}
         </div>
