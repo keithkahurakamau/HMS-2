@@ -151,3 +151,61 @@ export const printAllVisits = ({ patient = {}, visits = [] }) => {
   `;
   printDocument('All Visits', body);
 };
+
+/** Laboratory report — the patient's ordered tests and any results. */
+export const printLabReport = ({ patient = {}, tests = [] }) => {
+  const rows = (tests || []).length
+    ? tests.map((t) => `
+        <tr>
+          <td>${orDash(t.test_name)}</td>
+          <td>${orDash(t.status)}</td>
+          <td>${orDash(t.result_summary)}</td>
+          <td>${fmtDate(t.created_at || t.ordered_at)}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="4" style="text-align:center;color:#64748b;">No lab tests</td></tr>';
+
+  const body = `
+    ${header({ docType: 'Laboratory Report', docNumber: '—' })}
+    <h1 class="doc-title">Laboratory Report</h1>
+    ${patientPanel(patient)}
+    <div class="panel">
+      <h3>Tests (${(tests || []).length})</h3>
+      <table class="line-items">
+        <thead><tr><th>Test</th><th>Status</th><th>Result</th><th>Ordered</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    ${footer('Laboratory report — for the patient’s records.')}
+  `;
+  printDocument('Laboratory Report', body);
+};
+
+/** Theatre report — the patient's surgical cases. */
+export const printTheatreReport = ({ patient = {}, cases = [] }) => {
+  const rows = (cases || []).length
+    ? cases.map((c) => `
+        <tr>
+          <td>${orDash(c.procedure_name)}</td>
+          <td>${orDash(c.procedure_code)}</td>
+          <td>${orDash(c.diagnosis)}</td>
+          <td>${orDash(c.priority)}</td>
+          <td>${orDash(c.status)}</td>
+          <td>${fmtDate(c.scheduled_at)}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:#64748b;">No surgical cases</td></tr>';
+
+  const body = `
+    ${header({ docType: 'Theatre Report', docNumber: '—' })}
+    <h1 class="doc-title">Theatre Report</h1>
+    ${patientPanel(patient)}
+    <div class="panel">
+      <h3>Surgical cases (${(cases || []).length})</h3>
+      <table class="line-items">
+        <thead><tr><th>Procedure</th><th>Code</th><th>Diagnosis</th><th>Priority</th><th>Status</th><th>Scheduled</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    ${footer('Theatre report — for the patient’s records.')}
+  `;
+  printDocument('Theatre Report', body);
+};
