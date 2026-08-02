@@ -6,6 +6,15 @@ export const FORMULATIONS = ['Tablet', 'Capsule', 'Syrup', 'Suspension', 'Inject
 export const FREQUENCIES = ['OD (once daily)', 'BD (twice daily)', 'TDS (three times daily)', 'QDS (four times daily)', 'PRN (as needed)', 'STAT (immediately)', 'Nocte (at night)'];
 export const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tablet', dosage: '', frequency: '', duration: '' });
 
+// Whole minutes a patient has been waiting, from an ISO join timestamp. Never
+// negative (clock skew) and null-tolerant for legacy rows without joined_at.
+export const minutesWaiting = (joinedAt, now = Date.now()) => {
+    if (!joinedAt) return null;
+    const t = new Date(joinedAt).getTime();
+    if (Number.isNaN(t)) return null;
+    return Math.max(0, Math.floor((now - t) / 60000));
+};
+
 export const computeBmi = (weight, height) => {
     const w = parseFloat(weight);
     const h = parseFloat(height) / 100;

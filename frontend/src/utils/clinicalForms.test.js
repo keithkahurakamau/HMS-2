@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { computeBmi, serializeAssessPlan, parseAssessPlan, blankMed } from './clinicalForms';
+import { computeBmi, serializeAssessPlan, parseAssessPlan, blankMed, minutesWaiting } from './clinicalForms';
+
+describe('minutesWaiting', () => {
+    it('floors whole minutes since the join time', () => {
+        const now = new Date('2026-08-02T10:00:00Z').getTime();
+        expect(minutesWaiting('2026-08-02T09:45:00Z', now)).toBe(15);
+    });
+    it('never goes negative and tolerates missing/invalid values', () => {
+        const now = new Date('2026-08-02T10:00:00Z').getTime();
+        expect(minutesWaiting('2026-08-02T10:05:00Z', now)).toBe(0);
+        expect(minutesWaiting(null)).toBeNull();
+        expect(minutesWaiting('not-a-date')).toBeNull();
+    });
+});
 
 describe('computeBmi', () => {
     it('computes BMI from kg and cm', () => {
