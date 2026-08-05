@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import {
     Activity, HeartPulse, Save, ArrowRight, Stethoscope, XCircle, UserMinus, Paperclip,
-    TestTube, Image as ImageIcon, UserPlus, Printer,
+    TestTube, Image as ImageIcon, UserPlus, Printer, Scissors, Pill, FileText,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -11,14 +11,16 @@ import { useActivePatient } from '../context/PatientContext';
 import { useAuth } from '../context/AuthContext';
 import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 import PatientHistoryModal from '../components/PatientHistoryModal';
-import { printVisitSummary } from '../utils/printReports';
+import { printVisitSummary, printLabReport } from '../utils/printReports';
 import PatientDetailsHeader from './clinical/PatientDetailsHeader';
 import PatientHistoryTab from './clinical/PatientHistoryTab';
 import ActionsMenu from './clinical/ActionsMenu';
 import FilesModal from './clinical/modals/FilesModal';
 import LabOrderModal from './clinical/modals/LabOrderModal';
 import ImagingOrderModal from './clinical/modals/ImagingOrderModal';
+import TheatreRequestModal from './clinical/modals/TheatreRequestModal';
 import QueuePatientModal from './clinical/modals/QueuePatientModal';
+import PrescriptionModal from './clinical/modals/PrescriptionModal';
 import TriageTab from './triage/TriageTab';
 
 const DISPOSITIONS = ['Consultation', 'Laboratory', 'Pharmacy', 'Radiology', 'Billing', 'Wards'];
@@ -202,6 +204,32 @@ export default function Triage() {
         }
     };
 
+    // Lab Report — pull the patient's tests then print (printLabReport, T6).
+    const handleLabReport = () => {
+        if (!activePatient) return;
+        apiClient.get('/laboratory/tests', { params: { patient_id: activePatient.patient_id } })
+            .then((r) => printLabReport({ patient: activePatient, tests: r.data || [] }))
+            .catch((e) => toast.error(e.response?.data?.detail || 'Could not load lab tests.'));
+    };
+
+    // Prescription — compose meds then route a Pharmacy record (same path the
+    // Clinical Desk uses); the backend gates it on clinical:write + consent.
+    const handlePrescriptionSave = (meds) => {
+        if (!activePatient || !meds.length) return;
+        const treatment_plan = JSON.stringify(meds.filter((m) => m.drug.trim()).map(({ _uid, ...m }) => m));
+        apiClient.post('/clinical/submit', {
+            patient_id: activePatient.patient_id,
+            record_status: 'Pharmacy',
+            treatment_plan,
+        })
+            .then(() => toast.success('Prescription routed to Pharmacy.'))
+            .catch((e) => {
+                const detail = e.response?.data?.detail;
+                toast.error(typeof detail === 'string' && /consent/i.test(detail)
+                    ? 'No active Treatment consent on file — record consent first.' : (detail || 'Could not create prescription.'));
+            });
+    };
+
     // Print a triage visit summary from what the nurse captured.
     const handlePrintVisitSummary = () => printVisitSummary({
         patient: activePatient,
@@ -226,6 +254,8 @@ export default function Triage() {
         { label: 'Requests', items: [
             { label: 'Lab Request', icon: TestTube, perm: 'clinical:write', onClick: () => setActionModal('lab') },
             { label: 'Radiology Request', icon: ImageIcon, perm: 'clinical:write', onClick: () => setActionModal('imaging') },
+            { label: 'Theatre Request', icon: Scissors, perm: 'theatre:manage', onClick: () => setActionModal('theatre') },
+            { label: 'Prescription', icon: Pill, perm: 'clinical:write', onClick: () => setActionModal('prescription') },
         ] },
         { label: 'Flow', items: [
             { label: 'Queue Patient', icon: UserPlus, perm: 'patients:write', onClick: () => setActionModal('queue') },
@@ -236,7 +266,8 @@ export default function Triage() {
             { label: 'Attachments', icon: Paperclip, perm: 'clinical:read', onClick: () => setActionModal('files') },
         ] },
         { label: 'Reports', items: [
-            { label: 'Visit Summary', icon: Printer, onClick: handlePrintVisitSummary },
+            { label: 'Visit Summary', icon: FileText, onClick: handlePrintVisitSummary },
+            { label: 'Lab Report', icon: Printer, perm: 'laboratory:read', onClick: handleLabReport },
         ] },
     ];
 
@@ -339,6 +370,13 @@ export default function Triage() {
             )}
             {activePatient && actionModal === 'imaging' && (
                 <ImagingOrderModal patient={activePatient} onClose={() => setActionModal(null)} />
+            )}
+            {activePatient && actionModal === 'theatre' && (
+                <TheatreRequestModal patient={activePatient} onClose={() => setActionModal(null)} />
+            )}
+            {activePatient && actionModal === 'prescription' && (
+                <PrescriptionModal medications={[]} onClose={() => setActionModal(null)}
+                    onSave={handlePrescriptionSave} />
             )}
             {actionModal === 'queue' && (
                 <QueuePatientModal onQueued={fetchQueue} onClose={() => setActionModal(null)} />
