@@ -29,9 +29,19 @@ describe('PatientDetailsHeader', () => {
         expect(screen.getByText('OP-2')).toBeInTheDocument();
     });
 
-    it('shows demographics and flags allergies for the active patient', () => {
+    it('keeps the allergy pill visible but collapses the queue while charting', () => {
         render(<PatientDetailsHeader activePatient={ACTIVE} queue={QUEUE} onSelectPatient={() => {}} />);
+        // Allergy stays visible in the always-on summary row…
         expect(screen.getByText('Penicillin')).toBeInTheDocument();
+        // …but the queue table is collapsed by default when a patient is active.
+        expect(screen.queryByText('Roe, Sam')).not.toBeInTheDocument();
+    });
+
+    it('expands the queue when the summary toggle is clicked', async () => {
+        const user = userEvent.setup();
+        render(<PatientDetailsHeader activePatient={ACTIVE} queue={QUEUE} onSelectPatient={() => {}} />);
+        await user.click(screen.getByRole('button', { name: /show consultation queue|Doe, Jane/i }));
+        expect(await screen.findByText('Roe, Sam')).toBeInTheDocument();
     });
 
     it('selects a patient from the queue', async () => {

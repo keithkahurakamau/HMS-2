@@ -613,6 +613,7 @@ export default function ClinicalDesk() {
             {/* TOP PANEL: patient details + consultation queue (DoctorV2 IA) */}
             <div data-tour="clinical-queue" className="shrink-0 z-20">
                 <PatientDetailsHeader
+                    key={activePatient?.queue_id ?? activePatient?.patient_id ?? 'idle'}
                     activePatient={activePatient}
                     queue={queue}
                     isLoadingQueue={isLoadingQueue}
@@ -632,7 +633,7 @@ export default function ClinicalDesk() {
             </div>
 
             {/* BOTTOM PANEL: Consultation Workspace */}
-            <div className="flex-1 card overflow-hidden flex flex-col z-10 relative">
+            <div className="flex-1 min-h-0 card overflow-hidden flex flex-col z-10 relative">
                 {!activePatient ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40 dark:bg-ink-800/40">
                         <Stethoscope size={56} className="mb-4 text-ink-300 dark:text-ink-600" strokeWidth={1.5} />
