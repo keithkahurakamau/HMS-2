@@ -69,6 +69,11 @@ class TriageRecord(Base):
     chief_complaint = Column(String, nullable=True)
     acuity_level = Column(Integer, default=3)  # 1=Emergency … 5=Non-urgent
     triage_notes = Column(String, nullable=True)
+    # Structured MedicentreV3-parity assessment lists, stored as JSON strings:
+    #   systemic_exam → [{"body_system", "remark", "is_anomalous"}]
+    #   procedures    → [{"procedure", "remark"}]
+    systemic_exam = Column(Text, nullable=True)
+    procedures = Column(Text, nullable=True)
     # Department the nurse is routing the patient to next (canonical name).
     disposition = Column(String(50), default="Consultation")
 

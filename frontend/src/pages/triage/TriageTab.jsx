@@ -1,6 +1,11 @@
-import React from 'react';
-import { Activity, Plus, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Activity, Plus, X, Stethoscope, ClipboardList, AlertTriangle } from 'lucide-react';
 import DraftRecoveryBanner from '../../components/DraftRecoveryBanner';
+
+// Common pick-lists (free text still allowed via the datalists) — parity with
+// MedicentreV3's Body System / Procedure dropdowns.
+const BODY_SYSTEMS = ['CNS', 'CVS', 'Respiratory', 'GIT', 'Genitourinary', 'Musculoskeletal', 'Skin', 'ENT', 'Eyes', 'Endocrine'];
+const PROCEDURES = ['Dressing', 'Injection', 'Nebulization', 'Cannulation', 'Catheterization', 'Suturing', 'Wound cleaning', 'Oxygen therapy', 'Blood transfusion'];
 
 // Acuity scale shown to the nurse. 1 = most urgent; mirrors the 1–5 range the
 // backend clamps to and the doctor's queue sorts by.
@@ -20,6 +25,24 @@ const ACUITY_LEVELS = [
  */
 export default function TriageTab({ value, on }) {
     const { vitals, bmi, complaints, complaintInput, triageNotes, acuity, hasNotesDraft, notesDraftSavedAt } = value;
+    const systemicExam = value.systemicExam || [];
+    const procedures = value.procedures || [];
+
+    // Transient "new row" inputs for the two structured lists live here; the
+    // committed rows live in the shell (via on.addSystemic / on.addProcedure).
+    const [newSys, setNewSys] = useState({ body_system: '', remark: '', is_anomalous: false });
+    const [newProc, setNewProc] = useState({ procedure: '', remark: '' });
+
+    const addSystemic = () => {
+        if (!newSys.body_system.trim()) return;
+        on.addSystemic({ _uid: crypto.randomUUID(), ...newSys, body_system: newSys.body_system.trim(), remark: newSys.remark.trim() });
+        setNewSys({ body_system: '', remark: '', is_anomalous: false });
+    };
+    const addProcedure = () => {
+        if (!newProc.procedure.trim()) return;
+        on.addProcedure({ _uid: crypto.randomUUID(), procedure: newProc.procedure.trim(), remark: newProc.remark.trim() });
+        setNewProc({ procedure: '', remark: '' });
+    };
 
     return (
         <div className="space-y-5">
@@ -75,6 +98,84 @@ export default function TriageTab({ value, on }) {
                     )}
                     <textarea id="triage-triage-notes" value={triageNotes} onChange={(e) => on.setTriageNotes(e.target.value)} rows={3}
                         placeholder="Observations, mobility, anything the doctor should know." className="input resize-none" />
+                </div>
+            </section>
+
+            {/* Systemic Examination + Procedures (MedicentreV3 parity) */}
+            <section data-tour="triage-systemic" className="card-flush p-6 border-l-4 border-l-accent-500 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Systemic Examination */}
+                <div>
+                    <h3 className="section-eyebrow flex items-center gap-2 mb-3"><Stethoscope size={16} className="text-accent-600 dark:text-accent-400" /> Systemic Examination</h3>
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label htmlFor="tri-sys-system" className="label text-2xs">Body System</label>
+                                <input id="tri-sys-system" list="tri-body-systems" className="input py-1.5 text-sm" value={newSys.body_system}
+                                    onChange={(e) => setNewSys((p) => ({ ...p, body_system: e.target.value }))} placeholder="e.g. Respiratory" />
+                                <datalist id="tri-body-systems">{BODY_SYSTEMS.map((b) => <option key={b} value={b} />)}</datalist>
+                            </div>
+                            <div>
+                                <label htmlFor="tri-sys-remark" className="label text-2xs">Remark</label>
+                                <input id="tri-sys-remark" className="input py-1.5 text-sm" value={newSys.remark}
+                                    onChange={(e) => setNewSys((p) => ({ ...p, remark: e.target.value }))}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSystemic(); } }} placeholder="Findings" />
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <label htmlFor="tri-sys-anom" className="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-300">
+                                <input id="tri-sys-anom" type="checkbox" className="size-4 rounded" checked={newSys.is_anomalous}
+                                    onChange={(e) => setNewSys((p) => ({ ...p, is_anomalous: e.target.checked }))} /> Is anomalous
+                            </label>
+                            <button type="button" onClick={addSystemic} className="btn-secondary px-3 py-1.5 text-xs"><Plus size={13} /> Add</button>
+                        </div>
+                        {systemicExam.length > 0 && (
+                            <ul className="mt-2 space-y-1.5">
+                                {systemicExam.map((s, idx) => (
+                                    <li key={s._uid} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
+                                        <span className="font-semibold text-ink-800 dark:text-ink-200">{s.body_system}</span>
+                                        {s.remark && <span className="text-ink-600 dark:text-ink-400 truncate">— {s.remark}</span>}
+                                        {s.is_anomalous && <span className="badge-danger text-2xs inline-flex items-center gap-1"><AlertTriangle size={10} /> Anomalous</span>}
+                                        <button type="button" onClick={() => on.removeSystemic(idx)} aria-label={`Remove ${s.body_system} finding`} className="ml-auto text-ink-400 hover:text-rose-600 shrink-0"><X size={14} /></button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+
+                {/* Procedures */}
+                <div>
+                    <h3 className="section-eyebrow flex items-center gap-2 mb-3"><ClipboardList size={16} className="text-accent-600 dark:text-accent-400" /> Procedures</h3>
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label htmlFor="tri-proc-name" className="label text-2xs">Procedure</label>
+                                <input id="tri-proc-name" list="tri-procedures" className="input py-1.5 text-sm" value={newProc.procedure}
+                                    onChange={(e) => setNewProc((p) => ({ ...p, procedure: e.target.value }))} placeholder="e.g. Dressing" />
+                                <datalist id="tri-procedures">{PROCEDURES.map((b) => <option key={b} value={b} />)}</datalist>
+                            </div>
+                            <div>
+                                <label htmlFor="tri-proc-remark" className="label text-2xs">Remark</label>
+                                <input id="tri-proc-remark" className="input py-1.5 text-sm" value={newProc.remark}
+                                    onChange={(e) => setNewProc((p) => ({ ...p, remark: e.target.value }))}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addProcedure(); } }} placeholder="Notes" />
+                            </div>
+                        </div>
+                        <div className="flex justify-end">
+                            <button type="button" onClick={addProcedure} className="btn-secondary px-3 py-1.5 text-xs"><Plus size={13} /> Add</button>
+                        </div>
+                        {procedures.length > 0 && (
+                            <ul className="mt-2 space-y-1.5">
+                                {procedures.map((pr, idx) => (
+                                    <li key={pr._uid} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
+                                        <span className="font-semibold text-ink-800 dark:text-ink-200">{pr.procedure}</span>
+                                        {pr.remark && <span className="text-ink-600 dark:text-ink-400 truncate">— {pr.remark}</span>}
+                                        <button type="button" onClick={() => on.removeProcedure(idx)} aria-label={`Remove ${pr.procedure}`} className="ml-auto text-ink-400 hover:text-rose-600 shrink-0"><X size={14} /></button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                 </div>
             </section>
 

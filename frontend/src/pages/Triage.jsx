@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import {
     Activity, HeartPulse, Save, ArrowRight, Stethoscope, XCircle, UserMinus, Paperclip,
+    TestTube, Image as ImageIcon, UserPlus, Printer,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -10,10 +11,14 @@ import { useActivePatient } from '../context/PatientContext';
 import { useAuth } from '../context/AuthContext';
 import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 import PatientHistoryModal from '../components/PatientHistoryModal';
+import { printVisitSummary } from '../utils/printReports';
 import PatientDetailsHeader from './clinical/PatientDetailsHeader';
 import PatientHistoryTab from './clinical/PatientHistoryTab';
 import ActionsMenu from './clinical/ActionsMenu';
 import FilesModal from './clinical/modals/FilesModal';
+import LabOrderModal from './clinical/modals/LabOrderModal';
+import ImagingOrderModal from './clinical/modals/ImagingOrderModal';
+import QueuePatientModal from './clinical/modals/QueuePatientModal';
 import TriageTab from './triage/TriageTab';
 
 const DISPOSITIONS = ['Consultation', 'Laboratory', 'Pharmacy', 'Radiology', 'Billing', 'Wards'];
@@ -41,6 +46,9 @@ export default function Triage() {
     const [triageNotes, setTriageNotes] = useState('');
     const [acuity, setAcuity] = useState(3);
     const [disposition, setDisposition] = useState('Consultation');
+    // Structured MedicentreV3-parity lists: [{body_system,remark,is_anomalous}] and [{procedure,remark}]
+    const [systemicExam, setSystemicExam] = useState([]);
+    const [procedures, setProcedures] = useState([]);
 
     // Local draft safety net for the notes field — protects a nurse's typed
     // observations from an interruption before "Save & send" is clicked. Keyed
@@ -127,7 +135,14 @@ export default function Triage() {
         setTriageNotes('');
         setAcuity(item.acuity_level || 3);
         setDisposition('Consultation');
+        setSystemicExam([]);
+        setProcedures([]);
     };
+
+    const addSystemic = (row) => setSystemicExam((prev) => [...prev, row]);
+    const removeSystemic = (idx) => setSystemicExam((prev) => prev.filter((_, i) => i !== idx));
+    const addProcedure = (row) => setProcedures((prev) => [...prev, row]);
+    const removeProcedure = (idx) => setProcedures((prev) => prev.filter((_, i) => i !== idx));
 
     const addComplaint = () => {
         const value = complaintInput.trim();
@@ -169,6 +184,8 @@ export default function Triage() {
             chief_complaint: allComplaints.length ? allComplaints.join('; ') : null,
             acuity_level: acuity,
             triage_notes: triageNotes || null,
+            systemic_exam: systemicExam.length ? JSON.stringify(systemicExam) : null,
+            procedures: procedures.length ? JSON.stringify(procedures) : null,
             disposition,
         };
 
@@ -185,14 +202,41 @@ export default function Triage() {
         }
     };
 
-    // Consolidated Actions ▾ — permission-gated; empty groups disappear.
+    // Print a triage visit summary from what the nurse captured.
+    const handlePrintVisitSummary = () => printVisitSummary({
+        patient: activePatient,
+        encounter: {
+            date: new Date(),
+            doctorName: auth?.user?.full_name,
+            vitals,
+            bmi: calculateBMI(),
+            complaints,
+            physicalExams: systemicExam.map((s) => `${s.body_system}${s.remark ? `: ${s.remark}` : ''}${s.is_anomalous ? ' (anomalous)' : ''}`),
+            hpi: triageNotes,
+            diagnosis: '',
+            icdCodes: [],
+            medications: [],
+            followUp: null,
+        },
+    });
+
+    // Consolidated Actions ▾ — mirrors MedicentreV3's Triage menu; permission-
+    // gated (empty groups disappear). Lab/Radiology orders need clinical:write.
     const actionGroups = [
+        { label: 'Requests', items: [
+            { label: 'Lab Request', icon: TestTube, perm: 'clinical:write', onClick: () => setActionModal('lab') },
+            { label: 'Radiology Request', icon: ImageIcon, perm: 'clinical:write', onClick: () => setActionModal('imaging') },
+        ] },
         { label: 'Flow', items: [
+            { label: 'Queue Patient', icon: UserPlus, perm: 'patients:write', onClick: () => setActionModal('queue') },
             { label: 'Cancel patient', icon: XCircle, perm: 'triage:write', onClick: () => cancelFromTriage(activePatient) },
             { label: 'Remove from queue', icon: UserMinus, perm: 'triage:write', onClick: () => removeFromTriage(activePatient) },
         ] },
         { label: 'Documents', items: [
             { label: 'Attachments', icon: Paperclip, perm: 'clinical:read', onClick: () => setActionModal('files') },
+        ] },
+        { label: 'Reports', items: [
+            { label: 'Visit Summary', icon: Printer, onClick: handlePrintVisitSummary },
         ] },
     ];
 
@@ -250,10 +294,11 @@ export default function Triage() {
                         <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
                             {activeTab === 'triage' ? (
                                 <TriageTab
-                                    value={{ vitals, bmi: calculateBMI(), complaints, complaintInput, triageNotes, acuity, hasNotesDraft, notesDraftSavedAt }}
+                                    value={{ vitals, bmi: calculateBMI(), complaints, complaintInput, triageNotes, acuity, systemicExam, procedures, hasNotesDraft, notesDraftSavedAt }}
                                     on={{
                                         setVitals, setComplaintInput, addComplaint, removeComplaint,
                                         setTriageNotes, setAcuity,
+                                        addSystemic, removeSystemic, addProcedure, removeProcedure,
                                         onRestoreDraft: () => setTriageNotes(applyNotesDraft() || ''),
                                         onDiscardDraft: discardNotesDraft,
                                     }}
@@ -288,6 +333,15 @@ export default function Triage() {
 
             {activePatient && actionModal === 'files' && (
                 <FilesModal patient={activePatient} recordId={null} onClose={() => setActionModal(null)} />
+            )}
+            {activePatient && actionModal === 'lab' && (
+                <LabOrderModal patient={activePatient} onClose={() => setActionModal(null)} />
+            )}
+            {activePatient && actionModal === 'imaging' && (
+                <ImagingOrderModal patient={activePatient} onClose={() => setActionModal(null)} />
+            )}
+            {actionModal === 'queue' && (
+                <QueuePatientModal onQueued={fetchQueue} onClose={() => setActionModal(null)} />
             )}
             {activePatient && historyModal && (
                 <PatientHistoryModal
