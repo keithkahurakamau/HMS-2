@@ -154,9 +154,13 @@ def get_lab_queue(db: Session = Depends(get_db)):
                 "requires_barcode": bool(getattr(catalog, "requires_barcode", False)) if catalog else False,
                 "priority": t.priority,
                 "status": t.status,
+                "patient_id": t.patient_id,
                 "patient": f"{patient.surname}, {patient.other_names}" if patient else "Unknown Patient",
+                "outpatient_no": patient.outpatient_no if patient else None,
                 "doctor": doctor.full_name if doctor else "Unknown Doctor",
                 "requested_at": t.requested_at.isoformat() if t.requested_at else None,
+                # `joined_at` backs the shared header's mins-waiting column.
+                "joined_at": t.requested_at.isoformat() if t.requested_at else None,
             })
         return result
     except Exception as e:
