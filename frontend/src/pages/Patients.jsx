@@ -9,6 +9,7 @@ import {
     MoreVertical, Stethoscope, TestTube, UserMinus,
     Pill, Bed, CreditCard, Printer, Download, Trash, Eye, Edit,
     AlertTriangle, Droplet, Send, Image, ChevronDown, Save,
+    ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { printPatientCard } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
@@ -163,10 +164,18 @@ const computeDobFromAge = (age) => {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+// Registry page size — the backend caps a page at 200; the directory pages
+// through with skip/limit so every record is reachable (not just the first 50).
+const PAGE_SIZE = 50;
+
 export default function Patients() {
     const [patients, setPatients] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    // Pagination: `page` is 0-based; `totalCount` is the full active-patient
+    // count (honouring the search) fetched from /patients/count.
+    const [page, setPage] = useState(0);
+    const [totalCount, setTotalCount] = useState(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -220,15 +229,23 @@ export default function Patients() {
     const [consentForm, setConsentForm] = useState(DEFAULT_CONSENT_STATE);
 
     useEffect(() => {
-        const delayDebounce = setTimeout(() => fetchPatients(), 500);
+        const delayDebounce = setTimeout(() => fetchPatients(), 350);
         return () => clearTimeout(delayDebounce);
-    }, [searchQuery]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchQuery, page]);
 
     const fetchPatients = async () => {
         setIsLoading(true);
         try {
-            const response = await apiClient.get(`/patients/?search=${encodeURIComponent(searchQuery)}`);
+            const response = await apiClient.get('/patients/', {
+                params: { search: searchQuery, skip: page * PAGE_SIZE, limit: PAGE_SIZE },
+            });
             setPatients(response.data);
+            // Total is best-effort — an older API mid-deploy may not expose
+            // /count yet, so a failure just leaves the last known total.
+            apiClient.get('/patients/count', { params: { search: searchQuery } })
+                .then((r) => setTotalCount(r.data?.total ?? 0))
+                .catch(() => {});
         } catch (error) {
             // Suppress the toast when the client is in the middle of
             // redirecting to /portal (tenant guard) — the page is about
@@ -478,14 +495,23 @@ export default function Patients() {
         sexFilter ? patients.filter(p => p.sex === sexFilter) : patients
     ), [patients, sexFilter]);
 
-    // Aggregate stats for the strip at the top of the directory.
+    // Aggregate stats for the strip at the top of the directory. The headline
+    // total is the full active-patient count from the server; the demographic
+    // tallies are for the current page (a lightweight, per-page snapshot).
     const stats = useMemo(() => {
         const today = patients.filter(p => isToday(p.registered_on)).length;
         const female = patients.filter(p => p.sex === 'Female').length;
         const male = patients.filter(p => p.sex === 'Male').length;
         const withAllergies = patients.filter(p => p.allergies && p.allergies.trim()).length;
-        return { total: patients.length, today, female, male, withAllergies };
-    }, [patients]);
+        return { total: totalCount || patients.length, today, female, male, withAllergies };
+    }, [patients, totalCount]);
+
+    // Pagination window over the full result set.
+    const total = totalCount || patients.length;
+    const rangeStart = patients.length ? page * PAGE_SIZE + 1 : 0;
+    const rangeEnd = page * PAGE_SIZE + patients.length;
+    const hasPrev = page > 0;
+    const hasNext = totalCount ? rangeEnd < totalCount : patients.length === PAGE_SIZE;
 
     return (
         <div className="space-y-6">
@@ -526,7 +552,7 @@ export default function Patients() {
                         type="search"
                         placeholder="Search by OP Number, name, ID, or phone…"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
                         className="input pl-10"
                     />
                 </div>
@@ -548,8 +574,24 @@ export default function Patients() {
                         </button>
                     ))}
                 </div>
-                <div className="text-xs text-ink-500 sm:ml-2 shrink-0">
-                    {visiblePatients.length} of {patients.length} record{patients.length === 1 ? '' : 's'}
+                <div className="flex items-center gap-2 sm:ml-2 shrink-0">
+                    <span className="text-xs text-ink-500 whitespace-nowrap">
+                        {total === 0
+                            ? 'No records'
+                            : `${rangeStart}–${rangeEnd} of ${total}${sexFilter ? ` · ${visiblePatients.length} on page` : ''}`}
+                    </span>
+                    <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))}
+                            disabled={!hasPrev || isLoading} aria-label="Previous page"
+                            className="p-1.5 rounded-lg border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            <ChevronLeft size={15} />
+                        </button>
+                        <button type="button" onClick={() => setPage(p => p + 1)}
+                            disabled={!hasNext || isLoading} aria-label="Next page"
+                            className="p-1.5 rounded-lg border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            <ChevronRight size={15} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
