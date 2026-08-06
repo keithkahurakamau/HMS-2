@@ -189,6 +189,35 @@ describe('<Patients /> — search', () => {
     });
 });
 
+describe('<Patients /> — view details', () => {
+    it('opens the read-only details modal from the patient name with the full record', async () => {
+        const rows = [mkPatient({
+            patient_id: 1, surname: 'Mwangi', other_names: 'Aisha', outpatient_no: 'OP-0001',
+            occupation: 'Teacher', nok_name: 'John Mwangi', nok_relationship: 'Spouse',
+            id_number: '12345678', nationality: 'Kenyan',
+        })];
+        apiClient.get.mockImplementation((url) => {
+            if (url === '/patients/count') return okCount(1);
+            if (url === '/patients/') return okList(rows);
+            return okList([]);
+        });
+        const user = userEvent.setup();
+        renderWithProviders(<Patients />);
+
+        // The patient name is a button that opens the details modal.
+        const nameBtn = (await screen.findAllByRole('button', { name: /Mwangi, Aisha/ }))[0];
+        await user.click(nameBtn);
+
+        const dialog = await screen.findByRole('dialog', { name: /patient details/i });
+        expect(within(dialog).getByText('Occupation')).toBeInTheDocument();
+        expect(within(dialog).getByText('Teacher')).toBeInTheDocument();
+        expect(within(dialog).getByText('John Mwangi')).toBeInTheDocument();
+        expect(within(dialog).getByText('12345678')).toBeInTheDocument();
+        // A shortcut to the edit modal is offered.
+        expect(within(dialog).getByRole('button', { name: /edit details/i })).toBeInTheDocument();
+    });
+});
+
 describe('<Patients /> — registration modal', () => {
     it('opens the registration drawer and POSTs to /patients/ on submit', async () => {
         const user = userEvent.setup();
