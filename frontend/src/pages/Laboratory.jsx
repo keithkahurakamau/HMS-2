@@ -1,15 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
     Microscope, Clock, AlertCircle,
-    Printer, XCircle, TestTube, FileDigit, ChevronDown, ChevronUp,
+    Printer, XCircle, TestTube, FileDigit,
     Settings, Activity, FlaskConical, Send, Package, Plus, Trash2,
-    Pencil, Save, X, RefreshCcw
+    Pencil, Save, X, RefreshCcw, FileText, Paperclip, UserPlus, History, ClipboardList,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printLabReport } from '../utils/printTemplates';
+import { printVisitSummary, printLabReport as printPatientLabReport } from '../utils/printReports';
 import PageHeader from '../components/PageHeader';
-import DepartmentQueue from '../components/DepartmentQueue';
+import { useAuth } from '../context/AuthContext';
+import PatientDetailsHeader from './clinical/PatientDetailsHeader';
+import ActionsMenu from './clinical/ActionsMenu';
+import FilesModal from './clinical/modals/FilesModal';
+import QueuePatientModal from './clinical/modals/QueuePatientModal';
+import PatientHistoryModal from '../components/PatientHistoryModal';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Laboratory                                                                */
@@ -43,8 +50,12 @@ const flagFor = (val, low, high) => {
 };
 
 export default function Laboratory() {
+    const navigate = useNavigate();
+    const auth = useAuth();
+    const perms = auth?.user?.permissions || [];
+    const hasPerm = (p) => perms.includes(p);
+
     const [activeTab, setActiveTab] = useState('queue');
-    const [isQueueOpen, setIsQueueOpen] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
 
     // ── Domain state ───────────────────────────────────────────────────────
@@ -53,12 +64,20 @@ export default function Laboratory() {
     const [labInventory, setLabInventory] = useState([]);
 
     // ── Workspace state ────────────────────────────────────────────────────
+    // The lab queue is a flat list of test orders; the workbench is patient-
+    // centric (pick a patient → their requested tests → one test's results), so
+    // we track the selected patient key alongside the active test.
+    const [activePatientKey, setActivePatientKey] = useState(null);
     const [activeTest, setActiveTest] = useState(null);
     const [results, setResults] = useState({});
     const [techNotes, setTechNotes] = useState('');
     const [consumedItems, setConsumedItems] = useState([]);
     const [selectedBatchId, setSelectedBatchId] = useState('');
     const [consumeQty, setConsumeQty] = useState('');
+
+    // ── Consolidated Actions ▾ / secondary surfaces ─────────────────────────
+    const [actionModal, setActionModal] = useState(null); // 'files' | 'queue' | null
+    const [historyModal, setHistoryModal] = useState(null); // { entry_type } | null
 
     // ── Catalog editor state ───────────────────────────────────────────────
     const [editorOpen, setEditorOpen] = useState(false);
@@ -87,6 +106,55 @@ export default function Laboratory() {
 
     /* ─── Workspace helpers ──────────────────────────────────────────────── */
 
+    // Collapse the flat test queue into one row per patient (the screen is
+    // patient-centric: pick a patient → see their requested tests). The patient
+    // key is patient_id when present, else the display name.
+    const patientGroups = useMemo(() => {
+        const byKey = new Map();
+        queue.forEach((t) => {
+            const key = t.patient_id != null ? `p${t.patient_id}` : `n:${t.patient}`;
+            let g = byKey.get(key);
+            if (!g) {
+                g = {
+                    key,
+                    patient_id: t.patient_id,
+                    patient_name: t.patient,
+                    outpatient_no: t.outpatient_no,
+                    joined_at: t.joined_at || t.requested_at,
+                    priority: 'Normal',
+                    tests: [],
+                };
+                byKey.set(key, g);
+            }
+            g.tests.push(t);
+            if (t.priority === 'STAT') g.priority = 'Critical';
+            // Keep the earliest request time as the patient's wait start.
+            if (t.joined_at && (!g.joined_at || t.joined_at < g.joined_at)) g.joined_at = t.joined_at;
+        });
+        return Array.from(byKey.values());
+    }, [queue]);
+
+    const activePatientGroup = useMemo(
+        () => patientGroups.find((g) => g.key === activePatientKey) || null,
+        [patientGroups, activePatientKey],
+    );
+
+    // Header rows: one per patient (Q.No · OPD · Name · From · Mins).
+    const headerQueue = patientGroups.map((g) => ({
+        queue_id: g.key,
+        patient_id: g.patient_id,
+        patient_name: g.patient_name,
+        outpatient_no: g.outpatient_no,
+        joined_at: g.joined_at,
+        triage_time: g.joined_at ? new Date(g.joined_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
+        priority: g.priority,
+    }));
+    const headerPatient = activePatientGroup ? {
+        patient_name: activePatientGroup.patient_name,
+        outpatient_no: activePatientGroup.outpatient_no,
+        queue_id: activePatientGroup.key,
+    } : null;
+
     const activeCatalog = useMemo(
         () => catalog.find(c => c.catalog_id === activeTest?.catalog_id),
         [catalog, activeTest],
@@ -97,12 +165,44 @@ export default function Laboratory() {
         [activeCatalog],
     );
 
-    const handleTestSelect = (test) => {
+    const loadTest = (test) => {
         setActiveTest(test);
-        setIsQueueOpen(false);
         setResults({});
         setTechNotes('');
         setConsumedItems([]);
+    };
+
+    // Selecting a patient from the header queue opens their first requested test.
+    const handlePatientSelect = (item) => {
+        const group = patientGroups.find((g) => g.key === item.queue_id);
+        if (!group) return;
+        setActivePatientKey(group.key);
+        loadTest(group.tests[0] || null);
+    };
+
+    // After a test leaves the queue (removed / rejected / released), advance to
+    // the patient's next remaining test, or clear the workspace if none remain.
+    const afterTestRemoved = (testId) => {
+        const remaining = (activePatientGroup?.tests || []).filter((t) => t.test_id !== testId);
+        if (remaining.length) {
+            loadTest(remaining[0]);
+        } else {
+            setActiveTest(null);
+            setActivePatientKey(null);
+        }
+    };
+
+    // Remove a pending test from the queue (ordered in error / no longer needed).
+    const handleCancelTest = async (order) => {
+        if (!window.confirm(`Remove "${order.test_name}" for ${order.patient_name || order.patient} from the lab queue?`)) return;
+        try {
+            await apiClient.post(`/laboratory/tests/${order.test_id}/cancel`, { reason: null });
+            toast.success('Test removed from the queue.');
+            setQueue((prev) => prev.filter((q) => q.test_id !== order.test_id));
+            if (activeTest?.test_id === order.test_id) afterTestRemoved(order.test_id);
+        } catch (e) {
+            toast.error(e.response?.data?.detail || 'Could not remove the test.');
+        }
     };
 
     const handleCollectSpecimen = async () => {
@@ -165,9 +265,9 @@ export default function Laboratory() {
         try {
             await apiClient.post(`/laboratory/tests/${activeTest.test_id}/reject`, { reason });
             toast.success('Sample rejected.');
-            setQueue(queue.filter(q => q.test_id !== activeTest.test_id));
-            setActiveTest(null);
-            setIsQueueOpen(true);
+            const removedId = activeTest.test_id;
+            setQueue(queue.filter(q => q.test_id !== removedId));
+            afterTestRemoved(removedId);
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Reject failed.');
         }
@@ -182,14 +282,60 @@ export default function Laboratory() {
         try {
             await apiClient.post(`/laboratory/tests/${activeTest.test_id}/complete`, payload);
             toast.success('Results released & stock reconciled.');
-            setQueue(queue.filter(q => q.test_id !== activeTest.test_id));
-            setActiveTest(null);
-            setIsQueueOpen(true);
+            const removedId = activeTest.test_id;
+            setQueue(queue.filter(q => q.test_id !== removedId));
+            afterTestRemoved(removedId);
             fetchLaboratoryData();
         } catch (e) {
             toast.error(e.response?.data?.detail || 'Failed to commit results.');
         }
     };
+
+    /* ─── Reports + consolidated Actions ▾ ───────────────────────────────── */
+
+    const printPatient = () => ({
+        full_name: activePatientGroup?.patient_name,
+        outpatient_no: activePatientGroup?.outpatient_no,
+        patient_id: activePatientGroup?.patient_id,
+    });
+
+    // Lab Report — the patient's tests, printed via the shared list report.
+    const handleLabReport = () => {
+        if (!activePatientGroup?.patient_id) { toast.error('This queue row has no linked patient record.'); return; }
+        apiClient.get('/laboratory/tests', { params: { patient_id: activePatientGroup.patient_id } })
+            .then((r) => printPatientLabReport({ patient: printPatient(), tests: r.data || [] }))
+            .catch((e) => toast.error(e.response?.data?.detail || 'Could not load lab tests.'));
+    };
+
+    // Visit Summary — patient context + the requested tests as investigations.
+    const handleVisitSummary = () => {
+        if (!activePatientGroup) return;
+        printVisitSummary({
+            patient: printPatient(),
+            encounter: {
+                date: new Date(),
+                investigations: activePatientGroup.tests.map((t) => t.test_name),
+            },
+        });
+    };
+
+    // Consolidated Actions ▾ — mirrors MedicentreV3's Laboratory menu; perm-
+    // gated (empty groups disappear). Approve-as-a-second-step, Unlock Lab
+    // Request, and the Test-Per-Page report are follow-ups (no backend yet).
+    const actionGroups = [
+        { label: 'Requests', items: [
+            { label: 'View Requests', icon: ClipboardList, perm: 'laboratory:read', onClick: () => setHistoryModal({ entry_type: 'lab' }) },
+            { label: 'View Previous Visits', icon: History, perm: 'laboratory:read', onClick: () => setHistoryModal({ entry_type: 'visits' }) },
+        ] },
+        { label: 'Flow', items: [
+            { label: 'Queue Patient', icon: UserPlus, perm: 'patients:write', onClick: () => setActionModal('queue') },
+        ] },
+        { label: 'Documents', items: [
+            { label: 'Files', icon: Paperclip, perm: 'laboratory:read', onClick: () => setActionModal('files') },
+            { label: 'Lab Report', icon: Printer, perm: 'laboratory:read', onClick: handleLabReport },
+            { label: 'Visit Summary', icon: FileText, perm: 'laboratory:read', onClick: handleVisitSummary },
+        ] },
+    ];
 
     /* ─── Catalog editor ─────────────────────────────────────────────────── */
 
@@ -291,90 +437,99 @@ export default function Laboratory() {
             {/* ─────────────── Mode 1: Lab Operations ─────────────── */}
             {activeTab === 'queue' && (
                 <>
-                    <div data-tour="lab-queue" className="card shrink-0 flex flex-col z-20">
-                        <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
-                            <div className="flex items-center gap-3">
-                                <TestTube className="text-brand-600" size={18} />
-                                <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Pending lab orders</h2>
-                                <span className="badge-brand">{queue.length} Tests</span>
-                            </div>
-                            <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
-                        </button>
-
-                        {isQueueOpen && (
-                            <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
-                                {/* Triage-routed patients sit inline at the top of the queue. */}
-                                <DepartmentQueue department="Laboratory" inline />
-                                {isLoading ? (
-                                    <div className="text-center py-6 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Syncing orders…</div>
-                                ) : queue.length === 0 ? (
-                                    <div className="text-center py-6 text-ink-400">No pending lab tests in queue.</div>
-                                ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                                        {queue.map((order) => {
-                                            const active = activeTest?.test_id === order.test_id;
-                                            return (
-                                                <button key={order.test_id} type="button" onClick={() => handleTestSelect(order)}
-                                                        className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 hover:-translate-y-0.5'}`}>
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <h3 className="font-semibold text-sm text-ink-900 dark:text-ink-100 line-clamp-1">{order.test_name}</h3>
-                                                        {order.priority === 'STAT' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft shrink-0" />}
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-xs text-ink-500 mb-2">
-                                                        <span className="font-medium text-ink-800 dark:text-ink-200">{order.patient}</span>
-                                                        <span className="font-mono text-2xs text-ink-400">#{order.test_id}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-xs">
-                                                        <span className={order.status === 'Pending Collection' ? 'badge-warn' : 'badge-info'}>{order.status}</span>
-                                                        <span className="text-ink-400 flex items-center gap-1"><Clock size={10} /> {new Date(order.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                    {/* Patient details + laboratory queue (shared DoctorV2 header) */}
+                    <div data-tour="lab-queue" className="shrink-0 z-20">
+                        <PatientDetailsHeader
+                            key={activePatientKey ?? 'idle'}
+                            activePatient={headerPatient}
+                            queue={headerQueue}
+                            isLoadingQueue={isLoading}
+                            showSearch={false}
+                            queueLabel="Laboratory queue"
+                            onSelectPatient={handlePatientSelect}
+                            onViewAllPatients={() => navigate('/app/patients')}
+                        />
                     </div>
 
                     {/* Workbench */}
-                    <div data-tour="lab-workbench" className="flex-1 card overflow-hidden flex flex-col z-10 relative">
-                        {!activeTest ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40">
+                    <div data-tour="lab-workbench" className="flex-1 min-h-0 card overflow-hidden flex flex-col z-10 relative">
+                        {!activePatientGroup ? (
+                            <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40 dark:bg-ink-800/40">
                                 <FlaskConical size={56} className="mb-4 text-ink-300" strokeWidth={1.5} />
                                 <h3 className="text-base font-semibold text-ink-600 dark:text-ink-400 mb-1">Laboratory workbench</h3>
-                                <p className="text-sm">Select a pending test from the queue to process specimens and enter results.</p>
+                                <p className="text-sm">Select a patient from the queue to process specimens and enter results.</p>
                             </div>
                         ) : (
                             <>
-                                <div className="shrink-0 p-5 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-between items-center z-10">
-                                    <div className="flex gap-4 items-center flex-1 min-w-0">
-                                        <div className="size-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100">
-                                            <Microscope size={20} />
+                                {/* Patient strip + Actions ▾ */}
+                                <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-3 sm:p-4 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 z-10">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="size-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100 shrink-0"><Microscope size={19} /></div>
+                                        <div className="min-w-0">
+                                            <h1 className="text-base font-semibold text-ink-900 dark:text-ink-100 tracking-tight truncate">{activePatientGroup.patient_name}</h1>
+                                            <p className="text-xs font-medium text-ink-500 truncate">{activePatientGroup.outpatient_no || '—'} · {activePatientGroup.tests.length} requested test{activePatientGroup.tests.length === 1 ? '' : 's'}</p>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h1 className="text-lg font-semibold text-ink-900 dark:text-ink-100 tracking-tight truncate">{activeTest.test_name}</h1>
-                                                {activeTest.priority === 'STAT' && <span className="badge-danger animate-pulse-soft">STAT</span>}
-                                            </div>
-                                            <p className="text-xs font-medium text-ink-500 truncate">
-                                                Patient: <span className="text-ink-700 dark:text-ink-300">{activeTest.patient}</span> · Ordered by: <span className="text-ink-700 dark:text-ink-300">{activeTest.doctor}</span> · #{activeTest.test_id}
-                                            </p>
-                                        </div>
-                                        {(activeTest.status === 'Completed' || activeTest.result_summary) && (
-                                            <button type="button" onClick={() => printLabReport({
-                                                patient: { full_name: activeTest.patient, outpatient_no: activeTest.op_no },
-                                                test: activeTest,
-                                                performedBy: { full_name: activeTest.performed_by_name },
-                                                orderedBy: { full_name: activeTest.doctor },
-                                            })} className="btn-secondary shrink-0" title="Print lab report">
-                                                <Printer size={15} /> Print report
-                                            </button>
-                                        )}
                                     </div>
+                                    <ActionsMenu has={hasPerm} groups={actionGroups} />
                                 </div>
 
-                                <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 custom-scrollbar">
+                                {/* Requested-tests rail + results panel */}
+                                <div className="flex-1 min-h-0 flex flex-col md:flex-row">
+                                    <aside className="md:w-72 shrink-0 border-b md:border-b-0 md:border-r border-ink-100 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/30 overflow-y-auto custom-scrollbar max-h-48 md:max-h-none">
+                                        <h4 className="px-4 pt-3 pb-2 text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 flex items-center gap-2"><ClipboardList size={13} /> Requested tests</h4>
+                                        <div className="px-2 pb-2 space-y-1">
+                                            {activePatientGroup.tests.map((t) => {
+                                                const on = activeTest?.test_id === t.test_id;
+                                                return (
+                                                    <div key={t.test_id} className={`group relative rounded-xl border transition-colors ${on ? 'bg-brand-50/70 dark:bg-brand-500/10 border-brand-300 dark:border-brand-500/40' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300'}`}>
+                                                        <button type="button" onClick={() => loadTest(t)} className="w-full text-left p-3 pr-8">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="font-medium text-sm text-ink-900 dark:text-ink-100 line-clamp-1">{t.test_name}</span>
+                                                                {t.priority === 'STAT' && <AlertCircle size={13} className="text-rose-500 shrink-0" />}
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-2xs">
+                                                                <span className={t.status === 'Pending Collection' ? 'badge-warn' : t.status === 'In Progress' ? 'badge-info' : 'badge-neutral'}>{t.status}</span>
+                                                                <span className="text-ink-400 flex items-center gap-1"><Clock size={10} /> {t.requested_at ? new Date(t.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+                                                            </div>
+                                                        </button>
+                                                        <button type="button" onClick={() => handleCancelTest(t)} title="Remove from queue" aria-label={`Remove ${t.test_name} from the queue`}
+                                                            className="absolute top-1.5 right-1.5 p-1 rounded-lg text-ink-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+                                                            <X size={13} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </aside>
+
+                                    {/* Results panel for the selected test */}
+                                    <div className="flex-1 min-h-0 flex flex-col">
+                                        {!activeTest ? (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40 dark:bg-ink-800/30 p-6 text-center">
+                                                <TestTube size={40} className="mb-3 text-ink-300" strokeWidth={1.5} />
+                                                <p className="text-sm">Select a requested test to enter results.</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="shrink-0 px-5 py-3 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex items-center justify-between gap-3 z-10">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <h2 className="text-base font-semibold text-ink-900 dark:text-ink-100 tracking-tight truncate">{activeTest.test_name}</h2>
+                                                        {activeTest.priority === 'STAT' && <span className="badge-danger animate-pulse-soft">STAT</span>}
+                                                        <span className="text-2xs font-mono text-ink-400 shrink-0">#{activeTest.test_id}</span>
+                                                    </div>
+                                                    {(activeTest.status === 'Completed' || activeTest.result_summary) && (
+                                                        <button type="button" onClick={() => printLabReport({
+                                                            patient: { full_name: activePatientGroup.patient_name, outpatient_no: activePatientGroup.outpatient_no },
+                                                            test: activeTest,
+                                                            performedBy: { full_name: activeTest.performed_by_name },
+                                                            orderedBy: { full_name: activeTest.doctor },
+                                                        })} className="btn-secondary shrink-0" title="Print lab report">
+                                                            <Printer size={15} /> Print report
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 dark:bg-ink-800/30 custom-scrollbar">
 
                                     {/* Stage 1: pending collection — only when catalog requires barcode */}
                                     {activeTest.status === 'Pending Collection' ? (
@@ -523,17 +678,21 @@ export default function Laboratory() {
                                     )}
                                 </div>
 
-                                {/* Footer */}
-                                {activeTest.status !== 'Pending Collection' && (
-                                    <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0 z-10">
-                                        <button type="button" onClick={handleRejectSample} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
-                                            <XCircle size={16} /> Reject sample
-                                        </button>
-                                        <button type="button" onClick={handleReleaseResults} className="btn-success">
-                                            <Send size={16} /> Verify, release &amp; reconcile stock
-                                        </button>
+                                                {/* Footer */}
+                                                {activeTest.status !== 'Pending Collection' && (
+                                                    <div className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-end gap-2 shrink-0 z-10">
+                                                        <button type="button" onClick={handleRejectSample} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
+                                                            <XCircle size={16} /> Reject sample
+                                                        </button>
+                                                        <button type="button" onClick={handleReleaseResults} className="btn-success">
+                                                            <Send size={16} /> Verify, release &amp; reconcile stock
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
-                                )}
+                                </div>
                             </>
                         )}
                     </div>
@@ -715,6 +874,22 @@ export default function Laboratory() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Consolidated Actions ▾ surfaces */}
+            {activePatientGroup && actionModal === 'files' && (
+                <FilesModal patient={{ patient_id: activePatientGroup.patient_id, patient_name: activePatientGroup.patient_name }}
+                    recordId={null} onClose={() => setActionModal(null)} />
+            )}
+            {actionModal === 'queue' && (
+                <QueuePatientModal onQueued={fetchLaboratoryData} onClose={() => setActionModal(null)} />
+            )}
+            {activePatientGroup && historyModal && (
+                <PatientHistoryModal
+                    patientId={activePatientGroup.patient_id}
+                    initialSection={historyModal.entry_type}
+                    onClose={() => setHistoryModal(null)}
+                />
             )}
         </div>
     );

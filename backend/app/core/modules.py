@@ -72,6 +72,8 @@ MODULES: Tuple[ModuleDef, ...] = (
     ModuleDef("privacy",      "Privacy",            "Consent, DSAR, audit logs.",               False),
     ModuleDef("accounting",   "Managerial Accounting","Chart of accounts, journals, financial statements.", False),
     ModuleDef("maternity",    "Maternity",          "ANC/PNC clinics, labor partograph, deliveries, newborns.", False),
+    ModuleDef("dialysis",     "Dialysis",           "Renal dialysis orders, sessions, adequacy (Kt/V), and unit management.", False),
+    ModuleDef("theatre",      "Theatre & Surgery",  "Operating-theatre scheduling, WHO safety checklist, operative notes, billing.", False),
 )
 
 # Convenience lookups.
@@ -122,6 +124,8 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/privacy/",                     "privacy"),
     ("/api/accounting/",                  "accounting"),
     ("/api/maternity/",                   "maternity"),
+    ("/api/dialysis/",                    "dialysis"),
+    ("/api/theatre/",                     "theatre"),
 )
 
 

@@ -116,6 +116,25 @@ class TestPatients:
         assert r.status_code == 200
         assert len(r.json()) >= 1
 
+    def test_count_endpoint(self, client, admin_cookies):
+        r = client.get("/api/patients/count", cookies=admin_cookies)
+        assert r.status_code == 200
+        assert r.json()["total"] >= 10
+
+    def test_count_honours_search(self, client, receptionist_cookies):
+        r = client.get("/api/patients/count?search=Kamau", cookies=receptionist_cookies)
+        assert r.status_code == 200
+        assert r.json()["total"] >= 1
+
+    def test_pagination_skip_limit_no_overlap(self, client, admin_cookies):
+        page1 = client.get("/api/patients/?skip=0&limit=5", cookies=admin_cookies)
+        page2 = client.get("/api/patients/?skip=5&limit=5", cookies=admin_cookies)
+        assert page1.status_code == 200 and page2.status_code == 200
+        assert len(page1.json()) <= 5
+        ids1 = {p["patient_id"] for p in page1.json()}
+        ids2 = {p["patient_id"] for p in page2.json()}
+        assert ids1.isdisjoint(ids2)
+
     def test_get_by_id(self, client, doctor_cookies):
         r = client.get("/api/patients/1", cookies=doctor_cookies)
         assert r.status_code == 200

@@ -25,6 +25,10 @@ class TriageCreate(BaseModel):
     chief_complaint: Optional[str] = None
     acuity_level: int = 3  # 1=Emergency … 5=Non-urgent
     triage_notes: Optional[str] = None
+    # Structured assessment lists, serialised as JSON strings (parity with
+    # MedicentreV3's Systemic Examination + Procedures).
+    systemic_exam: Optional[str] = None
+    procedures: Optional[str] = None
     # Where the nurse routes the patient next. Defaults to the doctor's desk.
     disposition: str = "Consultation"
 

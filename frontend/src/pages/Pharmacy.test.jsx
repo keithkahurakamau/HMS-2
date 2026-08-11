@@ -228,12 +228,12 @@ describe('Pharmacy — Rx fulfillment tab', () => {
             expect(apiClient.get).toHaveBeenCalledWith('/clinical/prescriptions/pending')
         );
 
-        // Each queue row exposes the patient name + the Rx ID.
+        // The shared PatientDetailsHeader queue lists each patient by name + OPD.
         expect(await screen.findByText('Asha Mwangi')).toBeInTheDocument();
         expect(screen.getByText('Brian Kamau')).toBeInTheDocument();
-        expect(screen.getByText('RX-1001')).toBeInTheDocument();
-        // Badge: "2 Awaiting"
-        expect(screen.getByText(/2 Awaiting/i)).toBeInTheDocument();
+        expect(screen.getByText('OP-2025-0001')).toBeInTheDocument();
+        // Queue counter reflects the two waiting orders.
+        expect(screen.getByText(/2 waiting/i)).toBeInTheDocument();
     });
 
     it('renders the empty state when the queue is empty', async () => {
@@ -241,9 +241,9 @@ describe('Pharmacy — Rx fulfillment tab', () => {
         renderWithProviders(<Pharmacy />);
 
         expect(
-            await screen.findByText(/No pending prescriptions at this time/i)
+            await screen.findByText(/No patients waiting/i)
         ).toBeInTheDocument();
-        expect(screen.getByText(/0 Awaiting/i)).toBeInTheDocument();
+        expect(screen.getByText(/0 waiting/i)).toBeInTheDocument();
     });
 
     it('clicking a queue row sets the active order and shows the dispense panel', async () => {
@@ -251,19 +251,61 @@ describe('Pharmacy — Rx fulfillment tab', () => {
         renderWithProviders(<Pharmacy />);
 
         const row = await screen.findByText('Asha Mwangi');
-        // The clickable element is the button wrapping the row.
+        // The clickable element is the button wrapping the queue-row name.
         const rowButton = row.closest('button');
         expect(rowButton).not.toBeNull();
         await user.click(rowButton);
 
-        // Active-order panel renders the Rx header with the order id.
-        expect(await screen.findByText('Rx: RX-1001')).toBeInTheDocument();
-        // Dispense panel exposes the "Dispense & close" action.
+        // Active-order strip renders the bill header with the order id.
+        expect(await screen.findByText(/Bill · RX-1001/)).toBeInTheDocument();
+        // Footer exposes the "Dispense & bill" action.
         expect(
-            screen.getByRole('button', { name: /Dispense & close/i })
+            screen.getByRole('button', { name: /Dispense & bill/i })
         ).toBeInTheDocument();
-        // The prescribed drug renders inside the panel.
+        // The prescribed drug renders inside the Bill Items table.
         expect(screen.getByText('Amoxicillin 500mg')).toBeInTheDocument();
+    });
+
+    it('dispenses a matched, packed Rx line and opens the payment modal', async () => {
+        const user = userEvent.setup();
+        setupApiMocks({
+            queue: [{
+                id: 'RX-2001', patient: 'Cara Njoroge', patient_id: 21, record_id: 61,
+                op_no: 'OP-2025-0009', doctor: 'Dr. Ada', time: '10:00', priority: 'Normal',
+                prescriptions: [{ drug: 'Paracetamol 500mg', dosage: '500mg', frequency: '8h', duration: '5d' }],
+            }],
+        });
+        apiClient.post.mockImplementation((url) => {
+            if (url === '/pharmacy/dispense') {
+                return Promise.resolve({ data: { dispense_id: 900, invoice_id: 950, invoice_balance: 20 } });
+            }
+            return Promise.resolve({ data: {} });
+        });
+        renderWithProviders(<Pharmacy />);
+
+        const row = await screen.findByText('Cara Njoroge');
+        await user.click(row.closest('button'));
+
+        // The line matches the Paracetamol batch by name, so its row is enabled.
+        expect(await screen.findByText('Paracetamol 500mg')).toBeInTheDocument();
+
+        // Set the dispense quantity and mark the line packed.
+        const qty = screen.getByLabelText(/Quantity for Paracetamol 500mg/i);
+        await user.clear(qty);
+        await user.type(qty, '2');
+        await user.click(screen.getByLabelText(/Mark Paracetamol 500mg packed/i));
+
+        await user.click(screen.getByRole('button', { name: /Dispense & bill/i }));
+
+        // The matched batch is dispensed against the patient + record.
+        await waitFor(() => {
+            expect(apiClient.post).toHaveBeenCalledWith(
+                '/pharmacy/dispense',
+                expect.objectContaining({ batch_id: 1, quantity: 2, patient_id: 21, record_id: 61 })
+            );
+        });
+        // Payment modal opens seeded from the rolled-up invoice.
+        expect(await screen.findByText(/Collect payment/i)).toBeInTheDocument();
     });
 });
 

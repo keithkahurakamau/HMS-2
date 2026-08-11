@@ -1,22 +1,34 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
-    Search, Pill, CheckCircle2, AlertCircle, Clock,
-    ChevronDown, ChevronUp, Package, Printer, XCircle,
-    FileWarning, ShoppingCart, Plus, Minus, Trash2, CreditCard, Store, Activity,
+    Search, Pill, CheckCircle2, AlertCircle,
+    Printer, XCircle, Stethoscope,
+    ShoppingCart, Plus, Minus, Trash2, CreditCard, Store, Activity,
     Banknote, Smartphone, X as XIcon, ReceiptText, History,
+    Wallet, Paperclip, FileText, UserPlus, RotateCcw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
+import { printVisitSummary, printLabReport } from '../utils/printReports';
 import PageHeader from '../components/PageHeader';
-import DepartmentQueue from '../components/DepartmentQueue';
 import MpesaStkProgress from '../components/MpesaStkProgress';
 import usePaymentSocket from '../hooks/usePaymentSocket';
+import { useAuth } from '../context/AuthContext';
+import PatientDetailsHeader from './clinical/PatientDetailsHeader';
+import ActionsMenu from './clinical/ActionsMenu';
+import FilesModal from './clinical/modals/FilesModal';
+import QueuePatientModal from './clinical/modals/QueuePatientModal';
 
 // Pure helper hoisted to module scope (no component state).
 const genKey = () => crypto.randomUUID();
 
 export default function Pharmacy() {
+    const navigate = useNavigate();
+    const auth = useAuth();
+    const perms = auth?.user?.permissions || [];
+    const hasPerm = (p) => perms.includes(p);
+
     // --- APP STATE ---
     const [activeTab, setActiveTab] = useState('rx'); // 'rx' | 'otc' | 'transactions'
     const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +38,12 @@ export default function Pharmacy() {
     const [queue, setQueue] = useState([]);
     const [isLoadingQueue, setIsLoadingQueue] = useState(true);
     const [activeOrder, setActiveOrder] = useState(null);
-    const [isQueueOpen, setIsQueueOpen] = useState(true);
+    // Per-line "packed" toggles and dispense quantities for the active order,
+    // both keyed by line index.
+    const [packed, setPacked] = useState({});
+    const [lineQty, setLineQty] = useState({});
+    // Consolidated Actions ▾ / secondary surfaces.
+    const [actionModal, setActionModal] = useState(null); // 'files' | 'queue' | null
 
     // --- OTC POINT OF SALE STATE (RETAIL) ---
     const [otcSearch, setOtcSearch] = useState('');
@@ -70,7 +87,68 @@ export default function Pharmacy() {
         }
     };
 
-    const filteredInventory = inventory.filter(item => 
+    // The dispense queue is a list of prescription orders; map each to the
+    // shape the shared PatientDetailsHeader renders (Q.No · OPD · Name · From ·
+    // Mins). `queue_id` doubles as the row identity + active-row highlight key.
+    const headerQueue = queue.map((o) => ({
+        ...o,
+        queue_id: o.id,
+        patient_name: o.patient,
+        outpatient_no: o.op_no,
+        triage_time: o.time,
+        priority: o.priority === 'High' ? 'High' : 'Normal',
+    }));
+    const headerPatient = activeOrder ? {
+        patient_name: activeOrder.patient,
+        outpatient_no: activeOrder.op_no,
+        age: activeOrder.age,
+        gender: activeOrder.gender,
+        allergies: activeOrder.allergies,
+        queue_id: activeOrder.id,
+    } : null;
+
+    const selectOrder = (order) => {
+        setActiveOrder(order);
+        setPacked({});
+        setLineQty({});
+    };
+    const clearActiveOrder = () => { setActiveOrder(null); setPacked({}); setLineQty({}); };
+    const togglePacked = (idx) => setPacked((p) => ({ ...p, [idx]: !p[idx] }));
+    const setQty = (idx, v) => setLineQty((q) => ({ ...q, [idx]: v }));
+
+    const rxLines = activeOrder?.prescriptions || [];
+
+    // Resolve each prescription line to a stock batch by name (loose two-way
+    // contains match), preferring an in-stock batch. Prescriptions carry no
+    // batch/price, so this bridges them to dispensable stock; the pharmacist
+    // confirms the quantity per line and sees the matched batch before packing.
+    const resolveBatch = (drug) => {
+        const n = (drug || '').toLowerCase().trim();
+        if (!n) return null;
+        const match = (it) => { const a = (it.name || '').toLowerCase(); return a.includes(n) || n.includes(a); };
+        return inventory.find((it) => it.quantity > 0 && match(it)) || inventory.find(match) || null;
+    };
+
+    // One pass over the prescription lines derives everything the bill needs:
+    // the display rows (line + matched batch + qty + amount) plus, by side
+    // effect, the running total, the packed-line count, and the dispense run
+    // (packed lines with a resolved batch and a quantity).
+    let rxTotal = 0;
+    let packedCount = 0;
+    const rxCart = [];
+    const lineRows = rxLines.map((line, idx) => {
+        const batch = resolveBatch(line.drug);
+        const qty = Number(lineQty[idx] || 0);
+        const amount = batch && qty > 0 ? Number(batch.unit_price) * qty : 0;
+        rxTotal += amount;
+        if (packed[idx]) {
+            packedCount += 1;
+            if (batch && qty > 0) rxCart.push({ batch_id: batch.batch_id, qty, notes: line.drug });
+        }
+        return { line, idx, batch, qty, amount };
+    });
+
+    const filteredInventory = inventory.filter(item =>
         item.name.toLowerCase().includes(otcSearch.toLowerCase()) || 
         item.category.toLowerCase().includes(otcSearch.toLowerCase())
     );
@@ -191,8 +269,7 @@ export default function Pharmacy() {
             await apiClient.post(`/clinical/prescriptions/${activeOrder.record_id}/return`, { reason });
             toast.success('Returned to doctor with reason.');
             setQueue(queue.filter(q => q.id !== activeOrder.id));
-            setActiveOrder(null);
-            setIsQueueOpen(true);
+            clearActiveOrder();
         } catch (error) {
             toast.error(error.response?.data?.detail || 'Return failed.');
         }
@@ -205,8 +282,7 @@ export default function Pharmacy() {
             await apiClient.post(`/clinical/prescriptions/${recordId}/cancel`, { reason });
             toast.success('Prescription cancelled.');
             fetchRxQueue();
-            setActiveOrder(null);
-            setIsQueueOpen(true);
+            clearActiveOrder();
         } catch (err) {
             toast.error(err?.response?.data?.detail || 'Could not cancel prescription.');
         }
@@ -214,12 +290,12 @@ export default function Pharmacy() {
 
     const handleRxDispense = async () => {
         if (!activeOrder) return;
-        if (cart.length === 0) {
-            return toast.error("Add the prescribed items to the cart first.");
+        if (rxCart.length === 0) {
+            return toast.error('Set a quantity and mark at least one in-stock line as packed first.');
         }
         setIsProcessing(true);
         try {
-            const responses = await dispenseItems(cart, {
+            const responses = await dispenseItems(rxCart, {
                 patient_id: activeOrder.patient_id,
                 record_id: activeOrder.record_id,
             });
@@ -232,15 +308,14 @@ export default function Pharmacy() {
                 setPayment({
                     invoiceId: last.invoice_id,
                     dispenseId: last.dispense_id,
-                    amount: last.invoice_balance ?? cartTotal,
-                    patientName: activeOrder.patient_name,
+                    amount: last.invoice_balance ?? rxTotal,
+                    patientName: activeOrder.patient,
                 });
             } else {
                 // No invoice (walk-in) — just clear and exit.
                 setCart([]);
                 setQueue(queue.filter(q => q.id !== activeOrder.id));
-                setActiveOrder(null);
-                setIsQueueOpen(true);
+                clearActiveOrder();
             }
         } catch (error) {
             toast.error(error?.response?.data?.detail || "Failed to dispense prescription.");
@@ -266,10 +341,61 @@ export default function Pharmacy() {
         setCart([]);
         if (activeOrder) {
             setQueue(queue.filter(q => q.id !== activeOrder.id));
-            setActiveOrder(null);
-            setIsQueueOpen(true);
+            clearActiveOrder();
         }
     };
+
+    // Prescription report == the printable Rx (mirrors MedicentreV3's Actions).
+    const handlePrintRx = () => {
+        if (!activeOrder) return;
+        printPrescription({
+            patient: { full_name: activeOrder.patient, outpatient_no: activeOrder.op_no, allergies: activeOrder.allergies },
+            doctor: { full_name: activeOrder.doctor, license_number: activeOrder.doctor_license },
+            items: rxLines.map((p) => ({ drug_name: p.drug, formulation: p.formulation, dosage: p.dosage, frequency: p.frequency, duration: p.duration, route: p.route || p.notes })),
+            notes: activeOrder.clinical_notes,
+            recordId: activeOrder.id,
+        });
+    };
+
+    // Visit summary — printed from what the pharmacy can see of the encounter.
+    const handleVisitSummary = () => {
+        if (!activeOrder) return;
+        printVisitSummary({
+            patient: { full_name: activeOrder.patient, outpatient_no: activeOrder.op_no, allergies: activeOrder.allergies },
+            encounter: {
+                date: new Date(),
+                doctorName: activeOrder.doctor,
+                medications: rxLines.map((p) => ({ drug_name: p.drug, dosage: p.dosage, frequency: p.frequency, duration: p.duration })),
+                hpi: activeOrder.clinical_notes,
+            },
+        });
+    };
+
+    // Lab report — pull the patient's tests then print (shared printLabReport).
+    const handleLabReport = () => {
+        if (!activeOrder?.patient_id) return;
+        apiClient.get('/laboratory/tests', { params: { patient_id: activeOrder.patient_id } })
+            .then((r) => printLabReport({ patient: { full_name: activeOrder.patient, outpatient_no: activeOrder.op_no }, tests: r.data || [] }))
+            .catch((e) => toast.error(e.response?.data?.detail || 'Could not load lab tests.'));
+    };
+
+    // Consolidated Actions ▾ — mirrors MedicentreV3's Pharmacy menu; permission-
+    // gated (empty groups disappear).
+    const actionGroups = [
+        { label: 'Flow', items: [
+            { label: 'Return to doctor', icon: RotateCcw, perm: 'pharmacy:manage', onClick: handleReturnToDoctor },
+            { label: 'Cancel script', icon: XCircle, perm: 'pharmacy:manage', onClick: () => cancelPrescription(activeOrder?.record_id) },
+            { label: 'Queue Patient', icon: UserPlus, perm: 'patients:write', onClick: () => setActionModal('queue') },
+        ] },
+        { label: 'Documents', items: [
+            { label: 'Attachments', icon: Paperclip, perm: 'clinical:read', onClick: () => setActionModal('files') },
+        ] },
+        { label: 'Reports', items: [
+            { label: 'Prescription Report', icon: Printer, onClick: handlePrintRx },
+            { label: 'Visit Summary', icon: FileText, onClick: handleVisitSummary },
+            { label: 'Lab Report', icon: FileText, perm: 'laboratory:read', onClick: handleLabReport },
+        ] },
+    ];
 
     return (
         <div className="flex flex-col gap-4 h-full md:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)]">
@@ -303,123 +429,62 @@ export default function Pharmacy() {
             {/* ========================================= */}
             {activeTab === 'rx' && (
                 <>
-                    <div data-tour="pharmacy-dispense-queue" className="card shrink-0 flex flex-col z-20">
-                        <button type="button" onClick={() => setIsQueueOpen(!isQueueOpen)} className="w-full p-4 flex justify-between items-center bg-ink-50/60 hover:bg-brand-50/40 transition-colors rounded-t-2xl focus:outline-none">
-                            <div className="flex items-center gap-3">
-                                <Package className="text-brand-600" size={18} />
-                                <h2 className="font-semibold text-ink-900 dark:text-ink-100 text-base tracking-tight">Pending prescriptions</h2>
-                                <span className="badge-warn">{queue.length} Awaiting</span>
-                            </div>
-                            <span className="text-ink-500">{isQueueOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
-                        </button>
-
-                        {isQueueOpen && (
-                            <div className="border-t border-ink-100 dark:border-ink-800 p-4 bg-white dark:bg-ink-900 rounded-b-2xl">
-                                {/* Triage-routed patients sit inline at the top of the queue. */}
-                                <DepartmentQueue department="Pharmacy" inline onChange={fetchRxQueue} />
-                                {isLoadingQueue ? (
-                                    <div className="text-center py-8 text-ink-400">
-                                        <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} />
-                                        Syncing prescription queue&hellip;
-                                    </div>
-                                ) : queue.length === 0 ? (
-                                    <div className="text-center py-8 text-ink-400">No pending prescriptions at this time.</div>
-                                ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                                        {queue.map((order) => {
-                                            const active = activeOrder?.id === order.id;
-                                            return (
-                                                <button key={order.id} type="button"
-                                                    aria-label={`Open prescription ${order.id} for ${order.patient}`}
-                                                    onClick={() => {setActiveOrder(order); setIsQueueOpen(false);}}
-                                                    className={`text-left p-3 rounded-xl border transition-all duration-150 ${active ? 'bg-brand-50/60 border-brand-400 ring-2 ring-brand-500/15' : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:border-brand-300 hover:-translate-y-0.5'}`}>
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <h3 className="font-semibold text-sm text-ink-900 dark:text-ink-100">{order.patient}</h3>
-                                                        {order.priority === 'High' && <AlertCircle size={14} className="text-rose-500 animate-pulse-soft" />}
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-xs text-brand-700 font-mono mb-1"><span>{order.id}</span></div>
-                                                    <div className="flex justify-between items-center text-xs text-ink-400"><span>{order.doctor}</span><span className="bg-ink-100 dark:bg-ink-800 px-2 py-0.5 rounded-full text-ink-600 dark:text-ink-400 flex items-center gap-1"><Clock size={10} /> {order.time}</span></div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                    {/* Patient details + dispense queue (shared DoctorV2 header) */}
+                    <div data-tour="pharmacy-dispense-queue" className="shrink-0 z-20">
+                        <PatientDetailsHeader
+                            key={activeOrder?.id ?? 'idle'}
+                            activePatient={headerPatient}
+                            queue={headerQueue}
+                            isLoadingQueue={isLoadingQueue}
+                            showSearch={false}
+                            queueLabel="Pharmacy queue"
+                            onSelectPatient={(item) => { if (item?.patient_name) selectOrder(item); }}
+                            onRemoveFromQueue={(item) => item.record_id && cancelPrescription(item.record_id)}
+                            onViewAllPatients={() => navigate('/app/patients')}
+                        />
                     </div>
 
-                    <div className="flex-1 card overflow-hidden flex flex-col z-10 relative">
+                    {/* Dispense workspace */}
+                    <div className="flex-1 min-h-0 card overflow-hidden flex flex-col z-10 relative">
                         {!activeOrder ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40">
+                            <div className="flex-1 flex flex-col items-center justify-center text-ink-400 bg-ink-50/40 dark:bg-ink-800/40">
                                 <Pill size={56} className="mb-4 text-ink-300" strokeWidth={1.5} />
                                 <h3 className="text-base font-semibold text-ink-600 dark:text-ink-400 mb-1">Select a prescription</h3>
-                                <p className="text-sm">Choose an order from the queue to dispense.</p>
+                                <p className="text-sm">Choose a patient from the queue to dispense.</p>
                             </div>
                         ) : (
                             <>
-                                <div className="shrink-0 flex flex-col">
-                                    <div className="p-4 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex justify-between items-center z-10">
-                                        <div className="flex items-center gap-3">
-                                            <div className="size-11 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 text-white flex items-center justify-center shadow-glow"><FileWarning size={18} /></div>
-                                            <div>
-                                                <h1 className="text-lg font-semibold text-ink-900 dark:text-ink-100 tracking-tight">Rx: {activeOrder.id}</h1>
-                                                <p className="text-xs font-medium text-ink-500">{activeOrder.patient} &middot; {activeOrder.op_no} &middot; {activeOrder.doctor}</p>
-                                            </div>
+                                {/* Rx header strip + Actions ▾ */}
+                                <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-3 sm:p-4 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 z-10">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="size-10 rounded-full bg-gradient-to-br from-brand-400 to-accent-500 text-white flex items-center justify-center shadow-glow shrink-0"><Pill size={17} /></div>
+                                        <div className="min-w-0">
+                                            <h1 className="text-base font-semibold text-ink-900 dark:text-ink-100 tracking-tight truncate">Bill · {activeOrder.id}</h1>
+                                            <p className="text-xs font-medium text-ink-500 truncate">{activeOrder.doctor} &middot; {activeOrder.time}</p>
                                         </div>
-                                        {activeOrder.allergies && (
-                                            <div className="bg-rose-50 ring-1 ring-rose-100 px-3 py-2 rounded-xl flex items-center gap-2 animate-pulse-soft">
-                                                <AlertCircle size={18} className="text-rose-600" />
-                                                <div>
-                                                    <p className="text-2xs font-semibold text-rose-700 uppercase tracking-[0.14em]">Allergies</p>
-                                                    <p className="text-xs font-semibold text-rose-700">{activeOrder.allergies}</p>
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
+                                    <ActionsMenu has={hasPerm} groups={actionGroups} />
                                 </div>
 
-                                <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-3 bg-ink-50/40 custom-scrollbar">
-                                    {activeOrder.prescriptions?.map((med, idx) => (
-                                        <div key={`${med.drug}-${med.dosage}-${med.frequency}-${idx}`} className="card-flush p-5">
-                                            <div className="flex justify-between items-start gap-4">
-                                                <div className="flex-1">
-                                                    <h4 className="font-semibold text-base text-ink-900 dark:text-ink-100 tracking-tight flex items-center gap-2">
-                                                        <span className="size-6 shrink-0 rounded-full bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-300 text-xs font-bold flex items-center justify-center">{idx + 1}</span>
-                                                        {med.drug}
-                                                    </h4>
-                                                    <div className="flex flex-wrap gap-5 mt-3 text-sm text-ink-700 dark:text-ink-300">
-                                                        {med.formulation && <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Formulation</span>{med.formulation}</div>}
-                                                        <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Dosage</span>{med.dosage}</div>
-                                                        <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Freq</span>{med.frequency}</div>
-                                                        <div><span className="block text-2xs font-semibold text-ink-400 uppercase tracking-wider">Duration</span>{med.duration}</div>
-                                                    </div>
-                                                </div>
-                                                <label className="flex items-center gap-2 text-xs font-medium text-ink-700 dark:text-ink-300 cursor-pointer p-2.5 border border-ink-200 dark:border-ink-800 rounded-lg hover:bg-ink-50 dark:hover:bg-ink-800/50 shrink-0">
-                                                    <input type="checkbox" className="size-4 text-brand-600 rounded border-ink-300 focus:ring-brand-500" /> Packed
-                                                </label>
-                                            </div>
-                                        </div>
-                                    ))}
+                                {/* Scroll body: bill payment details + bill items */}
+                                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-ink-50/40 dark:bg-ink-800/30 custom-scrollbar">
+                                    <BillPaymentDetails total={rxTotal} />
+                                    <BillItemsTable rows={lineRows} packed={packed} onToggle={togglePacked} onQty={setQty} />
                                 </div>
 
-                                <div data-tour="pharmacy-rx-actions" className="p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap justify-end gap-2 shrink-0 z-10">
-                                    <button type="button"
-                                        onClick={() => printPrescription({
-                                            patient: { full_name: activeOrder.patient, outpatient_no: activeOrder.op_no, allergies: activeOrder.allergies },
-                                            doctor:  { full_name: activeOrder.doctor, license_number: activeOrder.doctor_license },
-                                            items:   (activeOrder.prescriptions || []).map(p => ({ drug_name: p.drug, formulation: p.formulation, dosage: p.dosage, frequency: p.frequency, duration: p.duration, route: p.route || p.notes })),
-                                            notes:   activeOrder.clinical_notes,
-                                            recordId: activeOrder.id,
-                                        })}
-                                        className="btn-secondary"
-                                    >
-                                        <Printer size={15} /> Print Rx
-                                    </button>
-                                    <button type="button" onClick={handleReturnToDoctor} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50"><XCircle size={15} /> Return to doctor</button>
-                                    <button type="button" onClick={() => cancelPrescription(activeOrder.record_id)} className="btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-500/10">Cancel script</button>
-                                    <button type="button" onClick={handleRxDispense} disabled={isProcessing} className="btn-primary">
-                                        <CheckCircle2 size={16} /> {isProcessing ? 'Processing…' : 'Dispense & close'}
-                                    </button>
+                                {/* Footer: packed progress + dispense */}
+                                <div data-tour="pharmacy-rx-actions" className="shrink-0 p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap items-center justify-between gap-3 z-10">
+                                    <p className="text-xs text-ink-500 dark:text-ink-400 flex items-center gap-1.5">
+                                        <Stethoscope size={13} /> {packedCount}/{rxLines.length} lines packed &middot; Bill {fmtKES(rxTotal)}
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <button type="button" onClick={handlePrintRx} className="btn-secondary">
+                                            <Printer size={15} /> Print Rx
+                                        </button>
+                                        <button type="button" onClick={handleRxDispense} disabled={isProcessing || rxCart.length === 0} className="btn-primary">
+                                            <CheckCircle2 size={16} /> {isProcessing ? 'Processing…' : 'Dispense & bill'}
+                                        </button>
+                                    </div>
                                 </div>
                             </>
                         )}
@@ -555,7 +620,125 @@ export default function Pharmacy() {
                     onSettled={handlePaymentSettled}
                 />
             )}
+
+            {activeOrder && actionModal === 'files' && (
+                <FilesModal patient={{ patient_id: activeOrder.patient_id, patient_name: activeOrder.patient }}
+                    recordId={activeOrder.record_id} onClose={() => setActionModal(null)} />
+            )}
+            {actionModal === 'queue' && (
+                <QueuePatientModal onQueued={fetchRxQueue} onClose={() => setActionModal(null)} />
+            )}
         </div>
+    );
+}
+
+
+/* ─── Rx dispense — bill panels ──────────────────────────────────────────── */
+
+// Pure helper hoisted to module scope (no component state).
+const fmtKES = (v) => `KES ${Number(v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// Bill Payment Details read-out (MedicentreV3 parity). Total Bill / Amount Due
+// come from the resolved dispense lines; the deposit ledger (deposited/used/
+// refunded/balance) needs a patient-account endpoint that billing doesn't yet
+// expose, so those cells read "—" with a footnote rather than fabricate values.
+function BillPaymentDetails({ total }) {
+    const cells = [
+        { label: 'Amount Deposited', value: '—', muted: true },
+        { label: 'Total Amount Used', value: '—', muted: true },
+        { label: 'Total Amount Refunded', value: '—', muted: true },
+        { label: 'Deposit Balance', value: '—', muted: true },
+        { label: 'Total Bill', value: fmtKES(total) },
+        { label: 'Amount Due', value: fmtKES(total), strong: true },
+    ];
+    return (
+        <section className="card-flush border border-ink-200 dark:border-ink-800 rounded-2xl overflow-hidden">
+            <header className="flex items-center gap-2 px-4 py-2.5 border-b border-ink-100 dark:border-ink-800 bg-ink-50/60 dark:bg-ink-800/40">
+                <Wallet size={15} className="text-brand-500" />
+                <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100 tracking-tight">Bill Payment Details</h3>
+            </header>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-ink-100 dark:bg-ink-800">
+                {cells.map((c) => (
+                    <div key={c.label} className="bg-white dark:bg-ink-900 px-4 py-2.5">
+                        <span className="block text-2xs font-semibold uppercase tracking-[0.12em] text-ink-400 dark:text-ink-500">{c.label}</span>
+                        <span className={`block mt-0.5 text-sm tabular-nums ${c.strong ? 'font-semibold text-ink-900 dark:text-ink-100' : c.muted ? 'text-ink-400 dark:text-ink-500' : 'font-medium text-ink-800 dark:text-ink-200'}`}>{c.value}</span>
+                    </div>
+                ))}
+            </div>
+            <p className="px-4 py-1.5 text-2xs text-ink-400 dark:text-ink-500">Amounts finalise on dispense · patient deposit ledger integrates with billing next.</p>
+        </section>
+    );
+}
+
+// Bill Items grid — one row per prescribed line, matched to a stock batch. The
+// pharmacist sets the quantity and marks each line packed before dispensing.
+function BillItemsTable({ rows, packed, onToggle, onQty }) {
+    return (
+        <section className="card-flush border border-ink-200 dark:border-ink-800 rounded-2xl overflow-hidden">
+            <header className="flex items-center justify-between px-4 py-2.5 border-b border-ink-100 dark:border-ink-800 bg-ink-50/60 dark:bg-ink-800/40">
+                <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100 tracking-tight flex items-center gap-2">
+                    <Pill size={15} className="text-brand-500" /> Bill Items
+                </h3>
+                <span className="text-2xs text-ink-500 dark:text-ink-400">{rows.length} line{rows.length === 1 ? '' : 's'}</span>
+            </header>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[720px]">
+                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-500 dark:text-ink-400">
+                        <tr className="text-left text-2xs uppercase tracking-wider">
+                            <th className="px-3 py-2 font-medium">#</th>
+                            <th className="px-3 py-2 font-medium">Item</th>
+                            <th className="px-3 py-2 font-medium">Dosage</th>
+                            <th className="px-3 py-2 font-medium">Freq</th>
+                            <th className="px-3 py-2 font-medium">Duration</th>
+                            <th className="px-3 py-2 font-medium">Stock / Batch</th>
+                            <th className="px-3 py-2 font-medium text-right">Rate</th>
+                            <th className="px-3 py-2 font-medium text-right">Qty</th>
+                            <th className="px-3 py-2 font-medium text-right">Amount</th>
+                            <th className="px-3 py-2 font-medium text-center">Packed</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                        {rows.map(({ line, idx, batch, qty, amount }) => (
+                            <tr key={`${idx}-${line.drug}-${line.dosage}`} className={packed[idx] ? 'bg-emerald-50/40 dark:bg-emerald-500/5' : ''}>
+                                <td className="px-3 py-2 text-ink-400">{idx + 1}</td>
+                                <td className="px-3 py-2">
+                                    <span className="font-medium text-ink-900 dark:text-ink-100">{line.drug}</span>
+                                    {line.formulation && <span className="block text-2xs text-ink-400">{line.formulation}</span>}
+                                </td>
+                                <td className="px-3 py-2 text-ink-600 dark:text-ink-300">{line.dosage}</td>
+                                <td className="px-3 py-2 text-ink-600 dark:text-ink-300">{line.frequency}</td>
+                                <td className="px-3 py-2 text-ink-600 dark:text-ink-300">{line.duration}</td>
+                                <td className="px-3 py-2">
+                                    {batch ? (
+                                        <span className="text-ink-600 dark:text-ink-300">
+                                            <span className="font-mono text-2xs">{batch.batch_number}</span>
+                                            <span className={`block text-2xs ${batch.quantity > 0 ? 'text-ink-400' : 'text-rose-600'}`}>avail {batch.quantity}</span>
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-2xs text-rose-600"><AlertCircle size={12} /> No stock match</span>
+                                    )}
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums text-ink-600 dark:text-ink-300">{batch ? fmtKES(batch.unit_price) : '—'}</td>
+                                <td className="px-3 py-2 text-right">
+                                    <input type="number" min="0" max={batch?.quantity ?? undefined}
+                                        aria-label={`Quantity for ${line.drug}`}
+                                        value={qty || ''} disabled={!batch}
+                                        onChange={(e) => onQty(idx, e.target.value)}
+                                        className="input py-1 w-20 text-right disabled:opacity-50" />
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums font-medium text-ink-800 dark:text-ink-200">{amount ? fmtKES(amount) : '—'}</td>
+                                <td className="px-3 py-2 text-center">
+                                    <input type="checkbox" checked={!!packed[idx]} disabled={!batch}
+                                        aria-label={`Mark ${line.drug} packed`}
+                                        onChange={() => onToggle(idx)}
+                                        className="size-4 text-brand-600 rounded border-ink-300 focus:ring-brand-500 disabled:opacity-50" />
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     );
 }
 

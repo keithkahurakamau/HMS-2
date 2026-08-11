@@ -154,14 +154,42 @@ def get_lab_queue(db: Session = Depends(get_db)):
                 "requires_barcode": bool(getattr(catalog, "requires_barcode", False)) if catalog else False,
                 "priority": t.priority,
                 "status": t.status,
+                "patient_id": t.patient_id,
                 "patient": f"{patient.surname}, {patient.other_names}" if patient else "Unknown Patient",
+                "outpatient_no": patient.outpatient_no if patient else None,
                 "doctor": doctor.full_name if doctor else "Unknown Doctor",
                 "requested_at": t.requested_at.isoformat() if t.requested_at else None,
+                # `joined_at` backs the shared header's mins-waiting column.
+                "joined_at": t.requested_at.isoformat() if t.requested_at else None,
             })
         return result
     except Exception as e:
         logger.error(f"Error fetching lab queue: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch lab queue.")
+
+
+# ==========================================
+# 1b. A PATIENT'S LAB TESTS (for the Lab Report print)
+# ==========================================
+@router.get("/tests", dependencies=[Depends(RequirePermission("laboratory:read"))])
+def list_patient_tests(patient_id: int, db: Session = Depends(get_db)):
+    """All lab tests for one patient, most recent first — backs the clinical
+    "Lab Report" action (printLabReport). Metadata only, no result payload."""
+    tests = (
+        db.query(LabTest)
+        .filter(LabTest.patient_id == patient_id)
+        .order_by(desc(LabTest.requested_at))
+        .limit(200)
+        .all()
+    )
+    return [{
+        "test_id": t.test_id,
+        "test_name": t.test_name,
+        "status": t.status,
+        "priority": t.priority,
+        "result_summary": t.result_summary,
+        "created_at": t.requested_at.isoformat() if t.requested_at else None,
+    } for t in tests]
 
 
 # ==========================================
@@ -542,3 +570,32 @@ def reject_lab_test(
     test.performed_by_id = current_user["user_id"]
     db.commit()
     return {"status": "rejected", "message": "Sample rejected. Requesting clinician will be notified."}
+
+
+class CancelTestRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+@router.post("/tests/{test_id}/cancel", dependencies=[Depends(RequirePermission("laboratory:read"))])
+def cancel_lab_test(
+    test_id: int,
+    payload: CancelTestRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Remove a pending test from the lab queue (ordered in error / no longer
+    needed). Refuses tests already completed or cancelled."""
+    test = db.query(LabTest).filter(LabTest.test_id == test_id).first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Lab test not found.")
+    if test.status in ("Completed", "Cancelled"):
+        raise HTTPException(status_code=400, detail=f"Cannot cancel a {test.status.lower()} test.")
+
+    test.status = "Cancelled"
+    if payload.reason:
+        test.lab_technician_notes = (test.lab_technician_notes or "") + (
+            f"\nCANCELLED ({datetime.now().isoformat()}): {payload.reason}"
+        )
+    db.commit()
+    return {"status": "cancelled", "message": "Test removed from the lab queue.", "test_id": test_id}
