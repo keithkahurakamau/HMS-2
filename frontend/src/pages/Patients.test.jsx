@@ -71,6 +71,7 @@ const mkPatient = (overrides = {}) => ({
 });
 
 const okList = (rows) => Promise.resolve({ data: rows });
+const okCount = (n = 0) => Promise.resolve({ data: { total: n } });
 
 /* ------------------------------------------------------------------ */
 /*  Default mock wiring                                                */
@@ -79,11 +80,10 @@ const okList = (rows) => Promise.resolve({ data: rows });
 beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default: every GET returns []. Individual tests override.
+    // Default: the list + staff GETs return []; the count GET returns 0.
+    // Individual tests override.
     apiClient.get.mockImplementation((url) => {
-        if (typeof url === 'string' && url.startsWith('/patients/staff')) {
-            return Promise.resolve({ data: [] });
-        }
+        if (typeof url === 'string' && url === '/patients/count') return okCount(0);
         return Promise.resolve({ data: [] });
     });
     apiClient.post.mockResolvedValue({ data: {} });
@@ -118,8 +118,10 @@ describe('<Patients /> — directory shell', () => {
         const empty = await screen.findAllByText(/no patients match the current filters/i);
         expect(empty.length).toBeGreaterThan(0);
 
-        // GET was issued exactly once with an empty search.
-        expect(apiClient.get).toHaveBeenCalledWith('/patients/?search=');
+        // The list GET was issued with an empty search + the first page window.
+        expect(apiClient.get).toHaveBeenCalledWith('/patients/', {
+            params: { search: '', skip: 0, limit: 50 },
+        });
     });
 
     it('renders a row per patient with surname, other names, OP number and age computed from DOB', async () => {
@@ -128,7 +130,8 @@ describe('<Patients /> — directory shell', () => {
             mkPatient({ patient_id: 2, surname: 'Otieno',   other_names: 'Brian',  outpatient_no: 'OP-0002', date_of_birth: dobFor(7),  sex: 'Male' }),
         ];
         apiClient.get.mockImplementation((url) => {
-            if (url.startsWith('/patients/?search=')) return okList(rows);
+            if (url === '/patients/count') return okCount(rows.length);
+            if (url === '/patients/') return okList(rows);
             return okList([]);
         });
 
@@ -152,33 +155,66 @@ describe('<Patients /> — directory shell', () => {
 });
 
 describe('<Patients /> — search', () => {
-    it('debounces the search input and refetches with the typed query embedded in the URL', async () => {
+    it('debounces the search input and refetches with the typed query in the request params', async () => {
         // userEvent v14 + vi.useFakeTimers deadlocks (its internal setTimeout
         // races vi's queue). Use real timers and let `waitFor` poll for the
-        // debounced call — the page debounces at 500ms.
+        // debounced call — the page debounces at 350ms.
         const user = userEvent.setup();
-        apiClient.get.mockImplementation(() => okList([]));
+        apiClient.get.mockImplementation((url) =>
+            url === '/patients/count' ? okCount(0) : okList([]));
 
         renderWithProviders(<Patients />);
 
-        // First fetch fires on mount (empty search).
+        // First fetch fires on mount (empty search, first page).
         await waitFor(() => {
-            expect(apiClient.get).toHaveBeenCalledWith('/patients/?search=');
+            expect(apiClient.get).toHaveBeenCalledWith('/patients/', {
+                params: { search: '', skip: 0, limit: 50 },
+            });
         });
         const initialCallCount = apiClient.get.mock.calls.length;
 
         const search = screen.getByLabelText(/search patients/i);
         await user.type(search, 'foo');
 
-        // Debounce window is 500ms — waitFor polls until the call fires.
+        // Debounce window is 350ms — waitFor polls until the list call fires
+        // with the typed query in params.
         await waitFor(() => {
             const newCalls = apiClient.get.mock.calls.slice(initialCallCount);
-            const searchCalls = newCalls.filter(([url]) =>
-                typeof url === 'string' && url.includes('search=foo'),
+            const searchCalls = newCalls.filter(([url, cfg]) =>
+                url === '/patients/' && cfg?.params?.search === 'foo',
             );
             expect(searchCalls.length).toBeGreaterThan(0);
-            expect(searchCalls[0][0]).toBe('/patients/?search=foo');
+            expect(searchCalls[0][1].params).toMatchObject({ search: 'foo', skip: 0, limit: 50 });
         }, { timeout: 2000 });
+    });
+});
+
+describe('<Patients /> — view details', () => {
+    it('opens the read-only details modal from the patient name with the full record', async () => {
+        const rows = [mkPatient({
+            patient_id: 1, surname: 'Mwangi', other_names: 'Aisha', outpatient_no: 'OP-0001',
+            occupation: 'Teacher', nok_name: 'John Mwangi', nok_relationship: 'Spouse',
+            id_number: '12345678', nationality: 'Kenyan',
+        })];
+        apiClient.get.mockImplementation((url) => {
+            if (url === '/patients/count') return okCount(1);
+            if (url === '/patients/') return okList(rows);
+            return okList([]);
+        });
+        const user = userEvent.setup();
+        renderWithProviders(<Patients />);
+
+        // The patient name is a button that opens the details modal.
+        const nameBtn = (await screen.findAllByRole('button', { name: /Mwangi, Aisha/ }))[0];
+        await user.click(nameBtn);
+
+        const dialog = await screen.findByRole('dialog', { name: /patient details/i });
+        expect(within(dialog).getByText('Occupation')).toBeInTheDocument();
+        expect(within(dialog).getByText('Teacher')).toBeInTheDocument();
+        expect(within(dialog).getByText('John Mwangi')).toBeInTheDocument();
+        expect(within(dialog).getByText('12345678')).toBeInTheDocument();
+        // A shortcut to the edit modal is offered.
+        expect(within(dialog).getByRole('button', { name: /edit details/i })).toBeInTheDocument();
     });
 });
 
@@ -339,7 +375,8 @@ describe('<Patients /> — soft delete', () => {
         const user = userEvent.setup();
         const row = mkPatient({ patient_id: 7, outpatient_no: 'OP-0007', surname: 'Njoki' });
         apiClient.get.mockImplementation((url) => {
-            if (url.startsWith('/patients/?search=')) return okList([row]);
+            if (url === '/patients/count') return okCount(1);
+            if (url === '/patients/') return okList([row]);
             return okList([]);
         });
 
@@ -372,7 +409,8 @@ describe('<Patients /> — soft delete', () => {
         const user = userEvent.setup();
         const row = mkPatient({ patient_id: 7, surname: 'Njoki' });
         apiClient.get.mockImplementation((url) => {
-            if (url.startsWith('/patients/?search=')) return okList([row]);
+            if (url === '/patients/count') return okCount(1);
+            if (url === '/patients/') return okList([row]);
             return okList([]);
         });
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
@@ -393,7 +431,8 @@ describe('<Patients /> — route to queue', () => {
         const user = userEvent.setup();
         const row = mkPatient({ patient_id: 11, surname: 'Achieng', other_names: 'Mary' });
         apiClient.get.mockImplementation((url) => {
-            if (url.startsWith('/patients/?search=')) return okList([row]);
+            if (url === '/patients/count') return okCount(1);
+            if (url === '/patients/') return okList([row]);
             if (url.startsWith('/patients/staff'))    return okList([]);
             return okList([]);
         });
@@ -432,7 +471,8 @@ describe('<Patients /> — route to queue', () => {
         const user = userEvent.setup();
         const row = mkPatient({ patient_id: 12, surname: 'Kariuki', other_names: 'Peter' });
         apiClient.get.mockImplementation((url) => {
-            if (url.startsWith('/patients/?search=')) return okList([row]);
+            if (url === '/patients/count') return okCount(1);
+            if (url === '/patients/') return okList([row]);
             if (url.startsWith('/patients/staff'))    return okList([]);
             return okList([]);
         });
@@ -456,7 +496,8 @@ describe('<Patients /> — route to queue', () => {
         const user = userEvent.setup();
         const row = mkPatient({ patient_id: 13, surname: 'Owino', other_names: 'Lucy' });
         apiClient.get.mockImplementation((url) => {
-            if (url.startsWith('/patients/?search=')) return okList([row]);
+            if (url === '/patients/count') return okCount(1);
+            if (url === '/patients/') return okList([row]);
             if (url.startsWith('/patients/staff'))    return okList([]);
             return okList([]);
         });
@@ -480,7 +521,8 @@ describe('<Patients /> — view history', () => {
         const user = userEvent.setup();
         const row = mkPatient({ patient_id: 42, surname: 'Wairimu', other_names: 'Joy' });
         apiClient.get.mockImplementation((url) => {
-            if (url.startsWith('/patients/?search=')) return okList([row]);
+            if (url === '/patients/count') return okCount(1);
+            if (url === '/patients/') return okList([row]);
             return okList([]);
         });
 
