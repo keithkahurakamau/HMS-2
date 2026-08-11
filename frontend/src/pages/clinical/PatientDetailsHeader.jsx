@@ -21,6 +21,7 @@ const priorityBadge = (priority) => {
 export default function PatientDetailsHeader({
     activePatient, queue = [], isLoadingQueue = false,
     onSelectPatient, onRemoveFromQueue, onViewAllPatients,
+    showSearch = true, queueLabel = 'Consultation queue',
 }) {
     // Queue starts collapsed while charting (maximise the workspace) and open
     // when idle (so the doctor can pick the next patient). The shell remounts
@@ -34,7 +35,7 @@ export default function PatientDetailsHeader({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 border-b border-ink-100 dark:border-ink-800">
                 <button type="button" onClick={() => setOpen((o) => !o)}
                     className="flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white shrink-0"
-                    aria-expanded={open} title={open ? 'Hide consultation queue' : 'Show consultation queue'}>
+                    aria-expanded={open} title={open ? `Hide ${queueLabel.toLowerCase()}` : `Show ${queueLabel.toLowerCase()}`}>
                     <User size={16} className="text-brand-500" />
                     <span className="max-w-[13rem] truncate">{activePatient ? activePatient.patient_name : 'No patient selected'}</span>
                     {open ? <ChevronUp size={15} className="text-ink-400" /> : <ChevronDown size={15} className="text-ink-400" />}
@@ -51,12 +52,16 @@ export default function PatientDetailsHeader({
                         )}
                     </div>
                 )}
-                <div className="flex-1 min-w-[200px]">
-                    <PatientSearch onSelect={onSelectPatient} placeholder="Search patient by name, ID, OP No or phone…" />
-                </div>
-                <button type="button" onClick={onViewAllPatients} className="btn-ghost text-xs whitespace-nowrap shrink-0">
-                    <Users size={14} /> View all patients
-                </button>
+                {showSearch ? (
+                    <div className="flex-1 min-w-[200px]">
+                        <PatientSearch onSelect={onSelectPatient} placeholder="Search patient by name, ID, OP No or phone…" />
+                    </div>
+                ) : <div className="flex-1" />}
+                {onViewAllPatients && (
+                    <button type="button" onClick={onViewAllPatients} className="btn-ghost text-xs whitespace-nowrap shrink-0">
+                        <Users size={14} /> View all patients
+                    </button>
+                )}
             </div>
 
             {/* Consultation queue table (collapsible) */}
@@ -64,7 +69,7 @@ export default function PatientDetailsHeader({
                 <div className="p-3">
                     <div className="flex items-center justify-between mb-2">
                         <h4 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 flex items-center gap-2">
-                            <Clock size={13} /> Consultation queue
+                            <Clock size={13} /> {queueLabel}
                         </h4>
                         <span className="text-2xs text-ink-500 dark:text-ink-400">{queue.length} waiting</span>
                     </div>

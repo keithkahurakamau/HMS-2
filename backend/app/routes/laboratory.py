@@ -165,6 +165,30 @@ def get_lab_queue(db: Session = Depends(get_db)):
 
 
 # ==========================================
+# 1b. A PATIENT'S LAB TESTS (for the Lab Report print)
+# ==========================================
+@router.get("/tests", dependencies=[Depends(RequirePermission("laboratory:read"))])
+def list_patient_tests(patient_id: int, db: Session = Depends(get_db)):
+    """All lab tests for one patient, most recent first — backs the clinical
+    "Lab Report" action (printLabReport). Metadata only, no result payload."""
+    tests = (
+        db.query(LabTest)
+        .filter(LabTest.patient_id == patient_id)
+        .order_by(desc(LabTest.requested_at))
+        .limit(200)
+        .all()
+    )
+    return [{
+        "test_id": t.test_id,
+        "test_name": t.test_name,
+        "status": t.status,
+        "priority": t.priority,
+        "result_summary": t.result_summary,
+        "created_at": t.requested_at.isoformat() if t.requested_at else None,
+    } for t in tests]
+
+
+# ==========================================
 # 2. FETCH ADMIN TEST CATALOG (with parameters)
 # ==========================================
 @router.get("/catalog", dependencies=[Depends(RequirePermission("laboratory:read"))])

@@ -40,6 +40,7 @@ def get_triage_queue(db: Session = Depends(get_db)):
         PatientQueue.acuity_level,
         PatientQueue.status,
         func.to_char(PatientQueue.joined_at, 'HH12:MI AM').label('joined_time'),
+        PatientQueue.joined_at,
         Patient.patient_id,
         Patient.surname,
         Patient.other_names,
@@ -67,6 +68,8 @@ def get_triage_queue(db: Session = Depends(get_db)):
             "age": age,
             "gender": "M" if q.sex == "Male" else "F",
             "joined_time": q.joined_time,
+            "joined_at": q.joined_at.isoformat() if q.joined_at else None,
+            "acuity_level": q.acuity_level,
             "status": q.status,
             "allergies": q.allergies or "None",
         })
