@@ -85,6 +85,7 @@ def get_visit_detail(record_id: int, request: Request, db: Session = Depends(get
         "physical_examination": rec.physical_examination,
         "icd10_codes": codes,
         "diagnosis": rec.diagnosis,
+        "assessment_plan": rec.assessment_plan,
         "prescriptions": _parse_prescriptions(rec.treatment_plan) if rec.treatment_plan else [],
         "prescription_notes": rec.prescription_notes,
         "follow_up_date": rec.follow_up_date.isoformat() if rec.follow_up_date else None,

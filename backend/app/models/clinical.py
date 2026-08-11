@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index, Float, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index, Float, JSON, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.config.database import Base
@@ -69,6 +69,11 @@ class TriageRecord(Base):
     chief_complaint = Column(String, nullable=True)
     acuity_level = Column(Integer, default=3)  # 1=Emergency … 5=Non-urgent
     triage_notes = Column(String, nullable=True)
+    # Structured MedicentreV3-parity assessment lists, stored as JSON strings:
+    #   systemic_exam → [{"body_system", "remark", "is_anomalous"}]
+    #   procedures    → [{"procedure", "remark"}]
+    systemic_exam = Column(Text, nullable=True)
+    procedures = Column(Text, nullable=True)
     # Department the nurse is routing the patient to next (canonical name).
     disposition = Column(String(50), default="Consultation")
 
@@ -111,6 +116,10 @@ class MedicalRecord(Base):
     icd10_code = Column(String(255), index=True, nullable=True)
     diagnosis = Column(String, nullable=True)
     treatment_plan = Column(String, nullable=True)
+    # Assessment & plan narrative (DoctorV2 "Assess & Plan" action). Kept
+    # separate from treatment_plan, which carries the prescription JSON the
+    # pharmacy pipeline parses.
+    assessment_plan = Column(Text, nullable=True)
     prescription_notes = Column(String, nullable=True)
     internal_notes = Column(String, nullable=True)
     follow_up_date = Column(DateTime(timezone=True), nullable=True)

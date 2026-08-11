@@ -9,6 +9,7 @@ import {
     MoreVertical, Stethoscope, TestTube, UserMinus,
     Pill, Bed, CreditCard, Printer, Download, Trash, Eye, Edit,
     AlertTriangle, Droplet, Send, Image, ChevronDown, Save,
+    ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { printPatientCard } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
@@ -163,10 +164,18 @@ const computeDobFromAge = (age) => {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+// Registry page size — the backend caps a page at 200; the directory pages
+// through with skip/limit so every record is reachable (not just the first 50).
+const PAGE_SIZE = 50;
+
 export default function Patients() {
     const [patients, setPatients] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    // Pagination: `page` is 0-based; `totalCount` is the full active-patient
+    // count (honouring the search) fetched from /patients/count.
+    const [page, setPage] = useState(0);
+    const [totalCount, setTotalCount] = useState(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -220,15 +229,23 @@ export default function Patients() {
     const [consentForm, setConsentForm] = useState(DEFAULT_CONSENT_STATE);
 
     useEffect(() => {
-        const delayDebounce = setTimeout(() => fetchPatients(), 500);
+        const delayDebounce = setTimeout(() => fetchPatients(), 350);
         return () => clearTimeout(delayDebounce);
-    }, [searchQuery]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchQuery, page]);
 
     const fetchPatients = async () => {
         setIsLoading(true);
         try {
-            const response = await apiClient.get(`/patients/?search=${encodeURIComponent(searchQuery)}`);
+            const response = await apiClient.get('/patients/', {
+                params: { search: searchQuery, skip: page * PAGE_SIZE, limit: PAGE_SIZE },
+            });
             setPatients(response.data);
+            // Total is best-effort — an older API mid-deploy may not expose
+            // /count yet, so a failure just leaves the last known total.
+            apiClient.get('/patients/count', { params: { search: searchQuery } })
+                .then((r) => setTotalCount(r.data?.total ?? 0))
+                .catch(() => {});
         } catch (error) {
             // Suppress the toast when the client is in the middle of
             // redirecting to /portal (tenant guard) — the page is about
@@ -374,6 +391,16 @@ export default function Patients() {
         setEditingPatient(patient);
     };
     const closeEditModal = () => setEditingPatient(null);
+
+    // Read-only "view all details" surface — the full patient record in one
+    // glance (no editing). Fed straight from the row, which already carries
+    // every column the list endpoint returns.
+    const [viewingPatient, setViewingPatient] = useState(null);
+    const openViewModal = (patient) => {
+        closeDropdown();
+        setViewingPatient(patient);
+    };
+    const closeViewModal = () => setViewingPatient(null);
     const handlePatientUpdated = async () => {
         await fetchPatients();
         closeEditModal();
@@ -478,14 +505,23 @@ export default function Patients() {
         sexFilter ? patients.filter(p => p.sex === sexFilter) : patients
     ), [patients, sexFilter]);
 
-    // Aggregate stats for the strip at the top of the directory.
+    // Aggregate stats for the strip at the top of the directory. The headline
+    // total is the full active-patient count from the server; the demographic
+    // tallies are for the current page (a lightweight, per-page snapshot).
     const stats = useMemo(() => {
         const today = patients.filter(p => isToday(p.registered_on)).length;
         const female = patients.filter(p => p.sex === 'Female').length;
         const male = patients.filter(p => p.sex === 'Male').length;
         const withAllergies = patients.filter(p => p.allergies && p.allergies.trim()).length;
-        return { total: patients.length, today, female, male, withAllergies };
-    }, [patients]);
+        return { total: totalCount || patients.length, today, female, male, withAllergies };
+    }, [patients, totalCount]);
+
+    // Pagination window over the full result set.
+    const total = totalCount || patients.length;
+    const rangeStart = patients.length ? page * PAGE_SIZE + 1 : 0;
+    const rangeEnd = page * PAGE_SIZE + patients.length;
+    const hasPrev = page > 0;
+    const hasNext = totalCount ? rangeEnd < totalCount : patients.length === PAGE_SIZE;
 
     return (
         <div className="space-y-6">
@@ -526,7 +562,7 @@ export default function Patients() {
                         type="search"
                         placeholder="Search by OP Number, name, ID, or phone…"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
                         className="input pl-10"
                     />
                 </div>
@@ -548,8 +584,24 @@ export default function Patients() {
                         </button>
                     ))}
                 </div>
-                <div className="text-xs text-ink-500 sm:ml-2 shrink-0">
-                    {visiblePatients.length} of {patients.length} record{patients.length === 1 ? '' : 's'}
+                <div className="flex items-center gap-2 sm:ml-2 shrink-0">
+                    <span className="text-xs text-ink-500 whitespace-nowrap">
+                        {total === 0
+                            ? 'No records'
+                            : `${rangeStart}–${rangeEnd} of ${total}${sexFilter ? ` · ${visiblePatients.length} on page` : ''}`}
+                    </span>
+                    <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))}
+                            disabled={!hasPrev || isLoading} aria-label="Previous page"
+                            className="p-1.5 rounded-lg border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            <ChevronLeft size={15} />
+                        </button>
+                        <button type="button" onClick={() => setPage(p => p + 1)}
+                            disabled={!hasNext || isLoading} aria-label="Next page"
+                            className="p-1.5 rounded-lg border border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            <ChevronRight size={15} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -595,7 +647,11 @@ export default function Patients() {
                                                         {initialsOf(patient)}
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <div className="font-semibold text-ink-900 dark:text-ink-100 truncate">{patient.surname}, {patient.other_names}</div>
+                                                        <button type="button" onClick={() => openViewModal(patient)}
+                                                            title="View all details"
+                                                            className="font-semibold text-ink-900 dark:text-ink-100 truncate max-w-full hover:text-brand-700 dark:hover:text-brand-400 hover:underline text-left cursor-pointer">
+                                                            {patient.surname}, {patient.other_names}
+                                                        </button>
                                                         <div className="flex items-center gap-2 text-xs text-ink-500 mt-0.5">
                                                             <span className="font-mono text-brand-700">{patient.outpatient_no}</span>
                                                             <span aria-hidden="true">·</span>
@@ -708,7 +764,10 @@ export default function Patients() {
                                         {initialsOf(patient)}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="font-semibold text-ink-900 dark:text-ink-100 truncate">{patient.surname}, {patient.other_names}</h3>
+                                        <button type="button" onClick={() => openViewModal(patient)}
+                                            className="font-semibold text-ink-900 dark:text-ink-100 truncate max-w-full hover:text-brand-700 dark:hover:text-brand-400 hover:underline text-left cursor-pointer">
+                                            {patient.surname}, {patient.other_names}
+                                        </button>
                                         <div className="text-xs text-ink-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                             <span className="font-mono text-brand-700">{patient.outpatient_no}</span>
                                             <span>{patient.sex}{age !== null ? ` · ${age}y` : ''}</span>
@@ -1128,6 +1187,7 @@ export default function Patients() {
                         patient={open}
                         anchorEl={activeDropdown.anchorEl}
                         onClose={closeDropdown}
+                        onViewDetails={openViewModal}
                         onView={viewHistory}
                         onEdit={openEditModal}
                         onPrint={(p) => { printPatientCard(p); closeDropdown(); }}
@@ -1145,6 +1205,14 @@ export default function Patients() {
                     patient={editingPatient}
                     onClose={closeEditModal}
                     onSaved={handlePatientUpdated}
+                />
+            )}
+
+            {viewingPatient && (
+                <PatientDetailsModal
+                    patient={viewingPatient}
+                    onClose={closeViewModal}
+                    onEdit={() => { const p = viewingPatient; closeViewModal(); openEditModal(p); }}
                 />
             )}
         </div>
@@ -1426,7 +1494,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
 const MENU_WIDTH = 232;
 const MENU_MARGIN = 8;
 
-function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport, onDeactivate, onErase, routeTargets = [], onRoute }) {
+function RowMenu({ patient, anchorEl, onClose, onViewDetails, onView, onEdit, onPrint, onExport, onDeactivate, onErase, routeTargets = [], onRoute }) {
     const [showRoute, setShowRoute] = useState(false);
     const menuRef = useRef(null);
     const [pos, setPos] = useState({ top: 0, left: 0, ready: false });
@@ -1499,8 +1567,11 @@ function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport
             className="bg-white dark:bg-ink-900 rounded-xl shadow-elevated border border-ink-200 dark:border-ink-800 py-2 z-[60] text-left animate-fade-in"
         >
             <div className="px-3 pt-1 pb-1.5 text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em]">Manage</div>
+            <button type="button" role="menuitem" onClick={() => onViewDetails(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
+                <Eye size={15} className="text-ink-500" aria-hidden="true" /> View details
+            </button>
             <button type="button" role="menuitem" onClick={() => onView(patient.patient_id)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
-                <Eye size={15} className="text-ink-500" aria-hidden="true" /> View history
+                <Clock size={15} className="text-ink-500" aria-hidden="true" /> View history
             </button>
             <button type="button" role="menuitem" onClick={() => onEdit(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
                 <Edit size={15} className="text-ink-500" aria-hidden="true" /> Edit details
@@ -1561,6 +1632,124 @@ function RowMenu({ patient, anchorEl, onClose, onView, onEdit, onPrint, onExport
  * kept here because front-desk frequently mis-keys them at registration
  * and the audit trail captures every change anyway.
  */
+/**
+ * PatientDetailsModal — read-only "view all details" surface. Renders the full
+ * patient record grouped into sections; fed straight from the row object (the
+ * list endpoint returns every column). No editing — a shortcut jumps to the
+ * edit modal.
+ */
+// Pure display helpers — hoisted to module scope so they aren't rebuilt each render.
+const fmtLongDate = (d) => (d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null);
+const shownOrDash = (v) => (v === 0 || v ? v : '—');
+
+function PatientDetailsModal({ patient, onClose, onEdit }) {
+    const age = ageFrom(patient.date_of_birth);
+
+    const sections = [
+        { title: 'Identity', icon: Users, rows: [
+            ['Surname', patient.surname],
+            ['Other names', patient.other_names],
+            ['Sex', patient.sex],
+            ['Date of birth', patient.date_of_birth ? `${fmtLongDate(patient.date_of_birth)}${age !== null ? ` · ${age}y` : ''}` : null],
+            ['Marital status', patient.marital_status],
+            ['Nationality', patient.nationality],
+            ['ID type', patient.id_type],
+            ['ID number', patient.id_number],
+            ['Religion', patient.religion],
+            ['Primary language', patient.primary_language],
+        ] },
+        { title: 'Contact', icon: Phone, rows: [
+            ['Telephone 1', patient.telephone_1],
+            ['Telephone 2', patient.telephone_2],
+            ['Email', patient.email],
+            ['Postal address', patient.postal_address],
+            ['Postal code', patient.postal_code],
+            ['Residence', patient.residence],
+            ['Town', patient.town],
+        ] },
+        { title: 'Employment', icon: Briefcase, rows: [
+            ['Occupation', patient.occupation],
+            ['Employer', patient.employer_name],
+            ['Reference number', patient.reference_number],
+        ] },
+        { title: 'Clinical', icon: HeartPulse, rows: [
+            ['Blood group', patient.blood_group && patient.blood_group !== 'Unknown' ? patient.blood_group : null],
+            ['Allergies', patient.allergies],
+            ['Chronic conditions', patient.chronic_conditions],
+        ] },
+        { title: 'Next of kin', icon: Users, rows: [
+            ['Name', patient.nok_name],
+            ['Relationship', patient.nok_relationship],
+            ['Contact', patient.nok_contact],
+        ] },
+        { title: 'Registration', icon: Clock, rows: [
+            ['Outpatient No', patient.outpatient_no],
+            ['Registered on', patient.registered_on ? new Date(patient.registered_on).toLocaleString() : null],
+            ['Notes', patient.notes],
+        ] },
+    ];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm cursor-default" onClick={onClose} />
+            <div role="dialog" aria-modal="true" aria-label="Patient details"
+                className="relative w-full max-w-2xl max-h-[90vh] bg-white dark:bg-ink-900 rounded-2xl shadow-elevated flex flex-col">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className={`shrink-0 size-11 rounded-full flex items-center justify-center text-sm font-semibold ${avatarColor(patient.outpatient_no)}`} aria-hidden="true">
+                            {initialsOf(patient)}
+                        </div>
+                        <div className="min-w-0">
+                            <h2 className="text-lg font-semibold text-ink-900 dark:text-ink-100 truncate">{patient.surname}, {patient.other_names}</h2>
+                            <p className="text-xs text-ink-500">
+                                <span className="font-mono text-brand-700">{patient.outpatient_no}</span> · {patient.sex}{age !== null ? `, ${age}y` : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 text-ink-400 hover:text-ink-700 p-1.5 hover:bg-ink-100 dark:hover:bg-ink-800 rounded-full cursor-pointer">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
+                    {patient.allergies && patient.allergies.trim() && (
+                        <div className="flex items-start gap-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-200 dark:ring-rose-500/20 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">
+                            <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+                            <span><span className="font-semibold">Allergies:</span> {patient.allergies}</span>
+                        </div>
+                    )}
+                    {sections.map((sec) => (
+                        <section key={sec.title}>
+                            <h3 className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 flex items-center gap-2 mb-2">
+                                <sec.icon size={13} aria-hidden="true" /> {sec.title}
+                            </h3>
+                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                                {sec.rows.map(([label, value]) => (
+                                    <div key={label} className="flex flex-col">
+                                        <dt className="text-2xs text-ink-400">{label}</dt>
+                                        <dd className="text-sm text-ink-800 dark:text-ink-200 break-words">{shownOrDash(value)}</dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        </section>
+                    ))}
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-ink-100 dark:border-ink-800 flex justify-end gap-2 shrink-0">
+                    <button type="button" onClick={onClose} className="btn-secondary">Close</button>
+                    {onEdit && (
+                        <button type="button" onClick={onEdit} className="btn-primary"><Edit size={15} /> Edit details</button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
 function EditPatientModal({ patient, onClose, onSaved }) {
     const [form, setForm] = useState({
         surname:           patient.surname           ?? '',

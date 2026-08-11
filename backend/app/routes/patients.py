@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, desc, text
+from sqlalchemy import or_, desc, text, func
 from sqlalchemy.exc import IntegrityError, DataError
 from pydantic import BaseModel
 from typing import List
@@ -119,29 +119,52 @@ def create_patient_record(db: Session, *, created_by: int, **fields) -> Patient:
 # ==========================================
 # 1. SEARCH & LIST PATIENTS
 # ==========================================
+# Registry page size cap — a single page never returns more than this many
+# rows, so a large tenant can't blow up the response. The frontend paginates
+# with skip/limit and reads the total from /count.
+MAX_PAGE_SIZE = 200
+
+
+def _apply_patient_search(query, search: str):
+    """Apply the shared registry search filter (used by list + count)."""
+    if not search:
+        return query
+    search_term = f"%{search}%"
+    # M-1 phase 2: id_number / telephone_1 are encrypted, so they can't be
+    # ILIKE-searched. Name + OP number stay substring; phone + ID become
+    # exact-match via their blind indexes (caller must type the full value).
+    conditions = [
+        Patient.outpatient_no.ilike(search_term),
+        Patient.surname.ilike(search_term),
+        Patient.other_names.ilike(search_term),
+    ]
+    ph = phone_bidx(search)
+    if ph:
+        conditions.append(Patient.telephone_1_bidx == ph)
+    idx = id_bidx(search)
+    if idx:
+        conditions.append(Patient.id_number_bidx == idx)
+    return query.filter(or_(*conditions))
+
+
 @router.get("/", dependencies=[Depends(RequirePermission("patients:read"))])
 @limiter.limit("60/minute")
 def get_patients(request: Request, search: str = Query("", description="Search by name, ID, OP number, or phone"), skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
-    query = db.query(Patient).filter(Patient.is_active == True) 
-    
-    if search:
-        search_term = f"%{search}%"
-        # M-1 phase 2: id_number / telephone_1 are encrypted, so they can't be
-        # ILIKE-searched. Name + OP number stay substring; phone + ID become
-        # exact-match via their blind indexes (caller must type the full value).
-        conditions = [
-            Patient.outpatient_no.ilike(search_term),
-            Patient.surname.ilike(search_term),
-            Patient.other_names.ilike(search_term),
-        ]
-        ph = phone_bidx(search)
-        if ph:
-            conditions.append(Patient.telephone_1_bidx == ph)
-        idx = id_bidx(search)
-        if idx:
-            conditions.append(Patient.id_number_bidx == idx)
-        query = query.filter(or_(*conditions))
+    # Clamp the page size so a caller can't request the whole (potentially huge)
+    # registry in one shot; the registry pages through with skip/limit instead.
+    limit = max(1, min(limit, MAX_PAGE_SIZE))
+    skip = max(0, skip)
+    query = _apply_patient_search(db.query(Patient).filter(Patient.is_active == True), search)
     return query.order_by(desc(Patient.registered_on)).offset(skip).limit(limit).all()
+
+
+@router.get("/count", dependencies=[Depends(RequirePermission("patients:read"))])
+@limiter.limit("60/minute")
+def count_patients(request: Request, search: str = Query("", description="Search by name, ID, OP number, or phone"), db: Session = Depends(get_db)):
+    """Total active patients (honouring the same search filter) — lets the
+    registry show an accurate count and paginate through every record."""
+    query = _apply_patient_search(db.query(func.count(Patient.patient_id)).filter(Patient.is_active == True), search)
+    return {"total": query.scalar() or 0}
 
 # ==========================================
 # 2. GET PATIENT BY ID
