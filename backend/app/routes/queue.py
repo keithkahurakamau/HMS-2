@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date as date_cls, timedelta
+from collections import defaultdict
 
 from app.config.database import get_db
 from app.models.clinical import PatientQueue
 from app.models.patient import Patient
+from app.models.user import User
 from app.schemas.queue import (
     QueueCreate, QueueResponse, QueueEndOfDay, QueueCheckoutResult, QueueCancel,
     CloseVisitResult,
@@ -76,6 +78,176 @@ def get_active_queue(department: Optional[str] = None, db: Session = Depends(get
         entry_dict["patient_name"] = f"{patient.other_names} {patient.surname}"
         result.append(entry_dict)
     return result
+
+
+def _scheme_of(patient: Patient) -> str:
+    """Display label for a patient's payment scheme — the insurance provider on
+    file, or 'Cash' when they have none."""
+    return (patient.insurance_provider or "").strip() or "Cash"
+
+
+@router.get("/live", dependencies=[Depends(RequirePermission("patients:read"))])
+def get_live_queue(db: Session = Depends(get_db)):
+    """Live board of every patient currently on a queue across ALL departments.
+
+    Each row carries Q.No (queue_id), patient + payment scheme, the timestamp
+    they joined, and the from→to "rooms" (departments): `to_department` is where
+    they're waiting now, `from_department` is the stop they were routed in from
+    (their most recent completed stop before this one, or null for a fresh
+    arrival). Duration is derived client-side from `joined_at` so it can tick
+    live. Ordered by acuity then wait time — sickest / longest-waiting first.
+    """
+    active = (
+        db.query(PatientQueue, Patient)
+        .join(Patient, PatientQueue.patient_id == Patient.patient_id)
+        .filter(~PatientQueue.status.in_(TERMINAL_QUEUE_STATUSES))
+        .order_by(PatientQueue.acuity_level.asc(), PatientQueue.joined_at.asc())
+        .all()
+    )
+    patient_ids = {q.patient_id for q, _ in active}
+
+    # Batch the "where did they come from" lookup: every completed stop for the
+    # patients on the board, newest-first, grouped per patient.
+    completed_by_patient: dict[int, list[PatientQueue]] = defaultdict(list)
+    staff_ids: set[int] = {q.assigned_to for q, _ in active if q.assigned_to}
+    if patient_ids:
+        completed = (
+            db.query(PatientQueue)
+            .filter(
+                PatientQueue.patient_id.in_(patient_ids),
+                PatientQueue.status == "Completed",
+                PatientQueue.completed_at.isnot(None),
+            )
+            .order_by(PatientQueue.completed_at.desc())
+            .all()
+        )
+        for r in completed:
+            completed_by_patient[r.patient_id].append(r)
+    staff = (
+        {u.user_id: u.full_name for u in db.query(User).filter(User.user_id.in_(staff_ids)).all()}
+        if staff_ids else {}
+    )
+
+    result = []
+    for q, p in active:
+        # The stop they came from = most recent completed stop at/before this
+        # one's joined_at.
+        frm = None
+        for r in completed_by_patient.get(p.patient_id, []):
+            if r.completed_at and q.joined_at and r.completed_at <= q.joined_at:
+                frm = r.department
+                break
+        result.append({
+            "queue_id": q.queue_id,
+            "patient_id": p.patient_id,
+            "patient_name": f"{p.other_names} {p.surname}",
+            "outpatient_no": p.outpatient_no,
+            "scheme": _scheme_of(p),
+            "from_department": frm,
+            "to_department": q.department,
+            "department": q.department,
+            "acuity_level": q.acuity_level,
+            "status": q.status,
+            "joined_at": q.joined_at.isoformat() if q.joined_at else None,
+            "assigned_to": staff.get(q.assigned_to),
+        })
+    return result
+
+
+@router.get("/day", dependencies=[Depends(RequirePermission("patients:read"))])
+def get_queue_day(
+    date: Optional[str] = Query(None, description="Day to report, YYYY-MM-DD (defaults to today)"),
+    from_ts: Optional[str] = Query(None, alias="from", description="ISO start of a custom window (overrides date)"),
+    to_ts: Optional[str] = Query(None, alias="to", description="ISO end of a custom window (overrides date)"),
+    db: Session = Depends(get_db),
+):
+    """Patients dealt with — and their movement footprints — for a given day.
+
+    Groups every queue stop in the window by patient into an ordered trail:
+    each stop is a room (department) with in/out times, the time spent, its
+    status, and who handled it. `dealt_with` marks patients who completed at
+    least one stop. A custom `from`/`to` window overrides `date` for a finer
+    time-stretch.
+    """
+    # Resolve the reporting window.
+    if from_ts or to_ts:
+        try:
+            start = datetime.fromisoformat(from_ts) if from_ts else datetime.now(timezone.utc) - timedelta(days=1)
+            end = datetime.fromisoformat(to_ts) if to_ts else datetime.now(timezone.utc)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="from/to must be ISO-8601 datetimes.")
+    else:
+        if date:
+            try:
+                d = date_cls.fromisoformat(date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD.")
+        else:
+            d = datetime.now(timezone.utc).date()
+        start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+        end = start + timedelta(days=1)
+
+    rows = (
+        db.query(PatientQueue, Patient)
+        .join(Patient, PatientQueue.patient_id == Patient.patient_id)
+        .filter(PatientQueue.joined_at >= start, PatientQueue.joined_at < end)
+        .order_by(Patient.patient_id.asc(), PatientQueue.joined_at.asc())
+        .all()
+    )
+
+    staff_ids = {q.assigned_to for q, _ in rows if q.assigned_to}
+    staff = (
+        {u.user_id: u.full_name for u in db.query(User).filter(User.user_id.in_(staff_ids)).all()}
+        if staff_ids else {}
+    )
+    now = datetime.now(timezone.utc)
+
+    grouped: dict[int, dict] = {}
+    for q, p in rows:
+        g = grouped.get(p.patient_id)
+        if g is None:
+            g = grouped[p.patient_id] = {
+                "patient_id": p.patient_id,
+                "patient_name": f"{p.other_names} {p.surname}",
+                "outpatient_no": p.outpatient_no,
+                "scheme": _scheme_of(p),
+                "footprint": [],
+                "dealt_with": False,
+                "still_active": False,
+            }
+        end_ts = q.completed_at or (now if q.status not in TERMINAL_QUEUE_STATUSES else None)
+        duration = int((end_ts - q.joined_at).total_seconds()) if (end_ts and q.joined_at) else None
+        g["footprint"].append({
+            "queue_id": q.queue_id,
+            "department": q.department,
+            "status": q.status,
+            "joined_at": q.joined_at.isoformat() if q.joined_at else None,
+            "completed_at": q.completed_at.isoformat() if q.completed_at else None,
+            "duration_seconds": duration,
+            "handled_by": staff.get(q.assigned_to),
+        })
+        if q.status == "Completed":
+            g["dealt_with"] = True
+        if q.status in ACTIVE_QUEUE_STATUSES:
+            g["still_active"] = True
+
+    patients = list(grouped.values())
+    for g in patients:
+        fp = g["footprint"]
+        g["stops"] = len(fp)
+        g["departments"] = list(dict.fromkeys(s["department"] for s in fp))
+        g["first_seen"] = fp[0]["joined_at"] if fp else None
+        g["last_seen"] = (fp[-1]["completed_at"] or fp[-1]["joined_at"]) if fp else None
+
+    # Sort: patients seen most recently first.
+    patients.sort(key=lambda g: g["first_seen"] or "", reverse=True)
+    return {
+        "window": {"start": start.isoformat(), "end": end.isoformat()},
+        "total_patients": len(patients),
+        "dealt_with": sum(1 for g in patients if g["dealt_with"]),
+        "still_active": sum(1 for g in patients if g["still_active"]),
+        "patients": patients,
+    }
 
 
 @router.patch(

@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, desc, text, func
 from sqlalchemy.exc import IntegrityError, DataError
 from pydantic import BaseModel
-from typing import List
-from datetime import datetime
+from typing import List, Optional
+from datetime import datetime, date, timedelta, timezone
 
 from app.config.database import get_db
 from app.models.patient import Patient
@@ -147,23 +147,52 @@ def _apply_patient_search(query, search: str):
     return query.filter(or_(*conditions))
 
 
+def _parse_registered_bound(value: str, *, end: bool = False):
+    """Parse a registry date filter bound into an aware UTC datetime. A date-only
+    value (YYYY-MM-DD) snaps to the start of that day, or — when ``end`` — the
+    start of the NEXT day, so filtering by a single day includes all of it."""
+    if not value:
+        return None
+    try:
+        if len(value) == 10:  # date only
+            d = date.fromisoformat(value)
+            dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+            return dt + timedelta(days=1) if end else dt
+        dt = datetime.fromisoformat(value)
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="registered_from/registered_to must be YYYY-MM-DD or an ISO datetime.")
+
+
+def _apply_patient_filters(query, search: str, registered_from: str, registered_to: str):
+    """Shared list/count filter: search + a registered-on date/time window."""
+    query = _apply_patient_search(query, search)
+    lo = _parse_registered_bound(registered_from)
+    hi = _parse_registered_bound(registered_to, end=True)
+    if lo is not None:
+        query = query.filter(Patient.registered_on >= lo)
+    if hi is not None:
+        query = query.filter(Patient.registered_on < hi)
+    return query
+
+
 @router.get("/", dependencies=[Depends(RequirePermission("patients:read"))])
 @limiter.limit("60/minute")
-def get_patients(request: Request, search: str = Query("", description="Search by name, ID, OP number, or phone"), skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
+def get_patients(request: Request, search: str = Query("", description="Search by name, ID, OP number, or phone"), skip: int = 0, limit: int = 50, registered_from: Optional[str] = None, registered_to: Optional[str] = None, db: Session = Depends(get_db)):
     # Clamp the page size so a caller can't request the whole (potentially huge)
     # registry in one shot; the registry pages through with skip/limit instead.
     limit = max(1, min(limit, MAX_PAGE_SIZE))
     skip = max(0, skip)
-    query = _apply_patient_search(db.query(Patient).filter(Patient.is_active == True), search)
+    query = _apply_patient_filters(db.query(Patient).filter(Patient.is_active == True), search, registered_from, registered_to)
     return query.order_by(desc(Patient.registered_on)).offset(skip).limit(limit).all()
 
 
 @router.get("/count", dependencies=[Depends(RequirePermission("patients:read"))])
 @limiter.limit("60/minute")
-def count_patients(request: Request, search: str = Query("", description="Search by name, ID, OP number, or phone"), db: Session = Depends(get_db)):
-    """Total active patients (honouring the same search filter) — lets the
+def count_patients(request: Request, search: str = Query("", description="Search by name, ID, OP number, or phone"), registered_from: Optional[str] = None, registered_to: Optional[str] = None, db: Session = Depends(get_db)):
+    """Total active patients (honouring the same search + date filters) — lets the
     registry show an accurate count and paginate through every record."""
-    query = _apply_patient_search(db.query(func.count(Patient.patient_id)).filter(Patient.is_active == True), search)
+    query = _apply_patient_filters(db.query(func.count(Patient.patient_id)).filter(Patient.is_active == True), search, registered_from, registered_to)
     return {"total": query.scalar() or 0}
 
 # ==========================================

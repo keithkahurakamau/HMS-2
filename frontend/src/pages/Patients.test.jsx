@@ -218,6 +218,27 @@ describe('<Patients /> — view details', () => {
     });
 });
 
+describe('<Patients /> — registered-on date filter', () => {
+    it('filters by registration day via the Today shortcut (sends registered_from/to)', async () => {
+        apiClient.get.mockImplementation((url) =>
+            url === '/patients/count' ? okCount(0) : okList([]));
+        const user = userEvent.setup();
+        renderWithProviders(<Patients />);
+
+        await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/patients/', expect.any(Object)));
+        const before = apiClient.get.mock.calls.length;
+
+        await user.click(screen.getByRole('button', { name: /^Today$/ }));
+
+        const today = new Date().toISOString().slice(0, 10);
+        await waitFor(() => {
+            const hit = apiClient.get.mock.calls.slice(before).some(([url, cfg]) =>
+                url === '/patients/' && cfg?.params?.registered_from === today && cfg?.params?.registered_to === today);
+            expect(hit).toBe(true);
+        }, { timeout: 2000 });
+    });
+});
+
 describe('<Patients /> — registration modal', () => {
     it('opens the registration drawer and POSTs to /patients/ on submit', async () => {
         const user = userEvent.setup();

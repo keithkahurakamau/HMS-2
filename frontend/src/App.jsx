@@ -22,6 +22,7 @@ import { isSuperAdminAuthenticated } from './pages/superadmin/superAdminAuth';
 // Lazy page imports — each becomes its own chunk, fetched on first visit.
 // Keeps the initial bundle small; authenticated modules load on demand.
 const Patients = lazy(() => import('./pages/Patients'));
+const QueueBoard = lazy(() => import('./pages/QueueBoard'));
 const ClinicalDesk = lazy(() => import('./pages/ClinicalDesk'));
 const Triage = lazy(() => import('./pages/Triage'));
 const Pharmacy = lazy(() => import('./pages/Pharmacy'));
@@ -208,6 +209,7 @@ export default function App() {
 
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="patients" element={<Patients />} />
+            <Route path="queue" element={<QueueBoard />} />
             <Route path="triage" element={<ModuleGuard moduleKey="clinical"><Triage /></ModuleGuard>} />
             <Route path="clinical" element={<ModuleGuard moduleKey="clinical"><ClinicalDesk /></ModuleGuard>} />
             <Route path="laboratory" element={<ModuleGuard moduleKey="laboratory"><Laboratory /></ModuleGuard>} />

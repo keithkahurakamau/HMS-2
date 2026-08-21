@@ -135,6 +135,25 @@ class TestPatients:
         ids2 = {p["patient_id"] for p in page2.json()}
         assert ids1.isdisjoint(ids2)
 
+    def test_registered_from_future_returns_none(self, client, admin_cookies):
+        # No patient is registered in the far future → empty page + zero count.
+        r = client.get("/api/patients/?registered_from=2999-01-01", cookies=admin_cookies)
+        assert r.status_code == 200
+        assert r.json() == []
+        c = client.get("/api/patients/count?registered_from=2999-01-01", cookies=admin_cookies)
+        assert c.status_code == 200
+        assert c.json()["total"] == 0
+
+    def test_registered_window_matches_all_when_open(self, client, admin_cookies):
+        # A window from the epoch to far future spans every active patient.
+        r = client.get("/api/patients/count?registered_from=2000-01-01&registered_to=2999-01-01", cookies=admin_cookies)
+        assert r.status_code == 200
+        assert r.json()["total"] >= 10
+
+    def test_registered_bad_date_returns_400(self, client, admin_cookies):
+        r = client.get("/api/patients/?registered_from=notadate", cookies=admin_cookies)
+        assert r.status_code == 400
+
     def test_get_by_id(self, client, doctor_cookies):
         r = client.get("/api/patients/1", cookies=doctor_cookies)
         assert r.status_code == 200
@@ -467,6 +486,36 @@ class TestQueueAndDashboard:
     def test_queue_list(self, client, admin_cookies):
         r = client.get("/api/queue/", cookies=admin_cookies)
         assert r.status_code == 200
+
+    def test_queue_live_board(self, client, admin_cookies):
+        r = client.get("/api/queue/live", cookies=admin_cookies)
+        assert r.status_code == 200
+        rows = r.json()
+        assert isinstance(rows, list)
+        if rows:
+            row = rows[0]
+            for f in ["queue_id", "patient_name", "scheme", "to_department", "from_department", "joined_at", "acuity_level"]:
+                assert f in row, f"live row missing {f}"
+
+    def test_queue_live_requires_auth(self, client):
+        assert client.get("/api/queue/live").status_code == 401
+
+    def test_queue_day_report(self, client, admin_cookies):
+        r = client.get("/api/queue/day", cookies=admin_cookies)
+        assert r.status_code == 200
+        data = r.json()
+        for f in ["window", "total_patients", "dealt_with", "still_active", "patients"]:
+            assert f in data
+        assert isinstance(data["patients"], list)
+
+    def test_queue_day_specific_date(self, client, admin_cookies):
+        r = client.get("/api/queue/day?date=2026-01-01", cookies=admin_cookies)
+        assert r.status_code == 200
+        assert r.json()["window"]["start"].startswith("2026-01-01")
+
+    def test_queue_day_rejects_bad_date(self, client, admin_cookies):
+        r = client.get("/api/queue/day?date=notadate", cookies=admin_cookies)
+        assert r.status_code == 400
 
     def test_appointments_list(self, client, receptionist_cookies):
         r = client.get("/api/appointments/", cookies=receptionist_cookies)

@@ -176,6 +176,9 @@ export default function Patients() {
     // count (honouring the search) fetched from /patients/count.
     const [page, setPage] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
+    // Registered-on date window (YYYY-MM-DD). Empty = no bound on that side.
+    const [regFrom, setRegFrom] = useState('');
+    const [regTo, setRegTo] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -232,18 +235,22 @@ export default function Patients() {
         const delayDebounce = setTimeout(() => fetchPatients(), 350);
         return () => clearTimeout(delayDebounce);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchQuery, page]);
+    }, [searchQuery, page, regFrom, regTo]);
 
     const fetchPatients = async () => {
         setIsLoading(true);
         try {
+            // Only send date bounds when set, so the default view is unfiltered.
+            const dateParams = {};
+            if (regFrom) dateParams.registered_from = regFrom;
+            if (regTo) dateParams.registered_to = regTo;
             const response = await apiClient.get('/patients/', {
-                params: { search: searchQuery, skip: page * PAGE_SIZE, limit: PAGE_SIZE },
+                params: { search: searchQuery, skip: page * PAGE_SIZE, limit: PAGE_SIZE, ...dateParams },
             });
             setPatients(response.data);
             // Total is best-effort — an older API mid-deploy may not expose
             // /count yet, so a failure just leaves the last known total.
-            apiClient.get('/patients/count', { params: { search: searchQuery } })
+            apiClient.get('/patients/count', { params: { search: searchQuery, ...dateParams } })
                 .then((r) => setTotalCount(r.data?.total ?? 0))
                 .catch(() => {});
         } catch (error) {
@@ -583,6 +590,21 @@ export default function Patients() {
                             {s || 'All'}
                         </button>
                     ))}
+                </div>
+                {/* Registered-on date window: pick one day (set both), a range, or Today. */}
+                <div data-tour="patients-date-filter" className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                    <span className="text-xs text-ink-500 whitespace-nowrap">Registered</span>
+                    <input type="date" aria-label="Registered from" value={regFrom} max={regTo || undefined}
+                        onChange={(e) => { setRegFrom(e.target.value); setPage(0); }} className="input w-auto py-1.5 text-sm" />
+                    <span className="text-ink-400 text-xs">–</span>
+                    <input type="date" aria-label="Registered to" value={regTo} min={regFrom || undefined}
+                        onChange={(e) => { setRegTo(e.target.value); setPage(0); }} className="input w-auto py-1.5 text-sm" />
+                    <button type="button" onClick={() => { const t = new Date().toISOString().slice(0, 10); setRegFrom(t); setRegTo(t); setPage(0); }}
+                        className="px-2 py-1 rounded-lg text-xs font-medium text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800">Today</button>
+                    {(regFrom || regTo) && (
+                        <button type="button" onClick={() => { setRegFrom(''); setRegTo(''); setPage(0); }} aria-label="Clear date filter"
+                            className="text-ink-400 hover:text-rose-600 p-1"><X size={14} /></button>
+                    )}
                 </div>
                 <div className="flex items-center gap-2 sm:ml-2 shrink-0">
                     <span className="text-xs text-ink-500 whitespace-nowrap">
