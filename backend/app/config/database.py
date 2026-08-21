@@ -68,6 +68,15 @@ DATABASE_URL = _normalize_db_url(settings.DATABASE_URL)
 
 
 def _engine_kwargs() -> dict:
+    # Behind PgBouncer (transaction mode), the pooler owns pooling. Using
+    # NullPool app-side means each engine hands back its server connection at
+    # transaction end instead of holding it — so N workers × M cached tenant
+    # engines don't pin N×M×DB_POOL_SIZE upstream connections, and PgBouncer is
+    # free to multiplex a small server pool across everything. See §1 of
+    # docs/DEPLOYMENT.md and deploy/pgbouncer/.
+    if settings.DB_POOLER_ENABLED:
+        from sqlalchemy.pool import NullPool
+        return {"poolclass": NullPool}
     return {
         "pool_size": settings.DB_POOL_SIZE,
         "max_overflow": settings.DB_MAX_OVERFLOW,
