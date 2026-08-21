@@ -564,4 +564,8 @@ def get_resumable_record(patient_id: int, db: Session = Depends(get_db), current
         "treatment_plan": rec.treatment_plan,
         "prescription_notes": rec.prescription_notes,
         "internal_notes": rec.internal_notes,
+        # DoctorV2 Assessment/Plan tab — was omitted here, so resuming a draft
+        # silently blanked it. It's persisted on /submit; return it so resume
+        # re-hydrates the tab.
+        "assessment_plan": rec.assessment_plan,
     }}

@@ -192,6 +192,25 @@ def test_resumable_returns_latest_draft_with_resolved_codes(client, patient):
     assert "hypertension" in codes["I10"].lower()
 
 
+def test_resumable_returns_assessment_plan(client, patient):
+    # Regression: /resumable previously omitted assessment_plan, so resuming a
+    # draft silently blanked the DoctorV2 Assessment/Plan tab.
+    plan = "A/P: DKA — IV fluids, insulin sliding scale, hourly glucose."
+    r = client.post("/api/clinical/submit", json={
+        "patient_id": patient["patient_id"],
+        "record_status": "Draft",
+        "chief_complaint": "Vomiting; drowsy",
+        "assessment_plan": plan,
+    })
+    assert r.status_code == 200, r.text
+
+    r = client.get(f"/api/clinical/patients/{patient['patient_id']}/resumable")
+    assert r.status_code == 200, r.text
+    rec = r.json()["record"]
+    assert rec is not None
+    assert rec["assessment_plan"] == plan
+
+
 def test_resumable_empty_for_fresh_patient(client, patient):
     r = client.get(f"/api/clinical/patients/{patient['patient_id']}/resumable")
     assert r.status_code == 200, r.text
