@@ -29,8 +29,8 @@ import { useActivePatient } from '../context/PatientContext';
 // → their respective clinical role; Clinical → Doctor.
 const ROUTE_TARGETS = [
     { department: 'Triage',       label: 'Triage',    icon: HeartPulse,  role: 'Nurse',           assignment: 'optional', accent: 'bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200' },
-    { department: 'Consultation', label: 'Clinical',  icon: Stethoscope, role: 'Doctor',          assignment: 'optional', accent: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200' },
-    { department: 'Laboratory',   label: 'Lab',       icon: TestTube,    role: 'Lab Technician',  assignment: 'optional', accent: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' },
+    { department: 'Consultation', label: 'Clinical Desk', icon: Stethoscope, role: 'Doctor',       assignment: 'optional', accent: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200' },
+    { department: 'Laboratory',   label: 'Laboratory', icon: TestTube,    role: 'Lab Technician',  assignment: 'optional', accent: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' },
     { department: 'Radiology',    label: 'Radiology', icon: Image,       role: 'Radiologist',     assignment: 'optional', accent: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200' },
     { department: 'Pharmacy',     label: 'Pharmacy',  icon: Pill,        role: 'Pharmacist',      assignment: 'optional', accent: 'bg-accent-50 text-accent-700 hover:bg-accent-100 border-accent-200' },
     { department: 'Billing',      label: 'Billing',   icon: CreditCard,  role: 'Receptionist',    assignment: 'optional', accent: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },

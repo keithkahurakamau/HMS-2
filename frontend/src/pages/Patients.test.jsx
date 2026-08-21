@@ -508,7 +508,7 @@ describe('<Patients /> — route to queue', () => {
 
         await waitFor(() => {
             expect(toast.success).toHaveBeenCalledWith(
-                expect.stringMatching(/already in the lab queue/i),
+                expect.stringMatching(/already in the laboratory queue/i),
             );
         });
     });

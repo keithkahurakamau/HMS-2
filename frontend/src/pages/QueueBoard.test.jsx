@@ -61,8 +61,9 @@ describe('QueueBoard — live queue', () => {
         expect(await screen.findByText('Aisha Mwangi')).toBeInTheDocument();
         expect(screen.getByText('#101')).toBeInTheDocument();
         expect(screen.getByText('NHIF')).toBeInTheDocument();
-        // from → to rooms rendered
-        expect(screen.getAllByText('Consultation').length).toBeGreaterThan(0);
+        // from → to rooms rendered with the unified display label
+        // (canonical "Consultation" shows as "Clinical Desk").
+        expect(screen.getAllByText('Clinical Desk').length).toBeGreaterThan(0);
         expect(screen.getByText('Dr. Otieno')).toBeInTheDocument();
         // unclaimed row surfaces its placeholder
         expect(screen.getByText(/Unclaimed/i)).toBeInTheDocument();

@@ -6,6 +6,7 @@ import {
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import PageHeader from '../components/PageHeader';
+import { departmentLabel } from '../utils/departments';
 
 const LIVE_REFRESH_MS = 15000; // re-pull the live board every 15s
 
@@ -124,7 +125,7 @@ function LiveQueue() {
                     {departments.map((d) => (
                         <button type="button" key={d} onClick={() => setDept(d)}
                             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dept === d ? 'bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300 ring-1 ring-brand-200 dark:ring-brand-500/30' : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800'}`}>
-                            {d}{d !== 'All' && <span className="ml-1 text-ink-400">{rows.filter((r) => r.to_department === d).length}</span>}
+                            {d === 'All' ? 'All' : departmentLabel(d)}{d !== 'All' && <span className="ml-1 text-ink-400">{rows.filter((r) => r.to_department === d).length}</span>}
                         </button>
                     ))}
                 </div>
@@ -160,7 +161,7 @@ function LiveQueue() {
                         ) : visible.length === 0 ? (
                             <tr><td colSpan={8} className="px-4 py-12 text-center text-ink-500">
                                 <Users size={32} className="mx-auto mb-2 text-ink-300" />
-                                <p className="text-sm font-medium">No patients waiting{dept !== 'All' ? ` in ${dept}` : ''}.</p>
+                                <p className="text-sm font-medium">No patients waiting{dept !== 'All' ? ` in ${departmentLabel(dept)}` : ''}.</p>
                             </td></tr>
                         ) : visible.map((r) => {
                             const waited = secondsSince(r.joined_at, nowMs);
@@ -179,9 +180,9 @@ function LiveQueue() {
                                     </td>
                                     <td className="px-4 py-2.5">
                                         <span className="inline-flex items-center gap-1.5 text-xs">
-                                            <span className="text-ink-500 dark:text-ink-400">{r.from_department || 'Arrival'}</span>
+                                            <span className="text-ink-500 dark:text-ink-400">{r.from_department ? departmentLabel(r.from_department) : 'Arrival'}</span>
                                             <ArrowRight size={12} className="text-ink-400 shrink-0" />
-                                            <span className="font-medium text-ink-800 dark:text-ink-200">{r.to_department}</span>
+                                            <span className="font-medium text-ink-800 dark:text-ink-200">{departmentLabel(r.to_department)}</span>
                                         </span>
                                     </td>
                                     <td className="px-4 py-2.5 text-ink-600 dark:text-ink-300 whitespace-nowrap">{fmtClock(r.joined_at)}</td>
@@ -277,7 +278,7 @@ function DayFootprints() {
                                         {p.departments.map((d, i) => (
                                             <React.Fragment key={d}>
                                                 {i > 0 && <ArrowRight size={9} className="text-ink-300" />}
-                                                <span>{d}</span>
+                                                <span>{departmentLabel(d)}</span>
                                             </React.Fragment>
                                         ))}
                                     </div>
@@ -296,7 +297,7 @@ function DayFootprints() {
                                                 <span className="mt-0.5 shrink-0 size-5 rounded-full bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-300 text-2xs font-bold flex items-center justify-center">{i + 1}</span>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="font-medium text-sm text-ink-800 dark:text-ink-200">{s.department}</span>
+                                                        <span className="font-medium text-sm text-ink-800 dark:text-ink-200">{departmentLabel(s.department)}</span>
                                                         <span className={`${statusBadge(s.status)} text-2xs`}>{s.status}</span>
                                                         {s.handled_by && <span className="text-2xs text-ink-500 dark:text-ink-400">by {s.handled_by}</span>}
                                                     </div>
