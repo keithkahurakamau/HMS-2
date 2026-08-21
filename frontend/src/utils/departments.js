@@ -18,6 +18,8 @@ export const DEPARTMENT_LABELS = {
     Billing: 'Billing',
     Wards: 'Wards',
     Maternity: 'Maternity',
+    Dialysis: 'Dialysis',
+    Theatre: 'Theatre',
 };
 
 /** Friendly, app-wide display label for a canonical department name. */

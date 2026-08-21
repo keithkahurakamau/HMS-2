@@ -24,7 +24,7 @@ import QueuePatientModal from './clinical/modals/QueuePatientModal';
 import PrescriptionModal from './clinical/modals/PrescriptionModal';
 import TriageTab from './triage/TriageTab';
 
-const DISPOSITIONS = ['Consultation', 'Laboratory', 'Pharmacy', 'Radiology', 'Billing', 'Wards'];
+const DISPOSITIONS = ['Consultation', 'Laboratory', 'Pharmacy', 'Radiology', 'Billing', 'Wards', 'Maternity', 'Dialysis', 'Theatre'];
 const EMPTY_VITALS = { weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '', pain: '', glucose: '' };
 // Map the nurse-assessed acuity to the shared header's priority chip.
 const ACUITY_TO_PRIORITY = { 1: 'Critical', 2: 'High' };

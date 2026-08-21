@@ -9,7 +9,7 @@ import {
     MoreVertical, Stethoscope, TestTube, UserMinus,
     Pill, Bed, CreditCard, Printer, Download, Trash, Eye, Edit,
     AlertTriangle, Droplet, Send, Image, ChevronDown, Save,
-    ChevronLeft, ChevronRight,
+    ChevronLeft, ChevronRight, Baby, Scissors,
 } from 'lucide-react';
 import { printPatientCard } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
@@ -35,6 +35,9 @@ const ROUTE_TARGETS = [
     { department: 'Pharmacy',     label: 'Pharmacy',  icon: Pill,        role: 'Pharmacist',      assignment: 'optional', accent: 'bg-accent-50 text-accent-700 hover:bg-accent-100 border-accent-200' },
     { department: 'Billing',      label: 'Billing',   icon: CreditCard,  role: 'Receptionist',    assignment: 'optional', accent: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },
     { department: 'Wards',        label: 'Wards',     icon: Bed,         role: 'Nurse',           assignment: 'optional', accent: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200' },
+    { department: 'Maternity',    label: 'Maternity', icon: Baby,        role: 'Nurse',           assignment: 'optional', accent: 'bg-pink-50 text-pink-700 hover:bg-pink-100 border-pink-200' },
+    { department: 'Dialysis',     label: 'Dialysis',  icon: Droplet,     role: 'Nurse',           assignment: 'optional', accent: 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border-cyan-200' },
+    { department: 'Theatre',      label: 'Theatre',   icon: Scissors,    role: 'Doctor',          assignment: 'optional', accent: 'bg-violet-50 text-violet-700 hover:bg-violet-100 border-violet-200' },
 ];
 
 const initialsOf = (patient) => {

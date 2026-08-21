@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Droplets } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import DepartmentQueue from '../components/DepartmentQueue';
 import OrdersTab from './dialysis/OrdersTab';
 import RenalProfileTab from './dialysis/RenalProfileTab';
 import RosterTab from './dialysis/RosterTab';
@@ -25,6 +26,8 @@ export default function Dialysis() {
         title="Dialysis"
         subtitle="Run haemodialysis sessions, safety checklists, adequacy (Kt/V), and the renal unit roster."
       />
+      {/* Patients routed here via the shared queue (sent to Dialysis) */}
+      <DepartmentQueue department="Dialysis" inline />
       <div className="flex gap-2 border-b border-ink-200/70 dark:border-ink-800" role="tablist">
         {TABS.map((t) => (
           <button

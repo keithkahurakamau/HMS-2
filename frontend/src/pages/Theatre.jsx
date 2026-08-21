@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Scissors } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import DepartmentQueue from '../components/DepartmentQueue';
 import CasesTab from './theatre/CasesTab';
 import ScheduleBoard from './theatre/ScheduleBoard';
 import RoomsTab from './theatre/RoomsTab';
@@ -23,6 +24,8 @@ export default function Theatre() {
         title="Theatre & Surgery"
         subtitle="Schedule cases, run the WHO safety checklist, and record operative notes, anaesthesia and billing."
       />
+      {/* Patients routed here via the shared queue (sent to Theatre) */}
+      <DepartmentQueue department="Theatre" inline />
       <div className="flex gap-2 border-b border-ink-200/70 dark:border-ink-800" role="tablist">
         {TABS.map((t) => (
           <button

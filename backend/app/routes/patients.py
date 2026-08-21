@@ -436,10 +436,16 @@ _DEPARTMENT_ALIASES = {
     "maternity":          "Maternity",
     "anc":                "Maternity",
     "mch":                "Maternity",
+    "dialysis":           "Dialysis",
+    "renal":              "Dialysis",
+    "theatre":            "Theatre",
+    "theater":            "Theatre",
+    "surgery":            "Theatre",
+    "ot":                 "Theatre",
 }
 CANONICAL_DEPARTMENTS = frozenset({
     "Reception", "Triage", "Consultation", "Laboratory", "Radiology",
-    "Pharmacy", "Billing", "Wards", "Maternity",
+    "Pharmacy", "Billing", "Wards", "Maternity", "Dialysis", "Theatre",
 })
 
 

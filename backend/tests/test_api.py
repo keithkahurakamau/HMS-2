@@ -517,6 +517,22 @@ class TestQueueAndDashboard:
         r = client.get("/api/queue/day?date=notadate", cookies=admin_cookies)
         assert r.status_code == 400
 
+    def test_new_departments_are_canonical(self):
+        # Dialysis + Theatre are now routable canonical departments, so the
+        # front desk / triage can send patients there via /route + dispositions.
+        from app.routes.patients import _canonical_department, CANONICAL_DEPARTMENTS
+        assert {"Maternity", "Dialysis", "Theatre"} <= CANONICAL_DEPARTMENTS
+        assert _canonical_department("dialysis") == "Dialysis"
+        assert _canonical_department("theatre") == "Theatre"
+        assert _canonical_department("surgery") == "Theatre"
+
+    def test_analytics_breakdown_includes_new_modules(self, client, admin_cookies):
+        r = client.get("/api/analytics/dashboard", cookies=admin_cookies)
+        assert r.status_code == 200
+        qb = r.json()["queue_breakdown"]
+        for dept in ("Maternity", "Dialysis", "Theatre"):
+            assert dept in qb, f"{dept} missing from queue_breakdown"
+
     def test_appointments_list(self, client, receptionist_cookies):
         r = client.get("/api/appointments/", cookies=receptionist_cookies)
         assert r.status_code == 200
