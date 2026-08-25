@@ -87,6 +87,17 @@ REDIS_URL=redis://redis.internal:6379/0
 
 For HA, use Redis Sentinel or a managed Redis (ElastiCache, Memorystore, Upstash).
 
+### Dashboard cache warmer
+
+With Redis set, a background loop (`app/core/dashboard_warmer.py`, started in the
+app lifespan) recomputes each active tenant's Command Center dashboard every
+`DASHBOARD_WARM_INTERVAL_SECONDS` (default 25s, under the 30s cache TTL) so the
+shared cache never goes cold — eliminating the multi-second cold-aggregation on
+first load after a restart or a quiet spell. A cross-worker Redis NX lock means
+only **one** worker warms per tick, so the DB cost is O(active tenants) per
+interval regardless of `WEB_CONCURRENCY`. It is a no-op without Redis (there is
+no shared cache to warm); disable with `DASHBOARD_WARM_ENABLED=false`.
+
 ## 3. Tenant provisioning
 
 `POST /api/public/hospitals` is the production-grade provisioning endpoint.
