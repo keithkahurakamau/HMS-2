@@ -1,0 +1,10 @@
+; DEV-ONLY userlist for the docker-compose `pgbouncer` profile (plain auth).
+; These are the compose Postgres defaults (POSTGRES_USER/POSTGRES_PASSWORD in
+; docker-compose.yml). They are NOT secrets — override via .env for a real run.
+;
+; PRODUCTION: switch pgbouncer.ini to `auth_type = scram-sha-256` and replace
+; the lines below with SCRAM verifiers. Generate one with:
+;   psql -Atq -c "SELECT '\"'||rolname||'\" \"'||rolpassword||'\"' \
+;     FROM pg_authid WHERE rolname='hms';"
+; (rolpassword already holds the SCRAM-SHA-256 verifier). See README.md.
+"medifleet" "medifleet"

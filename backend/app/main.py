@@ -1,4 +1,5 @@
 import time
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -117,9 +118,23 @@ async def lifespan(app: FastAPI):
     await ws_manager.init_redis()
     if not settings.REDIS_URL:
         logger.warning("REDIS_URL not configured. WebSocket broadcasts will not span workers.")
+
+    # Keep the Command Center dashboard cache hot (Redis only — no shared cache
+    # to warm otherwise). One worker warms per tick via a cross-worker lock.
+    warm_task = None
+    if settings.REDIS_URL and settings.DASHBOARD_WARM_ENABLED:
+        from app.core.dashboard_warmer import dashboard_warm_loop
+        warm_task = asyncio.create_task(dashboard_warm_loop())
+
     try:
         yield
     finally:
+        if warm_task is not None:
+            warm_task.cancel()
+            try:
+                await warm_task
+            except asyncio.CancelledError:
+                pass
         await ws_manager.shutdown()
 
 

@@ -144,6 +144,23 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE_SECONDS: int = 1800  # recycle every 30 min to dodge idle-killers
     TENANT_ENGINE_CACHE_SIZE: int = 32   # LRU cap on the in-process tenant engine cache
 
+    # Background warmer for the Command Center dashboard. When Redis is
+    # configured, one worker recomputes each active tenant's dashboard rollup
+    # every DASHBOARD_WARM_INTERVAL_SECONDS (kept under the 30s cache TTL) so the
+    # shared cache never goes cold — killing the multi-second cold-aggregation
+    # first-load. No-op without Redis (there's no shared cache to warm).
+    DASHBOARD_WARM_ENABLED: bool = True
+    DASHBOARD_WARM_INTERVAL_SECONDS: int = 25
+
+    # Set true when DATABASE_URL points at PgBouncer (transaction pool mode).
+    # The pooler then owns connection pooling, so every SQLAlchemy engine uses
+    # NullPool — this avoids the workers × tenants × DB_POOL_SIZE connection
+    # multiplication (see docs/DEPLOYMENT.md §1) and the double-pooling that
+    # would otherwise pin server connections PgBouncer expects to recycle at
+    # each COMMIT. When false (direct-to-Postgres), the DB_POOL_* knobs above
+    # apply as normal. See deploy/pgbouncer/.
+    DB_POOLER_ENABLED: bool = False
+
     # Concurrency / throughput tuning (per worker).
     #
     # ~245 of the API handlers are synchronous `def`, which FastAPI runs in
@@ -176,6 +193,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = ""
     POSTGRES_HOST_PORT: str = ""
+    PGBOUNCER_HOST_PORT: str = ""
     REDIS_HOST_PORT: str = ""
     BACKEND_HOST_PORT: str = ""
     FRONTEND_HOST_PORT: str = ""
