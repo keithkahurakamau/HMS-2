@@ -168,6 +168,9 @@ export default function LetterheadStudio({ value, onChange, headerText, footerTe
     };
     const noRoom = cfg.margin_top_mm + cfg.margin_bottom_mm >= A4_H_MM
         || cfg.margin_side_mm * 2 >= A4_W_MM;
+    // Artwork always prints in full now, so a tiny margin no longer hides the
+    // letterhead — it makes text land on top of it. Say so before they print.
+    const tooTight = cfg.margin_top_mm < 15 || cfg.margin_bottom_mm < 15;
 
     return (
         <div className="grid gap-5 lg:grid-cols-2">
@@ -245,9 +248,23 @@ export default function LetterheadStudio({ value, onChange, headerText, footerTe
                         </label>
 
                         <div className="space-y-3 pt-1">
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400">
-                                Content safe area
-                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400">
+                                    Content safe area
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => onChange({
+                                        ...cfg,
+                                        margin_top_mm: LETTERHEAD_DEFAULTS.margin_top_mm,
+                                        margin_bottom_mm: LETTERHEAD_DEFAULTS.margin_bottom_mm,
+                                        margin_side_mm: LETTERHEAD_DEFAULTS.margin_side_mm,
+                                    })}
+                                    className="text-xs font-semibold text-brand-600 hover:text-brand-700 cursor-pointer"
+                                >
+                                    Reset to recommended
+                                </button>
+                            </div>
                             <MmSlider label="Top margin" hint="Clear of your header artwork"
                                 value={cfg.margin_top_mm} min={0} max={120}
                                 onChange={(v) => set('margin_top_mm', v)} />
@@ -259,6 +276,15 @@ export default function LetterheadStudio({ value, onChange, headerText, footerTe
                                 onChange={(v) => set('margin_side_mm', v)} />
                         </div>
 
+
+                        {!noRoom && tooTight && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+                                <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                                These margins are very tight — document text will print over your
+                                header or footer artwork. Most letterheads need roughly 40 mm top
+                                and 45 mm bottom.
+                            </p>
+                        )}
 
                         {noRoom && (
                             <p className="text-xs text-rose-600 flex items-start gap-1.5">

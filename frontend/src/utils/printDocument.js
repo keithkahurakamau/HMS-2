@@ -335,25 +335,30 @@ const letterheadStyles = (lh) => `
 
   html, body { padding: 0; margin: 0; }
 
-  /* Painted artwork — fixed, so Chromium repeats it on every sheet, pinned to
-     the physical paper edges (possible because the page margin is 0). */
-  .letterhead-band {
+  /* Painted artwork — the WHOLE sheet, fixed so Chromium repeats it on every
+     page, pinned to the physical paper edges (possible because the page margin
+     is 0).
+
+     It is deliberately not cropped to the margins. Cropping coupled "how much
+     artwork shows" to "where content sits", so shrinking the margins silently
+     sliced the letterhead away — a 0 mm bottom margin erased the footer
+     entirely while Branding Studio still previewed the full page. The margins
+     below now position content and nothing else, so what prints always matches
+     the preview. */
+  .letterhead-sheet {
     position: fixed;
+    top: 0;
     left: 0;
     width: ${A4_WIDTH_MM}mm;
-    overflow: hidden;
+    height: ${A4_HEIGHT_MM}mm;
     z-index: 0;
   }
-  .letterhead-band img {
+  .letterhead-sheet img {
     width: 100%;
-    height: ${A4_HEIGHT_MM}mm;   /* full sheet; the band crops it */
+    height: 100%;
     object-fit: fill;
     display: block;
   }
-  .letterhead-band.top { top: 0; height: ${lh.top}mm; }
-  .letterhead-band.bottom { bottom: 0; height: ${lh.bottom}mm; }
-  /* Pull the artwork up so the band's window lands on its footer. */
-  .letterhead-band.bottom img { margin-top: -${A4_HEIGHT_MM - lh.bottom}mm; }
 
   /* Reserved space — thead/tfoot repeat on every page AND reserve their
      height in the flow, which fixed positioning alone cannot do. They hold
@@ -386,13 +391,12 @@ const buildDocument = (title, bodyHtml) => {
   const lh = letterhead;
   const styles = lh ? `${SHARED_PRINT_STYLES}\n${letterheadStyles(lh)}` : SHARED_PRINT_STYLES;
 
-  // Two mechanisms, because neither alone is enough: the fixed bands paint the
-  // artwork at the paper edges of every sheet, and the thead/tfoot spacers
-  // reserve that space in the flow so text never runs underneath it — on the
-  // first page, the last page, and every page between.
+  // Two mechanisms, because neither alone is enough: the fixed sheet paints the
+  // full artwork on every page, and the thead/tfoot spacers reserve the top and
+  // bottom margins in the flow so text never runs over the header or footer
+  // design — on the first page, the last page, and every page between.
   const content = lh
-    ? `<div class="letterhead-band top" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
-<div class="letterhead-band bottom" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
+    ? `<div class="letterhead-sheet" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
 <table class="letterhead-doc">
   <thead><tr><td><div class="letterhead-spacer top"></div></td></tr></thead>
   <tfoot><tr><td><div class="letterhead-spacer bottom"></div></td></tr></tfoot>
