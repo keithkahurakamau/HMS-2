@@ -3,12 +3,13 @@ import { apiClient } from '../api/client';
 import { useBranding } from '../context/BrandingContext';
 import {
     Palette, Image as ImageIcon, Upload, Trash2, Save, Activity,
-    Printer, Eye, ArrowLeft, CheckCircle2, AlertTriangle,
+    Printer, Eye, ArrowLeft, CheckCircle2, AlertTriangle, FileText,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import Logo, { TenantLogo } from '../components/Logo';
 import PageHeader from '../components/PageHeader';
+import LetterheadStudio, { LETTERHEAD_DEFAULTS } from '../components/LetterheadStudio';
 
 /**
  * Branding Studio — hospital admins customise their workspace identity.
@@ -91,6 +92,19 @@ export default function Branding() {
                     show_logo: draft.print_templates?.show_logo !== false,
                 },
             };
+
+            // Letterhead: only ship the artwork when it actually changed — it is
+            // ~100 KB of base64 and the server carries the stored copy forward
+            // when `image` is omitted.
+            const letterhead = draft.print_templates?.letterhead;
+            const savedLetterhead = branding.print_templates?.letterhead;
+            if (!letterhead?.image && savedLetterhead?.image) {
+                payload.clear_letterhead = true;
+            } else if (letterhead?.image) {
+                const { image, ...rest } = letterhead;
+                payload.print_templates.letterhead =
+                    image === savedLetterhead?.image ? rest : letterhead;
+            }
             // Image fields only attach when changed, or as explicit clears.
             if (draft.logo_data_url !== branding.logo_data_url) {
                 if (!draft.logo_data_url) payload.clear_logo = true;
@@ -271,6 +285,22 @@ export default function Branding() {
                             <span className="text-sm font-medium text-ink-700 dark:text-ink-200">Print my logo on documents</span>
                         </label>
                     </div>
+                </Section>
+
+                {/* Letterhead */}
+                <Section
+                    tour="branding-letterhead"
+                    span="md:col-span-12"
+                    icon={<FileText size={16} />}
+                    title="Letterhead"
+                    desc="Upload your own printed stationery and every document — invoices, prescriptions, lab and radiology reports, patient cards, admission slips and medical histories — prints on it."
+                >
+                    <LetterheadStudio
+                        value={draft.print_templates?.letterhead || LETTERHEAD_DEFAULTS}
+                        onChange={(next) => setTemplate('letterhead', next)}
+                        headerText={draft.print_templates?.header_text || ''}
+                        footerText={draft.print_templates?.footer_text || ''}
+                    />
                 </Section>
 
                 {/* Preview */}
