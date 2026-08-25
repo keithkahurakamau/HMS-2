@@ -24,14 +24,6 @@ const SORT_OPTIONS = [
     { key: 'premium', label: 'Premium first', cmp: (a, b) => (b.is_premium ? 1 : 0) - (a.is_premium ? 1 : 0) || a.name.localeCompare(b.name) },
 ];
 
-// Cursor-following radial highlight on each card (scoped via CSS vars so it
-// doesn't re-render the grid).
-const handleMove = (e) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
-    e.currentTarget.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
-};
-
 export default function HospitalPicker({ nextPath = '/login' }) {
     const [hospitals, setHospitals] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +80,7 @@ export default function HospitalPicker({ nextPath = '/login' }) {
                         placeholder="Hospital name or domain (e.g. mayoclinic.hms.co.ke)"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-12 pr-12 py-3.5 bg-white border border-[#b2f0f0] rounded-2xl text-[#012626] placeholder-[#94a3b8] shadow-sm focus:outline-none focus:border-[#008080] focus:ring-4 focus:ring-[#00ffff]/25 transition-all duration-200 text-base"
+                        className="w-full pl-12 pr-12 py-3.5 bg-white border border-[#b2f0f0] rounded-2xl text-[#012626] placeholder-[#94a3b8] shadow-sm focus:outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/20 transition-colors duration-200 text-base"
                         autoComplete="off"
                     />
                     {searchQuery && (
@@ -118,9 +110,9 @@ export default function HospitalPicker({ nextPath = '/login' }) {
                         const isActive = opt.key === sortKey;
                         return (
                             <button key={opt.key} type="button" onClick={() => setSortKey(opt.key)}
-                                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ease-in-out cursor-pointer ${
+                                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors duration-200 ease-in-out cursor-pointer ${
                                     isActive
-                                        ? 'bg-[#008080] text-white shadow-md shadow-[#008080]/30'
+                                        ? 'bg-[#008080] text-white'
                                         : 'bg-white ring-1 ring-[#b2f0f0] text-[#015050] hover:ring-[#00d4d4]'
                                 }`}>
                                 {opt.label}
@@ -190,17 +182,12 @@ function HospitalCard({ tenant, delayMs, onSelect }) {
         <button
             type="button"
             onClick={() => onSelect(tenant)}
-            onMouseMove={handleMove}
-            style={{
-                animationDelay: `${delayMs}ms`,
-                animationFillMode: 'both',
-                background: 'radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgba(0, 255, 255, 0.1), transparent 40%), rgba(255,255,255,0.7)',
-            }}
-            className="lp-card group relative text-left p-5 flex flex-col justify-between min-h-[12rem] cursor-pointer animate-reveal-up overflow-hidden focus-visible:outline-none focus-visible:lp-glow-ring"
+            style={{ animationDelay: `${delayMs}ms`, animationFillMode: 'both' }}
+            className="lp-card group relative text-left p-5 flex flex-col justify-between min-h-[12rem] cursor-pointer animate-fade-in overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008080]"
         >
             <div>
                 <div className="flex items-start justify-between mb-4">
-                    <div className="size-11 rounded-xl bg-[#e6fbfb] text-[#008080] flex items-center justify-center group-hover:bg-[#00ffff]/25 group-hover:scale-105 transition-all duration-200">
+                    <div className="size-11 rounded-xl bg-[#e6fbfb] text-[#008080] flex items-center justify-center transition-colors duration-200">
                         <Building2 size={18} />
                     </div>
                     {tenant.is_premium && (
@@ -216,9 +203,9 @@ function HospitalCard({ tenant, delayMs, onSelect }) {
             </div>
             <div className="mt-5 flex items-center justify-between text-xs font-bold text-[#015050]">
                 <span className="inline-flex items-center gap-1.5">
-                    <CheckCircle2 size={12} className="text-[#00d4d4]" /> Active instance
+                    <CheckCircle2 size={12} className="text-[#008080]" /> Active instance
                 </span>
-                <ArrowRight size={14} className="transition-transform duration-200 group-hover:translate-x-1.5" />
+                <ArrowRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
             </div>
         </button>
     );
