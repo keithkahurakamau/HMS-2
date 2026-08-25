@@ -5,11 +5,11 @@ import {
     ChevronDown, ChevronUp, Users, Send, Stethoscope, TestTube, ArrowRightLeft,
     History, Scissors, Cigarette, Dna, Syringe, CalendarPlus, FileSignature, Save, Receipt, Variable,
     X, Image as ImageIcon, Plus, Minus, ShieldCheck, CalendarX, UserMinus, Trash2, Maximize2, Printer,
-    BedDouble, CalendarDays, UserPlus, Paperclip, ClipboardList,
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+    BedDouble, CalendarDays, UserPlus, Paperclip, ClipboardList } from 'lucide-react';
+import {} from 'react-router-dom';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/PageHeader';
+import QueuePatientsModal from '../components/QueuePatientsModal';
 import PatientSearch from '../components/PatientSearch';
 import IcdDiagnosisPicker from '../components/IcdDiagnosisPicker';
 import ReferralModal from '../components/ReferralModal';
@@ -45,7 +45,6 @@ const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tab
 
 export default function ClinicalDesk() {
     const { user } = useAuth();
-    const navigate = useNavigate();
     const perms = useMemo(() => user?.permissions || [], [user?.permissions]);
     const hasPerm = (p) => perms.includes(p);
     // --- DYNAMIC QUEUE STATE ---
@@ -126,12 +125,10 @@ export default function ClinicalDesk() {
         savedAt: localDraftSavedAt,
         applyDraft: applyLocalDraft,
         discardDraft: discardLocalDraft,
-        clearDraft: clearLocalDraft,
-    } = useDraftSafetyNet({
+        clearDraft: clearLocalDraft } = useDraftSafetyNet({
         storageKey: encounterDraftKey,
         value: { vitals, clinicalNotes, complaints, physicalExams, medications, icdCodes, assessPlan },
-        enabled: !!activePatient,
-    });
+        enabled: !!activePatient });
 
     const handleRestoreLocalDraft = () => {
         const draft = applyLocalDraft();
@@ -154,8 +151,7 @@ export default function ClinicalDesk() {
     const [isConsentOpen, setIsConsentOpen] = useState(false);
     const [consentDraft, setConsentDraft] = useState({
         consent_method: 'Verbal',
-        notes: '',
-    });
+        notes: '' });
     const [consentSubmitting, setConsentSubmitting] = useState(false);
     const [hasRecordedConsent, setHasRecordedConsent] = useState(false);
 
@@ -176,6 +172,30 @@ export default function ClinicalDesk() {
             setMyFee(response.data);
         } catch {
             // Non-blocking — the server still resolves the right fee at charge time.
+        }
+    };
+
+    // "View all patients" opens the full queue in place. It used to navigate to
+    // the registry, which lost the clinician's place in the workspace and did
+    // not actually show who was waiting.
+    const [showQueueModal, setShowQueueModal] = useState(false);
+    const [isClearingQueue, setIsClearingQueue] = useState(false);
+
+    const handleClearQueue = async () => {
+        setIsClearingQueue(true);
+        try {
+            const res = await apiClient.post('/queue/end-of-day', { department: 'Consultation' });
+            const n = res.data?.checked_out ?? 0;
+            toast.success(n > 0
+                ? `${n} patient(s) removed from the queue.`
+                : 'The queue was already empty.');
+            setShowQueueModal(false);
+            clearWorkspace();
+            fetchQueue();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not clear the queue.');
+        } finally {
+            setIsClearingQueue(false);
         }
     };
 
@@ -299,8 +319,7 @@ export default function ClinicalDesk() {
                 rr: t.respiratory_rate ?? '',
                 temp: t.temperature ?? '',
                 spo2: t.spo2 ?? '',
-                glucose: t.blood_glucose ?? '',
-            });
+                glucose: t.blood_glucose ?? '' });
             if (t.chief_complaint) {
                 setComplaints(splitComplaints(t.chief_complaint));
             }
@@ -401,8 +420,7 @@ export default function ClinicalDesk() {
         diagnosis: clinicalNotes.diagnosis,
         icdCodes,
         medications,
-        followUp: pendingFollowUp,
-    });
+        followUp: pendingFollowUp });
 
     const handlePrintVisitSummary = () =>
         printVisitSummary({ patient: activePatient, encounter: buildEncounterForPrint() });
@@ -494,8 +512,7 @@ export default function ClinicalDesk() {
                 ? JSON.stringify(medications.filter((m) => m.drug.trim()).map(({ _uid, ...m }) => m))
                 : null,
             internal_notes: clinicalNotes.internal_notes,
-            assessment_plan: assessPlan || null,
-        };
+            assessment_plan: assessPlan || null };
 
         try {
             const res = await apiClient.post('/clinical/submit', payload);
@@ -559,8 +576,7 @@ export default function ClinicalDesk() {
                 consent_type: 'Treatment',
                 consent_given: true,
                 consent_method: consentDraft.consent_method,
-                notes: consentDraft.notes || null,
-            });
+                notes: consentDraft.notes || null });
             toast.success('Treatment consent recorded.');
             setHasRecordedConsent(true);
             setIsConsentOpen(false);
@@ -626,12 +642,22 @@ export default function ClinicalDesk() {
                         else handlePatientSelect({
                             patient_id: item.patient_id,
                             patient_name: `${item.surname}, ${item.other_names}`,
-                            outpatient_no: item.outpatient_no,
-                        });
+                            outpatient_no: item.outpatient_no });
                     }}
                     onRemoveFromQueue={handleRemoveFromQueue}
-                    onViewAllPatients={() => navigate('/app/patients')}
+                    onViewAllPatients={() => setShowQueueModal(true)}
                 />
+                {showQueueModal && (
+                    <QueuePatientsModal
+                        queue={queue}
+                        department="Consultation"
+                        onClose={() => setShowQueueModal(false)}
+                        onSelectPatient={handlePatientSelect}
+                        onRemoveFromQueue={handleRemoveFromQueue}
+                        onClearQueue={handleClearQueue}
+                        isClearing={isClearingQueue}
+                    />
+                )}
             </div>
 
             {/* BOTTOM PANEL: Consultation Workspace */}
@@ -743,8 +769,7 @@ export default function ClinicalDesk() {
                                             assessPlan,
                                             pendingFollowUp,
                                             chargeConsultation,
-                                            myFee,
-                                        }}
+                                            myFee }}
                                         on={{
                                             setVitals,
                                             setComplaintInput,
@@ -764,8 +789,7 @@ export default function ClinicalDesk() {
                                             setChargeConsultation,
                                             onChangeFee: () => setIsFeeModalOpen(true),
                                             onViewTrends: () => setIsTrendsOpen(true),
-                                            setAssessPlan,
-                                        }}
+                                            setAssessPlan }}
                                     />
                                     {/* Documents, order sets and care pathways — kept as
                                         contextual panels alongside the encounter. */}
@@ -1176,8 +1200,7 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
                 patient_id: patient.patient_id,
                 doctor_id:  parseInt(doctorId, 10),
                 appointment_date: iso,
-                notes: notes || null,
-            });
+                notes: notes || null });
             toast.success(`Follow-up booked for ${new Date(res.data.appointment_date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.`);
             onBooked(res.data);
         } catch (e) {
