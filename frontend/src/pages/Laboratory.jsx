@@ -13,6 +13,7 @@ import { printVisitSummary, printLabReport as printPatientLabReport } from '../u
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import PatientDetailsHeader from './clinical/PatientDetailsHeader';
+import DepartmentQueue from '../components/DepartmentQueue';
 import ActionsMenu from './clinical/ActionsMenu';
 import FilesModal from './clinical/modals/FilesModal';
 import QueuePatientModal from './clinical/modals/QueuePatientModal';
@@ -437,6 +438,8 @@ export default function Laboratory() {
             {/* ─────────────── Mode 1: Lab Operations ─────────────── */}
             {activeTab === 'queue' && (
                 <>
+                    {/* Patients routed here via the shared queue (sent to Laboratory) */}
+                    <DepartmentQueue department="Laboratory" inline onChange={fetchLaboratoryData} />
                     {/* Patient details + laboratory queue (shared DoctorV2 header) */}
                     <div data-tour="lab-queue" className="shrink-0 z-20">
                         <PatientDetailsHeader

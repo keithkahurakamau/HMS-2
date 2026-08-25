@@ -16,6 +16,7 @@ import MpesaStkProgress from '../components/MpesaStkProgress';
 import usePaymentSocket from '../hooks/usePaymentSocket';
 import { useAuth } from '../context/AuthContext';
 import PatientDetailsHeader from './clinical/PatientDetailsHeader';
+import DepartmentQueue from '../components/DepartmentQueue';
 import ActionsMenu from './clinical/ActionsMenu';
 import FilesModal from './clinical/modals/FilesModal';
 import QueuePatientModal from './clinical/modals/QueuePatientModal';
@@ -429,6 +430,8 @@ export default function Pharmacy() {
             {/* ========================================= */}
             {activeTab === 'rx' && (
                 <>
+                    {/* Patients routed here via the shared queue (walk-ins sent to Pharmacy) */}
+                    <DepartmentQueue department="Pharmacy" inline onChange={fetchRxQueue} />
                     {/* Patient details + dispense queue (shared DoctorV2 header) */}
                     <div data-tour="pharmacy-dispense-queue" className="shrink-0 z-20">
                         <PatientDetailsHeader

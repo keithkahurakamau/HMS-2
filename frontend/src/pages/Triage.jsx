@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 import PatientHistoryModal from '../components/PatientHistoryModal';
 import { printVisitSummary, printLabReport } from '../utils/printReports';
+import { departmentLabel } from '../utils/departments';
 import PatientDetailsHeader from './clinical/PatientDetailsHeader';
 import PatientHistoryTab from './clinical/PatientHistoryTab';
 import ActionsMenu from './clinical/ActionsMenu';
@@ -23,7 +24,7 @@ import QueuePatientModal from './clinical/modals/QueuePatientModal';
 import PrescriptionModal from './clinical/modals/PrescriptionModal';
 import TriageTab from './triage/TriageTab';
 
-const DISPOSITIONS = ['Consultation', 'Laboratory', 'Pharmacy', 'Radiology', 'Billing', 'Wards'];
+const DISPOSITIONS = ['Consultation', 'Laboratory', 'Pharmacy', 'Radiology', 'Billing', 'Wards', 'Maternity', 'Dialysis', 'Theatre'];
 const EMPTY_VITALS = { weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '', pain: '', glucose: '' };
 // Map the nurse-assessed acuity to the shared header's priority chip.
 const ACUITY_TO_PRIORITY = { 1: 'Critical', 2: 'High' };
@@ -343,13 +344,13 @@ export default function Triage() {
                         <div className="shrink-0 p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex flex-wrap items-center justify-between gap-3">
                             <div className="flex flex-wrap items-center gap-4">
                                 <p className="text-xs text-ink-500 dark:text-ink-400 flex items-center gap-1.5">
-                                    <Stethoscope size={13} /> On save, the patient is routed to {disposition}.
+                                    <Stethoscope size={13} /> On save, the patient is routed to {departmentLabel(disposition)}.
                                 </p>
                                 <div className="flex items-center gap-2">
                                     <label htmlFor="triage-disposition" className="label mb-0">Route to</label>
                                     <select id="triage-disposition" value={disposition}
                                         onChange={(e) => setDisposition(e.target.value)} className="input w-auto">
-                                        {DISPOSITIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+                                        {DISPOSITIONS.map((d) => <option key={d} value={d}>{departmentLabel(d)}</option>)}
                                     </select>
                                 </div>
                             </div>

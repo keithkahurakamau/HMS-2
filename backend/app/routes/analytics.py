@@ -23,15 +23,18 @@ _DASHBOARD_PREFIX = "analytics:dashboard"
 _DASHBOARD_TTL = 30
 
 
-@router.get("/dashboard", dependencies=[Depends(RequirePermission("users:manage"))])
-@cache.cached(_DASHBOARD_PREFIX, ttl_seconds=_DASHBOARD_TTL)
-def get_dashboard_metrics(request: Request, db: Session = Depends(get_db)):
-    """Aggregates system-wide telemetry for the Command Center."""
+def compute_dashboard(db: Session) -> dict:
+    """Aggregates system-wide telemetry for the Command Center.
+
+    Extracted from the route so the background warmer (dashboard_warmer) can
+    precompute the same payload and keep the (Redis) cache hot — see §rec-3 in
+    the load-test notes / docs/DEPLOYMENT.md.
+    """
     today = date.today()
-    
+
     total_patients = db.query(Patient).count()
     active_staff = db.query(User).filter(User.is_active == True).count()
-    
+
     # Today's Revenue
     today_revenue = db.query(func.sum(Invoice.amount_paid)).filter(
         func.date(Invoice.billing_date) == today
@@ -40,7 +43,7 @@ def get_dashboard_metrics(request: Request, db: Session = Depends(get_db)):
     # Live Queue Load
     waiting_patients = db.query(PatientQueue).filter(PatientQueue.status != "Completed").all()
     total_waiting = len(waiting_patients)
-    
+
     # Derived from the canonical department list rather than hardcoded, so a
     # new routable department (Maternity, and previously Reception/Radiology/
     # Wards) can't silently go missing from the Command Center. One pass.
@@ -54,5 +57,11 @@ def get_dashboard_metrics(request: Request, db: Session = Depends(get_db)):
         "total_staff": active_staff,
         "today_revenue": float(today_revenue),
         "total_waiting": total_waiting,
-        "queue_breakdown": queue_breakdown
+        "queue_breakdown": queue_breakdown,
     }
+
+
+@router.get("/dashboard", dependencies=[Depends(RequirePermission("users:manage"))])
+@cache.cached(_DASHBOARD_PREFIX, ttl_seconds=_DASHBOARD_TTL)
+def get_dashboard_metrics(request: Request, db: Session = Depends(get_db)):
+    return compute_dashboard(db)

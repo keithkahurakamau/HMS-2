@@ -7,6 +7,7 @@ import {
 import toast from 'react-hot-toast';
 import { printInvoice } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
+import DepartmentQueue from '../components/DepartmentQueue';
 import MpesaStkProgress from '../components/MpesaStkProgress';
 import usePaymentSocket from '../hooks/usePaymentSocket';
 
@@ -235,6 +236,9 @@ export default function Billing() {
                     </div>
                 }
             />
+
+            {/* Patients routed here via the shared queue (sent to Billing) */}
+            <DepartmentQueue department="Billing" inline onChange={fetchQueue} />
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                 {/* Billing Queue List */}
