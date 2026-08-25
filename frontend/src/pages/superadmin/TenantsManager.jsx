@@ -512,7 +512,7 @@ export default function TenantsManager() {
                                                                                     </div>
                                                                                     <p className="text-xs text-ink-500 dark:text-ink-400 truncate mt-0.5">{m.description}</p>
                                                                                 </div>
-                                                                                <span className="shrink-0 inline-flex items-center">
+                                                                                <span className="relative shrink-0 inline-flex items-center">
                                                                                     <input
                                                                                         id={`mod-${m.key}`}
                                                                                         type="checkbox"
@@ -567,7 +567,7 @@ export default function TenantsManager() {
                                             <div key={k} className="flex items-center justify-between gap-2 text-sm">
                                                 <code className="text-ink-700 dark:text-ink-200 font-mono text-xs truncate">{k}</code>
                                                 <div className="flex items-center gap-2 shrink-0">
-                                                    <label className="inline-flex items-center cursor-pointer">
+                                                    <label className="relative inline-flex items-center cursor-pointer">
                                                         <span className="sr-only">Toggle {k}</span>
                                                         <input type="checkbox" checked={!!v}
                                                                aria-label={`Toggle ${k}`}
