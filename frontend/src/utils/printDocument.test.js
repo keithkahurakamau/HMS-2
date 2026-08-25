@@ -65,7 +65,7 @@ describe('letterhead activation', () => {
         setPrintBranding(letterheadCfg({ margin_top_mm: -5, margin_side_mm: 'abc' }));
         expect(hasLetterhead()).toBe(true);
         const html = buildPrintHtml('t', '<p>x</p>');
-        expect(html).toContain('.letterhead-band.top { height: 42mm; }');
+        expect(html).toContain('.letterhead-band.top { top: 0; height: 42mm; }');
         expect(html).toContain('padding: 0 18mm');
     });
 });
@@ -73,13 +73,28 @@ describe('letterhead activation', () => {
 describe('letterhead page layout', () => {
     // thead/tfoot is what makes the artwork both repeat per page AND reserve
     // its height. `position: fixed` only repeats — content ran underneath it.
-    it('frames content in a table so the bands repeat and reserve space', () => {
+    it('paints the artwork with fixed bands pinned to the paper edges', () => {
+        setPrintBranding(letterheadCfg());
+        const html = buildPrintHtml('Invoice', '<p>x</p>');
+        expect(html).toContain('<div class="letterhead-band top"');
+        expect(html).toContain('<div class="letterhead-band bottom"');
+        expect(html).toMatch(/\.letterhead-band\s*\{[^}]*position:\s*fixed/);
+        expect(html).toContain('.letterhead-band.top { top: 0;');
+        expect(html).toContain('.letterhead-band.bottom { bottom: 0;');
+    });
+
+    // Fixed bands repeat but do not reserve space; thead/tfoot reserve space
+    // but sit under short content instead of at the paper edge. Both are
+    // needed, on the first page, the last page, and everything between.
+    it('reserves that space with repeating thead/tfoot spacers', () => {
         setPrintBranding(letterheadCfg());
         const html = buildPrintHtml('Invoice', '<p>MARKER</p>');
         expect(html).toContain('<table class="letterhead-doc">');
-        expect(html).toMatch(/<thead>[\s\S]*letterhead-band top[\s\S]*<\/thead>/);
-        expect(html).toMatch(/<tfoot>[\s\S]*letterhead-band bottom[\s\S]*<\/tfoot>/);
+        expect(html).toMatch(/<thead>[\s\S]*letterhead-spacer top[\s\S]*<\/thead>/);
+        expect(html).toMatch(/<tfoot>[\s\S]*letterhead-spacer bottom[\s\S]*<\/tfoot>/);
         expect(html).toMatch(/<tbody><tr><td><p>MARKER<\/p><\/td><\/tr><\/tbody>/);
+        // Spacers are empty — the fixed bands carry the visible artwork.
+        expect(html).toContain('<div class="letterhead-spacer top"></div>');
     });
 
     it('prints full-bleed so footer artwork reaches the paper edge', () => {
@@ -88,11 +103,14 @@ describe('letterhead page layout', () => {
         expect(html).toContain('@page { size: A4; margin: 0; }');
     });
 
-    it('sizes each band to its configured margin', () => {
+    it('sizes bands and spacers alike to the configured margins', () => {
         setPrintBranding(letterheadCfg({ margin_top_mm: 40, margin_bottom_mm: 50 }));
         const html = buildPrintHtml('t', '<p>x</p>');
-        expect(html).toContain('.letterhead-band.top { height: 40mm; }');
-        expect(html).toContain('.letterhead-band.bottom { height: 50mm; }');
+        expect(html).toContain('.letterhead-band.top { top: 0; height: 40mm; }');
+        expect(html).toContain('.letterhead-band.bottom { bottom: 0; height: 50mm; }');
+        // Reserved space must match the painted band exactly or text collides.
+        expect(html).toContain('.letterhead-spacer.top { height: 40mm; }');
+        expect(html).toContain('.letterhead-spacer.bottom { height: 50mm; }');
     });
 
     it('offsets the bottom band so it crops to the artwork footer', () => {

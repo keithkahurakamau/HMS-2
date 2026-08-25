@@ -11,6 +11,7 @@ import PageHeader from '../components/PageHeader';
 import VisitHistoryList from '../components/VisitHistoryList';
 import DraftRecoveryBanner from '../components/DraftRecoveryBanner';
 import { printMedicalHistory } from '../utils/printTemplates';
+import PatientDocumentsPanel from '../components/PatientDocumentsPanel';
 import { ENTRY_TYPES, ENTRY_TYPE_COLOR_CLASSES, ENTRY_TYPE_TO_CHART_FIELD } from '../constants/medicalHistoryEntryTypes';
 import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 
@@ -333,6 +334,9 @@ export default function MedicalHistory() {
                             consents={chart.consents || []}
                             onRecorded={() => fetchChart(chart.patient_id)}
                         />
+
+                        {/* Previously issued documents, reprintable on demand */}
+                        <PatientDocumentsPanel patientId={chart.patient_id} />
 
                         {/* History Sections */}
                         {ENTRY_TYPES.map(type => {
