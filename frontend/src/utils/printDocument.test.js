@@ -65,7 +65,7 @@ describe('letterhead activation', () => {
         setPrintBranding(letterheadCfg({ margin_top_mm: -5, margin_side_mm: 'abc' }));
         expect(hasLetterhead()).toBe(true);
         const html = buildPrintHtml('t', '<p>x</p>');
-        expect(html).toContain('.letterhead-band.top { top: 0; height: 42mm; }');
+        expect(html).toContain('.letterhead-spacer.top { height: 42mm; }');
         expect(html).toContain('padding: 0 18mm');
     });
 });
@@ -73,14 +73,24 @@ describe('letterhead activation', () => {
 describe('letterhead page layout', () => {
     // thead/tfoot is what makes the artwork both repeat per page AND reserve
     // its height. `position: fixed` only repeats — content ran underneath it.
-    it('paints the artwork with fixed bands pinned to the paper edges', () => {
+    it('paints the whole sheet, fixed to the paper edges', () => {
         setPrintBranding(letterheadCfg());
         const html = buildPrintHtml('Invoice', '<p>x</p>');
-        expect(html).toContain('<div class="letterhead-band top"');
-        expect(html).toContain('<div class="letterhead-band bottom"');
-        expect(html).toMatch(/\.letterhead-band\s*\{[^}]*position:\s*fixed/);
-        expect(html).toContain('.letterhead-band.top { top: 0;');
-        expect(html).toContain('.letterhead-band.bottom { bottom: 0;');
+        expect(html).toContain('<div class="letterhead-sheet"');
+        expect(html).toMatch(/\.letterhead-sheet\s*\{[^}]*position:\s*fixed/);
+        expect(html).toContain('width: 210mm');
+        expect(html).toContain('height: 297mm');
+    });
+
+    // Regression: cropping the artwork to the margins meant a 0 mm bottom
+    // margin erased the footer design while Branding Studio still previewed
+    // the full page — the letterhead looked "applied" but printed as nothing.
+    it('prints the full artwork even at near-zero margins', () => {
+        setPrintBranding(letterheadCfg({ margin_top_mm: 3, margin_bottom_mm: 0, margin_side_mm: 1 }));
+        const html = buildPrintHtml('Invoice', '<p>x</p>');
+        expect(html).toContain('<div class="letterhead-sheet"');
+        expect(html).toContain('height: 297mm');   // whole sheet, not a 0mm band
+        expect(html.split(IMG).length - 1).toBe(1);
     });
 
     // Fixed bands repeat but do not reserve space; thead/tfoot reserve space
@@ -103,21 +113,11 @@ describe('letterhead page layout', () => {
         expect(html).toContain('@page { size: A4; margin: 0; }');
     });
 
-    it('sizes bands and spacers alike to the configured margins', () => {
+    it('reserves the configured margins as flow spacers', () => {
         setPrintBranding(letterheadCfg({ margin_top_mm: 40, margin_bottom_mm: 50 }));
         const html = buildPrintHtml('t', '<p>x</p>');
-        expect(html).toContain('.letterhead-band.top { top: 0; height: 40mm; }');
-        expect(html).toContain('.letterhead-band.bottom { bottom: 0; height: 50mm; }');
-        // Reserved space must match the painted band exactly or text collides.
         expect(html).toContain('.letterhead-spacer.top { height: 40mm; }');
         expect(html).toContain('.letterhead-spacer.bottom { height: 50mm; }');
-    });
-
-    it('offsets the bottom band so it crops to the artwork footer', () => {
-        setPrintBranding(letterheadCfg({ margin_bottom_mm: 50 }));
-        const html = buildPrintHtml('t', '<p>x</p>');
-        // 297 mm sheet − 50 mm band = pull the image up by 247 mm.
-        expect(html).toContain('margin-top: -247mm');
     });
 
     it('applies side margins to the content cell', () => {
@@ -126,11 +126,10 @@ describe('letterhead page layout', () => {
         expect(html).toContain('padding: 0 22mm');
     });
 
-    it('reuses one stored artwork for both bands', () => {
+    it('embeds the artwork once', () => {
         setPrintBranding(letterheadCfg());
         const html = buildPrintHtml('t', '<p>x</p>');
-        // Same image twice — cropped by CSS, so a margin change needs no re-upload.
-        expect(html.split(IMG).length - 1).toBe(2);
+        expect(html.split(IMG).length - 1).toBe(1);
     });
 
     it('leaves plain documents untouched', () => {
