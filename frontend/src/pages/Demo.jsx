@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import Logo from '../components/Logo';
 import Reveal from '../components/Reveal';
-import WebGLHero from '../components/WebGLHero';
 import ContactStrip from '../components/ContactStrip';
 import InteractiveDashboard from '../components/InteractiveDashboard';
 import { SystemMockGrid } from '../components/SystemIllustrations';
@@ -36,7 +35,7 @@ export default function Demo() {
     const navigate = useNavigate();
 
     return (
-        <div className="relative min-h-screen bg-white text-ink-900 font-sans selection:bg-[#00ffff]/30">
+        <div className="relative min-h-screen bg-white text-ink-900 font-sans selection:bg-[#b2f0f0]/60">
             <Seo
                 title="Product demo"
                 path="/demo"
@@ -44,8 +43,8 @@ export default function Demo() {
             />
 
             {/* ============== Sticky frosted navbar ============== */}
-            <header className="fixed top-3 inset-x-3 sm:top-4 sm:inset-x-4 z-50">
-                <div className="max-w-7xl mx-auto lp-glass rounded-2xl px-4 sm:px-6 py-3 flex items-center justify-between">
+            <header className="fixed top-0 inset-x-0 z-50 bg-white/95 backdrop-blur-sm border-b border-ink-200/70">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                     <Link to="/" className="flex items-center cursor-pointer" aria-label="MediFleet home">
                         <Logo variant="full" size={32} label="MediFleet" />
                     </Link>
@@ -62,21 +61,14 @@ export default function Demo() {
             </header>
 
             {/* ============== Hero with the video stage ============== */}
-            <section className="relative pt-28 pb-24 sm:pt-36 sm:pb-28 overflow-hidden lp-bg-hero lp-grain isolate">
-                <div className="absolute inset-0 pointer-events-none">
-                    <WebGLHero className="absolute inset-0 opacity-70" />
-                    <div className="absolute -top-32 -right-24 size-[40rem] bg-[#00ffff]/15 rounded-full blur-[120px] animate-blob-breathe" />
-                    <div className="absolute top-1/3 -left-24 size-[34rem] bg-[#008080]/40 rounded-full blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
-                    <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-white" />
-                </div>
+            <section className="relative pt-28 pb-24 sm:pt-36 sm:pb-28 lp-bg-hero">
 
                 <div className="relative max-w-5xl mx-auto px-5 sm:px-6 text-center animate-slide-up">
                     <span className="lp-chip-dark inline-flex"><Play size={11} /> Guided walkthrough</span>
-                    <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tightest leading-[1.05] text-white">
-                        See MediFleet{' '}
-                        <span className="lp-text-gradient">in motion</span>.
+                    <h1 className="mt-6 font-display text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.08] text-white">
+                        See MediFleet <span className="text-[#7dd8d8]">in motion</span>.
                     </h1>
-                    <p className="mt-5 text-lg text-[#cdeeee] leading-relaxed max-w-2xl mx-auto">
+                    <p className="mt-5 text-lg text-[#c8e2e2] leading-relaxed max-w-2xl mx-auto">
                         One short walkthrough takes a patient from the front desk through the lab,
                         pharmacy, wards, and billing, so you can see the whole flow before you sign in.
                     </p>
@@ -85,15 +77,13 @@ export default function Demo() {
                     <div className="mt-10 max-w-4xl mx-auto">
                         <div className="relative aspect-video rounded-3xl overflow-hidden lp-glass-dark">
                             {/* When the video is ready, replace this block with the <video>/<iframe>. */}
-                            <div className="absolute inset-0 bg-grid opacity-[0.12]" />
                             <div className="relative h-full flex flex-col items-center justify-center gap-4">
-                                <span className="relative size-20 rounded-full bg-[#00ffff]/15 ring-1 ring-[#00ffff]/40 backdrop-blur-md flex items-center justify-center">
-                                    <span className="absolute inline-flex size-20 rounded-full bg-[#00ffff]/30 animate-ping" />
+                                <span className="relative size-20 rounded-full bg-white/10 ring-1 ring-white/25 flex items-center justify-center">
                                     <Play size={30} className="relative text-white translate-x-0.5" />
                                 </span>
                                 <div className="text-center">
                                     <p className="text-sm font-bold text-white">Walkthrough recording coming soon</p>
-                                    <p className="text-2xs text-[#9fdede] mt-1 uppercase tracking-[0.16em]">Roughly six minutes, end to end</p>
+                                    <p className="text-2xs text-[#9cc9c9] mt-1 uppercase tracking-[0.16em]">Roughly six minutes, end to end</p>
                                 </div>
                             </div>
                         </div>
@@ -116,7 +106,7 @@ export default function Demo() {
                 <Reveal className="relative max-w-7xl mx-auto px-5 sm:px-6 grid lg:grid-cols-2 gap-12 items-center">
                     <div>
                         <span className="lp-chip"><Play size={12} /> Interactive, no sign-in</span>
-                        <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight text-[#012626]">
+                        <h2 className="mt-4 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-[#012626]">
                             While the video renders, click around the real thing
                         </h2>
                         <p className="mt-4 text-ink-600 leading-relaxed">
@@ -131,7 +121,6 @@ export default function Demo() {
                         </div>
                     </div>
                     <div className="relative">
-                        <div className="absolute -inset-6 bg-[#00ffff]/10 rounded-[2rem] blur-3xl pointer-events-none" />
                         <InteractiveDashboard className="relative" />
                     </div>
                 </Reveal>
@@ -142,7 +131,7 @@ export default function Demo() {
                 <Reveal className="max-w-7xl mx-auto px-5 sm:px-6">
                     <div className="max-w-2xl mx-auto text-center">
                         <span className="lp-chip">What you will see</span>
-                        <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight text-[#012626]">
+                        <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-[#012626]">
                             Six chapters, one patient journey
                         </h2>
                         <p className="mt-3 text-ink-600 leading-relaxed">
@@ -160,7 +149,7 @@ export default function Demo() {
                                     style={{ animationDelay: `${idx * 60}ms`, animationFillMode: 'both' }}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <div className="size-12 rounded-2xl bg-[#e6fbfb] text-[#008080] flex items-center justify-center group-hover:bg-[#00ffff]/25 group-hover:scale-105 transition-all duration-200">
+                                        <div className="size-12 rounded-2xl bg-[#e6fbfb] text-[#008080] flex items-center justify-center transition-colors duration-200">
                                             <Icon size={20} />
                                         </div>
                                         <span className="inline-flex items-center gap-1 text-2xs font-bold text-[#008080] font-mono">
@@ -181,7 +170,7 @@ export default function Demo() {
                 <Reveal className="relative max-w-7xl mx-auto px-5 sm:px-6">
                     <div className="max-w-2xl mx-auto text-center">
                         <span className="lp-chip">Real surfaces</span>
-                        <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight text-[#012626]">
+                        <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-[#012626]">
                             The actual screens, not stock art
                         </h2>
                         <p className="mt-3 text-ink-600 leading-relaxed">
@@ -198,15 +187,13 @@ export default function Demo() {
             {/* ============== CTA ============== */}
             <section className="py-24 bg-white">
                 <div className="max-w-5xl mx-auto px-5 sm:px-6">
-                    <div className="relative overflow-hidden rounded-[2rem] lp-bg-hero p-10 sm:p-16 shadow-elevated isolate">
-                        <div className="absolute -top-24 -right-24 size-96 rounded-full bg-[#00ffff]/20 blur-3xl pointer-events-none" />
-                        <div className="absolute -bottom-24 -left-16 size-80 rounded-full bg-[#008080]/40 blur-3xl pointer-events-none" />
+                    <div className="relative overflow-hidden rounded-[2rem] lp-bg-hero p-10 sm:p-16">
                         <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
                             <div>
-                                <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white max-w-xl">
+                                <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-white max-w-xl">
                                     Want a closer look at your own data?
                                 </h2>
-                                <p className="mt-3 text-[#cdeeee] max-w-lg">
+                                <p className="mt-3 text-[#c8e2e2] max-w-lg">
                                     Sign in to your hospital, or talk to the platform team about provisioning a new workspace.
                                 </p>
                             </div>

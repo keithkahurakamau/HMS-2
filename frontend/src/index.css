@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -616,111 +616,86 @@ html.dark .bg-grid {
 }
 
 @layer components {
-  /* Frosted-glass panel — the core surface for the premium pages. */
+  /* Plain white panel — hairline border, quiet shadow. (Calm redesign: the
+     old frosted glass + heavy blur is gone; class name kept so every page
+     that uses it picks up the simple look.) */
   .lp-glass {
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, 0.65);
-    box-shadow: 0 1px 2px rgba(2, 53, 53, 0.04), 0 18px 48px -20px rgba(2, 53, 53, 0.28);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px rgba(2, 53, 53, 0.04), 0 8px 24px -16px rgba(2, 53, 53, 0.12);
   }
-  /* Dark frosted glass — for use over the dark-teal hero. */
+  /* On-dark panel — flat, hairline border, no blur. */
   .lp-glass-dark {
-    background: rgba(2, 38, 38, 0.45);
-    backdrop-filter: blur(22px) saturate(140%);
-    -webkit-backdrop-filter: blur(22px) saturate(140%);
-    border: 1px solid rgba(178, 240, 240, 0.18);
-    box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(178, 240, 240, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(178, 240, 240, 0.16);
   }
 
-  /* Glowing primary CTA — cyan fill that depresses to dark teal on active. */
+  /* Primary CTA — solid teal, quiet hover. No glow, no lift. */
   .lp-btn-glow {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    font-weight: 700;
-    color: var(--lp-teal-900);
-    background: linear-gradient(135deg, #6ff7f7 0%, var(--lp-cyan) 55%, #28e6e6 100%);
-    border-radius: 0.9rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: var(--lp-teal);
+    border-radius: 0.75rem;
     padding: 0.75rem 1.4rem;
-    box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.35), 0 10px 30px -8px rgba(0, 255, 255, 0.55);
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background 0.2s ease-in-out, color 0.2s ease-in-out;
+    transition: background-color 0.15s ease;
   }
-  .lp-btn-glow:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.5), 0 16px 42px -8px rgba(0, 255, 255, 0.7);
-  }
-  .lp-btn-glow:active {
-    transform: translateY(0);
-    background: linear-gradient(135deg, var(--lp-teal) 0%, var(--lp-teal-deep) 100%);
-    color: #eafffd;
-    box-shadow: 0 0 0 1px rgba(0, 128, 128, 0.6), 0 6px 18px -6px rgba(0, 128, 128, 0.6);
-  }
+  .lp-btn-glow:hover { background: #036666; }
+  .lp-btn-glow:active { background: var(--lp-teal-deep); }
 
-  /* Ghost CTA — outline that fills with ice on hover, dark teal on active. */
+  /* Ghost CTA — hairline outline, soft ice fill on hover. */
   .lp-btn-ghost {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
     font-weight: 600;
     color: var(--lp-teal);
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(0, 128, 128, 0.25);
-    border-radius: 0.9rem;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
     padding: 0.75rem 1.4rem;
-    transition: all 0.2s ease-in-out;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
   }
   .lp-btn-ghost:hover {
-    background: var(--lp-ice);
-    border-color: rgba(0, 128, 128, 0.45);
-    transform: translateY(-2px);
-  }
-  .lp-btn-ghost:active {
-    background: var(--lp-teal);
-    color: #eafffd;
-    transform: translateY(0);
+    background: var(--lp-ice-soft);
+    border-color: rgba(0, 128, 128, 0.4);
   }
 
-  /* On-dark ghost CTA variant for the hero. */
+  /* On-dark ghost CTA variant. */
   .lp-btn-ghost-dark {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
     font-weight: 600;
-    color: var(--lp-ice);
-    background: rgba(178, 240, 240, 0.06);
-    border: 1px solid rgba(178, 240, 240, 0.3);
-    border-radius: 0.9rem;
+    color: #eafffd;
+    background: transparent;
+    border: 1px solid rgba(178, 240, 240, 0.35);
+    border-radius: 0.75rem;
     padding: 0.75rem 1.4rem;
-    transition: all 0.2s ease-in-out;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
   }
   .lp-btn-ghost-dark:hover {
-    background: rgba(178, 240, 240, 0.16);
-    border-color: rgba(0, 255, 255, 0.6);
-    transform: translateY(-2px);
-  }
-  .lp-btn-ghost-dark:active {
-    background: var(--lp-teal);
-    transform: translateY(0);
+    background: rgba(178, 240, 240, 0.1);
+    border-color: rgba(178, 240, 240, 0.55);
   }
 
-  /* Interactive lift card — feature grid + dashboard widgets. */
+  /* Card — white, hairline border, whisper of shadow. Hover tints the
+     border teal; no lift, no glow. */
   .lp-card {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(16px) saturate(130%);
-    -webkit-backdrop-filter: blur(16px) saturate(130%);
-    border: 1px solid rgba(178, 240, 240, 0.7);
-    border-radius: 1.25rem;
-    box-shadow: 0 1px 2px rgba(2, 53, 53, 0.04), 0 12px 32px -16px rgba(2, 53, 53, 0.18);
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px rgba(2, 53, 53, 0.04);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .lp-card:hover {
-    transform: translateY(-6px);
-    border-color: rgba(0, 255, 255, 0.7);
-    box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.25), 0 28px 60px -22px rgba(0, 128, 128, 0.4);
+    border-color: rgba(0, 128, 128, 0.45);
+    box-shadow: 0 1px 2px rgba(2, 53, 53, 0.04), 0 10px 28px -18px rgba(2, 53, 53, 0.25);
   }
 
-  /* Cyan-on-teal eyebrow chip. */
+  /* Eyebrow chip. */
   .lp-chip {
     display: inline-flex;
     align-items: center;
@@ -736,69 +711,38 @@ html.dark .bg-grid {
     border: 1px solid rgba(0, 128, 128, 0.18);
   }
   .lp-chip-dark {
-    color: var(--lp-cyan);
-    background: rgba(0, 255, 255, 0.08);
-    border: 1px solid rgba(0, 255, 255, 0.25);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    color: var(--lp-ice);
+    background: rgba(178, 240, 240, 0.08);
+    border: 1px solid rgba(178, 240, 240, 0.28);
   }
 
-  /* Animated cyan gradient text. */
+  /* Accent text — static soft-cyan tint on dark, no animation. */
   .lp-text-gradient {
-    background-image: linear-gradient(110deg, #28e6e6 0%, var(--lp-cyan) 45%, #7dfdfd 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: #7dd8d8;
   }
 }
 
-/* Premium landing helpers (utilities layer for arbitrary use). */
+/* Calm landing helpers. */
 @layer utilities {
+  /* Flat deep-teal band (dark hero / CTA sections). No radial glows. */
   .lp-bg-hero {
-    background:
-      radial-gradient(ellipse at 75% 10%, rgba(0, 255, 255, 0.18), transparent 55%),
-      radial-gradient(ellipse at 10% 90%, rgba(0, 128, 128, 0.45), transparent 55%),
-      linear-gradient(165deg, #012626 0%, #023535 45%, #014444 100%);
+    background: linear-gradient(175deg, #012a2a 0%, #023535 100%);
   }
+  /* Near-white section wash. */
   .lp-bg-ice {
-    background:
-      radial-gradient(at 15% 12%, rgba(178, 240, 240, 0.5) 0px, transparent 50%),
-      radial-gradient(at 88% 85%, rgba(0, 255, 255, 0.1) 0px, transparent 45%),
-      linear-gradient(180deg, #ffffff 0%, #f2fdfd 100%);
+    background: #f7fbfb;
   }
-  .lp-glow-ring { box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.35), 0 0 40px -6px rgba(0, 255, 255, 0.5); }
-  .lp-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(0, 128, 128, 0.25), transparent); }
-}
-
-/* Reduced-motion: drop the lift/translate on premium cards & buttons. */
-@media (prefers-reduced-motion: reduce) {
-  .lp-card:hover, .lp-btn-glow:hover, .lp-btn-ghost:hover, .lp-btn-ghost-dark:hover { transform: none; }
-}
-
-/* ---------------------------------------------------------------------
-   Premium polish: animated gradient text + film grain (Awwwards-grade
-   touches that top product sites use for depth without clutter).
-   --------------------------------------------------------------------- */
-@layer components {
-  .lp-text-gradient {
-    background-size: 200% auto;
-    animation: lp-shimmer 6s linear infinite;
-  }
-}
-@keyframes lp-shimmer {
-  to { background-position: 200% center; }
-}
-
-@layer utilities {
-  /* Fine film grain — sits over dark hero sections at very low opacity. */
-  .lp-grain::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.06;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lp-text-gradient { animation: none; }
+  .lp-glow-ring { box-shadow: 0 0 0 2px rgba(0, 128, 128, 0.35); }
+  .lp-divider { height: 1px; background: #e2e8f0; }
+  /* Grain retired in the calm redesign — kept as a no-op for stragglers. */
+  .lp-grain::after { content: none; }
 }

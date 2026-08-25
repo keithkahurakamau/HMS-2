@@ -63,21 +63,16 @@ export default function Login() {
 
     return (
         <div className="min-h-screen w-full grid lg:grid-cols-5 bg-ink-50">
-            {/* ============== Brand panel (left, lg+) ============== */}
-            <aside className="hidden lg:flex lg:col-span-2 relative overflow-hidden bg-brand-gradient text-white">
-                {/* Tenant background image, when uploaded, overlaid under the gradient. */}
+            {/* ============== Brand panel (left, lg+) — flat teal, calm ============== */}
+            <aside className="hidden lg:flex lg:col-span-2 relative overflow-hidden bg-[#023535] text-white">
+                {/* Tenant background image, when uploaded, dimmed under the panel tint. */}
                 {hasTenantBg && (
                     <div
-                        className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-overlay pointer-events-none"
+                        className="absolute inset-0 bg-cover bg-center opacity-25 pointer-events-none"
                         style={{ backgroundImage: `url("${safeBg}")` }}
                         aria-hidden="true"
                     />
                 )}
-                {/* Decorative mesh + grid */}
-                <div className="absolute inset-0 bg-aurora opacity-80 pointer-events-none" />
-                <div className="absolute inset-0 bg-grid opacity-[0.07] pointer-events-none" />
-                <div className="absolute -top-32 -right-32 size-96 rounded-full bg-accent-400/20 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-40 -left-20 size-[28rem] rounded-full bg-brand-400/20 blur-3xl pointer-events-none" />
 
                 <div className="relative z-10 flex flex-col justify-between w-full p-12 xl:p-16">
                     {/* Logo */}
@@ -92,12 +87,12 @@ export default function Login() {
                     {/* Headline */}
                     <div className="max-w-md">
                         <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 ring-1 ring-white/20 text-2xs font-semibold uppercase tracking-[0.14em] text-white/85">
-                            <span className="size-1.5 rounded-full bg-accent-400 animate-pulse-soft" />
+                            <span className="size-1.5 rounded-full bg-accent-400" />
                             Clinical-grade workspace
                         </span>
-                        <h1 className="mt-6 text-4xl xl:text-5xl font-semibold leading-[1.05] tracking-tight">
+                        <h1 className="mt-6 font-display text-4xl xl:text-5xl font-semibold leading-[1.1] tracking-tight">
                             Care, coordinated.
-                            <span className="block text-white/70 font-light mt-2">One platform for every shift.</span>
+                            <span className="block text-white/60 mt-2">One platform for every shift.</span>
                         </h1>
                         <p className="mt-6 text-white/75 text-base leading-relaxed">
                             Sign in to access patient records, clinical workflows, billing, and pharmacy, all in one secure environment.
@@ -129,7 +124,7 @@ export default function Login() {
                 <div className="w-full max-w-md animate-slide-up">
                     <div className="mb-8">
                         <span className="section-eyebrow">Welcome back</span>
-                        <h2 className="mt-2 text-3xl font-semibold text-ink-900 tracking-tight">Sign in to your workspace</h2>
+                        <h2 className="mt-2 font-display text-3xl font-semibold text-ink-900 tracking-tight">Sign in to your workspace</h2>
                         <p className="mt-2 text-sm text-ink-500">
                             Enter your credentials to continue. New here?{' '}
                             <Link to="/portal" className="text-brand-600 font-semibold hover:text-brand-700">View hospitals</Link>.
