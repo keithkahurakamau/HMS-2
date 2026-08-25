@@ -231,7 +231,7 @@ export default function LetterheadStudio({ value, onChange, headerText, footerTe
 
                 {cfg.image && (
                     <>
-                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                        <label className="relative flex items-center gap-3 cursor-pointer select-none">
                             <input
                                 type="checkbox"
                                 checked={!!cfg.enabled}

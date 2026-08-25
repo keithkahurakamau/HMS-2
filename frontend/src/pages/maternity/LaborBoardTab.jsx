@@ -3,6 +3,7 @@ import { getLaborBoard, getPartograph } from './api';
 import PartographChart from './PartographChart';
 import PartographEntryForm from './PartographEntryForm';
 import StartLaborForm from './StartLaborForm';
+import { printDocument, printUtils } from '../../utils/printDocument';
 
 const ALERT_BADGE = {
   ok: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
@@ -24,6 +25,24 @@ export default function LaborBoardTab() {
   // that a late-resolving (out-of-order) fetch for a since-abandoned selection
   // can never overwrite the chart for whichever labor is selected now.
   const requestedLaborIdRef = useRef(null);
+  const partographRef = useRef(null);
+
+  // Printed through the shared engine rather than window.print() so the
+  // partograph lands on the tenant's letterhead like every other document.
+  // The on-screen section is cloned and its screen-only controls stripped,
+  // which keeps the chart (an SVG) and the entry table exactly as rendered.
+  const printPartograph = useCallback(() => {
+    const node = partographRef.current;
+    if (!node) return;
+    const clone = node.cloneNode(true);
+    clone.querySelectorAll('.print\\:hidden, button').forEach((el) => el.remove());
+    printDocument(
+      `Partograph — ${selected?.patient_name ?? ''}`,
+      `${printUtils.header({ docType: 'Partograph' })}
+       <div class="partograph-print">${clone.innerHTML}</div>
+       ${printUtils.footer()}`,
+    );
+  }, [selected]);
 
   const refreshBoard = useCallback(() => {
     Promise.resolve(getLaborBoard())
@@ -101,7 +120,7 @@ export default function LaborBoardTab() {
       </section>
 
       {selected && (
-        <section aria-label="Partograph" data-tour="mat-partograph"
+        <section aria-label="Partograph" data-tour="mat-partograph" ref={partographRef}
                  className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-900 dark:text-white">
@@ -110,7 +129,7 @@ export default function LaborBoardTab() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={printPartograph}
                 className="print:hidden rounded-lg border border-ink-200 dark:border-ink-800 px-3 py-1.5 text-sm font-medium text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50"
               >
                 Print
