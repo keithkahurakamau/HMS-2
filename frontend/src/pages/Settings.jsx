@@ -95,7 +95,7 @@ export default function Settings() {
 
         if (item.data_type === 'boolean') {
             return (
-                <label className="inline-flex items-center cursor-pointer">
+                <label className="relative inline-flex items-center cursor-pointer">
                     <span className="sr-only">{item.label || item.key}</span>
                     <input type="checkbox"
                            checked={current === true || current === 'true'}

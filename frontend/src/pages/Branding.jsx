@@ -274,7 +274,7 @@ export default function Branding() {
                                 })}
                             </div>
                         </div>
-                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                        <label className="relative flex items-center gap-3 cursor-pointer select-none">
                             <input
                                 type="checkbox"
                                 checked={draft.print_templates?.show_logo !== false}
