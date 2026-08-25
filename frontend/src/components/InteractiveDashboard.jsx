@@ -25,9 +25,9 @@ const TABS = [
 ];
 
 const METRICS = [
-    { key: 'hr', label: 'Heart rate', value: '72', unit: 'bpm', icon: HeartPulse, trend: 'down', delta: '-3', spark: [14, 12, 16, 11, 13, 9, 10], tint: '#00d4d4' },
+    { key: 'hr', label: 'Heart rate', value: '72', unit: 'bpm', icon: HeartPulse, trend: 'down', delta: '-3', spark: [14, 12, 16, 11, 13, 9, 10], tint: '#0d9488' },
     { key: 'bp', label: 'Blood pressure', value: '118/76', unit: 'mmHg', icon: Activity, trend: 'flat', delta: 'stable', spark: [12, 13, 12, 14, 12, 13, 12], tint: '#008080' },
-    { key: 'spo2', label: 'Oxygen', value: '98', unit: '%', icon: Droplet, trend: 'up', delta: '+1', spark: [9, 10, 11, 10, 12, 13, 14], tint: '#00d4d4' },
+    { key: 'spo2', label: 'Oxygen', value: '98', unit: '%', icon: Droplet, trend: 'up', delta: '+1', spark: [9, 10, 11, 10, 12, 13, 14], tint: '#0d9488' },
     { key: 'temp', label: 'Temperature', value: '36.6', unit: '°C', icon: Thermometer, trend: 'flat', delta: 'normal', spark: [11, 12, 11, 12, 11, 12, 11], tint: '#008080' },
 ];
 
@@ -74,33 +74,33 @@ export default function InteractiveDashboard({ className = '' }) {
     };
 
     return (
-        <div className={`lp-glass-dark rounded-[1.6rem] p-3 sm:p-4 ${className}`}>
+        <div className={`lp-card rounded-[1.2rem] p-3 sm:p-4 ${className}`}>
             {/* Window chrome */}
             <div className="flex items-center justify-between px-2 pt-1 pb-3">
                 <div className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-full bg-[#00ffff]/70" />
-                    <span className="size-2.5 rounded-full bg-[#b2f0f0]/50" />
-                    <span className="size-2.5 rounded-full bg-[#008080]/70" />
+                    <span className="size-2.5 rounded-full bg-[#cbd5e1]" />
+                    <span className="size-2.5 rounded-full bg-[#e2e8f0]" />
+                    <span className="size-2.5 rounded-full bg-[#008080]/60" />
                 </div>
-                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[#b2f0f0]/70">
+                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-ink-400">
                     Patient portal preview
                 </span>
             </div>
 
-            <div className="rounded-[1.2rem] bg-white/95 overflow-hidden shadow-2xl">
+            <div className="rounded-[0.9rem] bg-white overflow-hidden border border-ink-200/70">
                 {/* Patient header */}
-                <div className="px-4 sm:px-5 py-4 bg-gradient-to-r from-[#012626] to-[#015050] text-white flex items-center justify-between">
+                <div className="px-4 sm:px-5 py-4 bg-[#023535] text-white flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <span className="size-10 rounded-xl bg-[#00ffff]/20 ring-1 ring-[#00ffff]/40 flex items-center justify-center">
-                            <HeartPulse size={20} className="text-[#7dfdfd]" />
+                        <span className="size-10 rounded-xl bg-white/10 ring-1 ring-white/20 flex items-center justify-center">
+                            <HeartPulse size={20} className="text-[#9cc9c9]" />
                         </span>
                         <div>
                             <p className="text-sm font-semibold leading-none">Amara Njoki</p>
                             <p className="text-[0.7rem] text-[#b2f0f0]/80 mt-1 font-mono">OP-2026-0142</p>
                         </div>
                     </div>
-                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[0.65rem] font-semibold px-2.5 py-1 rounded-full bg-[#00ffff]/15 text-[#7dfdfd] ring-1 ring-[#00ffff]/30">
-                        <span className="size-1.5 rounded-full bg-[#00ffff] animate-pulse" /> Verified
+                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[0.65rem] font-semibold px-2.5 py-1 rounded-full bg-white/10 text-[#b2f0f0] ring-1 ring-white/20">
+                        <span className="size-1.5 rounded-full bg-[#34d399]" /> Verified
                     </span>
                 </div>
 
@@ -117,7 +117,7 @@ export default function InteractiveDashboard({ className = '' }) {
                                 aria-pressed={active}
                                 className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-lg transition-all duration-200 ease-in-out cursor-pointer ${
                                     active
-                                        ? 'bg-[#008080] text-white shadow-md shadow-[#008080]/30'
+                                        ? 'bg-[#008080] text-white'
                                         : 'text-[#015050] hover:bg-[#b2f0f0]/50'
                                 }`}
                             >
@@ -138,10 +138,10 @@ export default function InteractiveDashboard({ className = '' }) {
                                     return (
                                         <div
                                             key={m.key}
-                                            className="group rounded-xl border border-[#b2f0f0] bg-white p-3 transition-all duration-200 ease-in-out hover:-translate-y-1 hover:border-[#00d4d4] hover:shadow-lg hover:shadow-[#008080]/10"
+                                            className="group rounded-xl border border-[#b2f0f0] bg-white p-3 transition-colors duration-200 ease-in-out hover:border-[#008080]/50"
                                         >
                                             <div className="flex items-center justify-between">
-                                                <span className="size-7 rounded-lg bg-[#e6fbfb] text-[#008080] flex items-center justify-center group-hover:bg-[#00ffff]/20 transition-colors">
+                                                <span className="size-7 rounded-lg bg-[#e6fbfb] text-[#008080] flex items-center justify-center transition-colors">
                                                     <Icon size={15} />
                                                 </span>
                                                 <span className="inline-flex items-center gap-0.5 text-[0.62rem] font-semibold text-[#475569]">
@@ -171,7 +171,7 @@ export default function InteractiveDashboard({ className = '' }) {
                             {APPOINTMENTS.map((a) => {
                                 const isConfirmed = confirmed[a.id];
                                 return (
-                                    <div key={a.id} className="rounded-xl border border-[#b2f0f0] bg-white p-3.5 transition-all duration-200 ease-in-out hover:border-[#00d4d4] hover:shadow-md">
+                                    <div key={a.id} className="rounded-xl border border-[#b2f0f0] bg-white p-3.5 transition-colors duration-200 ease-in-out hover:border-[#008080]/50">
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                                 <p className="text-sm font-semibold text-[#012626] truncate">{a.doctor}</p>
@@ -188,7 +188,7 @@ export default function InteractiveDashboard({ className = '' }) {
                                                 className={`shrink-0 text-[0.7rem] font-bold px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out cursor-pointer ${
                                                     isConfirmed
                                                         ? 'bg-[#008080] text-white'
-                                                        : 'bg-[#e6fbfb] text-[#008080] hover:bg-[#00ffff]/25'
+                                                        : 'bg-[#e6fbfb] text-[#008080] hover:bg-[#d4f5f5]'
                                                 }`}
                                             >
                                                 {isConfirmed ? (
@@ -211,7 +211,7 @@ export default function InteractiveDashboard({ className = '' }) {
                                 const low = m.left <= 3;
                                 const isRefilling = refilling === m.id;
                                 return (
-                                    <div key={m.id} className="rounded-xl border border-[#b2f0f0] bg-white p-3.5 transition-all duration-200 ease-in-out hover:border-[#00d4d4] hover:shadow-md">
+                                    <div key={m.id} className="rounded-xl border border-[#b2f0f0] bg-white p-3.5 transition-colors duration-200 ease-in-out hover:border-[#008080]/50">
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-2.5 min-w-0">
                                                 <span className="size-8 rounded-lg bg-[#e6fbfb] text-[#008080] flex items-center justify-center shrink-0">
@@ -233,7 +233,7 @@ export default function InteractiveDashboard({ className = '' }) {
                                                     className={`mt-1 text-[0.65rem] font-bold px-2.5 py-1 rounded-md transition-all duration-200 ease-in-out cursor-pointer disabled:cursor-default ${
                                                         m.refilled
                                                             ? 'bg-[#008080] text-white'
-                                                            : 'bg-[#e6fbfb] text-[#008080] hover:bg-[#00ffff]/25'
+                                                            : 'bg-[#e6fbfb] text-[#008080] hover:bg-[#d4f5f5]'
                                                     }`}
                                                 >
                                                     {isRefilling ? (

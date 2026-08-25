@@ -13,7 +13,6 @@ import CountUp from '../components/CountUp';
 import ContactStrip from '../components/ContactStrip';
 import ContactForm from '../components/ContactForm';
 import Reveal from '../components/Reveal';
-import WebGLHero from '../components/WebGLHero';
 import InteractiveDashboard from '../components/InteractiveDashboard';
 import HospitalPicker from '../components/HospitalPicker';
 import { SystemMockGrid } from '../components/SystemIllustrations';
@@ -48,15 +47,15 @@ export default function Landing() {
     }, [searchParams]);
 
     return (
-        <div className="relative min-h-screen bg-white text-ink-900 font-sans selection:bg-[#00ffff]/30">
+        <div className="relative min-h-screen bg-white text-ink-900 font-sans selection:bg-[#b2f0f0]/60">
             <Seo
                 path="/"
                 description="MediFleet unifies registration, clinical desk, pharmacy, lab, radiology, wards, and billing into one secure workspace. Run an entire fleet of hospitals from one codebase, fully isolated per tenant."
             />
 
-            {/* ============== Sticky frosted navbar ============== */}
-            <header className="fixed top-3 inset-x-3 sm:top-4 sm:inset-x-4 z-50">
-                <div className="max-w-7xl mx-auto lp-glass rounded-2xl px-4 sm:px-6 py-3 flex items-center justify-between">
+            {/* ============== Sticky navbar — plain white bar, hairline rule ============== */}
+            <header className="fixed top-0 inset-x-0 z-50 bg-white/95 backdrop-blur-sm border-b border-ink-200/70">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                     <Link to="/" className="flex items-center cursor-pointer" aria-label="MediFleet home">
                         <Logo variant="full" size={32} label="MediFleet" />
                     </Link>
@@ -77,27 +76,19 @@ export default function Landing() {
                 </div>
             </header>
 
-            {/* ============== Hero (split screen, dark teal + cyan glow) ============== */}
-            <section className="relative pt-28 pb-24 sm:pt-36 sm:pb-32 overflow-hidden lp-bg-hero lp-grain isolate">
-                <div className="absolute inset-0 pointer-events-none">
-                    <WebGLHero className="absolute inset-0 opacity-70" />
-                    <div className="absolute -top-24 -right-20 size-[40rem] rounded-full bg-[#00ffff]/15 blur-[120px] animate-blob-breathe" />
-                    <div className="absolute top-1/2 -left-24 size-[34rem] rounded-full bg-[#008080]/40 blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
-                    <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-white" />
-                </div>
-
-                <div className="relative max-w-7xl mx-auto px-5 sm:px-6 grid lg:grid-cols-2 gap-12 lg:gap-10 items-center">
+            {/* ============== Hero — calm, light, editorial ============== */}
+            <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-24 bg-white border-b border-ink-100">
+                <div className="max-w-7xl mx-auto px-5 sm:px-6 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
                     {/* Left: message */}
                     <div className="animate-slide-up">
-                        <span className="lp-chip-dark inline-flex">
-                            <Sparkles size={12} /> Your health, digitally empowered
+                        <span className="lp-chip inline-flex">
+                            <Sparkles size={12} /> Hospital management, simplified
                         </span>
-                        <h1 className="mt-6 text-4xl sm:text-5xl lg:text-[3.7rem] font-extrabold tracking-tightest leading-[1.04] text-white">
+                        <h1 className="mt-6 font-display text-4xl sm:text-5xl lg:text-[3.5rem] font-semibold tracking-tight leading-[1.08] text-[#012626]">
                             Your health,{' '}
-                            <span className="lp-text-gradient">digitally</span>{' '}
-                            empowered.
+                            <em className="not-italic text-[#008080]">digitally empowered</em>.
                         </h1>
-                        <p className="mt-6 text-lg text-[#cdeeee] leading-relaxed max-w-xl">
+                        <p className="mt-6 text-lg text-ink-600 leading-relaxed max-w-xl">
                             One secure place for your whole hospital and every patient. Book care, see
                             records, manage prescriptions, and run clinical operations end to end, with
                             calm, modern tools that put people first.
@@ -107,39 +98,26 @@ export default function Landing() {
                                 Log in
                                 <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-0.5" />
                             </button>
-                            <button type="button" onClick={() => goPicker('patient')} className="lp-btn-ghost-dark text-base cursor-pointer">
+                            <button type="button" onClick={() => goPicker('patient')} className="lp-btn-ghost text-base cursor-pointer">
                                 <HeartPulse size={16} /> Patient portal
                             </button>
                         </div>
-                        <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-[#9fdede]">
-                            <Trust icon={<Lock size={14} className="text-[#7dfdfd]" />} label="HttpOnly JWT and CSRF" />
-                            <Trust icon={<ShieldCheck size={14} className="text-[#7dfdfd]" />} label="KDPA aligned" />
-                            <Trust icon={<Globe2 size={14} className="text-[#7dfdfd]" />} label="Database per tenant" />
+                        <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-ink-500">
+                            <Trust icon={<Lock size={14} className="text-[#008080]" />} label="HttpOnly JWT and CSRF" />
+                            <Trust icon={<ShieldCheck size={14} className="text-[#008080]" />} label="KDPA aligned" />
+                            <Trust icon={<Globe2 size={14} className="text-[#008080]" />} label="Database per tenant" />
                         </div>
                     </div>
 
-                    {/* Right: interactive dashboard illustration */}
+                    {/* Right: interactive portal preview in a plain frame */}
                     <div className="relative animate-slide-up lg:pl-4" style={{ animationDelay: '120ms', animationFillMode: 'both' }}>
-                        <div className="absolute -inset-6 bg-[#00ffff]/10 rounded-[2rem] blur-3xl pointer-events-none" />
-                        <div className="relative animate-float">
-                            <InteractiveDashboard />
-                        </div>
-                        {/* Floating glass stat chip */}
-                        <div className="hidden sm:flex absolute -bottom-5 -left-4 lp-glass rounded-2xl px-4 py-3 items-center gap-3 animate-float" style={{ animationDelay: '1.5s' }}>
-                            <span className="size-9 rounded-xl bg-[#e6fbfb] text-[#008080] flex items-center justify-center">
-                                <ShieldCheck size={18} />
-                            </span>
-                            <div>
-                                <p className="text-xs font-bold text-[#012626]">All systems operational</p>
-                                <p className="text-[0.65rem] text-[#64748b]">Last check 12s ago</p>
-                            </div>
-                        </div>
+                        <InteractiveDashboard />
                     </div>
                 </div>
             </section>
 
             {/* ============== Stat strip ============== */}
-            <section className="relative -mt-8">
+            <section className="relative py-10 bg-white">
                 <div className="max-w-7xl mx-auto px-5 sm:px-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <Stat label="Modules" value={<CountUp to={25} />} hint="Clinical, ops and finance" />
                     <Stat label="Tenant isolation" value={<CountUp to={100} suffix="%" />} hint="Per-database separation" />
@@ -149,14 +127,11 @@ export default function Landing() {
             </section>
 
             {/* ============== Find your hospital (combined picker) ============== */}
-            <section id="find-hospital" className="py-24 bg-white relative overflow-hidden scroll-mt-24">
-                <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute -top-20 left-1/2 -translate-x-1/2 size-[40rem] rounded-full bg-[#00ffff]/8 blur-[130px]" />
-                </div>
+            <section id="find-hospital" className="py-24 lp-bg-ice border-y border-ink-100 relative scroll-mt-24">
                 <Reveal className="relative max-w-7xl mx-auto px-5 sm:px-6">
                     <div className="max-w-2xl mx-auto text-center">
                         <span className="lp-chip"><Building2 size={12} /> Workspace selector</span>
-                        <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight text-[#012626]">
+                        <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-[#012626]">
                             {pickerMode === 'patient' ? 'Find your hospital to view your records' : 'Find your hospital to sign in'}
                         </h2>
                         <p className="mt-3 text-ink-600 leading-relaxed">
@@ -169,14 +144,14 @@ export default function Landing() {
                             <button type="button" role="tab" aria-selected={pickerMode === 'staff'}
                                 onClick={() => setPickerMode('staff')}
                                 className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ease-in-out cursor-pointer ${
-                                    pickerMode === 'staff' ? 'bg-[#008080] text-white shadow-md shadow-[#008080]/30' : 'text-[#015050] hover:bg-[#e6fbfb]'
+                                    pickerMode === 'staff' ? 'bg-[#008080] text-white' : 'text-[#015050] hover:bg-[#e6fbfb]'
                                 }`}>
                                 <Stethoscope size={15} /> I'm staff
                             </button>
                             <button type="button" role="tab" aria-selected={pickerMode === 'patient'}
                                 onClick={() => setPickerMode('patient')}
                                 className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ease-in-out cursor-pointer ${
-                                    pickerMode === 'patient' ? 'bg-[#008080] text-white shadow-md shadow-[#008080]/30' : 'text-[#015050] hover:bg-[#e6fbfb]'
+                                    pickerMode === 'patient' ? 'bg-[#008080] text-white' : 'text-[#015050] hover:bg-[#e6fbfb]'
                                 }`}>
                                 <HeartPulse size={15} /> I'm a patient
                             </button>
@@ -225,19 +200,14 @@ export default function Landing() {
             </section>
 
             {/* ============== Live interactive dashboard showcase ============== */}
-            <section id="dashboard" className="relative py-24 lp-bg-hero isolate overflow-hidden">
-                <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute -top-24 right-0 size-[34rem] rounded-full bg-[#00ffff]/12 blur-[130px] animate-blob-breathe" />
-                    <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white to-transparent" />
-                    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-white" />
-                </div>
+            <section id="dashboard" className="relative py-24 lp-bg-hero">
                 <Reveal className="relative max-w-7xl mx-auto px-5 sm:px-6 grid lg:grid-cols-2 gap-12 items-center">
                     <div>
                         <span className="lp-chip-dark inline-flex"><Play size={12} /> Try it yourself</span>
-                        <h2 className="mt-5 text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+                        <h2 className="mt-5 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-white">
                             See exactly what patients get
                         </h2>
-                        <p className="mt-4 text-[#cdeeee] leading-relaxed">
+                        <p className="mt-4 text-[#c8e2e2] leading-relaxed">
                             This is the real patient portal, running live on this page. Switch tabs to
                             check vitals, confirm an appointment, or request a prescription refill, no
                             sign-in required.
@@ -257,7 +227,6 @@ export default function Landing() {
                         </div>
                     </div>
                     <div className="relative">
-                        <div className="absolute -inset-6 bg-[#00ffff]/10 rounded-[2rem] blur-3xl pointer-events-none" />
                         <InteractiveDashboard className="relative" />
                     </div>
                 </Reveal>
@@ -321,7 +290,7 @@ export default function Landing() {
                 <div className="max-w-7xl mx-auto px-5 sm:px-6 grid lg:grid-cols-2 gap-12 items-center">
                     <div>
                         <span className="lp-chip">Compliance</span>
-                        <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight text-[#012626]">
+                        <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-[#012626]">
                             Built for clinical environments, not retrofitted into one.
                         </h2>
                         <p className="mt-4 text-ink-600 leading-relaxed">
@@ -344,15 +313,13 @@ export default function Landing() {
             {/* ============== CTA ============== */}
             <section className="py-24 bg-white">
                 <div className="max-w-5xl mx-auto px-5 sm:px-6">
-                    <div className="relative overflow-hidden rounded-[2rem] lp-bg-hero p-10 sm:p-16 shadow-elevated isolate">
-                        <div className="absolute -top-24 -right-24 size-96 rounded-full bg-[#00ffff]/20 blur-3xl pointer-events-none" />
-                        <div className="absolute -bottom-24 -left-16 size-80 rounded-full bg-[#008080]/40 blur-3xl pointer-events-none" />
+                    <div className="relative overflow-hidden rounded-[2rem] lp-bg-hero p-10 sm:p-16">
                         <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
                             <div>
-                                <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white max-w-xl">
+                                <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-white max-w-xl">
                                     Ready to run a calmer hospital?
                                 </h2>
-                                <p className="mt-3 text-[#cdeeee] max-w-lg">
+                                <p className="mt-3 text-[#c8e2e2] max-w-lg">
                                     Sign in to your tenant, or talk to the platform team about provisioning a new workspace.
                                 </p>
                             </div>
@@ -374,7 +341,7 @@ export default function Landing() {
                 <div className="max-w-2xl mx-auto px-5 sm:px-6">
                     <div className="text-center mb-8">
                         <span className="lp-chip">Get in touch</span>
-                        <h2 className="mt-4 text-2xl sm:text-3xl font-extrabold tracking-tight text-[#012626]">Send us a message</h2>
+                        <h2 className="mt-4 font-display text-2xl sm:text-3xl font-semibold tracking-tight text-[#012626]">Send us a message</h2>
                         <p className="mt-2 text-sm text-ink-600 max-w-xl mx-auto">
                             Tell us about your hospital and what you need, and we'll get back to you within one business day.
                         </p>
@@ -431,7 +398,7 @@ function SectionHeader({ eyebrow, title, subtitle }) {
     return (
         <div className="max-w-2xl mx-auto text-center">
             <span className="lp-chip">{eyebrow}</span>
-            <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight text-[#012626]">{title}</h2>
+            <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-[#012626]">{title}</h2>
             <p className="mt-3 text-ink-600 leading-relaxed">{subtitle}</p>
         </div>
     );
@@ -451,7 +418,7 @@ function FeatureCard({ icon, title, body, points, featured, onClick }) {
             <div className={`size-14 rounded-2xl flex items-center justify-center mb-5 transition-all duration-200 ease-in-out ${
                 featured
                     ? 'bg-[#008080] text-white group-hover:bg-[#00d4d4]'
-                    : 'bg-[#e6fbfb] text-[#008080] group-hover:bg-[#00ffff]/25'
+                    : 'bg-[#e6fbfb] text-[#008080]'
             }`}>
                 {icon}
             </div>
@@ -460,7 +427,7 @@ function FeatureCard({ icon, title, body, points, featured, onClick }) {
             <ul className="mt-5 space-y-2">
                 {points.map((p) => (
                     <li key={p} className="flex items-center gap-2 text-sm text-[#015050] font-medium">
-                        <CheckCircle2 size={15} className="text-[#00d4d4] shrink-0" /> {p}
+                        <CheckCircle2 size={15} className="text-[#008080] shrink-0" /> {p}
                     </li>
                 ))}
             </ul>
@@ -474,7 +441,7 @@ function FeatureCard({ icon, title, body, points, featured, onClick }) {
 function Step({ n, title, children }) {
     return (
         <div className="lp-card p-7">
-            <div className="size-10 rounded-xl bg-gradient-to-br from-[#00ffff] to-[#008080] flex items-center justify-center text-[#012626] font-extrabold lp-glow-ring">
+            <div className="size-10 rounded-xl bg-[#008080] flex items-center justify-center text-white font-bold">
                 {n}
             </div>
             <h3 className="mt-4 text-lg font-extrabold tracking-tight text-[#012626]">{title}</h3>
@@ -494,8 +461,8 @@ function Bullet({ children }) {
 
 function DarkBullet({ children }) {
     return (
-        <li className="flex items-start gap-2 text-sm text-[#cdeeee]">
-            <CheckCircle2 size={16} className="text-[#7dfdfd] shrink-0 mt-0.5" />
+        <li className="flex items-start gap-2 text-sm text-[#c8e2e2]">
+            <CheckCircle2 size={16} className="text-[#7dd8d8] shrink-0 mt-0.5" />
             <span>{children}</span>
         </li>
     );
@@ -506,8 +473,8 @@ function ComplianceCard() {
         <div className="lp-glass rounded-[1.6rem] overflow-hidden">
             <div className="p-8 space-y-5">
                 <div className="flex items-center gap-3">
-                    <div className="size-12 rounded-2xl bg-gradient-to-br from-[#00ffff] to-[#008080] flex items-center justify-center lp-glow-ring">
-                        <Lock size={20} className="text-[#012626]" />
+                    <div className="size-12 rounded-2xl bg-[#008080] flex items-center justify-center">
+                        <Lock size={20} className="text-white" />
                     </div>
                     <div>
                         <p className="text-2xs font-bold uppercase tracking-[0.14em] text-[#008080]">Security posture</p>
@@ -697,12 +664,12 @@ function ModuleShowcase({ goPicker }) {
                                 onClick={() => setActiveKey(g.key)}
                                 className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 ease-in-out cursor-pointer ${
                                     isActive
-                                        ? 'bg-[#008080] text-white shadow-md shadow-[#008080]/30'
+                                        ? 'bg-[#008080] text-white'
                                         : 'text-[#015050] hover:bg-[#e6fbfb]'
                                 }`}
                             >
                                 {g.label}
-                                <span className={`ml-1.5 text-2xs font-bold ${isActive ? 'text-[#7dfdfd]' : 'text-[#94a3b8]'}`}>
+                                <span className={`ml-1.5 text-2xs font-bold ${isActive ? 'text-[#b2f0f0]' : 'text-[#94a3b8]'}`}>
                                     {g.modules.length}
                                 </span>
                             </button>
@@ -722,10 +689,10 @@ function ModuleShowcase({ goPicker }) {
                 ))}
             </div>
 
-            <div className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl lp-bg-hero text-white p-6 isolate">
+            <div className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl lp-bg-hero text-white p-6">
                 <div>
                     <p className="text-sm font-bold">Don't see what you need? Tell us, and we ship modules every sprint.</p>
-                    <p className="text-xs text-[#9fdede] mt-1">Or jump in: the always-on modules are live the moment your hospital is provisioned.</p>
+                    <p className="text-xs text-[#9cc9c9] mt-1">Or jump in: the always-on modules are live the moment your hospital is provisioned.</p>
                 </div>
                 <button type="button" onClick={() => goPicker('staff')} className="lp-btn-glow text-sm cursor-pointer">
                     Get started <ArrowRight size={14} />
@@ -751,7 +718,7 @@ function ModuleCard({ module: m, delayMs, goPicker }) {
             style={{ animationDelay: `${delayMs}ms`, animationFillMode: 'both' }}
         >
             <div className="flex items-start justify-between gap-3">
-                <div className="size-11 rounded-xl bg-[#e6fbfb] text-[#008080] flex items-center justify-center shrink-0 group-hover:bg-[#00ffff]/25 group-hover:scale-105 transition-all duration-200">
+                <div className="size-11 rounded-xl bg-[#e6fbfb] text-[#008080] flex items-center justify-center shrink-0 transition-colors duration-200">
                     <Icon size={20} />
                 </div>
                 <span className={`text-2xs font-bold uppercase tracking-[0.12em] px-2 py-1 rounded-md ${
@@ -776,7 +743,7 @@ function ModuleCard({ module: m, delayMs, goPicker }) {
             >
                 {m.bullets.map(b => (
                     <li key={b} className="flex items-start gap-2 text-xs text-[#015050]">
-                        <CheckCircle2 size={13} className="text-[#00d4d4] shrink-0 mt-0.5" />
+                        <CheckCircle2 size={13} className="text-[#008080] shrink-0 mt-0.5" />
                         <span>{b}</span>
                     </li>
                 ))}
