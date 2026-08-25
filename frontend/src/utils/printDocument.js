@@ -8,6 +8,16 @@
 // Self-containing the HTML means the live app's CSS can never bleed into the
 // printed output — every document looks the same regardless of which page
 // triggered it.
+//
+// Tenant letterhead
+// -----------------
+// A hospital can upload its own pre-designed A4 stationery (Branding Studio →
+// Letterhead). When one is active, every document produced here is laid out on
+// top of that artwork instead of the generic MediFleet header/footer, so
+// invoices, prescriptions, lab reports and the rest all come out on the
+// clinic's own paper. `setPrintBranding()` is called by BrandingContext
+// whenever branding loads, which keeps this module synchronous — printing must
+// stay inside the user's click gesture or the browser blocks the popup.
 
 const SHARED_PRINT_STYLES = `
   @page { size: A4; margin: 16mm 14mm; }
@@ -241,19 +251,159 @@ const escapeHtml = (value) => {
 const getHospitalName = () =>
   localStorage.getItem('hms_tenant_name') || 'MediFleet';
 
-const buildDocument = (title, bodyHtml) => `
+/* ── Tenant letterhead ──────────────────────────────────────────────────────
+   Held in a module-level cache so printDocument() stays synchronous. */
+
+const A4_WIDTH_MM = 210;
+const A4_HEIGHT_MM = 297;
+
+const LETTERHEAD_DEFAULTS = {
+  margin_top_mm: 42,
+  margin_bottom_mm: 48,
+  margin_side_mm: 18,
+};
+
+let letterhead = null;
+// Text strap-lines configured in Branding Studio; used with or without
+// stationery so a tenant can brand its documents without uploading artwork.
+let printBranding = { header_text: '', footer_text: '' };
+
+// Same allow-list the app uses for tenant logos: the URL is interpolated into
+// an <img src>, and data:image/svg+xml can carry <script>, so SVG is out.
+const isSafePrintImage = (url) =>
+  typeof url === 'string'
+  && url.length > 0
+  && url.length <= 5_000_000
+  && !/["\\\r\n]/.test(url)
+  && (/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(url)
+      || /^https:\/\/[A-Za-z0-9.\-_~:/?#@!$&'*+,;=%]+$/.test(url));
+
+const clampMm = (value, fallback, max) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || n > max) return fallback;
+  return n;
+};
+
+/**
+ * Registers the active tenant's print branding. Called by BrandingContext on
+ * every branding load; pass null/undefined to fall back to the generic layout.
+ */
+export const setPrintBranding = (printTemplates) => {
+  printBranding = {
+    header_text: typeof printTemplates?.header_text === 'string' ? printTemplates.header_text : '',
+    footer_text: typeof printTemplates?.footer_text === 'string' ? printTemplates.footer_text : '',
+  };
+  const cfg = printTemplates?.letterhead;
+  if (!cfg?.enabled || !isSafePrintImage(cfg.image)) {
+    letterhead = null;
+    return;
+  }
+  const top = clampMm(cfg.margin_top_mm, LETTERHEAD_DEFAULTS.margin_top_mm, 150);
+  const bottom = clampMm(cfg.margin_bottom_mm, LETTERHEAD_DEFAULTS.margin_bottom_mm, 150);
+  const side = clampMm(cfg.margin_side_mm, LETTERHEAD_DEFAULTS.margin_side_mm, 60);
+  // A safe area with no room left would silently print blank pages.
+  if (top + bottom >= A4_HEIGHT_MM || side * 2 >= A4_WIDTH_MM) {
+    letterhead = null;
+    return;
+  }
+  letterhead = { image: cfg.image, top, bottom, side };
+};
+
+/** True when the active tenant prints on its own stationery. */
+export const hasLetterhead = () => letterhead !== null;
+
+/* Letterhead layout.
+
+   The artwork has to do two things on a multi-page document: repeat on every
+   sheet, and *reserve* the space it occupies so body text never runs beneath
+   it. `position: fixed` only does the first — it paints over the flow, and
+   `@page` margins with negative offsets proved unreliable in Chromium's print
+   pipeline (the artwork drifted into the middle of the page).
+
+   A table with `<thead>` / `<tfoot>` does both: browsers repeat header and
+   footer row groups on every printed page *and* reserve their height in the
+   flow. That behaviour long predates CSS paged media and is consistent across
+   engines, so it is what we rely on.
+
+   Both bands show the *same* stored full-page artwork, cropped with
+   `overflow: hidden` — the top band reveals its first `top`mm, the bottom band
+   is pulled up so only its last `bottom`mm shows. Cropping in CSS means
+   changing a margin re-crops instantly with no re-upload and no canvas work. */
+const letterheadStyles = (lh) => `
+  /* Full-bleed: the artwork runs to the paper edge, so all spacing is ours. */
+  @page { size: A4; margin: 0; }
+
+  body { padding: 0; margin: 0; }
+
+  .letterhead-doc {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .letterhead-band {
+    overflow: hidden;
+    position: relative;
+  }
+
+  .letterhead-band img {
+    width: 100%;
+    height: ${A4_HEIGHT_MM}mm;   /* full sheet; the band crops it */
+    object-fit: fill;
+    display: block;
+  }
+
+  .letterhead-band.top { height: ${lh.top}mm; }
+  .letterhead-band.bottom { height: ${lh.bottom}mm; }
+  /* Pull the artwork up so the band's window lands on its footer. */
+  .letterhead-band.bottom img { margin-top: -${A4_HEIGHT_MM - lh.bottom}mm; }
+
+  .letterhead-doc > tbody > tr > td { padding: 0 ${lh.side}mm; vertical-align: top; }
+  .letterhead-doc thead td, .letterhead-doc tfoot td { padding: 0; }
+
+  /* The stationery already carries the clinic's identity, so the generic
+     brand band collapses to a compact meta line. */
+  .doc-header { border-bottom: 1px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 14px; }
+  .footer { border-top: 1px solid #e2e8f0; margin-top: 20px; }
+
+  @media print {
+    /* Without this Chromium drops the artwork's background colours entirely. */
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+`;
+
+const buildDocument = (title, bodyHtml) => {
+  const lh = letterhead;
+  const styles = lh ? `${SHARED_PRINT_STYLES}\n${letterheadStyles(lh)}` : SHARED_PRINT_STYLES;
+
+  // thead/tfoot repeat on every printed page and reserve their own height, so
+  // the artwork frames the content instead of painting over it.
+  const content = lh
+    ? `<table class="letterhead-doc">
+  <thead><tr><td>
+    <div class="letterhead-band top" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
+  </td></tr></thead>
+  <tfoot><tr><td>
+    <div class="letterhead-band bottom" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
+  </td></tr></tfoot>
+  <tbody><tr><td>${bodyHtml}</td></tr></tbody>
+</table>`
+    : bodyHtml;
+
+  return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>${escapeHtml(title)}</title>
-  <style>${SHARED_PRINT_STYLES}</style>
+  <style>${styles}</style>
 </head>
 <body>
-  ${bodyHtml}
+  ${content}
 </body>
 </html>
 `;
+};
 
 // Open a hidden popup, navigate to a blob: URL holding the document, trigger
 // print, then revoke the URL. The prior implementation used document.write
@@ -303,30 +453,76 @@ export const printDocument = (title, bodyHtml) => {
   document.body.appendChild(iframe);
 };
 
+/**
+ * Renders a document against an ad-hoc print-branding config instead of the
+ * saved one, then restores the active config. Branding Studio uses this to
+ * test-print an *unsaved* letterhead draft. Restore happens synchronously
+ * because buildDocument() has already serialised the HTML by then.
+ */
+export const printDocumentWithBranding = (title, bodyHtml, printTemplates) => {
+  const previousLetterhead = letterhead;
+  const previousBranding = printBranding;
+  try {
+    setPrintBranding(printTemplates);
+    printDocument(title, bodyHtml);
+  } finally {
+    letterhead = previousLetterhead;
+    printBranding = previousBranding;
+  }
+};
+
+/** Serialised print HTML — used by tests and the on-screen letterhead preview. */
+export const buildPrintHtml = (title, bodyHtml) => buildDocument(title, bodyHtml);
+
 export const printUtils = {
   esc: escapeHtml,
   hospital: getHospitalName,
-  // Header reused across templates.
-  header: ({ docType, docNumber, dateLabel = 'Issued' }) => `
-    <div class="doc-header">
-      <div>
-        <div class="brand">
-          ${escapeHtml(getHospitalName())}
-          <small>Hospital Management System</small>
-        </div>
-      </div>
+  // Header reused across templates. On tenant stationery the clinic's identity
+  // is already printed above, so the brand band collapses to the document's
+  // own identifiers and we don't repeat (or fight with) the artwork.
+  header: ({ docType, docNumber, dateLabel = 'Issued' }) => {
+    const meta = `
       <div class="meta">
         <strong>${escapeHtml(docType)}</strong>
         ${docNumber ? `<div>No: <b>${escapeHtml(docNumber)}</b></div>` : ''}
         <div>${escapeHtml(dateLabel)}: ${new Date().toLocaleString()}</div>
       </div>
-    </div>
-  `,
-  footer: (extra = '') => `
-    <div class="footer">
-      ${extra ? `<div>${escapeHtml(extra)}</div>` : ''}
-      <div>This document was electronically generated by ${escapeHtml(getHospitalName())} via MediFleet.</div>
-      <div>Printed on ${new Date().toLocaleString()}.</div>
-    </div>
-  `,
+    `;
+    if (letterhead) {
+      const strap = printBranding.header_text;
+      return `
+        <div class="doc-header">
+          <div>${strap ? `<div class="brand"><small>${escapeHtml(strap)}</small></div>` : ''}</div>
+          ${meta}
+        </div>
+      `;
+    }
+    return `
+      <div class="doc-header">
+        <div>
+          <div class="brand">
+            ${escapeHtml(getHospitalName())}
+            <small>${escapeHtml(printBranding.header_text || 'Hospital Management System')}</small>
+          </div>
+        </div>
+        ${meta}
+      </div>
+    `;
+  },
+  footer: (extra = '') => {
+    const custom = printBranding.footer_text;
+    // Stationery carries its own footer artwork; adding the MediFleet
+    // provenance line under it would collide with the design.
+    const provenance = letterhead
+      ? ''
+      : `<div>This document was electronically generated by ${escapeHtml(getHospitalName())} via MediFleet.</div>`;
+    return `
+      <div class="footer">
+        ${extra ? `<div>${escapeHtml(extra)}</div>` : ''}
+        ${custom ? `<div>${escapeHtml(custom)}</div>` : ''}
+        ${provenance}
+        <div>Printed on ${new Date().toLocaleString()}.</div>
+      </div>
+    `;
+  },
 };
