@@ -1,5 +1,6 @@
 import React, { createContext, use, useEffect, useState, useCallback, useMemo } from 'react';
 import { apiClient } from '../api/client';
+import { setPrintBranding } from '../utils/printDocument';
 
 /**
  * BrandingContext — single source of truth for the active tenant's branding.
@@ -120,6 +121,13 @@ export function BrandingProvider({ children }) {
         if (bg) root.style.setProperty('--tenant-bg', `url("${bg}")`);
         else root.style.removeProperty('--tenant-bg');
     }, [branding.brand_primary, branding.brand_accent, branding.background_data_url]);
+
+    // Hand the print engine the tenant's letterhead + strap-lines. printDocument
+    // must stay synchronous (a popup opened after an await gets blocked), so it
+    // reads from a module cache that we prime here on every branding change.
+    useEffect(() => {
+        setPrintBranding(branding.print_templates);
+    }, [branding.print_templates]);
 
     const updateLocal = useCallback((next) => {
         setBranding((prev) => ({ ...prev, ...next }));
