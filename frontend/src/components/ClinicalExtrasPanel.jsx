@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
+import { printDocument, printUtils } from '../utils/printDocument';
 
 const EXTERNAL_TYPES = ['Lab', 'Radiology', 'Referral', 'Other'];
 const ITEM_TYPES = ['Lab', 'Radiology', 'Drug'];
@@ -34,6 +35,52 @@ function Modal({ title, icon: Icon, onClose, children, footer, wide = false }) {
 }
 
 /* ── Sick note ─────────────────────────────────────────────────────────── */
+
+/** Sick note as a proper printed document, so it inherits the letterhead. */
+function printSickNote(patient, form, days) {
+    const esc = printUtils.esc;
+    const dash = (v) => (v === null || v === undefined || v === '' ? '—' : esc(v));
+    const body = `
+      ${printUtils.header({ docType: 'Sick Note' })}
+
+      <h1 class="doc-title">Sick Note</h1>
+      <div class="doc-subtitle">
+        ${form.fit_for_duty
+          ? 'The patient is certified fit to resume duty.'
+          : `Excused from duty for ${days} day${days === 1 ? '' : 's'}.`}
+      </div>
+
+      <div class="panel">
+        <h3>Patient</h3>
+        <div class="grid-2">
+          <div class="field"><div class="label">Name</div><div class="value">${dash(patient.patient_name || patient.full_name)}</div></div>
+          <div class="field"><div class="label">OP Number</div><div class="value">${dash(patient.outpatient_no)}</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Certification</h3>
+        <div class="grid-2">
+          <div class="field"><div class="label">Diagnosis</div><div class="value">${dash(form.diagnosis)}</div></div>
+          <div class="field"><div class="label">Days</div><div class="value">${esc(days)}</div></div>
+          <div class="field"><div class="label">From</div><div class="value">${dash(form.start_date)}</div></div>
+          <div class="field"><div class="label">To</div><div class="value">${dash(form.end_date)}</div></div>
+        </div>
+        ${form.recommendation
+          ? `<div class="field"><div class="label">Recommendation</div><div class="value">${esc(form.recommendation)}</div></div>`
+          : ''}
+      </div>
+
+      <div class="signature-block">
+        <div class="line">Clinician signature &amp; stamp</div>
+        <div class="line">Date</div>
+      </div>
+
+      ${printUtils.footer()}
+    `;
+    printDocument('Sick note', body);
+}
+
 function SickNoteModal({ patient, onClose }) {
     const [form, setForm] = useState({ diagnosis: '', start_date: today(), end_date: today(), recommendation: '', fit_for_duty: false });
     const [saving, setSaving] = useState(false);
@@ -44,7 +91,13 @@ function SickNoteModal({ patient, onClose }) {
         if (new Date(form.end_date) < new Date(form.start_date)) { toast.error('End date is before start date.'); return; }
         setSaving(true);
         apiClient.post('/clinical-extras/sick-notes', { patient_id: patient.patient_id, ...form })
-            .then(() => { toast.success('Sick note saved.'); if (print) window.print(); onClose(); })
+            .then(() => {
+                toast.success('Sick note saved.');
+                // Previously window.print(), which printed the whole app page.
+                // Render a real document so it carries the tenant letterhead.
+                if (print) printSickNote(patient, form, days);
+                onClose();
+            })
             .catch((e) => err(e, 'Could not save sick note.'))
             .finally(() => setSaving(false));
     };

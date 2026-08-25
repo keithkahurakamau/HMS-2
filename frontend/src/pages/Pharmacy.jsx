@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
+import { printDocument, printUtils } from '../utils/printDocument';
 import { printVisitSummary, printLabReport } from '../utils/printReports';
 import PageHeader from '../components/PageHeader';
 import MpesaStkProgress from '../components/MpesaStkProgress';
@@ -784,80 +785,66 @@ function OtcPayBar({ disabled, onCash, onCard, onMpesa }) {
 
 /* ─── Receipt printer ─────────────────────────────────────────────────────── */
 
+/**
+ * Pharmacy receipt. Routed through the shared print engine (rather than
+ * writing its own HTML document, as it used to) so it picks up the tenant's
+ * letterhead and the same house styles as every other printed document.
+ */
 function printPharmacyReceipt(receipt) {
-    const win = window.open('', '_blank', 'width=420,height=720');
-    if (!win) {
-        toast.error('Pop-up blocked — allow pop-ups to print the receipt.');
-        return;
-    }
     const money = (v) => Number(v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const esc = printUtils.esc;
     const itemsHtml = (receipt.items || []).map(
-        (it) => `<tr><td>${escapeHtml(it.description)}</td><td class="r">${money(it.amount)}</td></tr>`
-    ).join('');
+        (it) => `<tr><td>${esc(it.description)}</td><td class="amount">${money(it.amount)}</td></tr>`
+    ).join('') || '<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No items dispensed.</td></tr>';
     const paymentsHtml = (receipt.payments || []).map(
-        (p) => `<tr><td>${escapeHtml(p.method)}${p.reference ? ` <span class="muted">${escapeHtml(p.reference)}</span>` : ''}</td><td class="r">${money(p.amount)}</td></tr>`
+        (p) => `<tr><td>${esc(p.method)}${p.reference ? ` <span style="color:#64748b">${esc(p.reference)}</span>` : ''}</td><td class="amount">${money(p.amount)}</td></tr>`
     ).join('');
-    const issued = receipt.issued_at ? new Date(receipt.issued_at).toLocaleString() : '';
-    const html = `<!doctype html><html><head><meta charset="utf-8"/>
-<title>${escapeHtml(receipt.receipt_no)}</title>
-<style>
-  body { font-family: ui-sans-serif, system-ui, sans-serif; padding: 16px; color: #1f2937; }
-  .hd { text-align: center; margin-bottom: 12px; }
-  .hd h1 { margin: 0; font-size: 18px; }
-  .hd p { margin: 2px 0; font-size: 11px; color: #6b7280; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th, td { padding: 4px 0; }
-  th { text-align: left; border-bottom: 1px dashed #9ca3af; }
-  .r { text-align: right; font-variant-numeric: tabular-nums; }
-  .muted { color: #6b7280; font-size: 10px; }
-  .total { border-top: 1px solid #111; font-weight: 600; }
-  .meta { font-size: 11px; color: #6b7280; margin: 8px 0; }
-  .foot { text-align: center; margin-top: 16px; font-size: 11px; color: #6b7280; }
-  @media print { @page { margin: 4mm; } }
-</style></head><body>
-  <div class="hd">
-    <h1>${escapeHtml(receipt.hospital?.name || 'MediFleet')}</h1>
-    ${receipt.hospital?.tagline ? `<p>${escapeHtml(receipt.hospital.tagline)}</p>` : ''}
-    <p>Receipt: <strong>${escapeHtml(receipt.receipt_no)}</strong></p>
-    <p>${escapeHtml(issued)}</p>
-  </div>
-  <div class="meta">
-    Customer: ${escapeHtml(receipt.patient || 'Walk-in')}<br/>
-    ${receipt.cashier ? `Cashier: ${escapeHtml(receipt.cashier)}<br/>` : ''}
-    Dispense #: ${receipt.dispense_id}
-  </div>
-  <table>
-    <thead><tr><th>Item</th><th class="r">Amount</th></tr></thead>
-    <tbody>${itemsHtml}</tbody>
-    <tfoot>
-      <tr class="total"><td>Total</td><td class="r">KES ${money(receipt.totals?.total)}</td></tr>
-    </tfoot>
-  </table>
-  ${paymentsHtml ? `
-    <table style="margin-top:10px">
-      <thead><tr><th>Paid via</th><th class="r">Amount</th></tr></thead>
-      <tbody>${paymentsHtml}</tbody>
-      <tfoot>
-        <tr class="total"><td>Total paid</td><td class="r">KES ${money(receipt.totals?.paid)}</td></tr>
-        <tr><td>Balance</td><td class="r">KES ${money(receipt.totals?.balance)}</td></tr>
-      </tfoot>
-    </table>
-  ` : ''}
-  <div class="foot">Thank you. ${receipt.totals?.status === 'Paid' ? 'Settled in full.' : `Status: ${escapeHtml(receipt.totals?.status || '')}`}</div>
-  <script>window.onload = function(){ window.print(); }</script>
-</body></html>`;
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
-}
+    const status = receipt.totals?.status || '';
+    const settled = status === 'Paid';
 
-function escapeHtml(s) {
-    if (s == null) return '';
-    return String(s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
+    const body = `
+      ${printUtils.header({ docType: settled ? 'Pharmacy Receipt' : 'Pharmacy Invoice', docNumber: receipt.receipt_no })}
 
+      <h1 class="doc-title">${settled ? 'Receipt' : 'Invoice'}</h1>
+      <div class="doc-subtitle">
+        Status: <span class="badge ${settled ? 'paid' : 'pending'}">${esc(status || 'Pending')}</span>
+      </div>
+
+      <div class="panel">
+        <h3>Dispense</h3>
+        <div class="grid-2">
+          <div class="field"><div class="label">Customer</div><div class="value">${esc(receipt.patient || 'Walk-in')}</div></div>
+          <div class="field"><div class="label">Receipt no</div><div class="value">${esc(receipt.receipt_no)}</div></div>
+          ${receipt.cashier ? `<div class="field"><div class="label">Cashier</div><div class="value">${esc(receipt.cashier)}</div></div>` : ''}
+          <div class="field"><div class="label">Dispense #</div><div class="value">${esc(receipt.dispense_id)}</div></div>
+        </div>
+      </div>
+
+      <table class="line-items">
+        <thead><tr><th>Item</th><th class="amount">Amount (KES)</th></tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+
+      <div class="totals">
+        <div class="row grand"><span>Total</span><span>KES ${money(receipt.totals?.total)}</span></div>
+      </div>
+
+      ${paymentsHtml ? `
+        <table class="line-items" style="margin-top:14px">
+          <thead><tr><th>Paid via</th><th class="amount">Amount (KES)</th></tr></thead>
+          <tbody>${paymentsHtml}</tbody>
+        </table>
+        <div class="totals">
+          <div class="row"><span>Total paid</span><span>${money(receipt.totals?.paid)}</span></div>
+          <div class="row"><span>Balance</span><span>${money(receipt.totals?.balance)}</span></div>
+        </div>
+      ` : ''}
+
+      ${printUtils.footer(settled ? 'Thank you. Settled in full.' : `Status: ${status}`)}
+    `;
+
+    printDocument(`${settled ? 'Receipt' : 'Invoice'} ${receipt.receipt_no ?? ''}`, body);
+}
 
 /* ─── Transactions tab ────────────────────────────────────────────────────── */
 
