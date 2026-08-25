@@ -9,7 +9,7 @@ import {
     MoreVertical, Stethoscope, TestTube, UserMinus,
     Pill, Bed, CreditCard, Printer, Download, Trash, Eye, Edit,
     AlertTriangle, Droplet, Send, Image, ChevronDown, Save,
-    ChevronLeft, ChevronRight,
+    ChevronLeft, ChevronRight, Baby, Scissors,
 } from 'lucide-react';
 import { printPatientCard } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
@@ -29,12 +29,15 @@ import { useActivePatient } from '../context/PatientContext';
 // → their respective clinical role; Clinical → Doctor.
 const ROUTE_TARGETS = [
     { department: 'Triage',       label: 'Triage',    icon: HeartPulse,  role: 'Nurse',           assignment: 'optional', accent: 'bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200' },
-    { department: 'Consultation', label: 'Clinical',  icon: Stethoscope, role: 'Doctor',          assignment: 'optional', accent: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200' },
-    { department: 'Laboratory',   label: 'Lab',       icon: TestTube,    role: 'Lab Technician',  assignment: 'optional', accent: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' },
+    { department: 'Consultation', label: 'Clinical Desk', icon: Stethoscope, role: 'Doctor',       assignment: 'optional', accent: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200' },
+    { department: 'Laboratory',   label: 'Laboratory', icon: TestTube,    role: 'Lab Technician',  assignment: 'optional', accent: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' },
     { department: 'Radiology',    label: 'Radiology', icon: Image,       role: 'Radiologist',     assignment: 'optional', accent: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200' },
     { department: 'Pharmacy',     label: 'Pharmacy',  icon: Pill,        role: 'Pharmacist',      assignment: 'optional', accent: 'bg-accent-50 text-accent-700 hover:bg-accent-100 border-accent-200' },
     { department: 'Billing',      label: 'Billing',   icon: CreditCard,  role: 'Receptionist',    assignment: 'optional', accent: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },
     { department: 'Wards',        label: 'Wards',     icon: Bed,         role: 'Nurse',           assignment: 'optional', accent: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200' },
+    { department: 'Maternity',    label: 'Maternity', icon: Baby,        role: 'Nurse',           assignment: 'optional', accent: 'bg-pink-50 text-pink-700 hover:bg-pink-100 border-pink-200' },
+    { department: 'Dialysis',     label: 'Dialysis',  icon: Droplet,     role: 'Nurse',           assignment: 'optional', accent: 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border-cyan-200' },
+    { department: 'Theatre',      label: 'Theatre',   icon: Scissors,    role: 'Doctor',          assignment: 'optional', accent: 'bg-violet-50 text-violet-700 hover:bg-violet-100 border-violet-200' },
 ];
 
 const initialsOf = (patient) => {
@@ -176,6 +179,9 @@ export default function Patients() {
     // count (honouring the search) fetched from /patients/count.
     const [page, setPage] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
+    // Registered-on date window (YYYY-MM-DD). Empty = no bound on that side.
+    const [regFrom, setRegFrom] = useState('');
+    const [regTo, setRegTo] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -232,18 +238,22 @@ export default function Patients() {
         const delayDebounce = setTimeout(() => fetchPatients(), 350);
         return () => clearTimeout(delayDebounce);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchQuery, page]);
+    }, [searchQuery, page, regFrom, regTo]);
 
     const fetchPatients = async () => {
         setIsLoading(true);
         try {
+            // Only send date bounds when set, so the default view is unfiltered.
+            const dateParams = {};
+            if (regFrom) dateParams.registered_from = regFrom;
+            if (regTo) dateParams.registered_to = regTo;
             const response = await apiClient.get('/patients/', {
-                params: { search: searchQuery, skip: page * PAGE_SIZE, limit: PAGE_SIZE },
+                params: { search: searchQuery, skip: page * PAGE_SIZE, limit: PAGE_SIZE, ...dateParams },
             });
             setPatients(response.data);
             // Total is best-effort — an older API mid-deploy may not expose
             // /count yet, so a failure just leaves the last known total.
-            apiClient.get('/patients/count', { params: { search: searchQuery } })
+            apiClient.get('/patients/count', { params: { search: searchQuery, ...dateParams } })
                 .then((r) => setTotalCount(r.data?.total ?? 0))
                 .catch(() => {});
         } catch (error) {
@@ -583,6 +593,21 @@ export default function Patients() {
                             {s || 'All'}
                         </button>
                     ))}
+                </div>
+                {/* Registered-on date window: pick one day (set both), a range, or Today. */}
+                <div data-tour="patients-date-filter" className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                    <span className="text-xs text-ink-500 whitespace-nowrap">Registered</span>
+                    <input type="date" aria-label="Registered from" value={regFrom} max={regTo || undefined}
+                        onChange={(e) => { setRegFrom(e.target.value); setPage(0); }} className="input w-auto py-1.5 text-sm" />
+                    <span className="text-ink-400 text-xs">–</span>
+                    <input type="date" aria-label="Registered to" value={regTo} min={regFrom || undefined}
+                        onChange={(e) => { setRegTo(e.target.value); setPage(0); }} className="input w-auto py-1.5 text-sm" />
+                    <button type="button" onClick={() => { const t = new Date().toISOString().slice(0, 10); setRegFrom(t); setRegTo(t); setPage(0); }}
+                        className="px-2 py-1 rounded-lg text-xs font-medium text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800">Today</button>
+                    {(regFrom || regTo) && (
+                        <button type="button" onClick={() => { setRegFrom(''); setRegTo(''); setPage(0); }} aria-label="Clear date filter"
+                            className="text-ink-400 hover:text-rose-600 p-1"><X size={14} /></button>
+                    )}
                 </div>
                 <div className="flex items-center gap-2 sm:ml-2 shrink-0">
                     <span className="text-xs text-ink-500 whitespace-nowrap">

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import AncClinicTab from './maternity/AncClinicTab';
 import LaborBoardTab from './maternity/LaborBoardTab';
 import DeliveriesTab from './maternity/DeliveriesTab';
+import DepartmentQueue from '../components/DepartmentQueue';
 
 const TABS = [
   { key: 'anc', label: 'ANC Clinic' },
@@ -14,6 +15,8 @@ export default function Maternity() {
   return (
     <div className="p-4 md:p-6">
       <h1 className="text-xl font-semibold text-ink-900 dark:text-white">Maternity</h1>
+      {/* Patients routed here via the shared queue (sent to Maternity) */}
+      <div className="mt-4"><DepartmentQueue department="Maternity" inline /></div>
       <div data-tour="mat-tabs" className="mt-4 flex gap-2 border-b border-ink-200/70 dark:border-ink-800" role="tablist">
         {TABS.map((t) => (
           <button
