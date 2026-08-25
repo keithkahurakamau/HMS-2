@@ -1,5 +1,5 @@
 """Tenant branding — uploaded logo, background image, brand colours, and
-print-template configuration.
+print-template configuration (including uploaded letterhead stationery).
 
 Branding lives on the **master DB** ``tenants`` row (one record per hospital)
 because every login surface needs to render the right logo/background before
@@ -42,14 +42,33 @@ public_router = APIRouter(prefix="/api/public/branding", tags=["Branding (public
 
 # ── Limits ──────────────────────────────────────────────────────────────────
 MAX_DATA_URL_BYTES = 1_200_000          # ~900 KB image after base64 overhead
+MAX_LETTERHEAD_BYTES = 1_200_000        # same cap as logo/background
 
 
 # ── Pydantic ────────────────────────────────────────────────────────────────
+class LetterheadConfig(BaseModel):
+    """A hospital's pre-designed stationery, applied to every printed document.
+
+    ``image`` is a full-page (A4 portrait) letterhead — the artwork the clinic
+    already has from its designer, uploaded as-is. At print time it is painted
+    as a fixed, full-bleed backdrop on every page while the document content
+    flows inside the safe area described by the four margins, so headers and
+    footers never collide with the artwork.
+    """
+    enabled: Optional[bool] = False
+    image: Optional[str] = None
+    # Safe-area margins in millimetres (A4 portrait is 210 × 297 mm).
+    margin_top_mm: Optional[float] = Field(default=42, ge=0, le=150)
+    margin_bottom_mm: Optional[float] = Field(default=48, ge=0, le=150)
+    margin_side_mm: Optional[float] = Field(default=18, ge=0, le=60)
+
+
 class PrintTemplateConfig(BaseModel):
     header_text: Optional[str] = None
     footer_text: Optional[str] = None
     primary_template: Optional[str] = Field(default="modern")  # modern|classic|minimal
     show_logo: Optional[bool] = True
+    letterhead: Optional[LetterheadConfig] = None
 
 
 class BrandingPayload(BaseModel):
@@ -62,6 +81,7 @@ class BrandingPayload(BaseModel):
     # Sentinels — pass true to wipe the field rather than leaving it unchanged.
     clear_logo: bool = False
     clear_background: bool = False
+    clear_letterhead: bool = False
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -75,13 +95,19 @@ def _resolve_tenant_by_request(request: Request, db: Session) -> Tenant:
     return tenant
 
 
+def _stored_templates(t: Tenant) -> Dict[str, Any]:
+    """Parses the tenant's print-template JSON, tolerating legacy/corrupt rows."""
+    if not t.print_templates:
+        return {}
+    try:
+        parsed = json.loads(t.print_templates)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
 def _serialize(t: Tenant) -> Dict[str, Any]:
-    templates: Dict[str, Any] = {}
-    if t.print_templates:
-        try:
-            templates = json.loads(t.print_templates)
-        except (json.JSONDecodeError, TypeError):
-            templates = {}
+    templates = _stored_templates(t)
     return {
         "tenant_id": t.tenant_id,
         "tenant_name": t.name,
@@ -110,6 +136,43 @@ def _validate_data_url(value: str, label: str) -> None:
 def _validate_hex_color(value: str, label: str) -> None:
     if not value.startswith("#") or len(value) not in (4, 7, 9):
         raise HTTPException(status_code=400, detail=f"{label} must be a hex colour (e.g. #06b6d4).")
+
+
+def _validate_letterhead(cfg: LetterheadConfig) -> None:
+    """Guards the letterhead artwork.
+
+    SVG is rejected (not just unsupported): ``data:image/svg+xml`` can carry
+    <script>, and this URL is interpolated into an <img> inside the printed
+    document, so it gets the same allow-list treatment as the other branding
+    images on the frontend.
+    """
+    if not cfg.image:
+        if cfg.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail="Upload a letterhead image before enabling letterhead printing.",
+            )
+        return
+    if not cfg.image.startswith(("data:image/png", "data:image/jpeg",
+                                 "data:image/jpg", "data:image/webp")):
+        raise HTTPException(
+            status_code=400,
+            detail="Letterhead must be a PNG, JPEG, or WebP data URL (SVG is not allowed).",
+        )
+    if len(cfg.image) > MAX_LETTERHEAD_BYTES:
+        kb = MAX_LETTERHEAD_BYTES // 1024
+        raise HTTPException(
+            status_code=413,
+            detail=f"Letterhead exceeds the {kb} KB upload cap. Compress the image and retry.",
+        )
+    # Each margin is individually bounded by the field constraints, but a
+    # top+bottom pair can still swallow the whole 297 mm sheet and silently
+    # print blank pages. (Side margins cannot: 2 × 60 mm max < 210 mm.)
+    if (cfg.margin_top_mm or 0) + (cfg.margin_bottom_mm or 0) >= 297:
+        raise HTTPException(
+            status_code=400,
+            detail="Top and bottom margins leave no printable area on an A4 page.",
+        )
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
@@ -164,7 +227,25 @@ def update_branding(
 
     # ─ print templates ─
     if payload.print_templates is not None:
-        tenant.print_templates = json.dumps(payload.print_templates.model_dump(exclude_none=True))
+        config = payload.print_templates.model_dump(exclude_none=True)
+        letterhead = payload.print_templates.letterhead
+
+        if payload.clear_letterhead:
+            config.pop("letterhead", None)
+        elif letterhead is not None:
+            lh = letterhead.model_dump(exclude_none=True)
+            # The artwork is ~100 KB of base64; clients that are only nudging
+            # margins omit `image` and we carry the stored one forward rather
+            # than making them re-upload it.
+            if letterhead.image is None:
+                previous = _stored_templates(tenant).get("letterhead") or {}
+                if previous.get("image"):
+                    lh["image"] = previous["image"]
+                    letterhead = letterhead.model_copy(update={"image": lh["image"]})
+            _validate_letterhead(letterhead)
+            config["letterhead"] = lh
+
+        tenant.print_templates = json.dumps(config)
 
     db.commit()
     db.refresh(tenant)
