@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {} from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
     Search, Pill, CheckCircle2, AlertCircle,
     Printer, XCircle, Stethoscope,
     ShoppingCart, Plus, Minus, Trash2, CreditCard, Store, Activity,
     Banknote, Smartphone, X as XIcon, ReceiptText, History,
-    Wallet, Paperclip, FileText, UserPlus, RotateCcw,
-} from 'lucide-react';
+    Wallet, Paperclip, FileText, UserPlus, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
 import { printDocument, printUtils } from '../utils/printDocument';
 import { printVisitSummary, printLabReport } from '../utils/printReports';
 import PageHeader from '../components/PageHeader';
+import QueuePatientsModal from '../components/QueuePatientsModal';
 import MpesaStkProgress from '../components/MpesaStkProgress';
 import usePaymentSocket from '../hooks/usePaymentSocket';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +26,6 @@ import QueuePatientModal from './clinical/modals/QueuePatientModal';
 const genKey = () => crypto.randomUUID();
 
 export default function Pharmacy() {
-    const navigate = useNavigate();
     const auth = useAuth();
     const perms = auth?.user?.permissions || [];
     const hasPerm = (p) => perms.includes(p);
@@ -76,6 +75,30 @@ export default function Pharmacy() {
         }
     };
 
+    // "View all patients" opens the full queue in place. It used to navigate to
+    // the registry, which lost the clinician's place in the workspace and did
+    // not actually show who was waiting.
+    const [showQueueModal, setShowQueueModal] = useState(false);
+    const [isClearingQueue, setIsClearingQueue] = useState(false);
+
+    const handleClearQueue = async () => {
+        setIsClearingQueue(true);
+        try {
+            const res = await apiClient.post('/queue/end-of-day', { department: 'Pharmacy' });
+            const n = res.data?.checked_out ?? 0;
+            toast.success(n > 0
+                ? `${n} patient(s) removed from the queue.`
+                : 'The queue was already empty.');
+            setShowQueueModal(false);
+            
+            fetchRxQueue();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not clear the queue.');
+        } finally {
+            setIsClearingQueue(false);
+        }
+    };
+
     const fetchRxQueue = async () => {
         setIsLoadingQueue(true);
         try {
@@ -98,16 +121,14 @@ export default function Pharmacy() {
         patient_name: o.patient,
         outpatient_no: o.op_no,
         triage_time: o.time,
-        priority: o.priority === 'High' ? 'High' : 'Normal',
-    }));
+        priority: o.priority === 'High' ? 'High' : 'Normal' }));
     const headerPatient = activeOrder ? {
         patient_name: activeOrder.patient,
         outpatient_no: activeOrder.op_no,
         age: activeOrder.age,
         gender: activeOrder.gender,
         allergies: activeOrder.allergies,
-        queue_id: activeOrder.id,
-    } : null;
+        queue_id: activeOrder.id } : null;
 
     const selectOrder = (order) => {
         setActiveOrder(order);
@@ -197,8 +218,7 @@ export default function Pharmacy() {
                 quantity: it.qty,
                 patient_id,
                 record_id,
-                notes: it.notes || null,
-            });
+                notes: it.notes || null });
             responses.push(res.data);
         }
         return responses;
@@ -229,8 +249,7 @@ export default function Pharmacy() {
                 method,
                 amount,
                 phone_number: method === 'mpesa' ? phoneNumber : null,
-                transaction_reference: reference || null,
-            });
+                transaction_reference: reference || null });
 
             if (method === 'mpesa') {
                 toast.success('STK push sent. Customer to confirm on their phone.');
@@ -243,8 +262,7 @@ export default function Pharmacy() {
                     pendingMpesa: { external_reference: res.data?.external_reference,
                                     payhero_reference: res.data?.payhero_reference,
                                     transaction_id: res.data?.transaction_id,
-                                    phone: phoneNumber },
-                });
+                                    phone: phoneNumber } });
             } else {
                 toast.success(`${method === 'card' ? 'Card' : 'Cash'} payment recorded.`);
                 // Receipt prints directly without the modal round-trip.
@@ -299,8 +317,7 @@ export default function Pharmacy() {
         try {
             const responses = await dispenseItems(rxCart, {
                 patient_id: activeOrder.patient_id,
-                record_id: activeOrder.record_id,
-            });
+                record_id: activeOrder.record_id });
             toast.success(`Prescription ${activeOrder.id} dispensed.`);
             fetchPharmacyInventory();
 
@@ -311,8 +328,7 @@ export default function Pharmacy() {
                     invoiceId: last.invoice_id,
                     dispenseId: last.dispense_id,
                     amount: last.invoice_balance ?? rxTotal,
-                    patientName: activeOrder.patient,
-                });
+                    patientName: activeOrder.patient });
             } else {
                 // No invoice (walk-in) — just clear and exit.
                 setCart([]);
@@ -355,8 +371,7 @@ export default function Pharmacy() {
             doctor: { full_name: activeOrder.doctor, license_number: activeOrder.doctor_license },
             items: rxLines.map((p) => ({ drug_name: p.drug, formulation: p.formulation, dosage: p.dosage, frequency: p.frequency, duration: p.duration, route: p.route || p.notes })),
             notes: activeOrder.clinical_notes,
-            recordId: activeOrder.id,
-        });
+            recordId: activeOrder.id });
     };
 
     // Visit summary — printed from what the pharmacy can see of the encounter.
@@ -368,9 +383,7 @@ export default function Pharmacy() {
                 date: new Date(),
                 doctorName: activeOrder.doctor,
                 medications: rxLines.map((p) => ({ drug_name: p.drug, dosage: p.dosage, frequency: p.frequency, duration: p.duration })),
-                hpi: activeOrder.clinical_notes,
-            },
-        });
+                hpi: activeOrder.clinical_notes } });
     };
 
     // Lab report — pull the patient's tests then print (shared printLabReport).
@@ -444,8 +457,19 @@ export default function Pharmacy() {
                             queueLabel="Pharmacy queue"
                             onSelectPatient={(item) => { if (item?.patient_name) selectOrder(item); }}
                             onRemoveFromQueue={(item) => item.record_id && cancelPrescription(item.record_id)}
-                            onViewAllPatients={() => navigate('/app/patients')}
+                            onViewAllPatients={() => setShowQueueModal(true)}
                         />
+                        {showQueueModal && (
+                            <QueuePatientsModal
+                                queue={headerQueue}
+                                department="Pharmacy"
+                                onClose={() => setShowQueueModal(false)}
+                                onSelectPatient={(item) => { if (item?.patient_name) selectOrder(item); }}
+                                onRemoveFromQueue={(item) => item.record_id && cancelPrescription(item.record_id)}
+                                onClearQueue={handleClearQueue}
+                                isClearing={isClearingQueue}
+                            />
+                        )}
                     </div>
 
                     {/* Dispense workspace */}
@@ -1075,8 +1099,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                 method,
                 amount: amt,
                 phone_number: method === 'mpesa' ? phone : null,
-                transaction_reference: reference || null,
-            };
+                transaction_reference: reference || null };
             const res = await apiClient.post(`/pharmacy/dispense/${dispenseId}/pay`, payload);
 
             if (method === 'cash') {

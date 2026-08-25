@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {} from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
     Microscope, Clock, AlertCircle,
     Printer, XCircle, TestTube, FileDigit,
     Settings, Activity, FlaskConical, Send, Package, Plus, Trash2,
-    Pencil, Save, X, RefreshCcw, FileText, Paperclip, UserPlus, History, ClipboardList,
-} from 'lucide-react';
+    Pencil, Save, X, RefreshCcw, FileText, Paperclip, UserPlus, History, ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printLabReport } from '../utils/printTemplates';
 import { printVisitSummary, printLabReport as printPatientLabReport } from '../utils/printReports';
 import PageHeader from '../components/PageHeader';
+import QueuePatientsModal from '../components/QueuePatientsModal';
 import { useAuth } from '../context/AuthContext';
 import PatientDetailsHeader from './clinical/PatientDetailsHeader';
 import DepartmentQueue from '../components/DepartmentQueue';
@@ -32,13 +32,11 @@ import PatientHistoryModal from '../components/PatientHistoryModal';
 const EMPTY_CATALOG_FORM = {
     test_name: '', description: '', category: 'Hematology',
     default_specimen_type: 'Blood', base_price: 0, turnaround_hours: 24,
-    is_active: true, requires_barcode: false, parameters: [],
-};
+    is_active: true, requires_barcode: false, parameters: [] };
 
 const EMPTY_PARAMETER = {
     key: '', name: '', unit: '', value_type: 'number',
-    choices: '', ref_low: '', ref_high: '', sort_order: 0, is_active: true,
-};
+    choices: '', ref_low: '', ref_high: '', sort_order: 0, is_active: true };
 
 // Pure result-flagging helper — hoisted to module scope.
 const flagFor = (val, low, high) => {
@@ -51,7 +49,6 @@ const flagFor = (val, low, high) => {
 };
 
 export default function Laboratory() {
-    const navigate = useNavigate();
     const auth = useAuth();
     const perms = auth?.user?.permissions || [];
     const hasPerm = (p) => perms.includes(p);
@@ -86,6 +83,30 @@ export default function Laboratory() {
     const [catalogForm, setCatalogForm] = useState(EMPTY_CATALOG_FORM);
 
     useEffect(() => { fetchLaboratoryData(); }, []);
+
+    // "View all patients" opens the full queue in place. It used to navigate to
+    // the registry, which lost the clinician's place in the workspace and did
+    // not actually show who was waiting.
+    const [showQueueModal, setShowQueueModal] = useState(false);
+    const [isClearingQueue, setIsClearingQueue] = useState(false);
+
+    const handleClearQueue = async () => {
+        setIsClearingQueue(true);
+        try {
+            const res = await apiClient.post('/queue/end-of-day', { department: 'Laboratory' });
+            const n = res.data?.checked_out ?? 0;
+            toast.success(n > 0
+                ? `${n} patient(s) removed from the queue.`
+                : 'The queue was already empty.');
+            setShowQueueModal(false);
+            
+            fetchLaboratoryData();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not clear the queue.');
+        } finally {
+            setIsClearingQueue(false);
+        }
+    };
 
     const fetchLaboratoryData = async () => {
         setIsLoading(true);
@@ -123,8 +144,7 @@ export default function Laboratory() {
                     outpatient_no: t.outpatient_no,
                     joined_at: t.joined_at || t.requested_at,
                     priority: 'Normal',
-                    tests: [],
-                };
+                    tests: [] };
                 byKey.set(key, g);
             }
             g.tests.push(t);
@@ -148,13 +168,11 @@ export default function Laboratory() {
         outpatient_no: g.outpatient_no,
         joined_at: g.joined_at,
         triage_time: g.joined_at ? new Date(g.joined_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
-        priority: g.priority,
-    }));
+        priority: g.priority }));
     const headerPatient = activePatientGroup ? {
         patient_name: activePatientGroup.patient_name,
         outpatient_no: activePatientGroup.outpatient_no,
-        queue_id: activePatientGroup.key,
-    } : null;
+        queue_id: activePatientGroup.key } : null;
 
     const activeCatalog = useMemo(
         () => catalog.find(c => c.catalog_id === activeTest?.catalog_id),
@@ -278,8 +296,7 @@ export default function Laboratory() {
         const payload = {
             result_data: results,
             tech_notes: techNotes,
-            consumed_items: consumedItems.map(c => ({ batch_id: c.batch_id, quantity: c.quantity })),
-        };
+            consumed_items: consumedItems.map(c => ({ batch_id: c.batch_id, quantity: c.quantity })) };
         try {
             await apiClient.post(`/laboratory/tests/${activeTest.test_id}/complete`, payload);
             toast.success('Results released & stock reconciled.');
@@ -297,8 +314,7 @@ export default function Laboratory() {
     const printPatient = () => ({
         full_name: activePatientGroup?.patient_name,
         outpatient_no: activePatientGroup?.outpatient_no,
-        patient_id: activePatientGroup?.patient_id,
-    });
+        patient_id: activePatientGroup?.patient_id });
 
     // Lab Report — the patient's tests, printed via the shared list report.
     const handleLabReport = () => {
@@ -315,9 +331,7 @@ export default function Laboratory() {
             patient: printPatient(),
             encounter: {
                 date: new Date(),
-                investigations: activePatientGroup.tests.map((t) => t.test_name),
-            },
-        });
+                investigations: activePatientGroup.tests.map((t) => t.test_name) } });
     };
 
     // Consolidated Actions ▾ — mirrors MedicentreV3's Laboratory menu; perm-
@@ -346,8 +360,7 @@ export default function Laboratory() {
             ...EMPTY_CATALOG_FORM,
             ...row,
             base_price: Number(row.base_price || 0),
-            parameters: (row.parameters || []).map(p => ({ ...p, _uid: crypto.randomUUID() })),
-        });
+            parameters: (row.parameters || []).map(p => ({ ...p, _uid: crypto.randomUUID() })) });
         setEditorOpen(true);
     };
 
@@ -362,8 +375,7 @@ export default function Laboratory() {
     const setParamField = (idx, field, val) =>
         setCatalogForm(f => ({
             ...f,
-            parameters: f.parameters.map((p, i) => (i === idx ? { ...p, [field]: val } : p)),
-        }));
+            parameters: f.parameters.map((p, i) => (i === idx ? { ...p, [field]: val } : p)) }));
 
     const saveCatalog = async () => {
         const body = {
@@ -374,9 +386,7 @@ export default function Laboratory() {
                 ...p,
                 ref_low: p.ref_low === '' ? null : parseFloat(p.ref_low),
                 ref_high: p.ref_high === '' ? null : parseFloat(p.ref_high),
-                sort_order: parseInt(p.sort_order) || 0,
-            })),
-        };
+                sort_order: parseInt(p.sort_order) || 0 })) };
         try {
             if (editing) {
                 const { parameters, ...patch } = body;
@@ -450,8 +460,18 @@ export default function Laboratory() {
                             showSearch={false}
                             queueLabel="Laboratory queue"
                             onSelectPatient={handlePatientSelect}
-                            onViewAllPatients={() => navigate('/app/patients')}
+                            onViewAllPatients={() => setShowQueueModal(true)}
                         />
+                        {showQueueModal && (
+                            <QueuePatientsModal
+                                queue={headerQueue}
+                                department="Laboratory"
+                                onClose={() => setShowQueueModal(false)}
+                                onSelectPatient={handlePatientSelect}
+                                onClearQueue={handleClearQueue}
+                                isClearing={isClearingQueue}
+                            />
+                        )}
                     </div>
 
                     {/* Workbench */}
@@ -525,8 +545,7 @@ export default function Laboratory() {
                                                             patient: { full_name: activePatientGroup.patient_name, outpatient_no: activePatientGroup.outpatient_no },
                                                             test: activeTest,
                                                             performedBy: { full_name: activeTest.performed_by_name },
-                                                            orderedBy: { full_name: activeTest.doctor },
-                                                        })} className="btn-secondary shrink-0" title="Print lab report">
+                                                            orderedBy: { full_name: activeTest.doctor } })} className="btn-secondary shrink-0" title="Print lab report">
                                                             <Printer size={15} /> Print report
                                                         </button>
                                                     )}
