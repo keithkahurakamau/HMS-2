@@ -333,30 +333,40 @@ const letterheadStyles = (lh) => `
   /* Full-bleed: the artwork runs to the paper edge, so all spacing is ours. */
   @page { size: A4; margin: 0; }
 
-  body { padding: 0; margin: 0; }
+  html, body { padding: 0; margin: 0; }
 
-  .letterhead-doc {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-  }
-
+  /* Painted artwork — fixed, so Chromium repeats it on every sheet, pinned to
+     the physical paper edges (possible because the page margin is 0). */
   .letterhead-band {
+    position: fixed;
+    left: 0;
+    width: ${A4_WIDTH_MM}mm;
     overflow: hidden;
-    position: relative;
+    z-index: 0;
   }
-
   .letterhead-band img {
     width: 100%;
     height: ${A4_HEIGHT_MM}mm;   /* full sheet; the band crops it */
     object-fit: fill;
     display: block;
   }
-
-  .letterhead-band.top { height: ${lh.top}mm; }
-  .letterhead-band.bottom { height: ${lh.bottom}mm; }
+  .letterhead-band.top { top: 0; height: ${lh.top}mm; }
+  .letterhead-band.bottom { bottom: 0; height: ${lh.bottom}mm; }
   /* Pull the artwork up so the band's window lands on its footer. */
   .letterhead-band.bottom img { margin-top: -${A4_HEIGHT_MM - lh.bottom}mm; }
+
+  /* Reserved space — thead/tfoot repeat on every page AND reserve their
+     height in the flow, which fixed positioning alone cannot do. They hold
+     empty spacers; the artwork above is what the reader actually sees. */
+  .letterhead-doc {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    position: relative;
+    z-index: 1;
+  }
+  .letterhead-spacer.top { height: ${lh.top}mm; }
+  .letterhead-spacer.bottom { height: ${lh.bottom}mm; }
 
   .letterhead-doc > tbody > tr > td { padding: 0 ${lh.side}mm; vertical-align: top; }
   .letterhead-doc thead td, .letterhead-doc tfoot td { padding: 0; }
@@ -376,16 +386,16 @@ const buildDocument = (title, bodyHtml) => {
   const lh = letterhead;
   const styles = lh ? `${SHARED_PRINT_STYLES}\n${letterheadStyles(lh)}` : SHARED_PRINT_STYLES;
 
-  // thead/tfoot repeat on every printed page and reserve their own height, so
-  // the artwork frames the content instead of painting over it.
+  // Two mechanisms, because neither alone is enough: the fixed bands paint the
+  // artwork at the paper edges of every sheet, and the thead/tfoot spacers
+  // reserve that space in the flow so text never runs underneath it — on the
+  // first page, the last page, and every page between.
   const content = lh
-    ? `<table class="letterhead-doc">
-  <thead><tr><td>
-    <div class="letterhead-band top" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
-  </td></tr></thead>
-  <tfoot><tr><td>
-    <div class="letterhead-band bottom" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
-  </td></tr></tfoot>
+    ? `<div class="letterhead-band top" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
+<div class="letterhead-band bottom" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
+<table class="letterhead-doc">
+  <thead><tr><td><div class="letterhead-spacer top"></div></td></tr></thead>
+  <tfoot><tr><td><div class="letterhead-spacer bottom"></div></td></tr></tfoot>
   <tbody><tr><td>${bodyHtml}</td></tr></tbody>
 </table>`
     : bodyHtml;

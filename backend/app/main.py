@@ -26,6 +26,7 @@ import app.routes.queue as queue_module
 import app.routes.triage as triage_module
 import app.routes.clinical as clinical_module
 import app.routes.clinical_history as clinical_history_module
+import app.routes.patient_documents as patient_documents_module
 import app.routes.clinical_extras as clinical_extras_module
 import app.routes.clinical_files as clinical_files_module
 import app.routes.laboratory as laboratory_module
@@ -331,6 +332,7 @@ app.include_router(queue_module.router)
 app.include_router(triage_module.router)
 app.include_router(clinical_module.router)
 app.include_router(clinical_history_module.router)
+app.include_router(patient_documents_module.router)
 app.include_router(clinical_extras_module.router)
 app.include_router(clinical_files_module.router)
 app.include_router(laboratory_module.router)
