@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import {
     Activity, HeartPulse, Save, ArrowRight, Stethoscope, XCircle, UserMinus, Paperclip,
-    TestTube, Image as ImageIcon, UserPlus, Printer, Scissors, Pill, FileText,
-} from 'lucide-react';
+    TestTube, Image as ImageIcon, UserPlus, Printer, Scissors, Pill, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import {} from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
+import QueuePatientsModal from '../components/QueuePatientsModal';
 import { useActivePatient } from '../context/PatientContext';
 import { useAuth } from '../context/AuthContext';
 import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
@@ -30,7 +30,6 @@ const EMPTY_VITALS = { weight: '', height: '', bp: '', hr: '', rr: '', temp: '',
 const ACUITY_TO_PRIORITY = { 1: 'Critical', 2: 'High' };
 
 export default function Triage() {
-    const navigate = useNavigate();
     const auth = useAuth();
     const perms = auth?.user?.permissions || [];
     const hasPerm = (p) => perms.includes(p);
@@ -62,12 +61,35 @@ export default function Triage() {
         savedAt: notesDraftSavedAt,
         applyDraft: applyNotesDraft,
         discardDraft: discardNotesDraft,
-        clearDraft: clearNotesDraft,
-    } = useDraftSafetyNet({ storageKey: triageDraftKey, value: triageNotes, enabled: !!activePatient });
+        clearDraft: clearNotesDraft } = useDraftSafetyNet({ storageKey: triageDraftKey, value: triageNotes, enabled: !!activePatient });
 
     const { setActivePatient: setGlobalActivePatient } = useActivePatient();
 
     useEffect(() => { fetchQueue(); }, []);
+
+    // "View all patients" opens the full queue in place. It used to navigate to
+    // the registry, which lost the clinician's place in the workspace and did
+    // not actually show who was waiting.
+    const [showQueueModal, setShowQueueModal] = useState(false);
+    const [isClearingQueue, setIsClearingQueue] = useState(false);
+
+    const handleClearQueue = async () => {
+        setIsClearingQueue(true);
+        try {
+            const res = await apiClient.post('/queue/end-of-day', { department: 'Triage' });
+            const n = res.data?.checked_out ?? 0;
+            toast.success(n > 0
+                ? `${n} patient(s) removed from the queue.`
+                : 'The queue was already empty.');
+            setShowQueueModal(false);
+            
+            fetchQueue();
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Could not clear the queue.');
+        } finally {
+            setIsClearingQueue(false);
+        }
+    };
 
     const fetchQueue = async () => {
         setIsLoadingQueue(true);
@@ -86,8 +108,7 @@ export default function Triage() {
     const headerQueue = queue.map((q) => ({
         ...q,
         triage_time: q.joined_time,
-        priority: ACUITY_TO_PRIORITY[q.acuity_level] || 'Normal',
-    }));
+        priority: ACUITY_TO_PRIORITY[q.acuity_level] || 'Normal' }));
 
     const clearWorkspace = () => {
         setActivePatient(null);
@@ -189,8 +210,7 @@ export default function Triage() {
             triage_notes: triageNotes || null,
             systemic_exam: systemicExam.length ? JSON.stringify(systemicExam) : null,
             procedures: procedures.length ? JSON.stringify(procedures) : null,
-            disposition,
-        };
+            disposition };
 
         try {
             const res = await apiClient.post('/triage/submit', payload);
@@ -221,8 +241,7 @@ export default function Triage() {
         apiClient.post('/clinical/submit', {
             patient_id: activePatient.patient_id,
             record_status: 'Pharmacy',
-            treatment_plan,
-        })
+            treatment_plan })
             .then(() => toast.success('Prescription routed to Pharmacy.'))
             .catch((e) => {
                 const detail = e.response?.data?.detail;
@@ -245,9 +264,7 @@ export default function Triage() {
             diagnosis: '',
             icdCodes: [],
             medications: [],
-            followUp: null,
-        },
-    });
+            followUp: null } });
 
     // Consolidated Actions ▾ — mirrors MedicentreV3's Triage menu; permission-
     // gated (empty groups disappear). Lab/Radiology orders need clinical:write.
@@ -292,8 +309,19 @@ export default function Triage() {
                     queueLabel="Triage queue"
                     onSelectPatient={(item) => { if (item?.patient_name) handlePatientSelect(item); }}
                     onRemoveFromQueue={removeFromTriage}
-                    onViewAllPatients={() => navigate('/app/patients')}
+                    onViewAllPatients={() => setShowQueueModal(true)}
                 />
+                {showQueueModal && (
+                    <QueuePatientsModal
+                        queue={headerQueue}
+                        department="Triage"
+                        onClose={() => setShowQueueModal(false)}
+                        onSelectPatient={(item) => { if (item?.patient_name) handlePatientSelect(item); }}
+                        onRemoveFromQueue={removeFromTriage}
+                        onClearQueue={handleClearQueue}
+                        isClearing={isClearingQueue}
+                    />
+                )}
             </div>
 
             {/* BOTTOM PANEL: triage workspace */}
@@ -332,8 +360,7 @@ export default function Triage() {
                                         setTriageNotes, setAcuity,
                                         addSystemic, removeSystemic, addProcedure, removeProcedure,
                                         onRestoreDraft: () => setTriageNotes(applyNotesDraft() || ''),
-                                        onDiscardDraft: discardNotesDraft,
-                                    }}
+                                        onDiscardDraft: discardNotesDraft }}
                                 />
                             ) : (
                                 <PatientHistoryTab patientId={activePatient.patient_id} onOpenHistory={(t) => setHistoryModal({ entry_type: t })} />
