@@ -78,6 +78,24 @@ describe('with artwork', () => {
         );
     });
 
+    it('warns that tight margins will print text over the artwork', () => {
+        // The artwork always prints in full now, so a small margin no longer
+        // hides the letterhead — it makes content land on top of it.
+        render(<LetterheadStudio value={{ ...withArt, margin_top_mm: 3, margin_bottom_mm: 0 }}
+            onChange={vi.fn()} />);
+        expect(screen.getByText(/print over your\s+header or footer artwork/i)).toBeInTheDocument();
+    });
+
+    it('offers a one-click reset back to the recommended safe area', async () => {
+        const onChange = vi.fn();
+        render(<LetterheadStudio value={{ ...withArt, margin_top_mm: 3, margin_bottom_mm: 0, margin_side_mm: 1 }}
+            onChange={onChange} />);
+        await userEvent.click(screen.getByRole('button', { name: /Reset to recommended/i }));
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+            margin_top_mm: 42, margin_bottom_mm: 48, margin_side_mm: 18,
+        }));
+    });
+
     it('warns instead of previewing when margins leave no printable area', () => {
         render(<LetterheadStudio value={{ ...withArt, margin_top_mm: 150, margin_bottom_mm: 150 }}
             onChange={vi.fn()} />);
