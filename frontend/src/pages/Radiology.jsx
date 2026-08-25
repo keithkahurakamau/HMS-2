@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import { printRadiologyReport } from '../utils/printTemplates';
 import PageHeader from '../components/PageHeader';
+import DepartmentQueue from '../components/DepartmentQueue';
 
 const EMPTY_CATALOG = {
     exam_name: '', modality: 'X-Ray', body_part: '', description: '',
@@ -159,6 +160,8 @@ export default function Radiology() {
                 title="Radiology"
                 subtitle="Acquire imaging requests, run studies, and publish reports."
             />
+            {/* Patients routed here via the shared queue (sent to Radiology) */}
+            <DepartmentQueue department="Radiology" inline />
             <div data-tour="radio-tabs" className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" className="flex bg-ink-100/70 dark:bg-ink-800/40 p-1 rounded-xl w-full max-w-md">
                     <button type="button" role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}

@@ -35,20 +35,40 @@ server_idle_timeout = 600
 
 ### Application-side settings
 
-In `.env`, point `DATABASE_URL` at PgBouncer (port 6432) and tune the per-engine
-pool to be small — PgBouncer is doing the real pooling:
+A ready-to-run config lives in [`deploy/pgbouncer/`](../deploy/pgbouncer/)
+(`pgbouncer.ini` + a dev `userlist.txt` + a README covering SCRAM hardening).
+
+In `.env`, point `DATABASE_URL` at PgBouncer (port 6432) and set
+`DB_POOLER_ENABLED=true` — the app then uses `NullPool` on every engine so the
+pooler owns pooling and the app never double-pools:
 
 ```env
 DATABASE_URL=postgresql://hms:secret@pgbouncer.internal:6432/mayoclinic_db
-DB_POOL_SIZE=2
-DB_MAX_OVERFLOW=4
-DB_POOL_RECYCLE_SECONDS=1800
-TENANT_ENGINE_CACHE_SIZE=32
+DB_POOLER_ENABLED=true
 ```
 
-> ⚠️ With PgBouncer in `transaction` mode, do NOT use server-side prepared
-> statements that span transactions, advisory locks, or session-level
-> features. Our codebase already avoids these.
+`DB_POOLER_ENABLED=true` is the recommended setting behind PgBouncer. (If you
+prefer to keep a small app-side pool instead of NullPool, leave it `false` and
+set `DB_POOL_SIZE=2` / `DB_MAX_OVERFLOW=4` — but NullPool is cleaner for this
+many-tenant topology.)
+
+### Local rehearsal
+
+```bash
+docker compose --profile pgbouncer up --build
+```
+
+The compose stack ships a profiled `pgbouncer` service (see `docker-compose.yml`
++ `deploy/pgbouncer/`). Set `DATABASE_URL=…@pgbouncer:6432/hms_master` and
+`DB_POOLER_ENABLED=true` in `.env` first to route the backend through it; without
+the profile the stack talks to Postgres directly as before.
+
+> ⚠️ With PgBouncer in `transaction` mode, do NOT use session-level state that
+> spans transactions — session-scoped advisory locks (`pg_advisory_lock`),
+> `LISTEN`/`NOTIFY`, or session `SET`. The codebase already complies: the
+> OP-number lock uses `pg_advisory_xact_lock`, which is transaction-scoped and
+> released at COMMIT, so it is pooler-safe. (psycopg2 doesn't use server-side
+> prepared statements by default, so those aren't a concern either.)
 
 ## 2. WebSocket pub/sub (Redis)
 
@@ -66,6 +86,17 @@ REDIS_URL=redis://redis.internal:6379/0
 ```
 
 For HA, use Redis Sentinel or a managed Redis (ElastiCache, Memorystore, Upstash).
+
+### Dashboard cache warmer
+
+With Redis set, a background loop (`app/core/dashboard_warmer.py`, started in the
+app lifespan) recomputes each active tenant's Command Center dashboard every
+`DASHBOARD_WARM_INTERVAL_SECONDS` (default 25s, under the 30s cache TTL) so the
+shared cache never goes cold — eliminating the multi-second cold-aggregation on
+first load after a restart or a quiet spell. A cross-worker Redis NX lock means
+only **one** worker warms per tick, so the DB cost is O(active tenants) per
+interval regardless of `WEB_CONCURRENCY`. It is a no-op without Redis (there is
+no shared cache to warm); disable with `DASHBOARD_WARM_ENABLED=false`.
 
 ## 3. Tenant provisioning
 

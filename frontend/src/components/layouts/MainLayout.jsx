@@ -8,7 +8,7 @@ import {
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
     ClipboardList, Radio, CalendarDays, MessageSquare, Settings, Banknote, LifeBuoy,
     BookOpen, Smartphone, HelpCircle, HeartPulse, PanelLeftClose, PanelLeftOpen,
-    CalendarClock, Home, UserCog, Baby, Droplets, Scissors,
+    CalendarClock, Home, UserCog, Baby, Droplets, Scissors, ListChecks,
 } from 'lucide-react';
 import WhatsNew from '../WhatsNew';
 import NotificationBell from '../NotificationBell';
@@ -57,6 +57,7 @@ const NAVIGATION = [
     { name: 'Command Center',    path: '/app/admin',           icon: <LayoutDashboard size={18} />, allowedRoles: ['Admin'],                                          requiredPermission: 'users:manage',     moduleKey: 'dashboard' },
     { name: 'Messages',          path: '/app/messages',        icon: <MessageSquare size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Receptionist'], requiredPermission: 'messaging:read', moduleKey: 'messaging' },
     { name: 'Patient Registry',  path: '/app/patients',        icon: <Users size={18} />,           allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'patients:read',    moduleKey: 'patients' },
+    { name: 'Queue Board',       path: '/app/queue',           icon: <ListChecks size={18} />,      allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist'], requiredPermission: 'patients:read', moduleKey: null },
     { name: 'Medical History',   path: '/app/medical-history', icon: <ClipboardList size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse'],                       requiredPermission: 'history:read',     moduleKey: 'medical_history' },
     { name: 'Triage',            path: '/app/triage',          icon: <HeartPulse size={18} />,      allowedRoles: ['Admin', 'Nurse', 'Doctor'],                       requiredPermission: 'triage:read',      moduleKey: 'clinical' },
     { name: 'Clinical Desk',     path: '/app/clinical',        icon: <Stethoscope size={18} />,     allowedRoles: ['Admin', 'Doctor'],                                requiredPermission: 'clinical:read',    moduleKey: 'clinical' },
