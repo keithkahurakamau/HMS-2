@@ -12,6 +12,7 @@ import Logo from './Logo';
  */
 
 export const PARENT_COMPANY = 'Nova-Habitat Technologies';
+export const PARENT_COMPANY_URL = 'https://www.novahabitat.tech';
 
 export default function PublicFooter({ children }) {
     return (
@@ -20,7 +21,15 @@ export default function PublicFooter({ children }) {
                 <div className="flex flex-col items-center md:items-start gap-2">
                     <Logo variant="full" size={28} />
                     <p className="text-2xs text-ink-500 uppercase tracking-[0.18em]">
-                        A product of <span className="font-semibold text-[#015050]">{PARENT_COMPANY}</span>
+                        A product of{' '}
+                        <a
+                            href={PARENT_COMPANY_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-[#015050] hover:text-[#00d4d4] transition-colors"
+                        >
+                            {PARENT_COMPANY}
+                        </a>
                     </p>
                 </div>
 
