@@ -6,7 +6,6 @@ import {
     HeartPulse, ShieldCheck, CalendarDays, Receipt, ClipboardList,
     LogOut, Activity, ArrowLeft, AlertCircle, Lock, CheckCircle2, Sparkles,
 } from 'lucide-react';
-import WebGLHero from '../components/WebGLHero';
 
 const TABS = [
     { key: 'profile',      label: 'Profile',      icon: HeartPulse },
@@ -125,33 +124,26 @@ export default function PatientPortal() {
 
     if (!authed) {
         return (
-            <div className="min-h-screen w-full grid lg:grid-cols-5 bg-white font-sans selection:bg-[#00ffff]/30">
+            <div className="min-h-screen w-full grid lg:grid-cols-5 bg-white font-sans selection:bg-[#b2f0f0]/60">
                 {/* ============== Immersive brand panel (left, lg+) ============== */}
-                <aside className="hidden lg:flex lg:col-span-2 relative overflow-hidden lp-bg-hero text-white isolate">
-                    <div className="absolute inset-0 pointer-events-none">
-                        <WebGLHero className="absolute inset-0 opacity-70" />
-                        <div className="absolute -top-24 -right-20 size-96 rounded-full bg-[#00ffff]/15 blur-[120px] animate-blob-breathe" />
-                        <div className="absolute -bottom-32 -left-16 size-[28rem] rounded-full bg-[#008080]/40 blur-[120px] animate-blob-breathe" style={{ animationDelay: '5s' }} />
-                    </div>
-
+                <aside className="hidden lg:flex lg:col-span-2 relative overflow-hidden bg-[#023535] text-white">
                     <div className="relative z-10 flex flex-col justify-between w-full p-12 xl:p-16">
                         <div className="flex items-center gap-3">
-                            <span className="inline-flex items-center justify-center size-11 rounded-2xl bg-[#00ffff]/15 ring-1 ring-[#00ffff]/30 backdrop-blur-md">
-                                <HeartPulse size={22} className="text-[#7dfdfd]" />
+                            <span className="inline-flex items-center justify-center size-11 rounded-2xl bg-white/10 ring-1 ring-white/20">
+                                <HeartPulse size={22} className="text-[#9cc9c9]" />
                             </span>
                             <div>
                                 <p className="text-sm font-bold tracking-tight">{tenantName}</p>
-                                <p className="text-2xs text-[#9fdede] uppercase tracking-[0.16em]">Patient portal</p>
+                                <p className="text-2xs text-[#9cc9c9] uppercase tracking-[0.16em]">Patient portal</p>
                             </div>
                         </div>
 
                         <div className="max-w-md">
                             <span className="lp-chip-dark inline-flex"><Sparkles size={11} /> Your records, in one place</span>
-                            <h1 className="mt-6 text-4xl xl:text-5xl font-extrabold leading-[1.05] tracking-tight">
-                                Your care,{' '}
-                                <span className="lp-text-gradient">on your side</span>.
+                            <h1 className="mt-6 font-display text-4xl xl:text-5xl font-semibold leading-[1.1] tracking-tight">
+                                Your care, <span className="text-[#7dd8d8]">on your side</span>.
                             </h1>
-                            <p className="mt-5 text-[#cdeeee] text-base leading-relaxed">
+                            <p className="mt-5 text-[#c8e2e2] text-base leading-relaxed">
                                 Look up your appointments, lab results, prescriptions, and bills the
                                 moment you verify. Everything here is read-only and private to you.
                             </p>
@@ -169,8 +161,8 @@ export default function PatientPortal() {
                 <main className="lg:col-span-3 flex flex-col justify-center items-center px-5 py-12 sm:px-10 relative lp-bg-ice">
                     {/* Mobile brand bar */}
                     <div className="lg:hidden w-full max-w-md mb-8 flex items-center gap-3">
-                        <span className="inline-flex items-center justify-center size-12 rounded-2xl bg-gradient-to-br from-[#00ffff] to-[#008080] lp-glow-ring">
-                            <HeartPulse size={22} className="text-[#012626]" />
+                        <span className="inline-flex items-center justify-center size-12 rounded-2xl bg-[#008080]">
+                            <HeartPulse size={22} className="text-white" />
                         </span>
                         <div>
                             <p className="text-base font-extrabold text-[#012626] tracking-tight">Patient Portal</p>
@@ -181,7 +173,7 @@ export default function PatientPortal() {
                     <div className="w-full max-w-md animate-slide-up">
                         <div className="mb-7">
                             <span className="lp-chip">Verify it's you</span>
-                            <h2 className="mt-3 text-3xl font-extrabold text-[#012626] tracking-tight">Open your portal</h2>
+                            <h2 className="mt-3 font-display text-3xl font-semibold text-[#012626] tracking-tight">Open your portal</h2>
                             <p className="mt-2 text-sm text-ink-600">
                                 Enter the details from your patient card and the last 4 digits of your registered phone number.
                             </p>
@@ -367,8 +359,8 @@ export default function PatientPortal() {
 
 function PortalPreview({ icon, label }) {
     return (
-        <div className="flex flex-col items-start gap-2 p-3 rounded-xl bg-[#00ffff]/[0.06] ring-1 ring-[#00ffff]/15 backdrop-blur-sm">
-            <span className="size-8 rounded-lg bg-[#00ffff]/10 flex items-center justify-center text-[#7dfdfd]">
+        <div className="flex flex-col items-start gap-2 p-3 rounded-xl bg-white/[0.06] ring-1 ring-white/15">
+            <span className="size-8 rounded-lg bg-white/10 flex items-center justify-center text-[#9cc9c9]">
                 {icon}
             </span>
             <span className="text-2xs font-semibold text-white/85">{label}</span>
@@ -389,8 +381,8 @@ function ValidatedField({
     const ring = showError
         ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-200/60'
         : touched && valid
-            ? 'border-[#00d4d4] focus:border-[#008080] focus:ring-[#00ffff]/30'
-            : 'border-[#b2f0f0] focus:border-[#008080] focus:ring-[#00ffff]/30';
+            ? 'border-[#008080]/60 focus:border-[#008080] focus:ring-[#008080]/15'
+            : 'border-[#cbd5e1] focus:border-[#008080] focus:ring-[#008080]/15';
     return (
         <div>
             <label htmlFor={id} className="block text-xs font-bold text-[#015050] mb-1.5">{label}</label>
@@ -406,7 +398,7 @@ function ValidatedField({
                     onChange={(e) => onChange(e.target.value)}
                     onBlur={onBlur}
                     aria-invalid={showError || undefined}
-                    className={`w-full rounded-xl bg-white px-3.5 py-2.5 text-sm text-[#012626] border ${ring} pr-10 shadow-sm outline-none transition-all duration-200 ease-in-out focus:ring-4 ${mono ? 'font-mono' : ''} ${center ? 'text-center tracking-[0.4em]' : ''}`}
+                    className={`w-full rounded-xl bg-white px-3.5 py-2.5 text-sm text-[#012626] border ${ring} pr-10 shadow-sm outline-none transition-all duration-200 ease-in-out focus:ring-2 ${mono ? 'font-mono' : ''} ${center ? 'text-center tracking-[0.4em]' : ''}`}
                 />
                 {/* Status icon micro-interaction */}
                 {touched && (
@@ -414,7 +406,7 @@ function ValidatedField({
                         {showError
                             ? <AlertCircle size={16} className="text-rose-400 animate-fade-in" />
                             : valid
-                                ? <CheckCircle2 size={16} className="text-[#00d4d4] animate-fade-in" />
+                                ? <CheckCircle2 size={16} className="text-[#008080] animate-fade-in" />
                                 : null}
                     </span>
                 )}

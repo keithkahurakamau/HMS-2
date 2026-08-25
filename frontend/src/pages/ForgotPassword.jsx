@@ -28,12 +28,12 @@ export default function ForgotPassword() {
     };
 
     return (
-        <div className="min-h-screen bg-ink-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-mesh">
+        <div className="min-h-screen bg-ink-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
             <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-                <div className="inline-flex items-center justify-center size-14 rounded-2xl bg-brand-gradient shadow-glow">
+                <div className="inline-flex items-center justify-center size-14 rounded-2xl bg-[#008080] shadow-soft">
                     <ShieldCheck size={28} className="text-white" />
                 </div>
-                <h2 className="mt-6 text-3xl font-semibold text-ink-900 tracking-tight">{tenantName}</h2>
+                <h2 className="mt-6 font-display text-3xl font-semibold text-ink-900 tracking-tight">{tenantName}</h2>
                 <p className="mt-2 text-sm text-ink-500">Reset your account password</p>
             </div>
 
