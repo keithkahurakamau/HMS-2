@@ -30,7 +30,7 @@ export default function PlatformSettings() {
         (async () => {
             try {
                 const [rootRes, tenantsRes] = await Promise.all([
-                    apiClient.get('/').catch(() => ({ data: null })),
+                    apiClient.get('/health').catch(() => ({ data: null })),
                     apiClient.get('/public/hospitals').catch(() => ({ data: [] })),
                 ]);
                 setHealth(rootRes.data);

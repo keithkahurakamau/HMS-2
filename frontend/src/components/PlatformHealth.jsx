@@ -122,7 +122,7 @@ export default function PlatformHealth() {
             </button>
 
             {open && (
-                <div className="absolute right-0 mt-2 w-80 max-h-[60vh] overflow-y-auto overlay-surface p-3 z-50 custom-scrollbar">
+                <div className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-2rem)] max-h-[60vh] overflow-y-auto overlay-surface p-3 z-50 custom-scrollbar">
                     <div className="flex items-center justify-between gap-2 mb-2">
                         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400">
                             Platform health

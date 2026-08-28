@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, CreditCard, Settings,
-    ShieldAlert, LogOut, Search, Users, LifeBuoy,
+    ShieldAlert, LogOut, Users, LifeBuoy,
     Menu, X, Smartphone, Wallet, KeyRound,
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/superAdminAuth';
@@ -169,16 +169,6 @@ export default function SuperAdminLayout() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="relative hidden md:block">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
-                            <label htmlFor="console-search" className="sr-only">Quick search tenants</label>
-                            <input
-                                id="console-search"
-                                type="search"
-                                placeholder="Quick search tenants…"
-                                className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-700 rounded-full pl-9 pr-4 py-1.5 text-sm text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 w-64 transition-all"
-                            />
-                        </div>
                         {/* Operator-scoped theme switch: independent of any tenant
                             client's preference (stored under hms_admin_theme). */}
                         <ThemeToggle scope="admin" compact />

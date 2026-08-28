@@ -21,6 +21,14 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const checkAuthStatus = async () => {
+        // The superadmin console authenticates with a platform token of its own
+        // and has no tenant, so /users/me there carries no X-Tenant-ID and 400s
+        // on every page load. Skip the tenant bootstrap entirely on those routes.
+        if (window.location.pathname.startsWith('/superadmin')) {
+            setUser(null);
+            setLoading(false);
+            return;
+        }
         try {
             const response = await apiClient.get('/users/me');
             const permRes = await apiClient.get('/users/me/permissions').catch(() => ({ data: [] }));
