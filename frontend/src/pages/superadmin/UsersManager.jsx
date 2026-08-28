@@ -248,26 +248,26 @@ export default function UsersManager() {
 
                                 {/* Desktop table */}
                                 <div className="hidden lg:block overflow-x-auto">
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
+                                    <table className="table-clean">
+                                        <thead>
                                             <tr>
-                                                <th className="px-5 py-3">Name</th>
-                                                <th className="px-5 py-3">Email</th>
-                                                <th className="px-5 py-3">Role</th>
-                                                <th className="px-5 py-3">Status</th>
-                                                <th className="px-5 py-3 text-right">Actions</th>
+                                                <th>Name</th>
+                                                <th>Email</th>
+                                                <th>Role</th>
+                                                <th>Status</th>
+                                                <th className="num">Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-200">
+                                        <tbody>
                                             {rows.map(u => {
                                                 const busy = busyKey === keyOf(u);
                                                 return (
                                                     <tr key={keyOf(u)} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors">
-                                                        <td className="px-5 py-3 font-semibold text-ink-900 dark:text-white">{u.full_name}</td>
-                                                        <td className="px-5 py-3 text-xs text-ink-600 dark:text-ink-400">{u.email}</td>
-                                                        <td className="px-5 py-3 text-xs">{u.role || '—'}</td>
-                                                        <td className="px-5 py-3"><StatusBadge user={u} /></td>
-                                                        <td className="px-5 py-3">
+                                                        <td className="font-semibold text-ink-900 dark:text-white">{u.full_name}</td>
+                                                        <td className="text-xs text-ink-600 dark:text-ink-400">{u.email}</td>
+                                                        <td className="text-xs">{u.role || '—'}</td>
+                                                        <td><StatusBadge user={u} /></td>
+                                                        <td>
                                                             <div className="flex items-center justify-end gap-1.5">
                                                                 <button type="button" disabled={busy} onClick={() => resetPassword(u)}
                                                                     className="btn-xs btn-secondary cursor-pointer disabled:opacity-50" title="Issue temporary password">

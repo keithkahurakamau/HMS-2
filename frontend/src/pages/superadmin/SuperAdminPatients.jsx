@@ -178,28 +178,28 @@ export default function SuperAdminPatients() {
 
                                 {/* Desktop table */}
                                 <div className="hidden md:block overflow-x-auto">
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
+                                    <table className="table-clean">
+                                        <thead>
                                             <tr>
-                                                <th className="px-5 py-3">OP #</th>
-                                                <th className="px-5 py-3">Name</th>
-                                                <th className="px-5 py-3">Sex / DOB</th>
-                                                <th className="px-5 py-3">Phone</th>
-                                                <th className="px-5 py-3">Town</th>
-                                                <th className="px-5 py-3">Registered</th>
-                                                <th className="px-5 py-3 text-right">View</th>
+                                                <th>OP #</th>
+                                                <th>Name</th>
+                                                <th>Sex / DOB</th>
+                                                <th>Phone</th>
+                                                <th>Town</th>
+                                                <th>Registered</th>
+                                                <th className="num">View</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-200">
+                                        <tbody>
                                             {rows.map(p => (
                                                 <tr key={`${p.tenant_id}:${p.patient_id}`} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors">
-                                                    <td className="px-5 py-3 font-mono text-xs text-brand-700">{p.outpatient_no}</td>
-                                                    <td className="px-5 py-3 font-semibold text-ink-900 dark:text-white">{p.surname}, {p.other_names}</td>
-                                                    <td className="px-5 py-3 text-xs">{p.sex} · {p.date_of_birth || '—'}</td>
-                                                    <td className="px-5 py-3 text-xs"><Phone size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.telephone_1 || '—'}</td>
-                                                    <td className="px-5 py-3 text-xs"><MapPin size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.town || '—'}</td>
-                                                    <td className="px-5 py-3 text-xs text-ink-500 dark:text-ink-400"><Calendar size={11} className="inline mr-1" aria-hidden="true" /> {p.registered_on ? new Date(p.registered_on).toLocaleDateString() : '—'}</td>
-                                                    <td className="px-5 py-3 text-right">
+                                                    <td className="font-mono text-xs text-brand-700">{p.outpatient_no}</td>
+                                                    <td className="font-semibold text-ink-900 dark:text-white">{p.surname}, {p.other_names}</td>
+                                                    <td className="text-xs">{p.sex} · {p.date_of_birth || '—'}</td>
+                                                    <td className="text-xs"><Phone size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.telephone_1 || '—'}</td>
+                                                    <td className="text-xs"><MapPin size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.town || '—'}</td>
+                                                    <td className="text-xs text-ink-500 dark:text-ink-400"><Calendar size={11} className="inline mr-1" aria-hidden="true" /> {p.registered_on ? new Date(p.registered_on).toLocaleDateString() : '—'}</td>
+                                                    <td className="num">
                                                         <button
                                                             type="button"
                                                             onClick={() => openDetail(p)}

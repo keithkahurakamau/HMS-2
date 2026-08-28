@@ -227,17 +227,17 @@ export default function TenantsManager() {
                     </div>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
+                    <table className="table-clean">
+                        <thead>
                             <tr>
-                                <th className="px-6 py-3">Tenant</th>
-                                <th className="px-6 py-3">Domain routing</th>
-                                <th className="px-6 py-3">Database node</th>
-                                <th className="px-6 py-3">Subscription tier</th>
-                                <th className="px-6 py-3 text-center">Actions</th>
+                                <th>Tenant</th>
+                                <th>Domain routing</th>
+                                <th>Database node</th>
+                                <th>Subscription tier</th>
+                                <th className="text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-200">
+                        <tbody>
                             {isLoading ? (
                                 <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500 dark:text-ink-400">Loading global registry…</td></tr>
                             ) : filteredTenants.map(tenant => {
@@ -250,7 +250,7 @@ export default function TenantsManager() {
                                 }[tenant.theme_color] || 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300';
                                 return (
                                     <tr key={tenant.id} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors group">
-                                        <td className="px-6 py-4">
+                                        <td>
                                             <div className="flex items-center gap-3">
                                                 <div className={`size-9 rounded-xl flex items-center justify-center border ${themeRing}`}>
                                                     <Building2 size={16} />
@@ -258,21 +258,21 @@ export default function TenantsManager() {
                                                 <span className="font-semibold text-ink-900 dark:text-white group-hover:text-brand-700 transition-colors">{tenant.name}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-mono text-xs text-ink-600 dark:text-ink-400">{tenant.domain}</td>
-                                        <td className="px-6 py-4">
+                                        <td className="font-mono text-xs text-ink-600 dark:text-ink-400">{tenant.domain}</td>
+                                        <td>
                                             <div className="flex items-center gap-2">
                                                 <Database size={13} className="text-ink-500" aria-hidden="true" />
                                                 <span className="font-mono text-xs text-accent-700">{tenant.db_name}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td>
                                             {tenant.is_premium ? (
                                                 <span className="badge-warn">Premium</span>
                                             ) : (
                                                 <span className="badge-neutral">Standard</span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="text-center">
                                             <div className="flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                                                 <button type="button" onClick={() => openEdit(tenant)} aria-label={`Edit ${tenant.name}`}
                                                     className="p-2 hover:bg-ink-100 rounded-lg text-ink-500 hover:text-ink-900 transition-colors cursor-pointer" title="Edit configuration">

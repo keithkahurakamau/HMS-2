@@ -137,17 +137,17 @@ export default function SessionBoard({ order, onChanged }) {
 
       {(order.observations || []).length > 0 && (
         <div className="overflow-x-auto rounded-xl border border-ink-200/70 dark:border-ink-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-ink-50 dark:bg-ink-800/40 text-xs uppercase text-ink-500 dark:text-ink-400">
-              <tr><th className="px-3 py-2">Time</th><th className="px-3 py-2">BP</th><th className="px-3 py-2">Pulse</th><th className="px-3 py-2">UF mL</th></tr>
+          <table className="table-clean">
+            <thead>
+              <tr><th>Time</th><th>BP</th><th>Pulse</th><th>UF mL</th></tr>
             </thead>
             <tbody>
               {order.observations.map((o) => (
                 <tr key={o.obs_id} className="border-t border-ink-100 dark:border-ink-800">
-                  <td className="px-3 py-2 text-ink-500 dark:text-ink-400">{o.recorded_at ? new Date(o.recorded_at).toLocaleTimeString() : '—'}</td>
-                  <td className="px-3 py-2 text-ink-800 dark:text-ink-200">{o.bp_systolic ?? '—'}/{o.bp_diastolic ?? '—'}</td>
-                  <td className="px-3 py-2 text-ink-800 dark:text-ink-200">{o.pulse ?? '—'}</td>
-                  <td className="px-3 py-2 text-ink-800 dark:text-ink-200">{o.uf_volume_ml ?? '—'}</td>
+                  <td className="text-ink-500 dark:text-ink-400">{o.recorded_at ? new Date(o.recorded_at).toLocaleTimeString() : '—'}</td>
+                  <td className="text-ink-800 dark:text-ink-200">{o.bp_systolic ?? '—'}/{o.bp_diastolic ?? '—'}</td>
+                  <td className="text-ink-800 dark:text-ink-200">{o.pulse ?? '—'}</td>
+                  <td className="text-ink-800 dark:text-ink-200">{o.uf_volume_ml ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

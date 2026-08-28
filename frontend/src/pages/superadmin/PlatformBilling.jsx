@@ -149,17 +149,17 @@ export default function PlatformBilling() {
 
                 {/* Desktop table */}
                 <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
+                    <table className="table-clean">
+                        <thead>
                             <tr>
-                                <th className="px-6 py-3">Tenant</th>
-                                <th className="px-6 py-3">Tier</th>
-                                <th className="px-6 py-3">Monthly fee</th>
-                                <th className="px-6 py-3">Status</th>
-                                <th className="px-6 py-3 text-right">Action</th>
+                                <th>Tenant</th>
+                                <th>Tier</th>
+                                <th>Monthly fee</th>
+                                <th>Status</th>
+                                <th className="num">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-200">
+                        <tbody>
                             {isLoading ? (
                                 <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500 dark:text-ink-400">
                                     <Activity size={16} className="inline animate-spin mr-2 text-brand-600 dark:text-brand-400" aria-hidden="true" />Loading…
@@ -168,7 +168,7 @@ export default function PlatformBilling() {
                                 <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500 dark:text-ink-400">No tenants match your filter.</td></tr>
                             ) : filtered.map(tenant => (
                                 <tr key={tenant.id} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors">
-                                    <td className="px-6 py-3">
+                                    <td>
                                         <div className="flex items-center gap-2">
                                             <Building2 size={16} className="text-ink-400" aria-hidden="true" />
                                             <div className="min-w-0">
@@ -177,7 +177,7 @@ export default function PlatformBilling() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-3">
+                                    <td>
                                         {tenant.is_premium ? (
                                             <span className="badge-warn inline-flex items-center gap-1">
                                                 <Crown size={10} aria-hidden="true" /> Premium
@@ -186,16 +186,16 @@ export default function PlatformBilling() {
                                             <span className="badge-neutral">Standard</span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-3 font-mono text-xs text-ink-700 dark:text-ink-200">
+                                    <td className="font-mono text-xs text-ink-700 dark:text-ink-200">
                                         {KES(tenant.is_premium ? TIER_PRICING.Premium : TIER_PRICING.Standard)}
                                     </td>
-                                    <td className="px-6 py-3">
+                                    <td>
                                         <span className="inline-flex items-center gap-1.5 text-accent-700 dark:text-accent-300 text-xs font-semibold">
                                             <span className="size-1.5 rounded-full bg-accent-500 animate-pulse-soft" aria-hidden="true"></span>
                                             Active
                                         </span>
                                     </td>
-                                    <td className="px-6 py-3 text-right">
+                                    <td className="num">
                                         <button
                                             type="button"
                                             onClick={() => toggleTier(tenant)}

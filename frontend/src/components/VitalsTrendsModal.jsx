@@ -75,7 +75,7 @@ export default function VitalsTrendsModal({ patient, onClose }) {
                         </p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="table-clean">
                                 <thead>
                                     <tr className="text-left text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 border-b border-ink-200 dark:border-ink-800 bg-ink-50/60 dark:bg-ink-800/40">
                                         <th scope="col" className="px-4 py-2.5">Date</th>
@@ -84,10 +84,10 @@ export default function VitalsTrendsModal({ patient, onClose }) {
                                         ))}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                                <tbody>
                                     {rows.map((r) => (
                                         <tr key={r.record_id} className="text-ink-800 dark:text-ink-200">
-                                            <td className="px-4 py-2 whitespace-nowrap text-xs text-ink-500 dark:text-ink-400">
+                                            <td className="whitespace-nowrap text-xs text-ink-500 dark:text-ink-400">
                                                 {r.recorded_at
                                                     ? new Date(r.recorded_at).toLocaleDateString([], { dateStyle: 'medium' })
                                                     : '—'}

@@ -334,6 +334,27 @@
     @apply text-right;
   }
 
+  /* The second table register: a compact list nested inside a card or panel,
+     such as the newborn list on a delivery or a vitals strip on a patient
+     header. It is not the primary content of its view, so it takes no sticky
+     header, no row hover and no horizontal padding, which would otherwise
+     misalign it with the surrounding card text. Numerals stay tabular. */
+  .table-inline {
+    @apply w-full text-left text-sm text-ink-700 dark:text-ink-300;
+    font-variant-numeric: tabular-nums;
+  }
+  .table-inline thead th {
+    @apply pr-3 pb-1.5 text-2xs uppercase tracking-wider font-medium
+           text-ink-500 dark:text-ink-400
+           border-b border-ink-100 dark:border-ink-800;
+  }
+  .table-inline td {
+    @apply pr-3 py-1.5 align-middle;
+  }
+  .table-inline th.num, .table-inline td.num {
+    @apply text-right pr-0;
+  }
+
   /* ---------------------------------------------------------------------
      Type scale.
 

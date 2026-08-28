@@ -339,23 +339,23 @@ function TxnTable({ txns, tenants }) {
     }
     return (
         <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-                <thead className="bg-ink-50 text-ink-600 text-2xs uppercase tracking-[0.14em]">
+            <table className="table-clean">
+                <thead>
                     <tr>
-                        <th className="px-5 py-3">Tenant</th><th className="px-5 py-3">Amount</th>
-                        <th className="px-5 py-3">Period</th><th className="px-5 py-3">Status</th>
-                        <th className="px-5 py-3">Receipt</th><th className="px-5 py-3">When</th>
+                        <th>Tenant</th><th>Amount</th>
+                        <th>Period</th><th>Status</th>
+                        <th>Receipt</th><th>When</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100 text-ink-700">
+                <tbody>
                     {txns.map(t => (
                         <tr key={t.id} className="hover:bg-ink-50">
-                            <td className="px-5 py-3"><span className="inline-flex items-center gap-1.5"><Building2 size={14} className="text-ink-400" />{nameFor(t.tenant_id)}</span></td>
-                            <td className="px-5 py-3 font-mono text-xs">KES {(t.amount || 0).toLocaleString('en-KE')}</td>
-                            <td className="px-5 py-3 text-xs">{t.period_label || '—'}</td>
-                            <td className={`px-5 py-3 font-semibold text-xs ${STATUS_TONE[t.status] || 'text-ink-500'}`}>{t.status}</td>
-                            <td className="px-5 py-3 font-mono text-xs">{t.receipt_number || '—'}</td>
-                            <td className="px-5 py-3 text-xs text-ink-500">{t.initiated_at ? new Date(t.initiated_at).toLocaleString() : '—'}</td>
+                            <td><span className="inline-flex items-center gap-1.5"><Building2 size={14} className="text-ink-400" />{nameFor(t.tenant_id)}</span></td>
+                            <td className="font-mono text-xs">KES {(t.amount || 0).toLocaleString('en-KE')}</td>
+                            <td className="text-xs">{t.period_label || '—'}</td>
+                            <td className={`font-semibold text-xs ${STATUS_TONE[t.status] || 'text-ink-500'}`}>{t.status}</td>
+                            <td className="font-mono text-xs">{t.receipt_number || '—'}</td>
+                            <td className="text-xs text-ink-500">{t.initiated_at ? new Date(t.initiated_at).toLocaleString() : '—'}</td>
                         </tr>
                     ))}
                 </tbody>
