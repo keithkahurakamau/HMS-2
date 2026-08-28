@@ -44,32 +44,32 @@ export default function BudgetingTab() {
                            subtitle="Plan revenue and expense by account and month, then track against actuals."
                            onNew={() => setOpenNew(true)} />
             <DataCard loading={loading} empty={budgets.length === 0} emptyMsg="No budgets yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Name</th>
-                            <th className="text-left px-4 py-2 font-medium">Fiscal year</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th className="text-left px-4 py-2 font-medium">Notes</th>
+                            <th className="font-medium">Name</th>
+                            <th className="font-medium">Fiscal year</th>
+                            <th className="font-medium">Status</th>
+                            <th className="font-medium">Notes</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {budgets.map(b => (
                             <tr key={b.budget_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
-                                <td className="px-4 py-2 font-medium">
+                                <td className="font-medium">
                                     <button type="button" onClick={() => setSelectedId(b.budget_id)} className="hover:underline">
                                         {b.name}
                                     </button>
                                 </td>
-                                <td className="px-4 py-2">{b.fiscal_year}</td>
-                                <td className="px-4 py-2">
+                                <td>{b.fiscal_year}</td>
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${BUDGET_STATUS_BADGE[b.status]}`}>
                                         {b.status}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2 text-ink-500 dark:text-ink-400 truncate max-w-xs">{b.notes || '-'}</td>
-                                <td className="px-4 py-2 text-right">
+                                <td className="text-ink-500 dark:text-ink-400 truncate max-w-xs">{b.notes || '-'}</td>
+                                <td className="num">
                                     <button type="button" onClick={() => setSelectedId(b.budget_id)}
                                             className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
                                         <Pencil size={12} /> Open
@@ -275,22 +275,22 @@ function BudgetGrid({ budget, accounts, periods }) {
                 {savedAt && <span className="text-emerald-600">Saved {savedAt.toLocaleTimeString()}</span>}
             </div>
             <div className="overflow-x-auto">
-                <table className="text-sm border-collapse">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-3 py-2 font-medium sticky left-0 bg-ink-50/60 dark:bg-ink-800/40 z-10 min-w-[220px]">Account</th>
+                            <th className="font-medium sticky left-0 bg-ink-50/60 dark:bg-ink-800/40 z-10 min-w-[220px]">Account</th>
                             {periods.map(p => (
                                 <th key={p.period_id} className="text-right px-2 py-2 font-medium min-w-[90px]">
                                     {MONTHS[p.month - 1]}
                                 </th>
                             ))}
-                            <th className="text-right px-3 py-2 font-medium min-w-[110px]">Total</th>
+                            <th className="num font-medium min-w-[110px]">Total</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {accounts.map(a => (
                             <tr key={a.account_id} className="hover:bg-ink-50/30 dark:hover:bg-ink-800/50">
-                                <td className="px-3 py-1.5 sticky left-0 bg-white dark:bg-ink-900 z-10">
+                                <td className="sticky left-0 bg-white dark:bg-ink-900 z-10">
                                     <span className="font-mono text-xs text-ink-500 dark:text-ink-400">{a.code}</span>{' '}
                                     {a.name}
                                 </td>
@@ -306,17 +306,17 @@ function BudgetGrid({ budget, accounts, periods }) {
                                         </td>
                                     );
                                 })}
-                                <td className="px-3 py-1.5 text-right font-mono font-medium">{formatAmount(rowTotal(a.account_id))}</td>
+                                <td className="num font-mono font-medium">{formatAmount(rowTotal(a.account_id))}</td>
                             </tr>
                         ))}
                     </tbody>
                     <tfoot className="bg-ink-50 dark:bg-ink-800/40 font-medium">
                         <tr>
-                            <td className="px-3 py-2 sticky left-0 bg-ink-50 dark:bg-ink-800/40 z-10 dark:text-ink-200">Total</td>
+                            <td className="sticky left-0 bg-ink-50 dark:bg-ink-800/40 z-10 dark:text-ink-200">Total</td>
                             {periods.map(p => (
                                 <td key={p.period_id} className="px-2 py-2 text-right font-mono">{formatAmount(colTotal(p.period_id))}</td>
                             ))}
-                            <td className="px-3 py-2 text-right font-mono">{formatAmount(grandTotal)}</td>
+                            <td className="num font-mono">{formatAmount(grandTotal)}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -356,29 +356,29 @@ function VsActualView({ budgetId, periods }) {
             <DataCard loading={loading} empty={!data || (data.rows || []).length === 0}
                       emptyMsg="No budget lines to compare yet.">
                 {data && (
-                    <table className="w-full text-sm">
-                        <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                    <table className="table-clean">
+                        <thead>
                             <tr>
-                                <th className="text-left px-4 py-2 font-medium">Account</th>
-                                <th className="text-right px-4 py-2 font-medium">Budget</th>
-                                <th className="text-right px-4 py-2 font-medium">Actual</th>
-                                <th className="text-right px-4 py-2 font-medium">Variance</th>
-                                <th className="text-right px-4 py-2 font-medium">%</th>
+                                <th className="font-medium">Account</th>
+                                <th className="num font-medium">Budget</th>
+                                <th className="num font-medium">Actual</th>
+                                <th className="num font-medium">Variance</th>
+                                <th className="num font-medium">%</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                        <tbody>
                             {data.rows.map(r => (
                                 <tr key={r.account_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
-                                    <td className="px-4 py-2">
+                                    <td>
                                         <span className="font-mono text-xs text-ink-500 dark:text-ink-400">{r.code}</span> {r.name}
                                     </td>
-                                    <td className="px-4 py-2 text-right font-mono">{formatAmount(r.budget)}</td>
-                                    <td className="px-4 py-2 text-right font-mono">{formatAmount(r.actual)}</td>
+                                    <td className="num font-mono">{formatAmount(r.budget)}</td>
+                                    <td className="num font-mono">{formatAmount(r.actual)}</td>
                                     <td className={'px-4 py-2 text-right font-mono ' +
                                         (Number(r.variance) < 0 ? 'text-rose-600' : 'text-emerald-700')}>
                                         {formatAmount(r.variance)}
                                     </td>
-                                    <td className="px-4 py-2 text-right text-ink-500 dark:text-ink-400">
+                                    <td className="num text-ink-500 dark:text-ink-400">
                                         {r.variance_pct == null ? '-' : `${Number(r.variance_pct).toFixed(1)}%`}
                                     </td>
                                 </tr>
@@ -386,9 +386,9 @@ function VsActualView({ budgetId, periods }) {
                         </tbody>
                         <tfoot className="bg-ink-50 dark:bg-ink-800/40 font-semibold">
                             <tr>
-                                <td className="px-4 py-2 dark:text-ink-200">Total</td>
-                                <td className="px-4 py-2 text-right font-mono">{formatAmount(data.totals.budget)}</td>
-                                <td className="px-4 py-2 text-right font-mono">{formatAmount(data.totals.actual)}</td>
+                                <td className="dark:text-ink-200">Total</td>
+                                <td className="num font-mono">{formatAmount(data.totals.budget)}</td>
+                                <td className="num font-mono">{formatAmount(data.totals.actual)}</td>
                                 <td className={'px-4 py-2 text-right font-mono ' +
                                     (Number(data.totals.variance) < 0 ? 'text-rose-600' : 'text-emerald-700')}>
                                     {formatAmount(data.totals.variance)}

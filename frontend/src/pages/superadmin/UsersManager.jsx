@@ -339,7 +339,7 @@ export default function UsersManager() {
             {tempResult && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="temp-pw-title">
                     <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => dispatchTemp({ type: 'clear' })} aria-hidden="true" />
-                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 rounded-2xl shadow-elevated border border-ink-200 dark:border-ink-800 p-6 animate-slide-up">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 rounded-xl shadow-overlay border border-ink-200 dark:border-ink-800 p-6 animate-slide-up">
                         <div className="flex items-start justify-between gap-3 mb-4">
                             <div className="flex items-center gap-2">
                                 <span className="inline-flex items-center justify-center size-9 rounded-xl bg-accent-100 text-accent-700 dark:bg-accent-500/10 dark:text-accent-300"><KeyRound size={18} aria-hidden="true" /></span>

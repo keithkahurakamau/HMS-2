@@ -60,7 +60,7 @@ export default function ResetPassword() {
         <div className="min-h-screen bg-ink-50 flex items-center justify-center p-4 sm:p-8">
             <div className="w-full max-w-md animate-slide-up">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center size-14 rounded-2xl bg-[#008080] shadow-soft">
+                    <div className="inline-flex items-center justify-center size-14 rounded-xl bg-[#008080]">
                         <ShieldCheck size={28} className="text-white" />
                     </div>
                     <h1 className="mt-5 font-display text-2xl font-semibold text-ink-900 tracking-tight">Reset your password</h1>

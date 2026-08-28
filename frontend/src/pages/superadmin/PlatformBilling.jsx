@@ -203,7 +203,7 @@ export default function PlatformBilling() {
                                             className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                                                 tenant.is_premium
                                                     ? 'bg-ink-100 hover:bg-ink-200 text-ink-700 border border-ink-200 dark:bg-ink-800 dark:hover:bg-ink-700 dark:text-ink-200 dark:border-ink-700'
-                                                    : 'bg-brand-600 hover:bg-brand-700 text-white shadow-soft'
+                                                    : 'bg-brand-600 hover:bg-brand-700 text-white'
                                             }`}
                                         >
                                             {tenant.is_premium ? (
@@ -252,7 +252,7 @@ export default function PlatformBilling() {
                                     className={`shrink-0 text-xs font-semibold px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] ${
                                         tenant.is_premium
                                             ? 'bg-ink-100 hover:bg-ink-200 text-ink-700 border border-ink-200 dark:bg-ink-800 dark:hover:bg-ink-700 dark:text-ink-200 dark:border-ink-700'
-                                            : 'bg-brand-600 hover:bg-brand-700 text-white shadow-soft'
+                                            : 'bg-brand-600 hover:bg-brand-700 text-white'
                                     }`}
                                 >
                                     {tenant.is_premium ? (
@@ -299,9 +299,9 @@ function KpiCard({ icon: Icon, label, value, sub, accent }) {
 
 function PricingCard({ tier, price, seats, features, highlight }) {
     return (
-        <div className={`rounded-2xl border p-5 ${
+        <div className={`rounded-xl border p-5 ${
             highlight
-                ? 'bg-gradient-to-br from-amber-50 to-amber-100/60 border-amber-200 shadow-soft dark:from-amber-500/10 dark:to-amber-500/5 dark:border-amber-500/20'
+                ? 'bg-gradient-to-br from-amber-50 to-amber-100/60 border-amber-200 dark:from-amber-500/10 dark:to-amber-500/5 dark:border-amber-500/20'
                 : 'card'
         }`}>
             <div className="flex justify-between items-start mb-3">

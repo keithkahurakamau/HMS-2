@@ -70,7 +70,7 @@ export default function SuperAdminLogin() {
                     </span>
                 </div>
 
-                <div className="bg-white/[0.05] backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-elevated">
+                <div className="bg-white/[0.05] backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-overlay">
                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 ring-1 ring-brand-500/20 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-300">
                         <Lock size={12} aria-hidden="true" /> Restricted access
                     </span>

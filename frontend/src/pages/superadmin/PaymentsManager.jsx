@@ -128,7 +128,7 @@ export default function PaymentsManager() {
 
             <ProvisioningGuide />
 
-            <div data-tour="prov-hospital" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5">
+            <div data-tour="prov-hospital" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5">
                 <label htmlFor="pay-hospital" className="block text-xs font-semibold text-ink-600 dark:text-ink-400 mb-1.5 inline-flex items-center gap-1.5">
                     <Building2 size={14} className="text-brand-600" /> Hospital
                 </label>
@@ -146,16 +146,16 @@ export default function PaymentsManager() {
             </div>
 
             {!selected ? (
-                <div className="bg-white dark:bg-ink-900 border border-dashed border-ink-200 dark:border-ink-800 rounded-2xl p-12 text-center text-ink-400">
+                <div className="bg-white dark:bg-ink-900 border border-dashed border-ink-200 dark:border-ink-800 rounded-xl p-12 text-center text-ink-400">
                     <Smartphone size={40} className="mx-auto mb-3 text-ink-300 dark:text-ink-600" />
                     <p className="text-sm font-medium text-ink-500 dark:text-ink-400">Select a hospital to manage its M-Pesa wiring.</p>
                 </div>
             ) : loadingCfg ? (
-                <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-8 text-sm text-ink-500 dark:text-ink-400">Loading…</div>
+                <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-8 text-sm text-ink-500 dark:text-ink-400">Loading…</div>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Editor */}
-                    <div className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+                    <div className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-6 space-y-5">
                         <SectionHead icon={Hash} title="Hospital Safaricom shortcode" />
                         <div className="grid grid-cols-2 gap-3">
                             <Field label="Shortcode (PayBill / Till)">
@@ -257,7 +257,7 @@ export default function PaymentsManager() {
                     <div className="space-y-4">
                         <StatusCard config={config} />
 
-                        <div data-tour="prov-test" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5 space-y-3">
+                        <div data-tour="prov-test" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5 space-y-3">
                             <SectionHead icon={Send} title="Send a test prompt" />
                             <p className="text-xs text-ink-500 dark:text-ink-400">
                                 Real KES&nbsp;1 STK push using this hospital's saved wiring.
@@ -289,7 +289,7 @@ export default function PaymentsManager() {
 
 function ProvisioningGuide() {
     return (
-        <div data-tour="prov-guide" className="bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/20 rounded-2xl p-5">
+        <div data-tour="prov-guide" className="bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/20 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-brand-900 dark:text-brand-200 mb-2 inline-flex items-center gap-2">
                 <Wallet size={16} /> How hospital payments are wired (the operator model)
             </h3>
@@ -314,7 +314,7 @@ function ProvisioningGuide() {
 function StatusCard({ config }) {
     if (!config?.configured) {
         return (
-            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-5 text-sm text-amber-800 dark:text-amber-300 inline-flex items-start gap-2">
+            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-5 text-sm text-amber-800 dark:text-amber-300 inline-flex items-start gap-2">
                 <AlertCircle size={16} className="mt-0.5" />
                 <div>
                     <div className="font-semibold">Nothing saved yet</div>
@@ -324,7 +324,7 @@ function StatusCard({ config }) {
         );
     }
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-5 text-sm space-y-2">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5 text-sm space-y-2">
             {config.mpesa_active ? (
                 <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-300"><CheckCircle2 size={16} /> M-Pesa live</div>
             ) : (

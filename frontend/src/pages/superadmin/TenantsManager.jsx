@@ -302,7 +302,7 @@ export default function TenantsManager() {
                     aria-modal="true"
                     aria-labelledby="edit-tenant-title"
                 >
-                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-4xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay w-full max-w-4xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
                         <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-center shrink-0 gap-3">
                             <div className="min-w-0">
                                 <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700 dark:text-brand-400">Tenant configuration</p>
@@ -721,7 +721,7 @@ export default function TenantsManager() {
                 surfaces. */}
             {provisionResult && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/40 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay w-full max-w-lg overflow-hidden animate-slide-up">
                         <div className="px-6 py-4 border-b border-amber-100 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10">
                             <h2 className="text-base font-semibold text-amber-900 dark:text-amber-300 tracking-tight">Tenant ready &mdash; admin temporary password</h2>
                             <p className="text-xs text-amber-800 dark:text-amber-400 mt-1">Shown once. Deliver to the admin via a secure channel.</p>
@@ -762,7 +762,7 @@ export default function TenantsManager() {
             {/* Provision Modal */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/80 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay w-full max-w-lg overflow-hidden animate-slide-up">
                         <div className="px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-center">
                             <h2 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">Provision new tenant</h2>
                             <button type="button" onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 transition-colors cursor-pointer"><X size={18} /></button>

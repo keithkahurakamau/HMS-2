@@ -258,7 +258,7 @@ export default function SuperAdminPatients() {
                         onClick={() => setSelected(null)}
                         aria-hidden="true"
                     />
-                    <div className="relative w-full max-w-3xl h-full bg-white dark:bg-ink-900 border-l border-ink-200 dark:border-ink-800 shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-3xl h-full bg-white dark:bg-ink-900 border-l border-ink-200 dark:border-ink-800 shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex items-start justify-between gap-3 shrink-0">
                             <div className="min-w-0">
                                 <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">Read-only patient view</span>

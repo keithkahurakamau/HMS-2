@@ -159,7 +159,7 @@ export default function PlatformSubscriptions() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Config */}
-                <div data-tour="sub-config" className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+                <div data-tour="sub-config" className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-6 space-y-5">
                     <SectionHead icon={Wallet} title="Your MediFleet Pay Hero account" />
                     <p className="text-xs text-ink-500 dark:text-ink-400 -mt-3">
                         These are MediFleet's OWN account values, subscription proceeds settle to MediFleet's bank.
@@ -231,7 +231,7 @@ export default function PlatformSubscriptions() {
 
                 {/* Charge a tenant */}
                 <div data-tour="sub-charge" className="space-y-4">
-                    <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5 space-y-3">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5 space-y-3">
                         <SectionHead icon={Phone} title="Charge a tenant" />
                         <Field label="Tenant">
                             <select className="input" value={chargeTenant} onChange={e => setChargeTenant(e.target.value)}>
@@ -268,7 +268,7 @@ export default function PlatformSubscriptions() {
             </div>
 
             {/* Live activity */}
-            <div data-tour="sub-activity" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+            <div data-tour="sub-activity" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl overflow-hidden">
                 <div className="p-4 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white inline-flex items-center gap-2">
                         <Activity size={16} className="text-accent-600 dark:text-accent-400" /> Subscription activity
@@ -285,7 +285,7 @@ export default function PlatformSubscriptions() {
 
 function SubsGuide() {
     return (
-        <div data-tour="sub-guide" className="bg-accent-50 dark:bg-accent-500/10 border border-accent-200 dark:border-accent-500/20 rounded-2xl p-5">
+        <div data-tour="sub-guide" className="bg-accent-50 dark:bg-accent-500/10 border border-accent-200 dark:border-accent-500/20 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-accent-900 dark:text-accent-200 mb-2 inline-flex items-center gap-2">
                 <Wallet size={16} /> This is the only money you receive
             </h3>
@@ -304,7 +304,7 @@ function HealthBanner({ health }) {
     if (!health) return null;
     if (health.ready) {
         return (
-            <div data-tour="sub-health" className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl p-4 text-sm text-emerald-800 dark:text-emerald-300 inline-flex items-start gap-2 w-full">
+            <div data-tour="sub-health" className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-4 text-sm text-emerald-800 dark:text-emerald-300 inline-flex items-start gap-2 w-full">
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
                 <div>
                     <span className="font-semibold">Ready to collect subscriptions.</span>
@@ -314,7 +314,7 @@ function HealthBanner({ health }) {
         );
     }
     return (
-        <div data-tour="sub-health" className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 text-sm text-amber-900 dark:text-amber-200 w-full">
+        <div data-tour="sub-health" className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4 text-sm text-amber-900 dark:text-amber-200 w-full">
             <div className="font-semibold inline-flex items-center gap-2 mb-1"><AlertCircle size={16} /> Not ready yet, finish these first</div>
             <ul className="list-disc pl-5 text-xs space-y-0.5">
                 {(health.blockers || []).map((b) => <li key={b}>{b}</li>)}

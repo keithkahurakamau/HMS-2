@@ -191,7 +191,7 @@ export default function SupportInbox() {
                             type="button"
                             onClick={() => dispatchFilters({ type: 'set', field: 'statusFilter', value: s })}
                             aria-pressed={isActive}
-                            className={`text-left rounded-2xl p-4 border transition-colors cursor-pointer ${
+                            className={`text-left rounded-xl p-4 border transition-colors cursor-pointer ${
                                 isActive
                                     ? 'bg-brand-50 border-brand-200 dark:bg-brand-500/10 dark:border-brand-500/20 ring-2 ring-brand-500/20'
                                     : 'card hover:bg-ink-50 dark:hover:bg-ink-800/50'
@@ -387,7 +387,7 @@ export default function SupportInbox() {
                                     const isPlatform = m.author_kind === 'platform';
                                     return (
                                         <div key={m.message_id} className={`flex ${isPlatform ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-3 border ${
+                                            <div className={`max-w-[85%] sm:max-w-[80%] rounded-xl p-3 border ${
                                                 isPlatform
                                                     ? 'bg-brand-50 border-brand-200 dark:bg-brand-500/10 dark:border-brand-500/20'
                                                     : 'bg-white border-ink-200 dark:bg-ink-900 dark:border-ink-800'
