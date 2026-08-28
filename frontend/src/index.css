@@ -5,6 +5,41 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------
+   Density and motion tokens.
+
+   Comfortable is the default and covers marketing, auth and the patient
+   portal. Clinical, admin and superadmin surfaces opt into .density-compact
+   on their layout wrapper, which is the single switch that tightens every
+   module page at once.
+   --------------------------------------------------------------------- */
+:root {
+  --ctl-h: 2.5rem;    /* 40px control height */
+  --row-h: 3.5rem;    /* 56px table row */
+  --card-p: 1.5rem;   /* 24px card padding */
+  --sec-gap: 2rem;    /* 32px section gap */
+
+  --dur-fast: 120ms;
+  --dur: 160ms;
+  --dur-slow: 220ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.density-compact {
+  --ctl-h: 2rem;      /* 32px */
+  --row-h: 2.5rem;    /* 40px */
+  --card-p: 1rem;     /* 16px */
+  --sec-gap: 1.25rem; /* 20px */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+}
+
+/* ---------------------------------------------------------------------
    Base typography & rendering
    --------------------------------------------------------------------- */
 @layer base {

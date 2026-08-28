@@ -31,7 +31,7 @@
 Run from `frontend/`:
 
 ```bash
-npm test                 # full Vitest suite (51 files)
+npm test                 # full Vitest suite (60 files, 304 tests)
 npm test -- Pharmacy     # single suite by name
 npm run lint             # ESLint; vite build does NOT surface no-undef
 npm run build            # production build
@@ -154,7 +154,7 @@ Extend `theme.extend.colors` with semantic status aliases that point at hues alr
 - [ ] **Step 3: Verify the build compiles and nothing regressed**
 
 Run: `cd frontend && npm run build && npm run lint && npm test`
-Expected: build succeeds, lint clean, all 51 suites pass. No visual change yet, these are additive tokens.
+Expected: build succeeds, lint clean, all 60 test files pass. No visual change yet, these are additive tokens.
 
 - [ ] **Step 4: Commit**
 
@@ -496,7 +496,7 @@ Read both files first. Rework `EmptyState.jsx` to use the `.empty` class and the
 - [ ] **Step 9: Verify the whole suite, since ModuleGuard is widely rendered**
 
 Run: `cd frontend && npm test && npm run lint`
-Expected: all 51 suites plus the 2 new ones pass.
+Expected: all 60 test files plus the 2 new ones pass.
 
 - [ ] **Step 10: Commit**
 
@@ -792,7 +792,7 @@ git commit -m "chore(copy): remove em dashes and clarify labels, errors and empt
 - [ ] **Step 1: Full green**
 
 Run: `cd frontend && npm test && npm run lint && npm run build`
-Expected: 51 plus 3 new suites pass, lint clean, build succeeds.
+Expected: all 60 test files plus the 3 new ones pass, lint clean, build succeeds.
 
 Then run the spec's remaining mechanical gates:
 

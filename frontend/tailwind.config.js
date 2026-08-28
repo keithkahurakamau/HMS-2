@@ -66,6 +66,15 @@ export default {
         slate: {
           850: '#111827',
         },
+        // Semantic status aliases. These point at hues already in the palette
+        // so nothing new enters the identity; they exist so pages stop
+        // reaching for raw palette steps and so status reads as status.
+        status: {
+          ok:       '#059669', // accent-600
+          warn:     '#d97706', // amber-600
+          critical: '#dc2626', // red-600
+          info:     '#2563eb', // blue-600
+        },
         surface: {
           DEFAULT: '#ffffff',
           muted:   '#f8fafc',
@@ -81,6 +90,29 @@ export default {
       fontSize: {
         '2xs': ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.04em' }],
       },
+      // Density tokens. Driven by the CSS variables in index.css so a single
+      // .density-compact class on a layout retunes every control under it.
+      height: {
+        ctl: 'var(--ctl-h)',
+        row: 'var(--row-h)',
+      },
+      minHeight: {
+        ctl: 'var(--ctl-h)',
+      },
+      padding: {
+        card: 'var(--card-p)',
+      },
+      gap: {
+        sec: 'var(--sec-gap)',
+      },
+      transitionDuration: {
+        fast: 'var(--dur-fast)',
+        DEFAULT: 'var(--dur)',
+        slow: 'var(--dur-slow)',
+      },
+      transitionTimingFunction: {
+        out: 'var(--ease-out)',
+      },
       letterSpacing: {
         'tightest': '-0.04em',
       },
@@ -90,6 +122,10 @@ export default {
         '3xl': '1.5rem',
       },
       boxShadow: {
+        // Reserved for genuinely floating surfaces: modals, popovers,
+        // dropdowns, toasts. Everything anchored to the page uses a border.
+        'overlay':    '0 12px 32px -8px rgba(2, 6, 23, 0.18), 0 2px 8px -2px rgba(2, 6, 23, 0.10)',
+        'pop':        '0 6px 16px -6px rgba(2, 6, 23, 0.16)',
         'soft':       '0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 4px 16px -4px rgba(15, 23, 42, 0.08)',
         'elevated':   '0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.14)',
         'glow':       '0 0 0 1px rgba(8, 145, 178, 0.18), 0 10px 32px -8px rgba(6, 182, 212, 0.45)',
