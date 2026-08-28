@@ -11,16 +11,16 @@ import { departmentLabel } from '../utils/departments';
 
 const LIVE_REFRESH_MS = 15000; // re-pull the live board every 15s
 
-/* ─── Pure display helpers (module scope — not rebuilt per render) ─────────── */
+/* ─── Pure display helpers (module scope, not rebuilt per render) ─────────── */
 
 const fmtClock = (iso) => {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return Number.isNaN(d.getTime()) ? '-' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
 const fmtDuration = (seconds) => {
-    if (seconds == null || seconds < 0) return '—';
+    if (seconds == null || seconds < 0) return '-';
     const s = Math.floor(seconds);
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
@@ -102,7 +102,7 @@ function LiveQueue() {
         } catch (err) {
             if (!quiet) toast.error(err.response?.data?.detail || 'Could not load the live queue.');
         } finally {
-            // Unconditional reset — a quiet refresh never set it true, so this is
+            // Unconditional reset: a quiet refresh never set it true, so this is
             // a no-op there (React bails on an unchanged value).
             setIsLoading(false);
         }
@@ -175,7 +175,7 @@ function LiveQueue() {
                                     <td className="font-mono text-ink-500 dark:text-ink-400">#{r.queue_id}</td>
                                     <td>
                                         <span className="font-medium text-ink-900 dark:text-ink-100">{r.patient_name}</span>
-                                        <span className="block text-2xs font-mono text-ink-400">{r.outpatient_no || '—'}</span>
+                                        <span className="block text-2xs font-mono text-ink-400">{r.outpatient_no || '-'}</span>
                                     </td>
                                     <td>
                                         <span className="inline-flex items-center gap-1 text-xs text-ink-600 dark:text-ink-300">
@@ -273,7 +273,7 @@ function DayFootprints() {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <span className="font-medium text-ink-900 dark:text-ink-100 truncate">{p.patient_name}</span>
-                                        <span className="text-2xs font-mono text-ink-400">{p.outpatient_no || '—'}</span>
+                                        <span className="text-2xs font-mono text-ink-400">{p.outpatient_no || '-'}</span>
                                         {p.dealt_with && <span className="badge-success text-2xs">Dealt with</span>}
                                         {p.still_active && <span className="badge-warn text-2xs">On queue</span>}
                                     </div>

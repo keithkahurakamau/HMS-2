@@ -4,7 +4,7 @@
 import React from 'react';
 import { X, Plus } from 'lucide-react';
 // formatAmount / todayISO moved to ./format (non-component file) so this file
-// exports only components — keeps Fast Refresh working.
+// exports only components: keeps Fast Refresh working.
 
 export function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg, newLabel = 'New' }) {
     return (

@@ -44,7 +44,7 @@ export default function AnaesthesiaForm({ caseObj, onSaved }) {
         <label className="block text-sm text-ink-700 dark:text-ink-300">
           ASA grade
           <select value={form.asa_grade} onChange={set('asa_grade')} className="input mt-1 w-full">
-            {ASA.map((g) => <option key={g} value={g}>{g || '—'}</option>)}
+            {ASA.map((g) => <option key={g} value={g}>{g || '-'}</option>)}
           </select>
         </label>
         <label className="block text-sm text-ink-700 dark:text-ink-300">

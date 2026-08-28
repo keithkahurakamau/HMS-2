@@ -11,7 +11,7 @@ export default function DeliveriesTab() {
   const [selected, setSelected] = useState(null);
   const [showDelivery, setShowDelivery] = useState(null);
   const [showPnc, setShowPnc] = useState(false);
-  // A Delivered episode is closed from here, not the ANC tab — the ANC tab
+  // A Delivered episode is closed from here, not the ANC tab, the ANC tab
   // only lists Active episodes, so without this the lifecycle after delivery
   // (PNC visits → discharge) would never terminate.
   const [showClose, setShowClose] = useState(false);
@@ -23,7 +23,7 @@ export default function DeliveriesTab() {
   // Tracks the episode_id of the most recently requested detail so that a
   // late-resolving (out-of-order) fetch for a since-abandoned selection can
   // never overwrite the deliveries/newborns shown for whichever episode is
-  // selected now — a delivery/newborn list must never render under the
+  // selected now: a delivery/newborn list must never render under the
   // wrong patient's name.
   const requestedEpisodeIdRef = useRef(null);
 
@@ -57,7 +57,7 @@ export default function DeliveriesTab() {
   }, []);
 
   // `episodeId` is captured at click time (see call site) rather than read
-  // from `selected` inside .then — if the user switches to viewing a
+  // from `selected` inside .then: if the user switches to viewing a
   // different episode while this request is in flight, `selected` (and
   // requestedEpisodeIdRef) will have moved on by the time this resolves.
   // Re-opening the now-stale `episodeId` here would discard whatever
@@ -179,8 +179,8 @@ export default function DeliveriesTab() {
                     <tr key={n.newborn_id} className="border-t border-ink-100 dark:border-ink-800">
                       <td>{n.birth_order}</td>
                       <td>{n.sex}</td>
-                      <td>{n.weight_g ?? '—'}</td>
-                      <td>{n.apgar_1 ?? '—'}/{n.apgar_5 ?? '—'}</td>
+                      <td>{n.weight_g ?? '-'}</td>
+                      <td>{n.apgar_1 ?? '-'}/{n.apgar_5 ?? '-'}</td>
                       <td>{n.outcome}</td>
                       <td>
                         {n.registered_patient_id ? (
@@ -223,9 +223,9 @@ export default function DeliveriesTab() {
                 <tr key={v.visit_id} className="border-t border-ink-100 dark:border-ink-800">
                   <td>{v.visit_number}</td>
                   <td>{v.visit_date}</td>
-                  <td>{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '—'}</td>
-                  <td>{v.involution ?? '—'}</td>
-                  <td>{v.feeding ?? '—'}</td>
+                  <td>{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '-'}</td>
+                  <td>{v.involution ?? '-'}</td>
+                  <td>{v.feeding ?? '-'}</td>
                 </tr>
               ))}
               {pncVisits.length === 0 && (
@@ -259,7 +259,7 @@ export default function DeliveriesTab() {
           onClose={() => setShowClose(false)}
           onClosed={() => {
             // A closed episode is neither Active nor Delivered, so it drops
-            // out of both lists — clear the detail rather than re-fetching an
+            // out of both lists: clear the detail rather than re-fetching an
             // episode the user can no longer act on.
             setShowClose(false);
             setSelected(null);

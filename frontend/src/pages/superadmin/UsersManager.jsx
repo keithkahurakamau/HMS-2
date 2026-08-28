@@ -8,10 +8,10 @@ import {
 import PageHeader from '../../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Superadmin — Users & Access (cross-tenant).                               */
+/*  Superadmin: Users & Access (cross-tenant).                               */
 /*                                                                            */
 /*  SECURE BY DESIGN. Passwords are Argon2id-hashed (one-way) and are NEVER   */
-/*  fetched or displayed — there is no endpoint that can return one. The      */
+/*  fetched or displayed: there is no endpoint that can return one. The      */
 /*  recovery model is RESET, not reveal: issue a one-time temp password       */
 /*  (forced change at next login), unlock a locked account, or disable it.    */
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -77,7 +77,7 @@ export default function UsersManager() {
                 const res = await apiClient.get('/public/hospitals?include_inactive=false');
                 dispatchData({ type: 'setTenants', value: res.data || [] });
             } catch {
-                // non-fatal — picker just stays empty
+                // non-fatal: picker just stays empty
             }
         })();
     }, []);
@@ -144,7 +144,7 @@ export default function UsersManager() {
             dispatchTemp({ type: 'setCopied', value: true });
             setTimeout(() => dispatchTemp({ type: 'setCopied', value: false }), 2000);
         } catch {
-            toast.error('Copy failed — select and copy manually.');
+            toast.error('Copy failed: select and copy manually.');
         }
     };
 
@@ -162,7 +162,7 @@ export default function UsersManager() {
             <PageHeader
                 eyebrow="Console"
                 icon={KeyRound}
-                title="Users & Access — cross-tenant"
+                title="Users & Access, cross-tenant"
                 subtitle="Recover access securely: reset, unlock, or disable. Passwords are never shown."
                 tone="brand"
                 meta={RESET_BADGE}
@@ -173,11 +173,11 @@ export default function UsersManager() {
                 }
             />
 
-            {/* Why no "view password" — keeps the security model explicit. */}
+            {/* Why no "view password": keeps the security model explicit. */}
             <div className="bg-sky-50 border border-sky-200 text-sky-900 dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-200 rounded-xl p-3 text-xs flex items-start gap-2">
                 <ShieldCheck size={14} className="text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" aria-hidden="true" />
                 <span>
-                    Passwords are stored as one-way Argon2id hashes and cannot be displayed by anyone — including platform staff.
+                    Passwords are stored as one-way Argon2id hashes and cannot be displayed by anyone, including platform staff.
                     To get a user back in, <strong>issue a temporary password</strong> (they’re forced to change it on next login) or <strong>unlock</strong> their account.
                 </span>
             </div>
@@ -265,7 +265,7 @@ export default function UsersManager() {
                                                     <tr key={keyOf(u)} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors">
                                                         <td className="font-semibold text-ink-900 dark:text-white">{u.full_name}</td>
                                                         <td className="text-xs text-ink-600 dark:text-ink-400">{u.email}</td>
-                                                        <td className="text-xs">{u.role || '—'}</td>
+                                                        <td className="text-xs">{u.role || '-'}</td>
                                                         <td><StatusBadge user={u} /></td>
                                                         <td>
                                                             <div className="flex items-center justify-end gap-1.5">
@@ -294,7 +294,7 @@ export default function UsersManager() {
                                     </table>
                                 </div>
 
-                                {/* Mobile / tablet card list — no horizontal scroll, no overlap */}
+                                {/* Mobile / tablet card list, no horizontal scroll, no overlap */}
                                 <ul className="lg:hidden divide-y divide-ink-100 dark:divide-ink-800">
                                     {rows.map(u => {
                                         const busy = busyKey === keyOf(u);
@@ -304,7 +304,7 @@ export default function UsersManager() {
                                                     <div className="min-w-0">
                                                         <p className="font-semibold text-ink-900 dark:text-white truncate">{u.full_name}</p>
                                                         <p className="text-xs text-ink-600 dark:text-ink-400 truncate">{u.email}</p>
-                                                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">{u.role || '—'}</p>
+                                                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">{u.role || '-'}</p>
                                                     </div>
                                                     <StatusBadge user={u} />
                                                 </div>

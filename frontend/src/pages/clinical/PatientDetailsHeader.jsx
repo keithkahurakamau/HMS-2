@@ -15,7 +15,7 @@ const priorityBadge = (priority) => {
  *
  *  Collapsible demographics for the patient being charted, a compact queue
  *  table (Q.No · OPD · Name · From · Mins waiting), a patient typeahead, and a
- *  "View all patients" shortcut. Purely presentational — every action is a
+ *  "View all patients" shortcut. Purely presentational: every action is a
  *  callback the shell wires up.
  */
 export default function PatientDetailsHeader({
@@ -44,7 +44,7 @@ export default function PatientDetailsHeader({
                     <div className="flex items-center gap-2 text-xs text-ink-500 dark:text-ink-400 min-w-0">
                         {activePatient.outpatient_no && <span className="font-mono truncate">{activePatient.outpatient_no}</span>}
                         <span className="text-ink-300 dark:text-ink-600">·</span>
-                        <span className="whitespace-nowrap">{activePatient.age ?? '—'} / {activePatient.gender ?? '—'}</span>
+                        <span className="whitespace-nowrap">{activePatient.age ?? '-'} / {activePatient.gender ?? '-'}</span>
                         {hasAllergy && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-200 dark:ring-rose-500/20 text-rose-700 dark:text-rose-300 px-2 py-0.5 font-medium max-w-[16rem] truncate">
                                 <AlertTriangle size={11} className="shrink-0" /> {activePatient.allergies}
@@ -98,7 +98,7 @@ export default function PatientDetailsHeader({
                                             <tr key={item.queue_id}
                                                 className={active ? 'bg-brand-50 dark:bg-brand-500/10' : ''}>
                                                 <td className="text-ink-500 dark:text-ink-400">{i + 1}</td>
-                                                <td className="text-ink-600 dark:text-ink-300">{item.outpatient_no || '—'}</td>
+                                                <td className="text-ink-600 dark:text-ink-300">{item.outpatient_no || '-'}</td>
                                                 <td>
                                                     <button type="button" onClick={() => onSelectPatient(item)}
                                                         className="font-medium text-ink-800 dark:text-ink-200 hover:text-brand-600 dark:hover:text-brand-400 text-left flex items-center gap-2">
@@ -108,8 +108,8 @@ export default function PatientDetailsHeader({
                                                         )}
                                                     </button>
                                                 </td>
-                                                <td className="text-ink-600 dark:text-ink-300">{item.triage_time || '—'}</td>
-                                                <td className="text-ink-600 dark:text-ink-300">{mins == null ? '—' : mins}</td>
+                                                <td className="text-ink-600 dark:text-ink-300">{item.triage_time || '-'}</td>
+                                                <td className="text-ink-600 dark:text-ink-300">{mins == null ? '-' : mins}</td>
                                                 <td className="num">
                                                     {onRemoveFromQueue && (
                                                         <button type="button" onClick={() => onRemoveFromQueue(item)}

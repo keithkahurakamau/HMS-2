@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Skeleton — a single loading placeholder block.
+ * Skeleton: a single loading placeholder block.
  *
  *  Size it with utilities: <Skeleton className="h-5 w-32" />.
  *
@@ -14,7 +14,7 @@ export function Skeleton({ className = '' }) {
 }
 
 /**
- * SkeletonTable — a placeholder grid shaped like the table that is loading.
+ * SkeletonTable: a placeholder grid shaped like the table that is loading.
  *
  *  Prefer this over a spinner for tabular data. It holds the layout still, so
  *  rows do not jump when the real data lands, and it tells the eye where to

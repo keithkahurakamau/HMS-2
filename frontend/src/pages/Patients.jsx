@@ -60,7 +60,7 @@ const ageFrom = (dob) => {
 // Coerce a stored DOB into the strict YYYY-MM-DD that <input type="date">
 // requires. Backend serializes a DATE column as "YYYY-MM-DD", but legacy /
 // imported rows can arrive as a full ISO timestamp ("1990-05-15T00:00:00"),
-// which the date input silently rejects and renders blank — and a blank value
+// which the date input silently rejects and renders blank, and a blank value
 // then gets force-sent on save and 422s the PUT. Slicing to the first 10 chars
 // normalizes both shapes; anything unparseable becomes '' (left for the user).
 const toDateInputValue = (dob) => {
@@ -70,7 +70,7 @@ const toDateInputValue = (dob) => {
 };
 
 // FastAPI returns 422 validation errors as an array of {loc, msg} objects, not
-// a string — rendering that array straight into a toast shows "[object Object]".
+// a string: rendering that array straight into a toast shows "[object Object]".
 // Flatten it into a readable, field-prefixed sentence.
 const apiErrorMessage = (err, fallback = 'Something went wrong') => {
     const detail = err?.response?.data?.detail;
@@ -97,7 +97,7 @@ const isToday = (iso) => {
 };
 
 const formatRelative = (iso) => {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const then = new Date(iso).getTime();
     const diff = Date.now() - then;
     const m = Math.floor(diff / 60000);
@@ -128,7 +128,7 @@ const avatarColor = (key) => {
     return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
 };
 
-// Registration form defaults — module scope so they're a stable reference, not
+// Registration form defaults: module scope so they're a stable reference, not
 // rebuilt every render. Read-only (form edits create new objects via setState;
 // reset re-applies these), so a shared reference is safe.
 const DEFAULT_FORM_STATE = {
@@ -141,7 +141,7 @@ const DEFAULT_FORM_STATE = {
     occupation: '', employer_name: '', reference_number: '',
     nok_name: '', nok_relationship: '', nok_contact: '', notes: ''
 };
-// KDPA Section 30 — treatment consent captured inline at registration.
+// KDPA Section 30: treatment consent captured inline at registration.
 // Default given + Verbal (how walk-ins work); clinician can adjust.
 const DEFAULT_CONSENT_STATE = { given: true, method: 'Verbal' };
 
@@ -167,7 +167,7 @@ const computeDobFromAge = (age) => {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-// Registry page size — the backend caps a page at 200; the directory pages
+// Registry page size: the backend caps a page at 200; the directory pages
 // through with skip/limit so every record is reachable (not just the first 50).
 const PAGE_SIZE = 50;
 
@@ -202,13 +202,13 @@ export default function Patients() {
     const toggleDropdown = (patientId, e) => {
         // Capture the DOM node NOW. React 18 zeroes out `e.currentTarget`
         // after the handler returns, and our updater fn runs during the
-        // next render — by then `e.currentTarget` would be null, the menu
+        // next render: by then `e.currentTarget` would be null, the menu
         // would anchor at viewport (0,0), and the doc-level click-outside
         // listener would see the trigger as "not inside the anchor" and
         // close the menu the moment it opened.
         const anchorEl = e.currentTarget;
         // Stop the synthetic click from bubbling to the doc-level
-        // mousedown/click listener the menu installs — the same physical
+        // mousedown/click listener the menu installs, the same physical
         // click would otherwise be treated as "outside" the menu.
         e.stopPropagation();
         setActiveDropdown(prev =>
@@ -216,18 +216,18 @@ export default function Patients() {
         );
     };
 
-    // Form State (defaults at module scope — see DEFAULT_FORM_STATE)
+    // Form State (defaults at module scope, see DEFAULT_FORM_STATE)
     const [formData, setFormData] = useState(DEFAULT_FORM_STATE);
     // Many patients (esp. older walk-ins) have no email. Default to "no email"
     // and only reveal the field when the receptionist marks one as available,
     // so a blank email is an explicit choice rather than a skipped field.
     const [regHasEmail, setRegHasEmail] = useState(false);
 
-    // KDPA Section 30 — Treatment consent must exist before any clinical
+    // KDPA Section 30: Treatment consent must exist before any clinical
     // write. We capture it inline at registration so the patient is
     // consent-active by the time anyone tries to record vitals / notes /
     // prescriptions. Persisted separately from the patient row via a
-    // follow-up POST to /medical-history/consent — the Patient schema
+    // follow-up POST to /medical-history/consent: the Patient schema
     // doesn't carry these fields. Default checked + Verbal because that's
     // how walk-in registrations work in practice; the clinician can
     // uncheck and capture written consent later if the patient hasn't
@@ -251,14 +251,14 @@ export default function Patients() {
                 params: { search: searchQuery, skip: page * PAGE_SIZE, limit: PAGE_SIZE, ...dateParams },
             });
             setPatients(response.data);
-            // Total is best-effort — an older API mid-deploy may not expose
+            // Total is best-effort: an older API mid-deploy may not expose
             // /count yet, so a failure just leaves the last known total.
             apiClient.get('/patients/count', { params: { search: searchQuery, ...dateParams } })
                 .then((r) => setTotalCount(r.data?.total ?? 0))
                 .catch(() => {});
         } catch (error) {
             // Suppress the toast when the client is in the middle of
-            // redirecting to /portal (tenant guard) — the page is about
+            // redirecting to /portal (tenant guard), the page is about
             // to unmount anyway and a flashing toast looks like a bug.
             if (isTenantRedirect(error)) return;
 
@@ -268,11 +268,11 @@ export default function Patients() {
             if (!status) {
                 msg = 'Cannot reach the server. Retrying shortly…';
             } else if (status === 401) {
-                msg = 'Your session has expired — sign in again.';
+                msg = 'Your session has expired, sign in again.';
             } else if (status === 403) {
                 msg = `Access denied: ${serverDetail || 'you do not have the patients:read permission.'}`;
             } else if (status === 402) {
-                msg = serverDetail || 'Patient Registry is not in your package — contact MediFleet support.';
+                msg = serverDetail || 'Patient Registry is not in your package, contact MediFleet support.';
             } else {
                 msg = serverDetail || `Failed to load patients (HTTP ${status}).`;
             }
@@ -302,7 +302,7 @@ export default function Patients() {
         setAgeDisplay(ageFromDobStr(formData.date_of_birth));
     }, [formData.date_of_birth]);
 
-    // Minors usually have no National ID — a Birth Certificate is the right
+    // Minors usually have no National ID, a Birth Certificate is the right
     // document. When the patient resolves to under 18 and the operator hasn't
     // already chosen a specific ID type, nudge the default to Birth
     // Certificate. We only switch *away* from the untouched default, so every
@@ -330,7 +330,7 @@ export default function Patients() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // ID number is optional (efficiency for the Kenyan market — minors and
+        // ID number is optional (efficiency for the Kenyan market, minors and
         // no-ID walk-ins are common). We never block on a missing ID; the
         // operator gets an inline hint while filling the form and a warning
         // toast on success so it isn't silently forgotten.
@@ -348,13 +348,12 @@ export default function Patients() {
             const newPatientId = created?.data?.patient_id ?? created?.data?.id;
             toast.success("Patient registered successfully & OP Number generated.");
             if (noIdWarning) {
-                toast('Registered without an ID number — add it later when available.', { icon: '⚠️' });
+                toast('Registered without an ID number, add it later when available.', { icon: '⚠️' });
             }
 
             // KDPA Section 30 follow-up: if the receptionist captured a
             // Treatment consent on the form, record it now so the next
-            // clinical write doesn't 403. Failure here is non-fatal —
-            // the patient row already exists; clinicians can record
+            // clinical write doesn't 403. Failure here is non-fatal:             // the patient row already exists; clinicians can record
             // consent later via the Medical History page.
             if (newPatientId && consentForm.given) {
                 try {
@@ -392,7 +391,7 @@ export default function Patients() {
     // confirms (or skips, in which case the row lands in the unassigned
     // pool so any qualified clinician can claim it).
     const [routeRequest, setRouteRequest] = useState(null); // { patient, target } | null
-    // Edit modal state. Holds the patient object being edited — null means
+    // Edit modal state. Holds the patient object being edited, null means
     // closed. The modal owns its own form state so the parent doesn't have
     // to track every keystroke, and a successful PUT triggers fetchPatients().
     const [editingPatient, setEditingPatient] = useState(null);
@@ -402,7 +401,7 @@ export default function Patients() {
     };
     const closeEditModal = () => setEditingPatient(null);
 
-    // Read-only "view all details" surface — the full patient record in one
+    // Read-only "view all details" surface, the full patient record in one
     // glance (no editing). Fed straight from the row, which already carries
     // every column the list endpoint returns.
     const [viewingPatient, setViewingPatient] = useState(null);
@@ -491,7 +490,7 @@ export default function Patients() {
     const erasePatient = async (patient) => {
         setActiveDropdown(null);
         const confirmation = window.prompt(
-            `KDPA Right to Erasure — this will anonymize "${patient.surname}, ${patient.other_names}". `
+            `KDPA Right to Erasure, this will anonymize "${patient.surname}, ${patient.other_names}". `
             + `Clinical records remain (Health Act 2017 retention). To confirm, retype the OP number: ${patient.outpatient_no}`
         );
         if (!confirmation) return;
@@ -690,7 +689,7 @@ export default function Patients() {
                                             <td className="px-5 py-3 align-top text-xs">
                                                 <div className="flex items-center gap-1.5 text-ink-700 dark:text-ink-300">
                                                     <Phone size={12} className="text-ink-400 shrink-0" aria-hidden="true" />
-                                                    <span className="truncate">{patient.telephone_1 || '—'}</span>
+                                                    <span className="truncate">{patient.telephone_1 || '-'}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-ink-500 mt-1">
                                                     <MapPin size={12} className="text-ink-400 shrink-0" aria-hidden="true" />
@@ -820,14 +819,14 @@ export default function Patients() {
                                         <dt className="text-ink-500">Phone</dt>
                                         <dd className="text-ink-900 dark:text-ink-100 flex items-center gap-1 mt-0.5">
                                             <Phone size={11} className="text-ink-400" aria-hidden="true" />
-                                            <span className="truncate">{patient.telephone_1 || '—'}</span>
+                                            <span className="truncate">{patient.telephone_1 || '-'}</span>
                                         </dd>
                                     </div>
                                     <div>
                                         <dt className="text-ink-500">Residence</dt>
                                         <dd className="text-ink-900 dark:text-ink-100 flex items-center gap-1 mt-0.5">
                                             <MapPin size={11} className="text-ink-400" aria-hidden="true" />
-                                            <span className="truncate">{patient.residence || patient.town || '—'}</span>
+                                            <span className="truncate">{patient.residence || patient.town || '-'}</span>
                                         </dd>
                                     </div>
                                     <div>
@@ -951,10 +950,10 @@ export default function Patients() {
                                                 onChange={handleAgeChange}
                                                 placeholder="e.g. 34"
                                                 className="input"
-                                                title="Type the age if exact DOB is unknown — DOB auto-fills to today minus N years. Confirm with patient."
+                                                title="Type the age if exact DOB is unknown, DOB auto-fills to today minus N years. Confirm with patient."
                                             />
                                             {ageDisplay && !formData.date_of_birth && (
-                                                <p className="helper text-amber-700">Approximated DOB — confirm with patient when possible.</p>
+                                                <p className="helper text-amber-700">Approximated DOB, confirm with patient when possible.</p>
                                             )}
                                         </div>
                                         <div>
@@ -980,10 +979,10 @@ export default function Patients() {
                                                 placeholder={formData.id_type === 'None' ? 'No ID on file' : ''}
                                             />
                                             {/* Kenya: many walk-in patients (minors, no-ID adults) have no
-                                                document. Don't block — just nudge, so it isn't forgotten. */}
+                                                document. Don't block: just nudge, so it isn't forgotten. */}
                                             {formData.id_type !== 'None' && !formData.id_number.trim() && (
                                                 <p className="helper text-amber-700">
-                                                    No ID number — you can still register; add it later, or set ID Type to “None”.
+                                                    No ID number: you can still register; add it later, or set ID Type to “None”.
                                                 </p>
                                             )}
                                         </div>
@@ -1130,7 +1129,7 @@ export default function Patients() {
                                     </div>
                                 </div>
 
-                                {/* SECTION 4: KDPA Section 30 — Treatment consent */}
+                                {/* SECTION 4: KDPA Section 30: Treatment consent */}
                                 <div className="p-5 rounded-xl border border-amber-200 bg-amber-50/40">
                                     <div className="flex items-start gap-3">
                                         <input
@@ -1145,7 +1144,7 @@ export default function Patients() {
                                                 Patient has consented to treatment (KDPA Section 30)
                                             </label>
                                             <p className="text-xs text-ink-600 dark:text-ink-400 mt-1">
-                                                Required before clinicians can record any clinical entry. Uncheck only if the patient hasn't agreed yet — you can capture written consent later from the Medical History page.
+                                                Required before clinicians can record any clinical entry. Uncheck only if the patient hasn't agreed yet, you can capture written consent later from the Medical History page.
                                             </p>
                                             <div className="mt-3 flex items-center gap-2">
                                                 <label htmlFor="reg-consent-method" className="text-xs text-ink-600 dark:text-ink-400">Method:</label>
@@ -1184,7 +1183,7 @@ export default function Patients() {
                 </div>
             )}
 
-            {/* Route-to picker modal — opens when the front desk clicks
+            {/* Route-to picker modal: opens when the front desk clicks
                 any route chip. Lets them pick a specific staff member to
                 assign the patient to within that module. */}
             {routeRequest && (
@@ -1201,7 +1200,7 @@ export default function Patients() {
                 />
             )}
 
-            {/* Singleton portal-anchored row menu — exactly one instance
+            {/* Singleton portal-anchored row menu: exactly one instance
                 rendered when *some* row's More button is active. Portaled
                 to <body> so no ancestor's overflow can clip it. */}
             {activeDropdown && (() => {
@@ -1267,12 +1266,12 @@ function DirectoryStat({ label, value, icon: Icon, accent = 'brand' }) {
 }
 
 /**
- * RouteToModal — "Who should this patient see?" picker.
+ * RouteToModal: "Who should this patient see?" picker.
  *
  * Fetches active staff for the destination's role via /api/patients/staff,
  * lets the receptionist either pick a specific person or send unassigned
  * (any qualified clinician can claim the row). Triage acuity is exposed so
- * the front desk can mark genuine emergencies — the clinical queue is
+ * the front desk can mark genuine emergencies, the clinical queue is
  * ordered by acuity ascending before joined_at, so a "Critical" patient
  * jumps the queue.
  */
@@ -1284,7 +1283,7 @@ const ACUITY_PRESETS = [
     { value: 5, label: 'Non-urgent', hint: 'Walk-in',            className: 'bg-ink-50 dark:bg-ink-900/40 text-ink-700 dark:text-ink-300 border-ink-200 dark:border-ink-800' },
 ];
 
-// Sentinel for "staff not yet loaded" — distinct from any real target.role
+// Sentinel for "staff not yet loaded", distinct from any real target.role
 // (including undefined) so the derived isLoading starts true.
 const STAFF_PENDING = Symbol('staff-pending');
 
@@ -1396,7 +1395,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                             <span className="text-2xs text-ink-500">{isLoading ? 'Loading…' : `${filtered.length} available`}</span>
                         </div>
 
-                        {/* Search — only show when more than a handful of staff */}
+                        {/* Search: only show when more than a handful of staff */}
                         {staff.length > 5 && (
                             <div className="relative mb-2">
                                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
@@ -1412,7 +1411,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                             </div>
                         )}
 
-                        {/* Unassigned option — first row, always visible */}
+                        {/* Unassigned option: first row, always visible */}
                         <label
                             htmlFor="staff-none"
                             className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
@@ -1444,8 +1443,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
                                 </div>
                             ) : noRoleMatch ? (
                                 <p className="p-4 text-center text-xs text-ink-500">
-                                    No active {target.role}s configured. The patient will land unassigned —
-                                    any qualified clinician can pick them up from the {target.label} queue.
+                                    No active {target.role}s configured. The patient will land unassigned,                                     any qualified clinician can pick them up from the {target.label} queue.
                                 </p>
                             ) : filtered.length === 0 ? (
                                 <p className="p-4 text-center text-xs text-ink-500">No staff match "{search}".</p>
@@ -1504,12 +1502,12 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
 }
 
 /**
- * RowMenu — portal-rendered "Manage" dropdown.
+ * RowMenu: portal-rendered "Manage" dropdown.
  *
  * Why a portal: the desktop table sits inside `<div className="overflow-x-auto">`
  * because the columns can overflow on smaller windows. CSS resolves `overflow-y`
  * to `auto` whenever `overflow-x` isn't `visible`, so an absolute child gets
- * clipped vertically — that's why the old menu hid its last items. Rendering
+ * clipped vertically: that's why the old menu hid its last items. Rendering
  * into <body> with `position: fixed` sidesteps every ancestor's overflow.
  *
  * Positioning: anchor to the trigger button's bounding rect. Right-align with
@@ -1647,25 +1645,25 @@ function RowMenu({ patient, anchorEl, onClose, onViewDetails, onView, onEdit, on
 }
 
 /**
- * EditPatientModal — focused editor for the fields most commonly corrected
+ * EditPatientModal: focused editor for the fields most commonly corrected
  * after registration (typos in name, missing phone, updated next-of-kin,
  * blood group / allergies / chronic conditions discovered at the first
  * encounter).
  *
- * Only fields in PatientUpdate are PUT — schema strict-mode would reject
+ * Only fields in PatientUpdate are PUT, schema strict-mode would reject
  * unknown keys. Sensitive identifiers (id_number, dob) are intentionally
  * kept here because front-desk frequently mis-keys them at registration
  * and the audit trail captures every change anyway.
  */
 /**
- * PatientDetailsModal — read-only "view all details" surface. Renders the full
+ * PatientDetailsModal: read-only "view all details" surface. Renders the full
  * patient record grouped into sections; fed straight from the row object (the
- * list endpoint returns every column). No editing — a shortcut jumps to the
+ * list endpoint returns every column). No editing: a shortcut jumps to the
  * edit modal.
  */
-// Pure display helpers — hoisted to module scope so they aren't rebuilt each render.
+// Pure display helpers: hoisted to module scope so they aren't rebuilt each render.
 const fmtLongDate = (d) => (d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null);
-const shownOrDash = (v) => (v === 0 || v ? v : '—');
+const shownOrDash = (v) => (v === 0 || v ? v : '-');
 
 function PatientDetailsModal({ patient, onClose, onEdit }) {
     const age = ageFrom(patient.date_of_birth);
@@ -1830,8 +1828,7 @@ function EditPatientModal({ patient, onClose, onSaved }) {
             // Strip empty optional fields so we don't overwrite existing
             // values with "" on a save the user didn't intend to clear.
             // surname/other_names/sex stay even if blank so the backend sees the
-            // intended values; date_of_birth is deliberately NOT force-kept —
-            // an empty date string fails strict date validation (422), so we
+            // intended values; date_of_birth is deliberately NOT force-kept,             // an empty date string fails strict date validation (422), so we
             // simply omit it when blank and leave the stored DOB untouched.
             const KEEP_EMPTY = new Set(['surname', 'other_names', 'sex']);
             const payload = Object.fromEntries(

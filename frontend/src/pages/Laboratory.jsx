@@ -24,7 +24,7 @@ import PatientHistoryModal from '../components/PatientHistoryModal';
 /*                                                                            */
 /*  The lab module is fully driven by `lab_test_catalog` + `lab_catalog_      */
 /*  parameters`. Adding a new test (with whatever discrete result fields it   */
-/*  has) is purely a data operation — no front-end changes required.          */
+/*  has) is purely a data operation, no front-end changes required.          */
 /*  Reagents that are reusable (slides, glassware, probes) are logged on use  */
 /*  but don't decrement stock.                                                */
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -38,7 +38,7 @@ const EMPTY_PARAMETER = {
     key: '', name: '', unit: '', value_type: 'number',
     choices: '', ref_low: '', ref_high: '', sort_order: 0, is_active: true };
 
-// Pure result-flagging helper — hoisted to module scope.
+// Pure result-flagging helper: hoisted to module scope.
 const flagFor = (val, low, high) => {
     if (val === '' || val == null) return null;
     const n = parseFloat(val);
@@ -228,7 +228,7 @@ export default function Laboratory() {
         if (!activeTest) return;
         try {
             const res = await apiClient.post(`/laboratory/tests/${activeTest.test_id}/collect`, {});
-            toast.success(`Specimen received — barcode ${res.data.specimen_id}`);
+            toast.success(`Specimen received, barcode ${res.data.specimen_id}`);
             const next = { ...activeTest, status: 'In Progress', specimen_id: res.data.specimen_id };
             setActiveTest(next);
             setQueue(queue.map(q => q.test_id === activeTest.test_id ? { ...q, status: 'In Progress' } : q));
@@ -241,7 +241,7 @@ export default function Laboratory() {
         if (!activeTest) return;
         setActiveTest({ ...activeTest, status: 'In Progress' });
         setQueue(queue.map(q => q.test_id === activeTest.test_id ? { ...q, status: 'In Progress' } : q));
-        toast('Barcode skipped — processing in single-step mode.', { icon: '⏭' });
+        toast('Barcode skipped: processing in single-step mode.', { icon: '⏭' });
     };
 
     /* ─── Reagent consumption ────────────────────────────────────────────── */
@@ -316,7 +316,7 @@ export default function Laboratory() {
         outpatient_no: activePatientGroup?.outpatient_no,
         patient_id: activePatientGroup?.patient_id });
 
-    // Lab Report — the patient's tests, printed via the shared list report.
+    // Lab Report: the patient's tests, printed via the shared list report.
     const handleLabReport = () => {
         if (!activePatientGroup?.patient_id) { toast.error('This queue row has no linked patient record.'); return; }
         apiClient.get('/laboratory/tests', { params: { patient_id: activePatientGroup.patient_id } })
@@ -324,7 +324,7 @@ export default function Laboratory() {
             .catch((e) => toast.error(e.response?.data?.detail || 'Could not load lab tests.'));
     };
 
-    // Visit Summary — patient context + the requested tests as investigations.
+    // Visit Summary: patient context + the requested tests as investigations.
     const handleVisitSummary = () => {
         if (!activePatientGroup) return;
         printVisitSummary({
@@ -334,7 +334,7 @@ export default function Laboratory() {
                 investigations: activePatientGroup.tests.map((t) => t.test_name) } });
     };
 
-    // Consolidated Actions ▾ — mirrors MedicentreV3's Laboratory menu; perm-
+    // Consolidated Actions ▾, mirrors MedicentreV3's Laboratory menu; perm-
     // gated (empty groups disappear). Approve-as-a-second-step, Unlock Lab
     // Request, and the Test-Per-Page report are follow-ups (no backend yet).
     const actionGroups = [
@@ -428,7 +428,7 @@ export default function Laboratory() {
                 eyebrow="Diagnostics"
                 icon={TestTube}
                 title="Laboratory"
-                subtitle="Process orders, capture results, and publish reports — with full sample lifecycle tracking."
+                subtitle="Process orders, capture results, and publish reports, with full sample lifecycle tracking."
             />
 
             {/* Tabs */}
@@ -490,7 +490,7 @@ export default function Laboratory() {
                                         <div className="size-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center ring-1 ring-inset ring-brand-100 shrink-0"><Microscope size={19} /></div>
                                         <div className="min-w-0">
                                             <h1 className="text-base font-semibold text-ink-900 dark:text-ink-100 tracking-tight truncate">{activePatientGroup.patient_name}</h1>
-                                            <p className="text-xs font-medium text-ink-500 truncate">{activePatientGroup.outpatient_no || '—'} · {activePatientGroup.tests.length} requested test{activePatientGroup.tests.length === 1 ? '' : 's'}</p>
+                                            <p className="text-xs font-medium text-ink-500 truncate">{activePatientGroup.outpatient_no || '-'} · {activePatientGroup.tests.length} requested test{activePatientGroup.tests.length === 1 ? '' : 's'}</p>
                                         </div>
                                     </div>
                                     <ActionsMenu has={hasPerm} groups={actionGroups} />
@@ -512,7 +512,7 @@ export default function Laboratory() {
                                                             </div>
                                                             <div className="flex items-center justify-between text-2xs">
                                                                 <span className={t.status === 'Pending Collection' ? 'badge-warn' : t.status === 'In Progress' ? 'badge-info' : 'badge-neutral'}>{t.status}</span>
-                                                                <span className="text-ink-400 flex items-center gap-1"><Clock size={10} /> {t.requested_at ? new Date(t.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+                                                                <span className="text-ink-400 flex items-center gap-1"><Clock size={10} /> {t.requested_at ? new Date(t.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
                                                             </div>
                                                         </button>
                                                         <button type="button" onClick={() => handleCancelTest(t)} title="Remove from queue" aria-label={`Remove ${t.test_name} from the queue`}
@@ -553,13 +553,13 @@ export default function Laboratory() {
 
                                 <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-ink-50/40 dark:bg-ink-800/30 custom-scrollbar">
 
-                                    {/* Stage 1: pending collection — only when catalog requires barcode */}
+                                    {/* Stage 1: pending collection: only when catalog requires barcode */}
                                     {activeTest.status === 'Pending Collection' ? (
                                         <div className="card p-6 text-center py-12">
                                             <TestTube size={44} className="mx-auto text-ink-300 mb-4" />
                                             <h3 className="text-base font-semibold text-ink-800 dark:text-ink-200 mb-1">Awaiting specimen collection</h3>
                                             <p className="text-sm text-ink-500 mb-6 max-w-md mx-auto">
-                                                This test's catalog entry requests a barcode label. You can generate one — or skip
+                                                This test's catalog entry requests a barcode label. You can generate one: or skip
                                                 the labelling step entirely if your workflow doesn't need it.
                                             </p>
                                             <div className="flex flex-wrap justify-center gap-3">
@@ -576,7 +576,7 @@ export default function Laboratory() {
                                         </div>
                                     ) : (
                                         <>
-                                            {/* Discrete result entry — driven by lab_catalog_parameters */}
+                                            {/* Discrete result entry: driven by lab_catalog_parameters */}
                                             <div className="card-flush p-5 sm:p-6 animate-fade-in">
                                                 <h3 className="section-eyebrow mb-5 border-b border-ink-100 dark:border-ink-800 pb-3 flex items-center gap-2">
                                                     <Activity className="text-brand-600" size={16} /> Enter results
@@ -598,7 +598,7 @@ export default function Laboratory() {
                                                                     {param.value_type === 'choice' && param.choices ? (
                                                                         <select className="input" value={results[param.key] || ''}
                                                                                 onChange={(e) => setResults({ ...results, [param.key]: e.target.value })}>
-                                                                            <option value="">—</option>
+                                                                            <option value="">, </option>
                                                                             {param.choices.split(',').map(c => <option key={c.trim()} value={c.trim()}>{c.trim()}</option>)}
                                                                         </select>
                                                                     ) : (
@@ -609,11 +609,11 @@ export default function Laboratory() {
                                                                                className="input" />
                                                                     )}
                                                                 </div>
-                                                                <div className="col-span-2 text-sm text-ink-500">{param.unit || '—'}</div>
+                                                                <div className="col-span-2 text-sm text-ink-500">{param.unit || '-'}</div>
                                                                 <div className="col-span-2 text-xs font-mono text-ink-400">
                                                                     {param.ref_low != null || param.ref_high != null
                                                                         ? `${param.ref_low ?? '–∞'} – ${param.ref_high ?? '+∞'}`
-                                                                        : '—'}
+                                                                        : '-'}
                                                                 </div>
                                                                 <div className="col-span-1 flex justify-center">
                                                                     {param.value_type === 'number' && flagFor(results[param.key], param.ref_low, param.ref_high)}
@@ -627,7 +627,7 @@ export default function Laboratory() {
                                                         <textarea id="labora-qualitative-result-impression" rows="4" value={results.qualitative || ''}
                                                                   onChange={(e) => setResults({ qualitative: e.target.value })}
                                                                   className="input resize-none"
-                                                                  placeholder="Enter findings… (no discrete parameters configured for this test — edit the catalog to add them)" />
+                                                                  placeholder="Enter findings… (no discrete parameters configured for this test, edit the catalog to add them)" />
                                                     </div>
                                                 )}
 
@@ -653,7 +653,7 @@ export default function Laboratory() {
                                                         ))}
                                                     </select>
                                                     {selectedBatchId && labInventory.find(i => i.batch_id === parseInt(selectedBatchId))?.is_reusable ? (
-                                                        <span className="badge-success flex items-center gap-1 px-3"><RefreshCcw size={12} /> Reusable — no qty</span>
+                                                        <span className="badge-success flex items-center gap-1 px-3"><RefreshCcw size={12} /> Reusable, no qty</span>
                                                     ) : (
                                                         <input aria-label="Qty" type="number" min="1" placeholder="Qty" value={consumeQty}
                                                                onChange={(e) => setConsumeQty(e.target.value)} className="input w-24" />

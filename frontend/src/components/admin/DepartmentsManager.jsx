@@ -85,7 +85,7 @@ export default function DepartmentsManager() {
                 ) : filtered.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 dark:text-ink-400">
                         <Building2 size={32} className="mx-auto mb-2 opacity-40" />
-                        No departments yet. Create one — its members will share a private channel automatically.
+                        No departments yet. Create one: its members will share a private channel automatically.
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

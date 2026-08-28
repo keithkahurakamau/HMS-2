@@ -53,7 +53,7 @@ export default function ActionsMenu({ groups, has, disabled = false }) {
     useEffect(() => {
         if (!open) return undefined;
         // Position is measured in the click handler before opening (a DOM read,
-        // not effect state) — here we just animate in and track viewport changes.
+        // not effect state): here we just animate in and track viewport changes.
         const raf = requestAnimationFrame(() => setShown(true));
         const onDoc = (e) => {
             if (menuRef.current?.contains(e.target) || btnRef.current?.contains(e.target)) return;

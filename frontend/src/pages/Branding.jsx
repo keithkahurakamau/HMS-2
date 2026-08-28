@@ -12,7 +12,7 @@ import PageHeader from '../components/PageHeader';
 import LetterheadStudio, { LETTERHEAD_DEFAULTS } from '../components/LetterheadStudio';
 
 /**
- * Branding Studio — hospital admins customise their workspace identity.
+ * Branding Studio: hospital admins customise their workspace identity.
  *
  *  - Upload a custom logo (PNG/JPG/SVG, max 600 KB after compression).
  *  - Upload a sign-in background image (max 800 KB after compression).
@@ -20,7 +20,7 @@ import LetterheadStudio, { LETTERHEAD_DEFAULTS } from '../components/LetterheadS
  *  - Configure printed-document templates (header, footer, layout style).
  *
  *  Today: images are stored base64-encoded in the master ``tenants`` row.
- *  Tomorrow: the same column will hold a Cloudinary URL — the UI doesn't
+ *  Tomorrow: the same column will hold a Cloudinary URL, the UI doesn't
  *  change.
  */
 
@@ -93,7 +93,7 @@ export default function Branding() {
                 },
             };
 
-            // Letterhead: only ship the artwork when it actually changed — it is
+            // Letterhead: only ship the artwork when it actually changed, it is
             // ~100 KB of base64 and the server carries the stored copy forward
             // when `image` is omitted.
             const letterhead = draft.print_templates?.letterhead;
@@ -171,7 +171,7 @@ export default function Branding() {
                         onClear={() => set('logo_data_url', null)}
                         maxBytes={MAX_LOGO_BYTES}
                         aspect="square"
-                        emptyHint="No custom logo — the MediFleet mark is shown."
+                        emptyHint="No custom logo, the MediFleet mark is shown."
                     />
                 </Section>
 
@@ -189,7 +189,7 @@ export default function Branding() {
                         onClear={() => set('background_data_url', null)}
                         maxBytes={MAX_BG_BYTES}
                         aspect="wide"
-                        emptyHint="No background — the cyan/teal gradient is used."
+                        emptyHint="No background, the cyan/teal gradient is used."
                     />
                 </Section>
 
@@ -293,7 +293,7 @@ export default function Branding() {
                     span="md:col-span-12"
                     icon={<FileText size={16} />}
                     title="Letterhead"
-                    desc="Upload your own printed stationery and every document — invoices, prescriptions, lab and radiology reports, patient cards, admission slips and medical histories — prints on it."
+                    desc="Upload your own printed stationery and every document. Invoices, prescriptions, lab and radiology reports, patient cards, admission slips and medical histories, prints on it."
                 >
                     <LetterheadStudio
                         value={draft.print_templates?.letterhead || LETTERHEAD_DEFAULTS}
@@ -350,7 +350,7 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
         if (!file) return;
         setError(null);
         if (file.size > maxBytes * 1.5) {
-            setError(`Image is ${Math.round(file.size / 1024)} KB — please compress to under ${Math.round(maxBytes / 1024)} KB.`);
+            setError(`Image is ${Math.round(file.size / 1024)} KB, please compress to under ${Math.round(maxBytes / 1024)} KB.`);
             return;
         }
         const reader = new FileReader();
@@ -361,7 +361,7 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
                 return;
             }
             if (dataUrl.length > maxBytes) {
-                setError(`Encoded image is ${Math.round(dataUrl.length / 1024)} KB — compress further or pick a smaller image.`);
+                setError(`Encoded image is ${Math.round(dataUrl.length / 1024)} KB, compress further or pick a smaller image.`);
                 return;
             }
             onChange(dataUrl);

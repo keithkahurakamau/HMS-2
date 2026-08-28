@@ -50,7 +50,7 @@ function dataReducer(state, action) {
     }
 }
 
-// The five inbox filters — one object, so each change is a single dispatch.
+// The five inbox filters: one object, so each change is a single dispatch.
 const initialFilters = { search: '', statusFilter: 'Open', categoryFilter: '', priorityFilter: '', deskFilter: '' };
 function filtersReducer(state, action) {
     switch (action.type) {
@@ -101,7 +101,7 @@ export default function SupportInbox() {
             const res = await apiClient.get('/public/superadmin/tickets/summary');
             dispatchData({ type: 'setSummary', value: res.data || {} });
         } catch {
-            // Summary is decorative — silently degrade if it fails.
+            // Summary is decorative: silently degrade if it fails.
         }
     };
 
@@ -180,7 +180,7 @@ export default function SupportInbox() {
                 }
             />
 
-            {/* KPI row — filterable */}
+            {/* KPI row: filterable */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {STATUSES.map(s => {
                     const count = summary[s] || 0;
@@ -204,7 +204,7 @@ export default function SupportInbox() {
                 })}
             </div>
 
-            {/* Desk tabs — Support / Finance / Technical */}
+            {/* Desk tabs: Support / Finance / Technical */}
             <div className="flex gap-2 flex-wrap" role="tablist" aria-label="Support desks">
                 {['', ...Object.keys(DESKS)].map(d => {
                     const Icon = d ? DESKS[d].icon : LifeBuoy;

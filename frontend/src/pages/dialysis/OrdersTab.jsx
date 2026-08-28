@@ -30,7 +30,7 @@ export default function OrdersTab() {
 
   const load = useCallback(() => {
     // Promise-chain (not async/await) so the effect calling load() has no
-    // setState in its synchronous path — matches the maternity tabs' convention.
+    // setState in its synchronous path, matches the maternity tabs' convention.
     listOrders({})
       .then((rows) => { setOrders(rows || []); setError(''); })
       .catch((err) => setError(errorText(err, 'Failed to load dialysis sessions')));

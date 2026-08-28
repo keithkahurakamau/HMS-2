@@ -90,11 +90,11 @@ export default function VitalsTrendsModal({ patient, onClose }) {
                                             <td className="whitespace-nowrap text-xs text-ink-500 dark:text-ink-400">
                                                 {r.recorded_at
                                                     ? new Date(r.recorded_at).toLocaleDateString([], { dateStyle: 'medium' })
-                                                    : '—'}
+                                                    : '-'}
                                             </td>
                                             {COLUMNS.map((c) => (
                                                 <td key={c.key} className="px-3 py-2 whitespace-nowrap font-mono text-xs">
-                                                    {r[c.key] ?? '—'}
+                                                    {r[c.key] ?? '-'}
                                                 </td>
                                             ))}
                                         </tr>
@@ -102,7 +102,7 @@ export default function VitalsTrendsModal({ patient, onClose }) {
                                 </tbody>
                             </table>
                             <p className="px-4 py-2.5 text-2xs text-ink-500 dark:text-ink-400">
-                                Oldest reading first — read down the table to follow the trend.
+                                Oldest reading first: read down the table to follow the trend.
                             </p>
                         </div>
                     )}

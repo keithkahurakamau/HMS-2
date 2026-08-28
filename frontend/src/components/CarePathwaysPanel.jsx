@@ -7,7 +7,7 @@ import { apiClient } from '../api/client';
 const PRIORITIES = ['Elective', 'Emergency'];
 const err = (e, fallback) => toast.error(e?.response?.data?.detail || fallback);
 
-/** Shared modal shell — portaled to <body> so it escapes the workspace card's
+/** Shared modal shell: portaled to <body> so it escapes the workspace card's
  *  stacking context and always sits above the queue bar and page chrome. */
 function Modal({ title, icon: Icon, onClose, children, footer }) {
     return createPortal(
@@ -134,7 +134,7 @@ function AdmitModal({ patient, diagnosis, onClose }) {
 }
 
 /**
- * Care pathways from the Clinical Desk — request a surgical case (theatre) or
+ * Care pathways from the Clinical Desk, request a surgical case (theatre) or
  * admit the patient to a ward. Reuses the theatre and wards modules; each
  * button is gated on the viewer's permission so it only appears when actionable.
  */

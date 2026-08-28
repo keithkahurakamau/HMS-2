@@ -9,21 +9,21 @@ import VisitHistoryList from './VisitHistoryList';
 import { ENTRY_TYPES, ENTRY_TYPE_COLOR_CLASSES, ENTRY_TYPE_TO_CHART_FIELD } from '../constants/medicalHistoryEntryTypes';
 
 /* ──────────────────────────────────────────────────────────────────────────
- * PatientHistoryModal — Clinical Desk's inline, read-only view of a
+ * PatientHistoryModal: Clinical Desk's inline, read-only view of a
  * patient's medical chart. Opens over the encounter form (nothing in the
  * in-progress SOAP notes is touched) instead of navigating away to
  * /app/medical-history. Fetches the same GET /medical-history/{id}/chart
- * endpoint the full Medical History page uses — no backend change, no
+ * endpoint the full Medical History page uses, no backend change, no
  * separate source of truth.
  *
  * This view never writes. A doctor who needs to add/edit/delete an entry,
  * print, or manage consents follows the "Open full record" link, which is
  * the same deep-link the old toolbar buttons used to navigate to directly.
  *
- *   patientId       required — whose chart to load
+ *   patientId       required: whose chart to load
  *   initialSection  optional ENTRY_TYPES key to auto-expand + scroll to.
  *                   Omitted/null expands every section (full-chart view).
- *   onClose         required — close handler
+ *   onClose         required: close handler
  * ────────────────────────────────────────────────────────────────────────── */
 export default function PatientHistoryModal({ patientId, initialSection = null, onClose }) {
     const navigate = useNavigate();
@@ -89,7 +89,7 @@ export default function PatientHistoryModal({ patientId, initialSection = null, 
                         {chart && (
                             <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                                 <span className="font-mono">{chart.opd_number}</span>
-                                <span>Blood group: <span className="font-semibold text-ink-700 dark:text-ink-200">{chart.blood_group || '—'}</span></span>
+                                <span>Blood group: <span className="font-semibold text-ink-700 dark:text-ink-200">{chart.blood_group || '-'}</span></span>
                             </p>
                         )}
                     </div>

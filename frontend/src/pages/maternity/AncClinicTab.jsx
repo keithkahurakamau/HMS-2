@@ -29,9 +29,9 @@ export default function AncClinicTab() {
       .catch(() => setError('Failed to load episode'));
 
   // A queue row's patient may already have an Active episode (e.g. routed
-  // back to Maternity for a follow-up ANC visit) — opening the enroll form
+  // back to Maternity for a follow-up ANC visit), opening the enroll form
   // for them would just 409. Match on patient_id against the already-loaded
-  // Active episode list (listEpisodes carries patient_id — see
+  // Active episode list (listEpisodes carries patient_id, see
   // app/routes/maternity.py _episode_dict) and jump straight to their
   // episode; only fall back to the enroll form when they have none.
   const enrollOrOpenFromQueue = (patientId) => {
@@ -44,8 +44,7 @@ export default function AncClinicTab() {
   };
 
   // The closed/transferred episode drops out of the "Active pregnancies"
-  // list on refresh, so its detail panel is cleared rather than re-fetched —
-  // there's nothing left in this view for the user to look at.
+  // list on refresh, so its detail panel is cleared rather than re-fetched,   // there's nothing left in this view for the user to look at.
   const handleClosed = () => {
     setShowClose(false);
     setSelected(null);
@@ -157,9 +156,9 @@ export default function AncClinicTab() {
                   <tr key={v.visit_id} className="border-t border-ink-100 dark:border-ink-800">
                     <td>{v.visit_number}</td>
                     <td>{v.visit_date}</td>
-                    <td>{v.gestation_weeks ?? '—'}</td>
-                    <td>{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '—'}</td>
-                    <td>{v.fetal_heart_rate ?? '—'}</td>
+                    <td>{v.gestation_weeks ?? '-'}</td>
+                    <td>{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '-'}</td>
+                    <td>{v.fetal_heart_rate ?? '-'}</td>
                   </tr>
                 ))}
                 {ancVisits.length === 0 && (

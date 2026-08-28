@@ -12,7 +12,7 @@ const TIER_PRICING = {
     Standard: 18500,
 };
 
-// Pure currency formatter — module scope so it isn't redefined every render.
+// Pure currency formatter: module scope so it isn't redefined every render.
 const KES = (n) => `KES ${(n || 0).toLocaleString('en-KE')}`;
 
 export default function PlatformBilling() {

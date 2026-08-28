@@ -3,7 +3,7 @@ import { X, Search, Activity, Send, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../../api/client';
 
-// Imaging (radiology) order modal — one exam per order from /radiology/catalog
+// Imaging (radiology) order modal: one exam per order from /radiology/catalog
 // (or a free-text custom exam), with notes + priority, POSTed to /radiology/.
 // Shared by the Clinical Desk and Triage.
 const PRIORITIES = ['Routine', 'Urgent', 'STAT'];

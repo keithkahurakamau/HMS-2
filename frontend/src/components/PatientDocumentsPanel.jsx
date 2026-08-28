@@ -8,7 +8,7 @@ import { apiClient } from '../api/client';
 import { reprintPatientDocument } from '../utils/reprintDocument';
 
 /**
- * PatientDocumentsPanel — every document previously issued to a patient, with
+ * PatientDocumentsPanel: every document previously issued to a patient, with
  * a one-click reprint.
  *
  * Reprints render from the *current* record rather than a stored file, so a
@@ -27,7 +27,7 @@ const KIND_META = {
 };
 
 const formatDate = (value) => {
-    if (!value) return '—';
+    if (!value) return '-';
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
@@ -110,7 +110,7 @@ export default function PatientDocumentsPanel({ patientId }) {
             <div className="p-5 space-y-4">
                 <p className="text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
                     Anything already issued to this patient can be printed again. Reprints are
-                    generated from the current record, so corrections are included — and each one
+                    generated from the current record, so corrections are included, and each one
                     is written to the access log.
                 </p>
 

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 
 /*
-   SystemIllustrations — faithful, scaled-down recreations of real MediFleet
+   SystemIllustrations: faithful, scaled-down recreations of real MediFleet
    surfaces, built from the same palette and utility classes the live app
    uses (card / badge / brand-gradient). They are static, non-interactive
    previews so a visitor sees what the workspace actually looks like before
@@ -16,7 +16,7 @@ import {
    it needs, or render the full set via <SystemMockGrid />.
 */
 
-/* Static mock data — hoisted to module scope so it is built once, not
+/* Static mock data: hoisted to module scope so it is built once, not
    rebuilt on every render (which would break memoized children). */
 const QUEUE_ROWS = [
     { name: 'A. Mwangi', op: 'OP-2026-0142', wait: '4 min', tone: 'rose', tag: 'Urgent' },

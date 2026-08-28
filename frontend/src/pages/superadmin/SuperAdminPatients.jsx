@@ -8,7 +8,7 @@ import {
 import PageHeader from '../../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Superadmin patient browser — READ-ONLY, end-to-end.                       */
+/*  Superadmin patient browser: READ-ONLY, end-to-end.                       */
 /*                                                                            */
 /*  No write paths exist. Every column is shown as text only. Cross-tenant    */
 /*  reads go through /api/public/superadmin/patients which iterates each      */
@@ -38,7 +38,7 @@ export default function SuperAdminPatients() {
                 const res = await apiClient.get('/public/hospitals?include_inactive=false');
                 setTenants(res.data || []);
             } catch {
-                // non-fatal — the picker just stays empty
+                // non-fatal: the picker just stays empty
             }
         })();
     }, []);
@@ -94,7 +94,7 @@ export default function SuperAdminPatients() {
             <PageHeader
                 eyebrow="Console"
                 icon={Users}
-                title="Patients — cross-tenant"
+                title="Patients, cross-tenant"
                 subtitle="Read-only browser across every active tenant database."
                 tone="brand"
                 meta={READONLY_BADGE}
@@ -195,10 +195,10 @@ export default function SuperAdminPatients() {
                                                 <tr key={`${p.tenant_id}:${p.patient_id}`} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors">
                                                     <td className="font-mono text-xs text-brand-700">{p.outpatient_no}</td>
                                                     <td className="font-semibold text-ink-900 dark:text-white">{p.surname}, {p.other_names}</td>
-                                                    <td className="text-xs">{p.sex} · {p.date_of_birth || '—'}</td>
-                                                    <td className="text-xs"><Phone size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.telephone_1 || '—'}</td>
-                                                    <td className="text-xs"><MapPin size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.town || '—'}</td>
-                                                    <td className="text-xs text-ink-500 dark:text-ink-400"><Calendar size={11} className="inline mr-1" aria-hidden="true" /> {p.registered_on ? new Date(p.registered_on).toLocaleDateString() : '—'}</td>
+                                                    <td className="text-xs">{p.sex} · {p.date_of_birth || '-'}</td>
+                                                    <td className="text-xs"><Phone size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.telephone_1 || '-'}</td>
+                                                    <td className="text-xs"><MapPin size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.town || '-'}</td>
+                                                    <td className="text-xs text-ink-500 dark:text-ink-400"><Calendar size={11} className="inline mr-1" aria-hidden="true" /> {p.registered_on ? new Date(p.registered_on).toLocaleDateString() : '-'}</td>
                                                     <td className="num">
                                                         <button
                                                             type="button"
@@ -215,7 +215,7 @@ export default function SuperAdminPatients() {
                                     </table>
                                 </div>
 
-                                {/* Mobile card list — preserves info without horizontal scroll */}
+                                {/* Mobile card list: preserves info without horizontal scroll */}
                                 <ul className="md:hidden divide-y divide-ink-100 dark:divide-ink-800">
                                     {rows.map(p => (
                                         <li key={`${p.tenant_id}:${p.patient_id}-mb`} className="p-4">
@@ -223,9 +223,9 @@ export default function SuperAdminPatients() {
                                                 <div className="min-w-0">
                                                     <p className="font-semibold text-ink-900 dark:text-white truncate">{p.surname}, {p.other_names}</p>
                                                     <p className="text-xs text-brand-700 font-mono mt-0.5">{p.outpatient_no}</p>
-                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-1">{p.sex} · {p.date_of_birth || '—'}</p>
-                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-0.5 flex items-center gap-1"><Phone size={11} aria-hidden="true" /> {p.telephone_1 || '—'}</p>
-                                                    <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 flex items-center gap-1"><MapPin size={11} aria-hidden="true" /> {p.town || '—'}</p>
+                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-1">{p.sex} · {p.date_of_birth || '-'}</p>
+                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-0.5 flex items-center gap-1"><Phone size={11} aria-hidden="true" /> {p.telephone_1 || '-'}</p>
+                                                    <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 flex items-center gap-1"><MapPin size={11} aria-hidden="true" /> {p.town || '-'}</p>
                                                 </div>
                                                 <button
                                                     type="button"
@@ -282,7 +282,7 @@ export default function SuperAdminPatients() {
                             ) : detail ? (
                                 <div className="space-y-4">
                                     <div className="bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-200 rounded-xl p-3 text-2xs flex items-center gap-2">
-                                        <ShieldCheck size={13} aria-hidden="true" /> Read-only — no actions are exposed in this view.
+                                        <ShieldCheck size={13} aria-hidden="true" /> Read-only, no actions are exposed in this view.
                                     </div>
                                     <div className="card divide-y divide-ink-100 dark:divide-ink-800">
                                         {Object.entries(detail).flatMap(([k, v]) => k === 'tenant' ? [] : [

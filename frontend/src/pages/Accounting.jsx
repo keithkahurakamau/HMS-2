@@ -248,9 +248,9 @@ function NewAccountModal({ flatAccounts, onClose, onSaved }) {
                 <Field label="Parent (optional)">
                     <select className="input" value={form.parent_id}
                             onChange={(e) => setForm({ ...form, parent_id: e.target.value })}>
-                        <option value="">— none —</option>
+                        <option value="">, none, </option>
                         {parents.map((a) =>
-                            <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                            <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
                 <label className="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-200">
@@ -353,8 +353,8 @@ function JournalEntriesTab() {
                                     <td className="px-4 py-2 font-mono text-xs">{e.entry_number}</td>
                                     <td className="px-4 py-2">{e.entry_date}</td>
                                     <td className="px-4 py-2">{e.currency_code}</td>
-                                    <td className="px-4 py-2">{e.reference || '—'}</td>
-                                    <td className="px-4 py-2 text-ink-600 dark:text-ink-400">{e.memo || '—'}</td>
+                                    <td className="px-4 py-2">{e.reference || '-'}</td>
+                                    <td className="px-4 py-2 text-ink-600 dark:text-ink-400">{e.memo || '-'}</td>
                                     <td className="px-4 py-2 text-right font-mono">{formatAmount(totalDr)}</td>
                                     <td className="px-4 py-2">
                                         <span className={`text-xs px-2 py-0.5 rounded-md ${STATUS_BADGE[e.status]}`}>
@@ -463,7 +463,7 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                     <select className="input" value={form.currency_code}
                             onChange={(e) => setForm({ ...form, currency_code: e.target.value })}>
                         {currencies.map((c) =>
-                            <option key={c.currency_id} value={c.code}>{c.code} — {c.name}</option>)}
+                            <option key={c.currency_id} value={c.code}>{c.code}, {c.name}</option>)}
                     </select>
                 </Field>
                 <Field label="Reference">
@@ -495,10 +495,10 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                                 <td className="px-3 py-1.5">
                                     <select className="input" value={l.account_id}
                                             onChange={(e) => setLine(idx, { account_id: e.target.value })}>
-                                        <option value="">—</option>
+                                        <option value="">, </option>
                                         {accounts.map((a) =>
                                             <option key={a.account_id} value={a.account_id}>
-                                                {a.code} — {a.name}
+                                                {a.code}, {a.name}
                                             </option>)}
                                     </select>
                                 </td>
@@ -711,14 +711,14 @@ function NewFxRateModal({ currencies, onClose, onSaved }) {
                 <Field label="From">
                     <select className="input" value={form.from_currency}
                             onChange={(e) => setForm({ ...form, from_currency: e.target.value })}>
-                        <option value="">—</option>
+                        <option value="">, </option>
                         {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
                 </Field>
                 <Field label="To">
                     <select className="input" value={form.to_currency}
                             onChange={(e) => setForm({ ...form, to_currency: e.target.value })}>
-                        <option value="">—</option>
+                        <option value="">, </option>
                         {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
                 </Field>
@@ -899,8 +899,8 @@ function SuppliersSection() {
                         {items.map((s) => (
                             <tr key={s.supplier_id}>
                                 <td className="px-4 py-1.5 font-medium">{s.name}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{s.contact_person || '—'}{s.email ? ` · ${s.email}` : ''}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{s.tax_pin || '—'}</td>
+                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{s.contact_person || '-'}{s.email ? ` · ${s.email}` : ''}</td>
+                                <td className="px-4 py-1.5 font-mono text-xs">{s.tax_pin || '-'}</td>
                                 <td className="px-4 py-1.5 text-right">{s.payment_terms_days}</td>
                                 <td className="px-4 py-1.5">
                                     <span className={'text-xs ' + (s.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
@@ -973,8 +973,8 @@ function SupplierModal({ initial, onClose, onSaved }) {
                 <Field label="Default payable account">
                     <select className="input" value={form.default_payable_account_id || ''}
                             onChange={(e) => setForm({ ...form, default_payable_account_id: e.target.value })}>
-                        <option value="">— default (2110 Accounts Payable) —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, default (2110 Accounts Payable), </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
                 {isEdit && (
@@ -1036,8 +1036,8 @@ function InsuranceSection() {
                         {items.map((p) => (
                             <tr key={p.provider_id}>
                                 <td className="px-4 py-1.5 font-medium">{p.name}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{p.contact_person || '—'}{p.email ? ` · ${p.email}` : ''}</td>
-                                <td className="px-4 py-1.5">{p.phone || '—'}</td>
+                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{p.contact_person || '-'}{p.email ? ` · ${p.email}` : ''}</td>
+                                <td className="px-4 py-1.5">{p.phone || '-'}</td>
                                 <td className="px-4 py-1.5">
                                     <span className={'text-xs ' + (p.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {p.is_active ? 'active' : 'inactive'}
@@ -1102,8 +1102,8 @@ function ProviderModal({ initial, onClose, onSaved }) {
                     <Field label="Default receivable account">
                         <select className="input" value={form.default_receivable_account_id || ''}
                                 onChange={(e) => setForm({ ...form, default_receivable_account_id: e.target.value })}>
-                            <option value="">— default (1150 Insurance Receivable) —</option>
-                            {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                            <option value="">, default (1150 Insurance Receivable), </option>
+                            {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                         </select>
                     </Field>
                 </div>
@@ -1139,7 +1139,7 @@ function SchemesSection() {
     };
     useEffect(() => { load(); }, []);
 
-    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '—';
+    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '-';
 
     return (
         <div className="space-y-4">
@@ -1164,9 +1164,9 @@ function SchemesSection() {
                             <tr key={s.scheme_id}>
                                 <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{providerName(s.provider_id)}</td>
                                 <td className="px-4 py-1.5 font-medium">{s.name}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{s.scheme_code || '—'}</td>
+                                <td className="px-4 py-1.5 font-mono text-xs">{s.scheme_code || '-'}</td>
                                 <td className="px-4 py-1.5 text-right font-mono">
-                                    {s.coverage_limit ? formatAmount(s.coverage_limit) : '—'}
+                                    {s.coverage_limit ? formatAmount(s.coverage_limit) : '-'}
                                 </td>
                                 <td className="px-4 py-1.5">
                                     <span className={'text-xs ' + (s.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
@@ -1425,8 +1425,8 @@ function PriceModal({ initial, categories, onClose, onSaved }) {
                 <Field label="Revenue account">
                     <select className="input" value={form.revenue_account_id || ''}
                             onChange={(e) => setForm({ ...form, revenue_account_id: e.target.value })}>
-                        <option value="">— default (per ledger mapping) —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, default (per ledger mapping), </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
             </div>
@@ -1461,7 +1461,7 @@ function MappingsSection() {
     useEffect(() => { load(); }, []);
 
     const codeName = (id) => {
-        if (!id) return '— unset —';
+        if (!id) return ': unset: ';
         const a = accounts.find(x => x.account_id === id);
         return a ? `${a.code} ${a.name}` : `#${id}`;
     };
@@ -1472,7 +1472,7 @@ function MappingsSection() {
                 <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Ledger Mappings</h3>
                 <p className="text-sm text-ink-600 dark:text-ink-400 mt-1">
                     These tell auto-posting (Phase 4) which accounts to use for each event. Defaults are seeded
-                    to match the default CoA — re-point them if you renamed or restructured accounts.
+                    to match the default CoA, re-point them if you renamed or restructured accounts.
                 </p>
             </div>
             <DataCard loading={loading} empty={catalogue.length === 0} emptyMsg="No mappings.">
@@ -1542,15 +1542,15 @@ function MappingModal({ initial, accounts, onClose, onSaved }) {
                 <Field label="Debit account">
                     <select className="input" value={form.debit_account_id || ''}
                             onChange={(e) => setForm({ ...form, debit_account_id: e.target.value })}>
-                        <option value="">— unset —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, unset, </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
                 <Field label="Credit account">
                     <select className="input" value={form.credit_account_id || ''}
                             onChange={(e) => setForm({ ...form, credit_account_id: e.target.value })}>
-                        <option value="">— unset —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, unset, </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
             </div>
@@ -1679,14 +1679,14 @@ function TransactionLogTab() {
 
     // Replays every source record (billing payments incl. cash, pharmacy,
     // Pay Hero, cheques) into the journal so the log shows ALL transactions
-    // that ever happened. Server-side it's idempotent — safe to re-run.
+    // that ever happened. Server-side it's idempotent: safe to re-run.
     const rebuildLog = async () => {
         if (!window.confirm('Sync the transaction log from all source records? This backfills any payment that is missing from the log. It never duplicates existing entries.')) return;
         setRebuilding(true);
         try {
             const res = await apiClient.post('/accounting/transaction-log/rebuild');
             const totals = res.data?.totals || {};
-            toast.success(`Sync complete — ${totals.posted ?? 0} transaction(s) in the log, ${totals.skipped ?? 0} skipped.`);
+            toast.success(`Sync complete. ${totals.posted ?? 0} transaction(s) in the log, ${totals.skipped ?? 0} skipped.`);
             load(0);
             setOffset(0);
         } catch (err) {
@@ -1740,7 +1740,7 @@ function TransactionLogTab() {
                            className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2" />
                 </div>
                 <button type="button" onClick={rebuildLog} disabled={rebuilding}
-                        title="Backfill the log from billing, pharmacy, Pay Hero, and cheque records — shows every transaction, even ones made before auto-posting was configured."
+                        title="Backfill the log from billing, pharmacy, Pay Hero, and cheque records. Shows every transaction, even ones made before auto-posting was configured."
                         className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-60">
                     <RefreshCw size={15} className={rebuilding ? 'animate-spin' : ''} /> {rebuilding ? 'Syncing…' : 'Sync all transactions'}
                 </button>
@@ -1778,8 +1778,8 @@ function TransactionLogTab() {
                                         {r.source_label}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2">{r.reference || '—'}</td>
-                                <td className="px-4 py-2 text-ink-600 dark:text-ink-400 max-w-[22rem] truncate" title={r.memo || ''}>{r.memo || '—'}</td>
+                                <td className="px-4 py-2">{r.reference || '-'}</td>
+                                <td className="px-4 py-2 text-ink-600 dark:text-ink-400 max-w-[22rem] truncate" title={r.memo || ''}>{r.memo || '-'}</td>
                                 <td className="px-4 py-2 text-right font-mono whitespace-nowrap">{formatAmount(r.amount)}</td>
                                 <td className="px-4 py-2">
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${STATUS_BADGE[r.status] || ''}`}>{r.status}</span>
@@ -1934,7 +1934,7 @@ function exportReport(report, data) {
             ...data.assets.map(r => ({ section: 'Asset', ...r })),
             ...data.liabilities.map(r => ({ section: 'Liability', ...r })),
             ...data.equity.map(r => ({ section: 'Equity', ...r })),
-            { section: 'Equity', code: '—', name: 'Current Year Earnings', amount: data.current_year_earnings },
+            { section: 'Equity', code: '-', name: 'Current Year Earnings', amount: data.current_year_earnings },
         ];
         csvDownload(`balance-sheet-${data.as_of}.csv`, rows, [
             { key: 'section', label: 'Section' }, { key: 'code', label: 'Code' },
@@ -1959,7 +1959,7 @@ function TrialBalanceView({ data }) {
     return (
         <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
             <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Trial Balance — as of {data.as_of}</h3>
+                <h3 className="text-sm font-semibold">Trial Balance, as of {data.as_of}</h3>
                 <span className={'text-xs ' + (Number(data.totals.difference) === 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                     Difference: {formatAmount(data.totals.difference)}
                 </span>
@@ -2008,7 +2008,7 @@ function IncomeStatementView({ data }) {
     return (
         <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
             <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
-                Income Statement — {data.from_date} to {data.to_date}
+                Income Statement: {data.from_date} to {data.to_date}
             </h3>
 
             <Section label="Revenue" rows={data.revenue} total={data.total_revenue} totalTone="text-emerald-700 dark:text-emerald-300" />
@@ -2031,7 +2031,7 @@ function BalanceSheetView({ data }) {
     return (
         <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Balance Sheet — as of {data.as_of}</h3>
+                <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Balance Sheet, as of {data.as_of}</h3>
                 <span className={'text-xs ' + (data.balanced ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                     {data.balanced ? 'Balanced' : 'Out of balance'}
                 </span>
@@ -2046,7 +2046,7 @@ function BalanceSheetView({ data }) {
             <div className="pt-3 border-t border-ink-200 dark:border-ink-800">
                 <h4 className="text-xs font-semibold text-ink-600 dark:text-ink-400 uppercase mb-2">Equity</h4>
                 {data.equity.map(e => (
-                    <Row key={e.account_id} label={`${e.code} — ${e.name}`} value={e.amount} />
+                    <Row key={e.account_id} label={`${e.code}, ${e.name}`} value={e.amount} />
                 ))}
                 <Row label="Current Year Earnings" value={data.current_year_earnings} />
                 <Row label="Total Equity" value={data.total_equity} bold tone="text-violet-700 dark:text-violet-300" />
@@ -2063,7 +2063,7 @@ function CashFlowView({ data }) {
     return (
         <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-4">
             <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
-                Cash Flow — {data.from_date} to {data.to_date}
+                Cash Flow: {data.from_date} to {data.to_date}
             </h3>
             <Row label="Operating activities" value={data.operating} />
             <Row label="Investing activities" value={data.investing} />
@@ -2089,7 +2089,7 @@ function DailyCollectionsView({ data }) {
         <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
             <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">
-                    Daily Collections — {data.from_date} to {data.to_date}
+                    Daily Collections: {data.from_date} to {data.to_date}
                 </h3>
                 <span className="text-xs text-ink-700 dark:text-ink-200">Total: <span className="font-mono font-semibold">{formatAmount(data.total)}</span></span>
             </div>
@@ -2131,7 +2131,7 @@ function Section({ label, rows, total, totalTone }) {
     return (
         <div>
             <h4 className="text-xs font-semibold text-ink-600 dark:text-ink-400 uppercase mb-2">{label}</h4>
-            {rows.map(r => <Row key={r.account_id} label={`${r.code} — ${r.name}`} value={r.amount} />)}
+            {rows.map(r => <Row key={r.account_id} label={`${r.code}, ${r.name}`} value={r.amount} />)}
             <Row label={`Total ${label}`} value={total} bold tone={totalTone} />
         </div>
     );
@@ -2221,7 +2221,7 @@ function ClaimsSection() {
     };
     useEffect(() => { load(); }, []);
 
-    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '—';
+    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '-';
 
     const submit = async (id) => {
         try {
@@ -2288,7 +2288,7 @@ function ClaimsSection() {
                                 <td className="px-4 py-2 text-ink-600 dark:text-ink-400">{c.period_from} → {c.period_to}</td>
                                 <td className="px-4 py-2 text-right">{c.items?.length || 0}</td>
                                 <td className="px-4 py-2 text-right font-mono">{formatAmount(c.total_amount)}</td>
-                                <td className="px-4 py-2 text-right font-mono">{c.settled_amount ? formatAmount(c.settled_amount) : '—'}</td>
+                                <td className="px-4 py-2 text-right font-mono">{c.settled_amount ? formatAmount(c.settled_amount) : '-'}</td>
                                 <td className="px-4 py-2">
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${CLAIM_STATUS_BADGE[c.status]}`}>
                                         {c.status}
@@ -2392,7 +2392,7 @@ function ClaimModal({ providers, onClose, onSaved }) {
                 <Field label="Scheme">
                     <select className="input" value={form.scheme_id}
                             onChange={(e) => setForm({ ...form, scheme_id: e.target.value })}>
-                        <option value="">— any/none —</option>
+                        <option value="">, any/none, </option>
                         {(form.provider_id ? schemes : []).map(s => <option key={s.scheme_id} value={s.scheme_id}>{s.name}</option>)}
                     </select>
                 </Field>
@@ -2497,9 +2497,9 @@ function ClaimDetailsModal({ claim, providerName, onClose }) {
                     <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                         {claim.items.map(it => (
                             <tr key={it.item_id}>
-                                <td className="px-3 py-1.5">{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '—')}</td>
-                                <td className="px-3 py-1.5">{it.patient_name || '—'}</td>
-                                <td className="px-3 py-1.5 font-mono text-xs">{it.member_number || '—'}</td>
+                                <td className="px-3 py-1.5">{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '-')}</td>
+                                <td className="px-3 py-1.5">{it.patient_name || '-'}</td>
+                                <td className="px-3 py-1.5 font-mono text-xs">{it.member_number || '-'}</td>
                                 <td className="px-3 py-1.5 text-right font-mono">{formatAmount(it.amount_claimed)}</td>
                             </tr>
                         ))}
@@ -2764,7 +2764,7 @@ function BankAccountsSection() {
 
     const accountName = (id) => {
         const a = accounts.find(x => x.account_id === id);
-        return a ? `${a.code} ${a.name}` : '—';
+        return a ? `${a.code} ${a.name}` : '-';
     };
 
     return (
@@ -2857,8 +2857,8 @@ function BankAccountModal({ initial, accounts, onClose, onSaved }) {
                 <Field label="GL account">
                     <select className="input" value={form.gl_account_id || ''}
                             onChange={(e) => setForm({ ...form, gl_account_id: e.target.value })}>
-                        <option value="">— pick an Asset account —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, pick an Asset account, </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
                 <Field label="Opening balance"><input aria-label="Opening balance" type="number" step="0.01" className="input"
@@ -2898,7 +2898,7 @@ function BankTransactionsSection() {
     };
     useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter]);
 
-    const accountName = (id) => accounts.find(a => a.bank_account_id === id)?.name || '—';
+    const accountName = (id) => accounts.find(a => a.bank_account_id === id)?.name || '-';
 
     return (
         <div className="space-y-4">
@@ -2940,7 +2940,7 @@ function BankTransactionsSection() {
                                 <td className="px-4 py-1.5">{t.transaction_date}</td>
                                 <td className="px-4 py-1.5">{accountName(t.bank_account_id)}</td>
                                 <td className="px-4 py-1.5 text-ink-700 dark:text-ink-200">{t.description}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '—'}</td>
+                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '-'}</td>
                                 <td className={'px-4 py-1.5 text-right font-mono ' +
                                     (Number(t.amount) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                                     {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
@@ -3073,7 +3073,7 @@ function ReconciliationSection() {
                 <Field label="Account">
                     <select className="input min-w-[200px]" value={selected}
                             onChange={(e) => setSelected(e.target.value)}>
-                        <option value="">—</option>
+                        <option value="">, </option>
                         {accounts.map(a => <option key={a.bank_account_id} value={a.bank_account_id}>{a.name}</option>)}
                     </select>
                 </Field>
@@ -3096,7 +3096,7 @@ function ReconciliationSection() {
                             <tr key={t.bank_transaction_id}>
                                 <td className="px-4 py-1.5">{t.transaction_date}</td>
                                 <td className="px-4 py-1.5">{t.description}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '—'}</td>
+                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '-'}</td>
                                 <td className={'px-4 py-1.5 text-right font-mono ' +
                                     (Number(t.amount) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                                     {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
@@ -3182,7 +3182,7 @@ function MatchModal({ tx, onClose, onSaved }) {
                                     <td className="px-3 py-1.5">{c.entry_date}</td>
                                     <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.debit)}</td>
                                     <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.credit)}</td>
-                                    <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{c.memo || c.description || '—'}</td>
+                                    <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{c.memo || c.description || '-'}</td>
                                     <td className="px-3 py-1.5 text-right">
                                         <button type="button" onClick={() => match(c.line_id)} disabled={saving}
                                                 className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline">

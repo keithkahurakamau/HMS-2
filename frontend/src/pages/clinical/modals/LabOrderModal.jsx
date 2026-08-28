@@ -3,7 +3,7 @@ import { X, Search, Activity, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../../api/client';
 
-// Lab order modal — fetches /laboratory/catalog (active tests), lets the
+// Lab order modal: fetches /laboratory/catalog (active tests), lets the
 // clinician pick one or more with per-test notes + priority, and submits via
 // /laboratory/orders. Shared by the Clinical Desk and Triage.
 const PRIORITIES = ['Routine', 'Urgent', 'STAT'];

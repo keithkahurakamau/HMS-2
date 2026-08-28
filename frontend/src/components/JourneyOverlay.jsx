@@ -7,16 +7,16 @@ import {
 import { useJourney } from '../context/JourneyContext';
 
 /**
- * JourneyOverlay — full-viewport guided-tour overlay.
+ * JourneyOverlay: full-viewport guided-tour overlay.
  *
  * Composition (top-to-bottom in z-order)
  *   1. Backdrop scrim with SVG-masked rectangular cutout around the
  *      current step's target element. Click outside the spotlight
  *      skips the tour. Spotlight has a pulsing gradient ring so it
  *      reads as "look here, not just a box of light."
- *   2. Arrow connector — a small circle with a directional glyph
+ *   2. Arrow connector: a small circle with a directional glyph
  *      pointing from the tooltip toward the target.
- *   3. Glass tooltip card — gradient outer frame (1.5px brand→teal→
+ *   3. Glass tooltip card: gradient outer frame (1.5px brand→teal→
  *      accent), then glass-card body, step counter pill, title with
  *      sparkle icon, optional "tip" annotation in a tinted box,
  *      progress dots (active step has a wide gradient pill, completed
@@ -24,7 +24,7 @@ import { useJourney } from '../context/JourneyContext';
  *      Skip-all-tours link.
  *
  * Steps with `placement: 'center'` or an unresolved selector render
- * a centred card with no spotlight or arrow — used for "Welcome to …"
+ * a centred card with no spotlight or arrow, used for "Welcome to …"
  * opening cards and any step whose target may not exist for a given
  * role.
  */
@@ -227,7 +227,7 @@ export default function JourneyOverlay() {
 
                         {step.tip && (
                             <div className="mt-3 rounded-xl bg-brand-50/70 ring-1 ring-brand-100 px-3 py-2 text-xs text-brand-800">
-                                <span className="font-semibold">Tip — </span>{step.tip}
+                                <span className="font-semibold">Tip, </span>{step.tip}
                             </div>
                         )}
 

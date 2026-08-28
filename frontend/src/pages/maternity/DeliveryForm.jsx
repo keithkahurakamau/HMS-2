@@ -8,7 +8,7 @@ const SEXES = ['Male', 'Female'];
 const OUTCOMES = ['Live', 'FSB', 'MSB'];
 
 // Each newborn row carries a stable `id` (independent of its position in the
-// array) so React can key rows correctly across add/remove — using the array
+// array) so React can key rows correctly across add/remove, using the array
 // index as the key would let a row's DOM/focus state get reattached to the
 // wrong newborn's data when a row in the middle is removed.
 const emptyNewborn = (id) => ({ id, sex: 'Male', weight_g: '', apgar_1: '', apgar_5: '', outcome: 'Live' });

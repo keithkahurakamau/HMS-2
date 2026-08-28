@@ -72,7 +72,7 @@
     color: #94a3b8;
   }
 
-  /* Unify focus across the app — any input/select/textarea/button gets the
+  /* Unify focus across the app, any input/select/textarea/button gets the
      same teal ring instead of the browser's default. */
   input:focus, select:focus, textarea:focus, button:focus {
     outline: none;
@@ -82,7 +82,7 @@
     box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.18);
   }
 
-  /* Tables — gentle defaults so module pages without `.table-clean` still match */
+  /* Tables: gentle defaults so module pages without `.table-clean` still match */
   table { border-collapse: separate; border-spacing: 0; }
   thead th {
     background-color: rgba(241, 245, 249, 0.6);
@@ -96,7 +96,7 @@
 }
 
 /* ---------------------------------------------------------------------
-   Component classes — reusable design primitives
+   Component classes: reusable design primitives
    --------------------------------------------------------------------- */
 @layer components {
   /* Surfaces.
@@ -137,26 +137,6 @@
   }
 
   /* Buttons */
-  /*
-   * ─── Liquid-glass buttons (Apple iOS 18 material) ───────────────────
-   *
-   * Every variant inherits the same glass substrate from .btn:
-   *   - backdrop-filter blur + saturate (the frosted "behind" look)
-   *   - layered inset shadows for the specular ring — a bright hairline
-   *     at the top + subtle hairline at the bottom + 1px outer ring
-   *     that catches ambient light
-   *   - soft outer drop shadow for elevation
-   *   - hover lifts +1px and brightens the rings
-   *   - active scales to 0.97 with a 90ms snap-back, so a tap feels
-   *     like pressing actual glass
-   *
-   * Colour variants (primary, danger, success) stack a soft white
-   * "top gloss" gradient over a saturated colour fill, so the glass
-   * still reads as glass even with a brand colour underneath.
-   * Secondary is the canonical clear-glass card.
-   * Ghost is transparent until hover, when it materialises into the
-   * glass family for visual continuity.
-   */
   /* Buttons are flat and bordered. The previous treatment layered a
      backdrop-filter, a five-stop inset shadow stack and a hover lift, which is
      the single loudest "dated" signal in the app and the most expensive thing
@@ -453,7 +433,7 @@
 }
 
 /* ---------------------------------------------------------------------
-   Utilities — scrollbars, focus, accessibility
+   Utilities: scrollbars, focus, accessibility
    --------------------------------------------------------------------- */
 @layer utilities {
   /* ── Liquid-glass surface treatment ──────────────────────────────────
@@ -533,7 +513,7 @@
       radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.08) 0px, transparent 60%);
   }
 
-  /* Animated gradient text — Cyan → Teal → Emerald sweep */
+  /* Animated gradient text: Cyan → Teal → Emerald sweep */
   .text-gradient-brand {
     background-image: linear-gradient(135deg, #0891b2 0%, #14b8a6 50%, #10b981 100%);
     -webkit-background-clip: text;
@@ -593,7 +573,7 @@ html.dark body {
    Most modules are built from these classes, so theming them here gives
    every module dark mode at once (matching the hand-tuned Messages module)
    without editing each page. Module-specific raw colours (bg-white,
-   text-ink-900 …) still need per-element `dark:` variants — this covers the
+   text-ink-900 …) still need per-element `dark:` variants, this covers the
    common chrome: cards, inputs, tables, badges, glass.
    ink: 900=#0f172a 850=#111827 800=#1e293b 700=#334155 300=#cbd5e1 …
    --------------------------------------------------------------------- */
@@ -605,7 +585,7 @@ html.dark .card-elevated {
 }
 html.dark .card-elevated { box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5); }
 
-/* Inputs — both the .input class and bare form controls in modules. */
+/* Inputs: both the .input class and bare form controls in modules. */
 html.dark .input,
 html.dark input[type="text"], html.dark input[type="email"],
 html.dark input[type="password"], html.dark input[type="number"],
@@ -623,7 +603,7 @@ html.dark textarea::placeholder { color: #64748b; }   /* ink-500 */
 
 html.dark .label { color: #cbd5e1; }                  /* ink-300 */
 
-/* Tables — header + row hover. */
+/* Tables: header + row hover. */
 html.dark thead th {
   background-color: rgba(30, 41, 59, 0.5);            /* ink-800/50 */
   color: #94a3b8;                                     /* ink-400 */
@@ -637,7 +617,7 @@ html.dark .badge-neutral {
   --tw-ring-color: #334155;
 }
 
-/* Frosted glass cards — flip the white substrate to a dark one. */
+/* Frosted glass cards: flip the white substrate to a dark one. */
 html.dark .glass-card {
   background-color: rgba(15, 23, 42, 0.72);           /* ink-900/72 */
   border-color: rgba(255, 255, 255, 0.08);
@@ -647,7 +627,7 @@ html.dark .card-glass {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Secondary / ghost buttons — their light skin is a white glass substrate that
+/* Secondary / ghost buttons: their light skin is a white glass substrate that
    reads as a near-white slab on dark. Flip to a translucent light-on-dark glass
    so they still read as glass but belong to the dark surface. (primary / danger
    / success are saturated colour fills and already sit fine on dark.) */
@@ -683,7 +663,7 @@ html.dark .btn-ghost:hover:not(:disabled) {
     0 6px 14px -2px rgba(0, 0, 0, 0.45);
 }
 
-/* Section / stat / helper typography — the shared text primitives. */
+/* Section / stat / helper typography, the shared text primitives. */
 html.dark .section-title { color: #f8fafc; }          /* near-white */
 html.dark .section-sub,
 html.dark .section-eyebrow { color: #94a3b8; }        /* ink-400 */
@@ -701,7 +681,7 @@ html.dark .table-clean thead {
 html.dark .table-clean tbody tr { border-top-color: #1e293b; }   /* ink-800 */
 html.dark .table-clean tbody tr:hover { background-color: rgba(30, 41, 59, 0.4); }
 
-/* Faint grid background — lighten the hairlines so they read on dark. */
+/* Faint grid background: lighten the hairlines so they read on dark. */
 html.dark .bg-grid {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
@@ -750,7 +730,7 @@ html.dark .bg-grid {
 }
 
 @layer components {
-  /* Plain white panel — hairline border, quiet shadow. (Calm redesign: the
+  /* Plain white panel: hairline border, quiet shadow. (Calm redesign: the
      old frosted glass + heavy blur is gone; class name kept so every page
      that uses it picks up the simple look.) */
   .lp-glass {
@@ -758,13 +738,13 @@ html.dark .bg-grid {
     border: 1px solid #e2e8f0;
     box-shadow: 0 1px 2px rgba(2, 53, 53, 0.04), 0 8px 24px -16px rgba(2, 53, 53, 0.12);
   }
-  /* On-dark panel — flat, hairline border, no blur. */
+  /* On-dark panel: flat, hairline border, no blur. */
   .lp-glass-dark {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(178, 240, 240, 0.16);
   }
 
-  /* Primary CTA — solid teal, quiet hover. No glow, no lift. */
+  /* Primary CTA: solid teal, quiet hover. No glow, no lift. */
   .lp-btn-glow {
     display: inline-flex;
     align-items: center;
@@ -779,7 +759,7 @@ html.dark .bg-grid {
   .lp-btn-glow:hover { background: #036666; }
   .lp-btn-glow:active { background: var(--lp-teal-deep); }
 
-  /* Ghost CTA — hairline outline, soft ice fill on hover. */
+  /* Ghost CTA: hairline outline, soft ice fill on hover. */
   .lp-btn-ghost {
     display: inline-flex;
     align-items: center;
@@ -815,7 +795,7 @@ html.dark .bg-grid {
     border-color: rgba(178, 240, 240, 0.55);
   }
 
-  /* Card — white, hairline border, whisper of shadow. Hover tints the
+  /* Card: white, hairline border, whisper of shadow. Hover tints the
      border teal; no lift, no glow. */
   .lp-card {
     background: #ffffff;
@@ -859,7 +839,7 @@ html.dark .bg-grid {
     border: 1px solid rgba(178, 240, 240, 0.28);
   }
 
-  /* Accent text — static soft-cyan tint on dark, no animation. */
+  /* Accent text: static soft-cyan tint on dark, no animation. */
   .lp-text-gradient {
     color: #7dd8d8;
   }
@@ -877,6 +857,6 @@ html.dark .bg-grid {
   }
   .lp-glow-ring { box-shadow: 0 0 0 2px rgba(0, 128, 128, 0.35); }
   .lp-divider { height: 1px; background: #e2e8f0; }
-  /* Grain retired in the calm redesign — kept as a no-op for stragglers. */
+  /* Grain retired in the calm redesign, kept as a no-op for stragglers. */
   .lp-grain::after { content: none; }
 }

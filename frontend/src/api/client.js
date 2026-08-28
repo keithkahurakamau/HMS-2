@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Endpoints served by the platform router. Used by the 401 response handler
-// to know "don't try the tenant /auth/refresh dance — this is a superadmin
+// to know "don't try the tenant /auth/refresh dance, this is a superadmin
 // path and refresh works differently" (the superadmin cookie has no refresh
 // counterpart; the 20-minute TTL is hard).
 const SUPERADMIN_PATH_PREFIXES = ['/public/superadmin', '/public/hospitals'];
@@ -27,7 +27,7 @@ export const apiClient = axios.create({
 });
 
 // Inject Tenant ID into every request. The superadmin JWT used to be smuggled
-// in as a Bearer header from localStorage — that's gone, the cookie does the
+// in as a Bearer header from localStorage, that's gone, the cookie does the
 // authentication now and Axios's `withCredentials: true` carries it
 // automatically. Anything an XSS could once steal from localStorage now lives
 // in HttpOnly cookie space.
@@ -67,12 +67,12 @@ const SKIP_REFRESH_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout', '/au
 // root-mounted providers (AuthContext, BrandingContext, ModuleContext) all
 // fire their bootstrap fetches on every SPA mount, and a fresh visitor on
 // medifleet.app legitimately has no cookie + no tenant. The 400 response
-// from /users/me must NOT bounce them to the hospital picker — that's the
+// from /users/me must NOT bounce them to the hospital picker, that's the
 // "the first page should be the landing page" regression we saw post-PR-#35.
 const TENANT_OPTIONAL_PATHS = ['/portal', '/login', '/superadmin', '/patient', '/forgot-password', '/reset-password'];
 
 const isTenantOptionalPath = (pathname) => {
-    if (pathname === '/') return true; // Landing — see comment above.
+    if (pathname === '/') return true; // Landing: see comment above.
     return TENANT_OPTIONAL_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`));
 };
 
@@ -138,13 +138,13 @@ apiClient.interceptors.response.use(
             && !isSuperAdminPath(original?.url)
         ) {
             tenantRedirectFired = true;
-            // Soft redirect — preserve where we wanted to go so portal can
+            // Soft redirect: preserve where we wanted to go so portal can
             // bounce back. URL-encode so query strings survive the round trip.
             const back = encodeURIComponent(window.location.pathname + window.location.search);
             window.location.assign(`/portal?next=${back}`);
-            // Don't reject — we're navigating away. Resolve with an empty
+            // Don't reject: we're navigating away. Resolve with an empty
             // shape so any pending UI code can finish without throwing.
-            return Promise.reject(new axios.Cancel('Redirecting to portal — no tenant selected'));
+            return Promise.reject(new axios.Cancel('Redirecting to portal: no tenant selected'));
         }
 
         if (!original || status !== 401) {
@@ -158,7 +158,7 @@ apiClient.interceptors.response.use(
         }
 
         // Superadmin sessions don't participate in the cookie-based refresh
-        // dance — a 401 there means the 20-minute platform JWT expired (or
+        // dance: a 401 there means the 20-minute platform JWT expired (or
         // the cookie was cleared). Wipe the local UI markers so the next
         // SuperAdminProtectedRoute render bounces back to /superadmin/login.
         if (isSuperAdminPath(original.url)) {

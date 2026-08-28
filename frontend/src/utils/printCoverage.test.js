@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
  *
  * Tenant letterhead, house styles and the CSP-safe blob popup all live in
  * printDocument.js. A feature that calls window.print() or writes its own
- * document silently opts out of all three — which is exactly how the pharmacy
+ * document silently opts out of all three, which is exactly how the pharmacy
  * receipt, the sick note and the partograph ended up printing without the
  * hospital's letterhead after it was uploaded.
  *

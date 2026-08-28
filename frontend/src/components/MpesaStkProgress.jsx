@@ -4,7 +4,7 @@ import { Smartphone, CheckCircle2, XCircle, RefreshCcw } from 'lucide-react';
 /* ──────────────────────────────────────────────────────────────────────────
  * Shared M-Pesa STK-push progress panel.
  *
- * Presentational only — the parent owns the countdown + the DB-status poll
+ * Presentational only: the parent owns the countdown + the DB-status poll
  * and just feeds this component the current state. Used by both the cashier
  * (Billing) and pharmacy checkout so the customer-facing wait/success/failure
  * experience is identical across the app.
@@ -16,8 +16,8 @@ import { Smartphone, CheckCircle2, XCircle, RefreshCcw } from 'lucide-react';
  *   total       countdown length in seconds (for the ring sweep; default 60)
  *   receipt     M-Pesa receipt number (success)
  *   errorDesc   failure reason from Pay Hero / timeout (failed)
- *   onRetry     () => void  — re-show the payment form (failed)
- *   onCancel    () => void  — dismiss while waiting (optional)
+ *   onRetry     () => void, re-show the payment form (failed)
+ *   onCancel    () => void, dismiss while waiting (optional)
  * ────────────────────────────────────────────────────────────────────────── */
 export default function MpesaStkProgress({
     status = 'waiting',
@@ -67,7 +67,7 @@ export default function MpesaStkProgress({
         );
     }
 
-    // status === 'waiting' — pulsing phone + circular countdown.
+    // status === 'waiting', pulsing phone + circular countdown.
     const R = 30;
     const C = 2 * Math.PI * R;
     const clamped = Math.max(0, Math.min(secondsLeft, total));

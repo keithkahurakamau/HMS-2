@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [mustChangePassword, setMustChangePassword] = useState(false);
     // AUTH-001: the forced-change flow used to stash a numeric user_id from
-    // the 403 response and POST {user_id, new_password} back — which let
+    // the 403 response and POST {user_id, new_password} back, which let
     // anyone rewrite anyone's password. We now carry the email + the
     // password the user just typed, and the backend re-verifies that
     // current_password against the hash before accepting a new one.
@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const response = await apiClient.get('/users/me');
             const permRes = await apiClient.get('/users/me/permissions').catch(() => ({ data: [] }));
-            // Explicit pick-list instead of `...response.data` spread — the
+            // Explicit pick-list instead of `...response.data` spread, the
             // backend is trusted today, but an attacker who can shape the
             // response (compromised tenant API, MITM on a downgraded link)
             // could otherwise inject `isAuthenticated:false` or arbitrary

@@ -1,4 +1,4 @@
-/* Debit / credit notes — post-invoice receivable adjustments that post
+/* Debit / credit notes: post-invoice receivable adjustments that post
  * through the normal journal pipeline. Backed by /api/accounting/notes. */
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../../api/client';
@@ -152,7 +152,7 @@ export default function NotesTab() {
 function AccountSelect({ value, onChange, accounts }) {
     return (
         <select className="input" value={value} onChange={onChange}>
-            <option value="">— select account —</option>
+            <option value="">, select account, </option>
             {accounts.map((a) => (
                 <option key={a.account_id} value={a.account_id}>{a.code} {a.name}</option>
             ))}

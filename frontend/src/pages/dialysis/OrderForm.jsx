@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createOrder } from './api';
 import { errorText } from './errors';
 
-// key, label, [step] — number inputs; Number()'d and omitted when blank.
+// key, label, [step], number inputs; Number()'d and omitted when blank.
 const RX = [
   ['dialyzer', 'Dialyzer'], ['membrane_type', 'Membrane'], ['priming', 'Priming'],
   ['k_bath', 'K+ bath'], ['dialysate_calcium', 'Dialysate Ca'],
@@ -100,7 +100,7 @@ export default function OrderForm({ patientId = '', onClose, onSaved }) {
           <Card title="Anticoagulation">
             <Field label="Type" value={form.anticoag_type} onChange={set('anticoag_type')}>
               <select value={form.anticoag_type} onChange={set('anticoag_type')} className="input mt-1 w-full">
-                {ANTICOAG.map((o) => <option key={o} value={o}>{o || '—'}</option>)}
+                {ANTICOAG.map((o) => <option key={o} value={o}>{o || '-'}</option>)}
               </select>
             </Field>
             <Field label="Loading dose" value={form.heparin_loading_dose} onChange={set('heparin_loading_dose')} />

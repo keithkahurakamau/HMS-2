@@ -12,14 +12,14 @@ import ModuleGuard from './components/ModuleGuard';
 import { Activity } from 'lucide-react';
 import Seo from './components/Seo';
 
-// Eager imports — public entry points (first paint) + the superadmin guard
+// Eager imports: public entry points (first paint) + the superadmin guard
 // helper, which is read synchronously by SuperAdminProtectedRoute.
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import SuperAdminLogin from './pages/superadmin/SuperAdminLogin';
 import { isSuperAdminAuthenticated } from './pages/superadmin/superAdminAuth';
 
-// Lazy page imports — each becomes its own chunk, fetched on first visit.
+// Lazy page imports: each becomes its own chunk, fetched on first visit.
 // Keeps the initial bundle small; authenticated modules load on demand.
 const Patients = lazy(() => import('./pages/Patients'));
 const QueueBoard = lazy(() => import('./pages/QueueBoard'));
@@ -52,7 +52,7 @@ const Maternity = lazy(() => import('./pages/Maternity'));
 const Dialysis = lazy(() => import('./pages/Dialysis'));
 const Theatre = lazy(() => import('./pages/Theatre'));
 
-// Layout + superadmin pages — also lazy (the back-office is rarely the first load).
+// Layout + superadmin pages, also lazy (the back-office is rarely the first load).
 const MainLayout = lazy(() => import('./components/layouts/MainLayout'));
 const SuperAdminLayout = lazy(() => import('./components/layouts/SuperAdminLayout'));
 const SuperAdminDashboard = lazy(() => import('./pages/superadmin/SuperAdminDashboard'));
@@ -90,7 +90,7 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Superadmin route guard — checks for the platform-level token in localStorage.
+// Superadmin route guard: checks for the platform-level token in localStorage.
 // On miss, redirect to /superadmin/login while preserving the original path so
 // the user lands where they intended after authenticating.
 const SuperAdminProtectedRoute = ({ children }) => {
@@ -104,7 +104,7 @@ const SuperAdminProtectedRoute = ({ children }) => {
 // Routes that should be indexed by search engines. These pages render their
 // own rich <Seo> (title/description/canonical). Every other route is part of
 // the authenticated app, the patient portal, the platform back-office, or an
-// auth flow — none of which belong in a search index — so RouteMeta stamps
+// auth flow: none of which belong in a search index, so RouteMeta stamps
 // them noindex. New private routes are covered automatically.
 const PUBLIC_PATHS = new Set(['/', '/demo']);
 
@@ -116,7 +116,7 @@ const RouteMeta = () => {
 
 // The hospital picker now lives on the Landing page. The old /portal route
 // stays as a thin redirect so every existing link and tenant-guard bounce
-// (api/client, AuthContext) keeps working — it forwards to the Landing
+// (api/client, AuthContext) keeps working, it forwards to the Landing
 // picker section, preserving staff vs patient intent via ?mode=.
 const PortalRedirect = () => {
   const [sp] = useSearchParams();
@@ -153,7 +153,7 @@ const RoleBasedRedirect = () => {
     if (loading) return null;
     if (!user) return <Navigate to="/login" replace />;
 
-    // Everyone lands on the role-aware Home page — it adapts its quick
+    // Everyone lands on the role-aware Home page, it adapts its quick
     // actions, schedule, and notifications to the user's permissions, so a
     // single landing works for built-in and custom roles alike.
     return <Navigate to="/app/home" replace />;
@@ -170,7 +170,7 @@ export default function App() {
         <JourneyProvider>
           <Toaster position="top-right" />
           <a href="#main-content" className="skip-link">Skip to main content</a>
-          {/* User-journey overlay — renders the spotlight + tooltip when a
+          {/* User-journey overlay: renders the spotlight + tooltip when a
               module page calls useModuleJourney(). Mounted once at the
               app root so portal target (document.body) is always available. */}
           <JourneyOverlay />
@@ -232,11 +232,11 @@ export default function App() {
             <Route path="maternity" element={<ModuleGuard moduleKey="maternity"><Maternity /></ModuleGuard>} />
             <Route path="dialysis" element={<ModuleGuard moduleKey="dialysis"><Dialysis /></ModuleGuard>} />
             <Route path="theatre" element={<ModuleGuard moduleKey="theatre"><Theatre /></ModuleGuard>} />
-            {/* Support is always-on — never wrap it; that's the escape hatch. */}
+            {/* Support is always-on: never wrap it; that's the escape hatch. */}
             <Route path="support" element={<Support />} />
           </Route>
 
-          {/* Patient self-service portal — no staff auth required */}
+          {/* Patient self-service portal: no staff auth required */}
           <Route path="/patient" element={<PatientPortal />} />
 
           <Route path="*" element={<Navigate to="/app/dashboard" replace />} />

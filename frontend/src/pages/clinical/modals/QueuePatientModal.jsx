@@ -6,11 +6,11 @@ import PatientSearch from '../../../components/PatientSearch';
 import { apiClient } from '../../../api/client';
 
 const ACUITY = [
-    { value: 1, label: '1 — Emergency' },
-    { value: 2, label: '2 — Urgent' },
-    { value: 3, label: '3 — Standard' },
-    { value: 4, label: '4 — Non-urgent' },
-    { value: 5, label: '5 — Routine' },
+    { value: 1, label: '1: Emergency' },
+    { value: 2, label: '2: Urgent' },
+    { value: 3, label: '3: Standard' },
+    { value: 4, label: '4: Non-urgent' },
+    { value: 5, label: '5: Routine' },
 ];
 const err = (e, fallback) => toast.error(e?.response?.data?.detail || fallback);
 

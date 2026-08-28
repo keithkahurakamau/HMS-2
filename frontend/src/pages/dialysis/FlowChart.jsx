@@ -1,5 +1,5 @@
 // Lightweight intradialytic trend chart (BP systolic, pulse, UF volume) drawn
-// as inline SVG — no external chart dependency. Each series is normalized
+// as inline SVG: no external chart dependency. Each series is normalized
 // independently to the plot height so differently-scaled vitals are comparable.
 const SERIES = [
   { key: 'bp_systolic', label: 'BP sys', color: '#ef4444' },

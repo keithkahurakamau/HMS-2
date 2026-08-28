@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Search, Plus, Inbox } from 'lucide-react';
 
 /**
- * Worklist — the shared master/detail worklist used by the Theatre and Dialysis
+ * Worklist: the shared master/detail worklist used by the Theatre and Dialysis
  * modules (and anything else with "a filterable list of things on the left, the
  * selected thing's board on the right").
  *

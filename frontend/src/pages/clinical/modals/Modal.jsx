@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 /**
- * Shared modal shell for the DoctorV2 clinical desk — portaled to <body> so it
+ * Shared modal shell for the DoctorV2 clinical desk, portaled to <body> so it
  * escapes the workspace card's stacking context and always sits above the queue
  * bar and page chrome. Mirrors the shell in ClinicalExtrasPanel so every modal
  * on the desk looks and behaves identically.

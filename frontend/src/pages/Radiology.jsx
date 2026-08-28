@@ -77,7 +77,7 @@ export default function Radiology() {
             const res = await apiClient.put(`/radiology/${activeRequest.request_id}/status`, { status: 'In Progress' });
             setActiveRequest(res.data);
             setQueue(queue.map(q => q.request_id === activeRequest.request_id ? res.data : q));
-            toast.success('Patient acknowledged — exam in progress.');
+            toast.success('Patient acknowledged: exam in progress.');
         } catch {
             toast.error('Failed to update status.');
         }
@@ -396,7 +396,7 @@ export default function Radiology() {
                                     <tr key={row.catalog_id} className={!row.is_active ? 'opacity-50' : ''}>
                                         <td className="font-semibold text-ink-900 dark:text-white">{row.exam_name}</td>
                                         <td>{row.modality}</td>
-                                        <td>{row.body_part || '—'}</td>
+                                        <td>{row.body_part || '-'}</td>
                                         <td className="font-mono">{Number(row.base_price || 0).toFixed(2)}</td>
                                         <td>{row.requires_prep ? <span className="badge-warn text-2xs">Yes</span> : <span className="badge-neutral text-2xs">No</span>}</td>
                                         <td>{row.requires_contrast ? <span className="badge-warn text-2xs">Yes</span> : <span className="badge-neutral text-2xs">No</span>}</td>

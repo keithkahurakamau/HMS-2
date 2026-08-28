@@ -14,7 +14,7 @@ import PageHeader from '../components/PageHeader';
 /*  Hospital Settings                                                         */
 /*                                                                            */
 /*  Renders the per-tenant flat KV store grouped by category. Each setting    */
-/*  picks its widget from `data_type` so the page is fully data-driven —      */
+/*  picks its widget from `data_type` so the page is fully data-driven, */
 /*  new categories appear automatically as soon as someone inserts a row.     */
 /* ────────────────────────────────────────────────────────────────────────── */
 
@@ -179,7 +179,7 @@ export default function Settings() {
                 }
             />
 
-            {/* Branding Studio promo card — distinct from the flat key/value store. */}
+            {/* Branding Studio promo card: distinct from the flat key/value store. */}
             <Link
                 to="/app/branding"
                 className="block group relative overflow-hidden rounded-2xl bg-brand-gradient text-white p-6 shadow-soft hover:shadow-elevated transition-all cursor-pointer"

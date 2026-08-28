@@ -64,7 +64,7 @@ export default function TenantsManager() {
 
     // Canonical module catalogue from the backend. Drives the curated package
     // editor below so superadmins can't typo a module key and silently fail
-    // to gate anything. Falls back to [] on error — the UI shows just the
+    // to gate anything. Falls back to [] on error, the UI shows just the
     // legacy free-text editor in that case.
     const [moduleCatalogue, setModuleCatalogue] = useState([]);
     const [moduleSearch, setModuleSearch] = useState('');
@@ -114,7 +114,7 @@ export default function TenantsManager() {
 
     useEffect(() => {
         fetchTenants();
-        // Catalogue rarely changes — fetched once per session.
+        // Catalogue rarely changes: fetched once per session.
         apiClient.get('/public/superadmin/module-catalogue')
             .then((res) => setModuleCatalogue(res.data || []))
             .catch(() => setModuleCatalogue([]));
@@ -126,7 +126,7 @@ export default function TenantsManager() {
         setIsLoading(true);
         try {
             // Superadmin view should see suspended tenants too, so they can
-            // reactivate them — public picker callers omit this flag.
+            // reactivate them: public picker callers omit this flag.
             const res = await apiClient.get('/public/hospitals?include_inactive=true');
             setTenants(res.data);
         } catch (error) {
@@ -407,7 +407,7 @@ export default function TenantsManager() {
 
                                     {moduleCatalogue.length === 0 ? (
                                         <p className="text-xs text-ink-500 dark:text-ink-400 italic bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg p-3">
-                                            Module catalogue unavailable — use the custom-flag editor on the right.
+                                            Module catalogue unavailable: use the custom-flag editor on the right.
                                         </p>
                                     ) : (
                                         <>
@@ -550,7 +550,7 @@ export default function TenantsManager() {
                             <div className="p-5 sm:p-6 space-y-4 border-t border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                            {/* Custom flags — escape hatch for ad-hoc keys that aren't in the
+                            {/* Custom flags: escape hatch for ad-hoc keys that aren't in the
                                 canonical module catalogue. Most operators won't need this; it's
                                 here so forward-compat with new flags doesn't require a frontend
                                 redeploy. */}
@@ -626,7 +626,7 @@ export default function TenantsManager() {
                                 <div className="flex items-center justify-between mb-3">
                                     <div>
                                         <p className="text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em]">Plan limits</p>
-                                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Numeric caps — max_users, storage_gb, max_patients…</p>
+                                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Numeric caps. Max_users, storage_gb, max_patients…</p>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -714,7 +714,7 @@ export default function TenantsManager() {
                 </div>
             )}
 
-            {/* One-time provisioning result — shows admin temp password.
+            {/* One-time provisioning result: shows admin temp password.
                 Kept amber-accented because this is a one-shot warning surface:
                 "save this now, you won't see it again." The amber band reads as
                 "important, time-sensitive" against the otherwise neutral light

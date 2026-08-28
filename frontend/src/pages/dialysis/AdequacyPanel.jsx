@@ -16,7 +16,7 @@ function Metric({ label, value }) {
   return (
     <div className="rounded-lg bg-brand-50 dark:bg-brand-900/20 px-3 py-2 text-center">
       <div className="text-xs text-ink-500 dark:text-ink-400">{label}</div>
-      <div className="text-lg font-semibold text-brand-700 dark:text-brand-300">{value ?? '—'}</div>
+      <div className="text-lg font-semibold text-brand-700 dark:text-brand-300">{value ?? '-'}</div>
     </div>
   );
 }

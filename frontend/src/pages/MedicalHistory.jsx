@@ -42,7 +42,7 @@ export default function MedicalHistory() {
     const [form, setForm] = useState(defaultForm);
     const [editEntry, setEditEntry] = useState(null);
 
-    // Local draft safety net for the add/edit entry form — an interruption
+    // Local draft safety net for the add/edit entry form, an interruption
     // while writing a description shouldn't cost the clinician the entry.
     // Keyed by patient + which entry is being edited ('new' when adding) so
     // one patient's/entry's draft can never surface on another's form.
@@ -208,7 +208,7 @@ export default function MedicalHistory() {
                 eyebrow="Patient chart"
                 icon={FileText}
                 title="Medical History"
-                subtitle="Full patient medical chart — KDPA 2019 compliant."
+                subtitle="Full patient medical chart, KDPA 2019 compliant."
                 meta={KDPA_BADGE}
             />
 
@@ -294,7 +294,7 @@ export default function MedicalHistory() {
                                 <div className="flex flex-wrap gap-2">
                                     <div className="bg-white/10 backdrop-blur-sm ring-1 ring-white/15 rounded-xl px-4 py-2 text-center">
                                         <p className="text-2xs text-brand-100 uppercase font-semibold tracking-[0.14em]">Blood group</p>
-                                        <p className="text-base font-semibold text-white mt-1">{chart.blood_group || '—'}</p>
+                                        <p className="text-base font-semibold text-white mt-1">{chart.blood_group || '-'}</p>
                                     </div>
                                     <div className="bg-rose-500/20 ring-1 ring-rose-300/30 rounded-xl px-4 py-2 max-w-xs">
                                         <p className="text-2xs text-rose-100 uppercase font-semibold tracking-[0.14em] mb-1">Allergies</p>
@@ -321,7 +321,7 @@ export default function MedicalHistory() {
                         <div className="card p-4 flex items-center justify-between gap-3">
                             <div>
                                 <h3 className="font-semibold text-ink-900 dark:text-white text-sm">Visit</h3>
-                                <p className="text-xs text-ink-500 dark:text-ink-400">Start a new visit — closes any active queue entries for this patient.</p>
+                                <p className="text-xs text-ink-500 dark:text-ink-400">Start a new visit, closes any active queue entries for this patient.</p>
                             </div>
                             <button type="button" onClick={clearPreviousVisit} className="btn-secondary">
                                 Clear previous visit
@@ -409,7 +409,7 @@ export default function MedicalHistory() {
                             );
                         })}
 
-                        {/* Full visit history — every consultation, expandable to full detail */}
+                        {/* Full visit history: every consultation, expandable to full detail */}
                         <VisitHistoryList visits={chart.recent_visits || []} />
 
                         {/* Triage History */}
@@ -425,12 +425,12 @@ export default function MedicalHistory() {
                                         <div key={t.triage_id} className="p-3 bg-slate-50 dark:bg-ink-800/40 rounded-xl border border-slate-100 dark:border-ink-800">
                                             <div className="flex justify-between items-start">
                                                 <p className="font-semibold text-sm text-slate-800 dark:text-ink-200">{t.chief_complaint || 'No complaint recorded'}</p>
-                                                <span className="text-xs text-slate-400 dark:text-ink-400">{t.date ? new Date(t.date).toLocaleDateString() : '—'}</span>
+                                                <span className="text-xs text-slate-400 dark:text-ink-400">{t.date ? new Date(t.date).toLocaleDateString() : '-'}</span>
                                             </div>
                                             <p className="text-xs text-slate-500 dark:text-ink-400 mt-1">
-                                                Acuity {t.acuity_level ?? '—'} &middot; BP {t.blood_pressure || '—'} &middot; HR {t.heart_rate ?? '—'} &middot; Temp {t.temperature ?? '—'}°C &middot; SpO₂ {t.spo2 ?? '—'}% &middot; BMI {t.calculated_bmi ?? '—'} &middot; RBS {t.blood_glucose ?? '—'} mmol/L
+                                                Acuity {t.acuity_level ?? '-'} &middot; BP {t.blood_pressure || '-'} &middot; HR {t.heart_rate ?? '-'} &middot; Temp {t.temperature ?? '-'}°C &middot; SpO₂ {t.spo2 ?? '-'}% &middot; BMI {t.calculated_bmi ?? '-'} &middot; RBS {t.blood_glucose ?? '-'} mmol/L
                                             </p>
-                                            <p className="text-xs text-slate-400 dark:text-ink-400">Nurse: {t.nurse || '—'}</p>
+                                            <p className="text-xs text-slate-400 dark:text-ink-400">Nurse: {t.nurse || '-'}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -532,7 +532,7 @@ const CONSENT_TYPES = ['Treatment', 'Data Sharing', 'Research', 'Telehealth', 'P
 const CONSENT_METHODS = ['Verbal', 'Written', 'Electronic'];
 
 /**
- * ConsentCard — view + record patient consents (KDPA Section 30).
+ * ConsentCard: view + record patient consents (KDPA Section 30).
  *
  *  Lists every consent_record currently on file for the patient and
  *  surfaces an inline form so the clinician can capture a new one without
@@ -603,7 +603,7 @@ function ConsentCard({ patientId, consents, onRecorded }) {
                     {activeTreatment ? (
                         <span className="text-xs text-emerald-700 dark:text-emerald-300">Treatment consent active</span>
                     ) : (
-                        <span className="text-xs text-rose-700 dark:text-rose-300 font-medium">No active Treatment consent — clinical writes will be blocked</span>
+                        <span className="text-xs text-rose-700 dark:text-rose-300 font-medium">No active Treatment consent, clinical writes will be blocked</span>
                     )}
                 </div>
                 <button

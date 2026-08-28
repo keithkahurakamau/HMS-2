@@ -54,7 +54,7 @@ export default function Landing() {
                 description="MediFleet unifies registration, clinical desk, pharmacy, lab, radiology, wards, and billing into one secure workspace. Run an entire fleet of hospitals from one codebase, fully isolated per tenant."
             />
 
-            {/* ============== Sticky navbar — plain white bar, hairline rule ============== */}
+            {/* ============== Sticky navbar, plain white bar, hairline rule ============== */}
             <header className="fixed top-0 inset-x-0 z-50 bg-white/95 backdrop-blur-sm border-b border-ink-200/70">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                     <Link to="/" className="flex items-center cursor-pointer" aria-label="MediFleet home">
@@ -77,7 +77,7 @@ export default function Landing() {
                 </div>
             </header>
 
-            {/* ============== Hero — calm, light, editorial ============== */}
+            {/* ============== Hero, calm, light, editorial ============== */}
             <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-24 bg-white border-b border-ink-100">
                 <div className="max-w-7xl mx-auto px-5 sm:px-6 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
                     {/* Left: message */}

@@ -25,7 +25,7 @@ const STATUS_DOT_COLOR = {
 };
 
 const formatRelative = (iso) => {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const then = new Date(iso).getTime();
     const diff = Date.now() - then;
     const m = Math.floor(diff / 60000);
@@ -92,7 +92,7 @@ export default function Support() {
     const [replyBox, dispatchReply] = useReducer(replyReducer, initialReplyBox);
     const { reply, sendingReply } = replyBox;
 
-    useEffect(() => { fetchTickets(); }, []);  // initial load — filter is client-side now
+    useEffect(() => { fetchTickets(); }, []);  // initial load: filter is client-side now
 
     // ModuleGuard hands us a prefill payload via router state when the user
     // clicks "Contact MediFleet Support to upgrade". Open the new-ticket
@@ -115,7 +115,7 @@ export default function Support() {
         // Strip the state so a back-forward navigation doesn't re-open the
         // composer with stale prefill data.
         navigate(location.pathname, { replace: true, state: null });
-        // location is react-router's useLocation() — a reactive value, so these
+        // location is react-router's useLocation(): a reactive value, so these
         // deps are correct and the effect must re-run on navigation. The
         // no-mutable-in-deps rule matches the name "location" and can't tell it
         // apart from window.location here; this is its documented false positive.
@@ -151,7 +151,7 @@ export default function Support() {
         dispatchCompose({ type: 'submitting', value: true });
         try {
             const res = await apiClient.post('/support/', draft);
-            toast.success('Ticket raised — the MediFleet team will respond shortly.');
+            toast.success('Ticket raised: the MediFleet team will respond shortly.');
             dispatchCompose({ type: 'close' });
             dispatchCompose({ type: 'reset' });
             await fetchTickets();
@@ -201,7 +201,7 @@ export default function Support() {
         return counts;
     }, [tickets]);
 
-    // History view — newest activity first. Apply the status filter here
+    // History view: newest activity first. Apply the status filter here
     // rather than on the server so the filter chips above can show counts.
     const sortedTickets = useMemo(() => {
         const filtered = statusFilter ? tickets.filter(t => t.status === statusFilter) : tickets;
@@ -227,7 +227,7 @@ export default function Support() {
                 }
             />
 
-            {/* History filter chips — show count per status across the whole inbox */}
+            {/* History filter chips: show count per status across the whole inbox */}
             <div data-tour="support-filters" className="card p-2 flex flex-wrap gap-1" role="tablist" aria-label="Filter tickets by status">
                 <button
                     type="button"

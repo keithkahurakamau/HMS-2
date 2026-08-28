@@ -14,10 +14,10 @@ const CATEGORIES = [
     { icon: Syringe, label: 'Immunizations', entry_type: 'IMMUNIZATION' },
 ];
 
-const fmt = (v) => (v ? new Date(v).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+const fmt = (v) => (v ? new Date(v).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '-');
 
 /**
- * Patient History tab — the six history categories (each opens the read-only
+ * Patient History tab: the six history categories (each opens the read-only
  * history popup, pre-focused) plus this patient's previous visits pulled from
  * GET /clinical/records/{id}. `onOpenHistory(entry_type)` and `onPrintAllVisits`
  * are wired by the shell.
@@ -26,7 +26,7 @@ export default function PatientHistoryTab({ patientId, onOpenHistory, onPrintAll
     const [visits, setVisits] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // No synchronous setState in the effect body — the loader starts `true` and
+    // No synchronous setState in the effect body, the loader starts `true` and
     // every update lives in the promise callbacks (react-hooks/set-state-in-effect).
     // The tab remounts per patient (the shell resets to Notes on patient switch),
     // so state is fresh each time.
@@ -81,9 +81,9 @@ export default function PatientHistoryTab({ patientId, onOpenHistory, onPrintAll
                                 {visits.map((v) => (
                                     <tr key={v.record_id}>
                                         <td className="text-ink-600 dark:text-ink-300 whitespace-nowrap">{fmt(v.created_at)}</td>
-                                        <td className="text-ink-800 dark:text-ink-200">{v.chief_complaint || '—'}</td>
-                                        <td className="text-ink-600 dark:text-ink-300">{v.icd10_code || '—'}</td>
-                                        <td className="text-ink-600 dark:text-ink-300">{v.blood_pressure || '—'}</td>
+                                        <td className="text-ink-800 dark:text-ink-200">{v.chief_complaint || '-'}</td>
+                                        <td className="text-ink-600 dark:text-ink-300">{v.icd10_code || '-'}</td>
+                                        <td className="text-ink-600 dark:text-ink-300">{v.blood_pressure || '-'}</td>
                                         <td><span className="badge-neutral text-2xs">{v.record_status}</span></td>
                                     </tr>
                                 ))}

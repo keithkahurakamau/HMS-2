@@ -3,7 +3,7 @@ import { JOURNEYS, readProgress, writeProgress } from '../journeys';
 import { useAuth } from './AuthContext';
 
 /**
- * JourneyContext — orchestrates the in-app product tour system.
+ * JourneyContext: orchestrates the in-app product tour system.
  *
  *   • `progress` is a Set<string> of module keys this user has already
  *     completed or skipped. Persisted to localStorage so tours don't
@@ -41,7 +41,7 @@ export function JourneyProvider({ children }) {
         if (!moduleKey) return;
         const steps = JOURNEYS[moduleKey];
         if (!steps || steps.length === 0) return;
-        if (progress.has(moduleKey)) return; // already done — don't pester
+        if (progress.has(moduleKey)) return; // already done: don't pester
         setActiveKey(moduleKey);
     }, [progress]);
 
@@ -61,7 +61,7 @@ export function JourneyProvider({ children }) {
     }, [activeKey, progress, persist]);
 
     const skipCurrent = useCallback(() => {
-        // Mark as completed too — "skip" means "don't show this again."
+        // Mark as completed too: "skip" means "don't show this again."
         completeCurrent();
     }, [completeCurrent]);
 
@@ -99,7 +99,7 @@ export function useJourney() {
 }
 
 /**
- * useModuleJourney — drop-in hook for module pages.
+ * useModuleJourney: drop-in hook for module pages.
  *
  * Call once at the top of your page component:
  *

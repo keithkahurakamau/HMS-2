@@ -1,18 +1,18 @@
 import React from 'react';
 
 /**
- * MediFleet Logo — a stylized "M" formed from two interlocking caduceus-like
+ * MediFleet Logo: a stylized "M" formed from two interlocking caduceus-like
  * arcs, evoking continuity of care and the cyan→teal→emerald medical sweep.
  *
  * Variants:
- *   - "mark"  — just the symbol, square aspect ratio
- *   - "full"  — symbol + wordmark, default
- *   - "wordmark" — text only
+ *   - "mark": just the symbol, square aspect ratio
+ *   - "full": symbol + wordmark, default
+ *   - "wordmark": text only
  *
  * Tones:
- *   - "color" — gradient + accent stop (default)
- *   - "mono-light" — single-tone white (use on dark surfaces)
- *   - "mono-dark"  — single-tone ink (use on light surfaces)
+ *   - "color": gradient + accent stop (default)
+ *   - "mono-light": single-tone white (use on dark surfaces)
+ *   - "mono-dark": single-tone ink (use on light surfaces)
  *
  * The mark is a pure SVG so it scales crisp at any size and respects
  * `currentColor` for mono variants.
@@ -99,7 +99,7 @@ function LogoMark({ tone = 'color', size = 36 }) {
     );
 }
 
-/* The interlocking M / cross / pulse mark — drawn once, reused by every tone. */
+/* The interlocking M / cross / pulse mark, drawn once, reused by every tone. */
 function MarkPaths({ fill, cross }) {
     return (
         <g>
@@ -112,19 +112,19 @@ function MarkPaths({ fill, cross }) {
                 strokeLinejoin="round"
                 fill="none"
             />
-            {/* Medical cross — the breath in the middle */}
+            {/* Medical cross: the breath in the middle */}
             <g transform="translate(24 24)">
                 <rect x="-1.6" y="-5" width="3.2" height="10" rx="1.4" fill={cross} fillOpacity="0.95" />
                 <rect x="-5" y="-1.6" width="10" height="3.2" rx="1.4" fill={cross} fillOpacity="0.95" />
             </g>
-            {/* Pulse dot — bottom-right energy */}
+            {/* Pulse dot: bottom-right energy */}
             <circle cx="37" cy="35" r="2" fill={cross} fillOpacity="0.95" />
         </g>
     );
 }
 
 /**
- * TenantLogo — renders the tenant's uploaded logo when present, otherwise
+ * TenantLogo: renders the tenant's uploaded logo when present, otherwise
  * falls back to the MediFleet mark. Use anywhere in tenant-scoped surfaces.
  */
 export function TenantLogo({

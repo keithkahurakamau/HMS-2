@@ -5,14 +5,14 @@ import {
 import { printDocumentWithBranding, printUtils } from '../utils/printDocument';
 
 /**
- * LetterheadStudio — upload the hospital's own pre-designed A4 stationery and
+ * LetterheadStudio: upload the hospital's own pre-designed A4 stationery and
  * position the safe area that document content flows inside.
  *
  * Hospitals almost always already own this artwork (their designer supplies a
  * full-page letterhead), so the upload takes the page exactly as-is rather than
  * asking an admin to crop separate header and footer bands. At print time the
  * artwork is painted full-bleed on every sheet and the content is inset by the
- * margins configured here — see `printDocument.js` for the paged-media rules.
+ * margins configured here: see `printDocument.js` for the paged-media rules.
  *
  * Uploads are downscaled to A4 @ ~150 DPI and re-encoded as JPEG before they
  * leave the browser, which turns a multi-megabyte scan into ~100 KB.
@@ -22,7 +22,7 @@ import { printDocumentWithBranding, printUtils } from '../utils/printDocument';
 export const A4_W_MM = 210;
 export const A4_H_MM = 297;
 
-// 1240 px across 210 mm ≈ 150 DPI — plenty for laser output, small on the wire.
+// 1240 px across 210 mm ≈ 150 DPI, plenty for laser output, small on the wire.
 const MAX_WIDTH_PX = 1240;
 const JPEG_QUALITY = 0.86;
 const MAX_ENCODED_BYTES = 1_100_000;   // stays under the server's 1.2 MB cap
@@ -39,7 +39,7 @@ export const LETTERHEAD_DEFAULTS = {
 /**
  * Downscales an uploaded letterhead to A4 proportions and returns a JPEG data
  * URL. Scans usually carry a slightly-off aspect ratio (paper edges, phone
- * photos), so the image is drawn onto an exact-A4 canvas — the printed sheet is
+ * photos), so the image is drawn onto an exact-A4 canvas, the printed sheet is
  * A4 regardless, and normalising here means the on-screen preview matches the
  * paper instead of drifting a few millimetres.
  */
@@ -169,7 +169,7 @@ export default function LetterheadStudio({ value, onChange, headerText, footerTe
     const noRoom = cfg.margin_top_mm + cfg.margin_bottom_mm >= A4_H_MM
         || cfg.margin_side_mm * 2 >= A4_W_MM;
     // Artwork always prints in full now, so a tiny margin no longer hides the
-    // letterhead — it makes text land on top of it. Say so before they print.
+    // letterhead: it makes text land on top of it. Say so before they print.
     const tooTight = cfg.margin_top_mm < 15 || cfg.margin_bottom_mm < 15;
 
     return (
@@ -188,7 +188,7 @@ export default function LetterheadStudio({ value, onChange, headerText, footerTe
                             {busy ? 'Processing…' : 'Upload your letterhead'}
                         </span>
                         <span className="text-xs mt-1 text-center max-w-xs">
-                            A full A4 page — the same artwork your printer or designer supplied. PNG, JPG, or WebP.
+                            A full A4 page: the same artwork your printer or designer supplied. PNG, JPG, or WebP.
                         </span>
                     </button>
                 ) : (
@@ -280,7 +280,7 @@ export default function LetterheadStudio({ value, onChange, headerText, footerTe
                         {!noRoom && tooTight && (
                             <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
                                 <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-                                These margins are very tight — document text will print over your
+                                These margins are very tight, document text will print over your
                                 header or footer artwork. Most letterheads need roughly 40 mm top
                                 and 45 mm bottom.
                             </p>

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /* ──────────────────────────────────────────────────────────────────────────
- * usePlatformPaymentSocket — live subscription-billing updates for the
+ * usePlatformPaymentSocket: live subscription-billing updates for the
  * superadmin console.
  *
  * While `enabled` is true, opens a WebSocket to the platform feed
@@ -10,8 +10,8 @@ import { useEffect, useRef } from 'react';
  * subscription charge settles, so the operator watches it flip to
  * success/failure without polling. Polling stays as a fallback.
  *
- *   enabled  boolean — open the socket only while watching for charges
- *   onEvent  (data) => void — called per platform_payment_update frame
+ *   enabled  boolean: open the socket only while watching for charges
+ *   onEvent  (data) => void, called per platform_payment_update frame
  * ────────────────────────────────────────────────────────────────────────── */
 export default function usePlatformPaymentSocket(enabled, onEvent) {
     const cbRef = useRef(onEvent);

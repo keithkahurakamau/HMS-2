@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { apiClient } from '../api/client';
 
-// Reusable patient typeahead. Type a name, ID, OP number or phone — the
-// patients API (`GET /patients/?search=`) matches all of them — pick from the
+// Reusable patient typeahead. Type a name, ID, OP number or phone, the
+// patients API (`GET /patients/?search=`) matches all of them, pick from the
 // dropdown. Calls onSelect(patient) with the chosen row. Replaces raw
 // "Patient ID" number inputs so lookup is convenient everywhere.
 export default function PatientSearch({

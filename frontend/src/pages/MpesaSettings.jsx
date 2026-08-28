@@ -8,11 +8,11 @@ import {
 import PageHeader from '../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  M-Pesa payment settings — hospital-facing.                                */
+/*  M-Pesa payment settings: hospital-facing.                                */
 /*                                                                            */
 /*  The hospital enters only its OWN Safaricom till (PayBill / Buy-Goods)     */
 /*  and the bank account where proceeds settle. The payment aggregator that   */
-/*  MediFleet uses behind the scenes is never surfaced here — activation is   */
+/*  MediFleet uses behind the scenes is never surfaced here, activation is   */
 /*  handled by the MediFleet team, and this page simply reflects whether      */
 /*  M-Pesa is live for the hospital.                                          */
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -129,7 +129,7 @@ export default function MpesaSettings() {
                     </div>
                     <p className="text-xs text-ink-500 dark:text-ink-400 -mt-2 inline-flex items-start gap-1.5">
                         <ShieldCheck size={13} className="mt-0.5 text-brand-600 shrink-0" />
-                        MediFleet activates M-Pesa for your till on its end — there's nothing
+                        MediFleet activates M-Pesa for your till on its end, there's nothing
                         else for you to set up or copy from anywhere.
                     </p>
                     </div>
@@ -138,15 +138,14 @@ export default function MpesaSettings() {
                     <SectionHead icon={Building2} title="Settlement bank" />
                     <p className="text-xs text-ink-500 dark:text-ink-400 -mt-3">
                         Proceeds are deposited into <strong>your hospital's own bank account</strong> on the
-                        settlement schedule agreed at onboarding. MediFleet never holds your money —
-                        it routes the payment and settles straight to you.
+                        settlement schedule agreed at onboarding. MediFleet never holds your money,                         it routes the payment and settles straight to you.
                     </p>
 
                     <div className="grid grid-cols-2 gap-3 mt-3">
                         <Field label="Bank *">
                             <select className="input" value={form.settlement_bank_code}
                                     onChange={e => setForm({ ...form, settlement_bank_code: e.target.value })}>
-                                <option value="">— select bank —</option>
+                                <option value="">, select bank, </option>
                                 {banks.map(b => (
                                     <option key={b.code} value={b.code}>{b.name}</option>
                                 ))}
@@ -192,7 +191,7 @@ export default function MpesaSettings() {
                         <SectionHead icon={Send} title="Send a test M-Pesa prompt" />
                         <p className="text-xs text-ink-500 dark:text-ink-400">
                             Sends a real KES&nbsp;1 prompt to the phone below. It doesn't
-                            actually charge — the customer can decline.
+                            actually charge: the customer can decline.
                         </p>
                         <input aria-label="07XXXXXXXX or 2547XXXXXXXX" className="input" value={testPhone}
                                onChange={e => setTestPhone(e.target.value)}
@@ -232,8 +231,7 @@ function MoneyFlowNote() {
             <p className="text-sm text-emerald-900 dark:text-emerald-200 leading-relaxed">
                 When a patient pays by M-Pesa, the money goes through your own Safaricom
                 shortcode and settles directly into <strong>your hospital's bank account</strong> on
-                your settlement schedule. <strong>MediFleet never holds or touches your money</strong> —
-                the platform only triggers the payment prompt and shows you a live status as it
+                your settlement schedule. <strong>MediFleet never holds or touches your money</strong>,                 the platform only triggers the payment prompt and shows you a live status as it
                 completes. The only thing MediFleet bills you for is your subscription.
             </p>
         </div>
@@ -280,7 +278,7 @@ function StatusCard({ config, loading }) {
             </div>
             {config.mpesa_active ? (
                 <div className="text-xs inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 pt-2 border-t border-ink-100 dark:border-ink-800 w-full">
-                    <CheckCircle2 size={14} /> M-Pesa is live — you can collect payments at the till and pharmacy.
+                    <CheckCircle2 size={14} /> M-Pesa is live, you can collect payments at the till and pharmacy.
                 </div>
             ) : (
                 <div className="text-xs inline-flex items-start gap-1.5 text-amber-700 dark:text-amber-300 pt-2 border-t border-ink-100 dark:border-ink-800 w-full">

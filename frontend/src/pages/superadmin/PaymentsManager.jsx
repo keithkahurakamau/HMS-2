@@ -9,11 +9,11 @@ import PageHeader from '../../components/PageHeader';
 import PasswordInput from '../../components/PasswordInput';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Superadmin — M-Pesa / Pay Hero provisioning.                              */
+/*  Superadmin: M-Pesa / Pay Hero provisioning.                              */
 /*                                                                            */
 /*  Only the platform operator is linked with Pay Hero. Here the operator     */
 /*  wires each hospital's Pay Hero channel + credentials (and can set the     */
-/*  till + bank during onboarding). Hospitals never see any of this — their   */
+/*  till + bank during onboarding). Hospitals never see any of this, their   */
 /*  own page only shows whether M-Pesa is live.                               */
 /* ────────────────────────────────────────────────────────────────────────── */
 
@@ -122,7 +122,7 @@ export default function PaymentsManager() {
                 eyebrow="Platform"
                 icon={Smartphone}
                 title="M-Pesa Provisioning"
-                subtitle="Wire each hospital's Pay Hero channel + credentials. Hospitals never see this — only whether their M-Pesa is live."
+                subtitle="Wire each hospital's Pay Hero channel + credentials. Hospitals never see this: only whether their M-Pesa is live."
                 tone="brand"
             />
 
@@ -138,7 +138,7 @@ export default function PaymentsManager() {
                     value={selected || ''}
                     onChange={(e) => loadConfig(e.target.value)}
                 >
-                    <option value="">— select a hospital —</option>
+                    <option value="">, select a hospital, </option>
                     {tenants.map((t) => (
                         <option key={t.id || t.tenant_id} value={numericId(t)}>{t.name}</option>
                     ))}
@@ -219,7 +219,7 @@ export default function PaymentsManager() {
                             <Field label="Bank">
                                 <select className="input" value={form.settlement_bank_code}
                                         onChange={e => setForm({ ...form, settlement_bank_code: e.target.value })}>
-                                    <option value="">— select bank —</option>
+                                    <option value="">, select bank, </option>
                                     {banks.map(b => (<option key={b.code} value={b.code}>{b.name}</option>))}
                                 </select>
                             </Field>
@@ -296,7 +296,7 @@ function ProvisioningGuide() {
             <p className="text-sm text-brand-900/90 dark:text-brand-200/90 leading-relaxed mb-2">
                 Each hospital owns its <strong>own Pay Hero account</strong>. Patient money flows
                 patient → that hospital's Pay Hero account → that hospital's bank. <strong>MediFleet
-                never holds hospital money</strong> — the platform only triggers the STK push (using
+                never holds hospital money</strong>, the platform only triggers the STK push (using
                 the hospital's credentials) and relays the live status back to their screens.
             </p>
             <ol className="list-decimal pl-5 text-sm text-brand-900/90 dark:text-brand-200/90 space-y-1">
@@ -305,7 +305,7 @@ function ProvisioningGuide() {
                 <li>Saving a channel id flips their M-Pesa to live. Send a KES 1 test to confirm end-to-end.</li>
             </ol>
             <p className="text-xs text-brand-700 dark:text-brand-300 mt-2">
-                Your own MediFleet account (for collecting subscriptions) is configured separately under <strong>Subscription Billing</strong> — that's the only money you receive.
+                Your own MediFleet account (for collecting subscriptions) is configured separately under <strong>Subscription Billing</strong>, that's the only money you receive.
             </p>
         </div>
     );

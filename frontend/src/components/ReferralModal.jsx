@@ -12,7 +12,7 @@ const URGENCIES = ['Routine', 'Urgent', 'Emergency'];
 /**
  * External referral capture + letter printing. Typed letters require the
  * referral to be saved first (the referral log stays accurate); the two
- * blank modes only print — nothing is recorded.
+ * blank modes only print: nothing is recorded.
  */
 export default function ReferralModal({ patient, recordId = null, initialSummary = '', onClose }) {
     const { user } = useAuth();
@@ -23,7 +23,7 @@ export default function ReferralModal({ patient, recordId = null, initialSummary
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    // Local draft safety net — the letter is only recorded on Save; closing
+    // Local draft safety net: the letter is only recorded on Save; closing
     // the modal early (backdrop click, Escape, a browser interruption)
     // would otherwise lose everything typed. Keyed by patient so reopening
     // this modal for the same patient later offers the letter back.

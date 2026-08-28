@@ -37,7 +37,7 @@ export default function LaborBoardTab() {
     const clone = node.cloneNode(true);
     clone.querySelectorAll('.print\\:hidden, button').forEach((el) => el.remove());
     printDocument(
-      `Partograph — ${selected?.patient_name ?? ''}`,
+      `Partograph, ${selected?.patient_name ?? ''}`,
       `${printUtils.header({ docType: 'Partograph' })}
        <div class="partograph-print">${clone.innerHTML}</div>
        ${printUtils.footer()}`,
@@ -107,7 +107,7 @@ export default function LaborBoardTab() {
                 <span className="font-medium text-ink-900 dark:text-white">{row.patient_name}</span>
                 {row.latest && (
                   <span className={`rounded-full px-2 py-0.5 text-xs ${ALERT_BADGE[row.latest.alert_status] || ALERT_BADGE.ok}`}>
-                    {row.latest.cervical_dilation_cm ?? '—'} cm · FHR {row.latest.fetal_heart_rate ?? '—'}
+                    {row.latest.cervical_dilation_cm ?? '-'} cm · FHR {row.latest.fetal_heart_rate ?? '-'}
                   </span>
                 )}
               </button>
@@ -124,7 +124,7 @@ export default function LaborBoardTab() {
                  className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-900 dark:text-white">
-              Partograph — {selected.patient_name}
+              Partograph: {selected.patient_name}
             </h2>
             <div className="flex gap-2">
               <button
@@ -182,16 +182,16 @@ export default function LaborBoardTab() {
                             </span>
                           )}
                         </td>
-                        <td>{e.cervical_dilation_cm ?? '—'}</td>
-                        <td>{e.descent_fifths ?? '—'}</td>
-                        <td>{e.contractions_per_10min ?? '—'}</td>
-                        <td>{e.fetal_heart_rate ?? '—'}</td>
-                        <td>{e.liquor ?? '—'}</td>
+                        <td>{e.cervical_dilation_cm ?? '-'}</td>
+                        <td>{e.descent_fifths ?? '-'}</td>
+                        <td>{e.contractions_per_10min ?? '-'}</td>
+                        <td>{e.fetal_heart_rate ?? '-'}</td>
+                        <td>{e.liquor ?? '-'}</td>
                         <td>
-                          {e.maternal_bp_systolic != null ? `${e.maternal_bp_systolic}/${e.maternal_bp_diastolic ?? '—'}` : '—'}
+                          {e.maternal_bp_systolic != null ? `${e.maternal_bp_systolic}/${e.maternal_bp_diastolic ?? '-'}` : '-'}
                         </td>
-                        <td>{e.maternal_pulse ?? '—'}</td>
-                        <td>{e.temperature_c ?? '—'}</td>
+                        <td>{e.maternal_pulse ?? '-'}</td>
+                        <td>{e.temperature_c ?? '-'}</td>
                         <td className="print:hidden">
                           {!e.superseded && (
                             <button

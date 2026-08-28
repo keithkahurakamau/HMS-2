@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { Toaster } from 'react-hot-toast';
 import { renderWithProviders } from '../test/renderWithProviders';
 
-// toast.custom() only renders through a mounted <Toaster /> — render it
+// toast.custom() only renders through a mounted <Toaster />, render it
 // alongside the bell so the sneak-peek toast actually appears in the DOM
 // (a higher-fidelity check than mocking toast.custom's internals).
 const renderBell = () => renderWithProviders(<><NotificationBell /><Toaster /></>);
@@ -21,7 +21,7 @@ vi.mock('../context/AuthContext', async (orig) => {
 
 // The live socket is exercised by useNotificationSocket's own unit tests
 // (mirrors the already-shipped usePaymentSocket pattern) and would otherwise
-// try to open a real WebSocket in jsdom — capture the onEvent callback
+// try to open a real WebSocket in jsdom, capture the onEvent callback
 // instead so tests can simulate a push without a real connection.
 let capturedOnEvent = null;
 vi.mock('../hooks/useNotificationSocket', () => ({
@@ -56,7 +56,7 @@ describe('NotificationBell', () => {
 
         capturedOnEvent({
             type: 'notification', notification_id: 99, category: 'critical',
-            title: 'Critical lab result', body: 'Potassium 6.8 — flagged critical',
+            title: 'Critical lab result', body: 'Potassium 6.8: flagged critical',
             link: '/app/laboratory?test_id=99', created_at: '2026-07-20T12:00:00Z',
         });
 

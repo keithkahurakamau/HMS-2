@@ -4,11 +4,11 @@ import { X, User, AlertTriangle, Droplet, History, Stethoscope, FlaskConical } f
 import { useActivePatient } from '../context/PatientContext';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Active patient bar — renders above the main outlet whenever a patient    */
+/*  Active patient bar: renders above the main outlet whenever a patient    */
 /*  has been opened. Provides a constant "who am I working on" affordance     */
 /*  plus shortcuts to the chart and clinical queue.                           */
 /*                                                                            */
-/*  Keep this bar SHORT — it spans every page, every device. Anything that    */
+/*  Keep this bar SHORT: it spans every page, every device. Anything that    */
 /*  doesn't help the clinician immediately identify the patient and reach    */
 /*  their most-common destinations belongs on the chart itself, not here.    */
 /* ────────────────────────────────────────────────────────────────────────── */

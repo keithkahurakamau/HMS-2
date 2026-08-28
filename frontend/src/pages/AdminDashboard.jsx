@@ -13,7 +13,7 @@ import DepartmentsManager from '../components/admin/DepartmentsManager';
 import RolesManager from '../components/admin/RolesManager';
 import UserPermissionsEditor from '../components/admin/UserPermissionsEditor';
 
-// Built-in role names — static seed so the staff create/edit dropdowns work on
+// Built-in role names: static seed so the staff create/edit dropdowns work on
 // a cold render before the API returns custom roles. Module scope: built once.
 const BUILTIN_ROLES = ["Admin", "Doctor", "Nurse", "Pharmacist", "Lab Technician", "Radiologist", "Receptionist"];
 
@@ -53,7 +53,7 @@ export default function AdminDashboard() {
     }, [activeTab]);
 
     // Pull the current set of role names so create-staff + edit-role dropdowns
-    // include any custom roles the admin has created. Best-effort — falls back
+    // include any custom roles the admin has created. Best-effort: falls back
     // to the built-in seven if /admin/roles is not yet reachable.
     const fetchAllRoles = async () => {
         try {
@@ -146,9 +146,9 @@ export default function AdminDashboard() {
                 eyebrow="Administration"
                 icon={LayoutDashboard}
                 title="Command Center"
-                subtitle="Hospital operations cockpit — staff, roles, departments, pricing, and audit."
+                subtitle="Hospital operations cockpit. Staff, roles, departments, pricing, and audit."
             />
-            {/* HEADER & TABS — unified pill row, single accent for active state */}
+            {/* HEADER & TABS: unified pill row, single accent for active state */}
             <div data-tour="admin-tabs" className="card p-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Admin sections" className="flex flex-wrap bg-ink-100/70 p-1 rounded-xl w-full lg:w-auto lg:flex-1 gap-1">
                     {[

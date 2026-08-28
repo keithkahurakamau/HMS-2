@@ -5,7 +5,7 @@ import { useJourney } from '../context/JourneyContext';
 import { APP_VERSION, unseenReleases, writeLastSeenVersion, readLastSeenVersion } from '../releases';
 
 /**
- * WhatsNew — shows a versioned "what changed" panel when the signed-in user is
+ * WhatsNew: shows a versioned "what changed" panel when the signed-in user is
  * behind the current APP_VERSION. Dismissing records APP_VERSION as last-seen
  * (per-user, localStorage) so it won't reappear. Optional "Take the tour"
  * button replays the product tours via JourneyContext.

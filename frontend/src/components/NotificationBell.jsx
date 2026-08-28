@@ -10,7 +10,7 @@ import { NOTIFICATION_CATEGORY_ICONS as CATEGORY_ICONS, NOTIFICATION_CATEGORY_ST
 
 const POLL_INTERVAL_MS = 30_000;
 // How long the live sneak-peek popup stays up before settling into the bell
-// (which already has it — see handleLiveNotification).
+// (which already has it: see handleLiveNotification).
 const TOAST_DURATION_MS = 6_000;
 
 export default function NotificationBell() {
@@ -27,7 +27,7 @@ export default function NotificationBell() {
             setNotifications(res.data.notifications || []);
             setUnreadCount(res.data.unread_count || 0);
         } catch (e) {
-            // Silently ignore — user not authenticated yet, etc.
+            // Silently ignore: user not authenticated yet, etc.
         }
     }, []);
 
@@ -70,12 +70,12 @@ export default function NotificationBell() {
         }
     };
 
-    // Live push from useNotificationSocket — notify() (backend) fires this the
+    // Live push from useNotificationSocket: notify() (backend) fires this the
     // instant a notification is created. Put it in the bell's list right away
     // (don't wait for the next 30s poll) and surface a sneak-peek toast that
     // auto-dismisses on its own; the notification is already sitting in the
     // bell underneath, so nothing is lost when the toast times out. Passed
-    // fresh each render — useNotificationSocket keeps the latest callback in
+    // fresh each render: useNotificationSocket keeps the latest callback in
     // a ref internally, so this doesn't need to be memoized.
     const handleLiveNotification = (payload) => {
         const n = {
@@ -127,7 +127,7 @@ export default function NotificationBell() {
                 )}
             </button>
 
-            {/* Backdrop — closes the panel when clicking the page content */}
+            {/* Backdrop: closes the panel when clicking the page content */}
             {open && (
                 <div
                     className="fixed inset-0 z-[60] bg-transparent"

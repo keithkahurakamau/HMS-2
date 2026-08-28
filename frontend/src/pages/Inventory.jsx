@@ -85,7 +85,7 @@ export default function Inventory() {
             const response = await apiClient.get('/inventory/locations');
             const decorated = (response.data || []).map(decorateLocation);
             setLocations(decorated);
-            // Pick the first location as the active one — usually Main Store.
+            // Pick the first location as the active one, usually Main Store.
             setActiveLocation((prev) => prev || decorated[0] || null);
         } catch (error) {
             console.error('Failed to fetch locations', error);
@@ -673,7 +673,7 @@ function ExpiredStockModal({ onClose }) {
                                                 {r.is_expired ? `${Math.abs(r.days_to_expiry)}d ago` : `in ${r.days_to_expiry}d`}
                                             </div>
                                         </td>
-                                        <td className="px-4 py-2 text-right font-mono">{r.value_at_cost != null ? `KES ${r.value_at_cost.toLocaleString()}` : '—'}</td>
+                                        <td className="px-4 py-2 text-right font-mono">{r.value_at_cost != null ? `KES ${r.value_at_cost.toLocaleString()}` : '-'}</td>
                                     </tr>
                                 ))}
                             </tbody>

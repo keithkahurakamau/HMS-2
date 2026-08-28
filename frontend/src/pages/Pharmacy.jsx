@@ -54,7 +54,7 @@ export default function Pharmacy() {
     // --- PAYMENT MODAL STATE (post-dispense) ---
     // payment.invoice_id is the rolled-up invoice for the dispense run;
     // payment.lastDispenseId is the dispense whose /pay endpoint we'll hit
-    // (any of the items work — they share the invoice).
+    // (any of the items work, they share the invoice).
     const [payment, setPayment] = useState(null);
 
     // --- DATA FETCHING ---
@@ -226,7 +226,7 @@ export default function Pharmacy() {
 
     // Pay-straight-away OTC checkout: dispense the cart, then immediately
     // process the chosen method against the rolled-up invoice. No "choose
-    // method" modal — the cashier already picked Cash/Card/M-Pesa.
+    // method" modal: the cashier already picked Cash/Card/M-Pesa.
     const handleOTCPay = async (method, { phoneNumber = null, reference = null } = {}) => {
         if (cart.length === 0) return;
         if (method === 'mpesa' && !phoneNumber) {
@@ -269,7 +269,7 @@ export default function Pharmacy() {
                 try {
                     const r = await apiClient.get(`/pharmacy/dispense/${last.dispense_id}/receipt`);
                     printPharmacyReceipt(r.data);
-                } catch { /* silently skip — payment still landed */ }
+                } catch { /* silently skip, payment still landed */ }
                 setCart([]);
             }
         } catch (error) {
@@ -330,7 +330,7 @@ export default function Pharmacy() {
                     amount: last.invoice_balance ?? rxTotal,
                     patientName: activeOrder.patient });
             } else {
-                // No invoice (walk-in) — just clear and exit.
+                // No invoice (walk-in): just clear and exit.
                 setCart([]);
                 setQueue(queue.filter(q => q.id !== activeOrder.id));
                 clearActiveOrder();
@@ -344,7 +344,7 @@ export default function Pharmacy() {
 
     const handlePaymentSettled = async (settledPayment) => {
         // Called by the modal when payment completes successfully.
-        // Fire the receipt print before we tear down state — the modal's
+        // Fire the receipt print before we tear down state, the modal's
         // already closed by the time this resolves.
         const dispenseId = settledPayment?.dispenseId ?? payment?.dispenseId;
         if (dispenseId) {
@@ -374,7 +374,7 @@ export default function Pharmacy() {
             recordId: activeOrder.id });
     };
 
-    // Visit summary — printed from what the pharmacy can see of the encounter.
+    // Visit summary: printed from what the pharmacy can see of the encounter.
     const handleVisitSummary = () => {
         if (!activeOrder) return;
         printVisitSummary({
@@ -386,7 +386,7 @@ export default function Pharmacy() {
                 hpi: activeOrder.clinical_notes } });
     };
 
-    // Lab report — pull the patient's tests then print (shared printLabReport).
+    // Lab report: pull the patient's tests then print (shared printLabReport).
     const handleLabReport = () => {
         if (!activeOrder?.patient_id) return;
         apiClient.get('/laboratory/tests', { params: { patient_id: activeOrder.patient_id } })
@@ -394,7 +394,7 @@ export default function Pharmacy() {
             .catch((e) => toast.error(e.response?.data?.detail || 'Could not load lab tests.'));
     };
 
-    // Consolidated Actions ▾ — mirrors MedicentreV3's Pharmacy menu; permission-
+    // Consolidated Actions ▾, mirrors MedicentreV3's Pharmacy menu; permission-
     // gated (empty groups disappear).
     const actionGroups = [
         { label: 'Flow', items: [
@@ -661,7 +661,7 @@ export default function Pharmacy() {
 }
 
 
-/* ─── Rx dispense — bill panels ──────────────────────────────────────────── */
+/* ─── Rx dispense, bill panels ──────────────────────────────────────────── */
 
 // Pure helper hoisted to module scope (no component state).
 const fmtKES = (v) => `KES ${Number(v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -669,13 +669,13 @@ const fmtKES = (v) => `KES ${Number(v ?? 0).toLocaleString(undefined, { minimumF
 // Bill Payment Details read-out (MedicentreV3 parity). Total Bill / Amount Due
 // come from the resolved dispense lines; the deposit ledger (deposited/used/
 // refunded/balance) needs a patient-account endpoint that billing doesn't yet
-// expose, so those cells read "—" with a footnote rather than fabricate values.
+// expose, so those cells read "-" with a footnote rather than fabricate values.
 function BillPaymentDetails({ total }) {
     const cells = [
-        { label: 'Amount Deposited', value: '—', muted: true },
-        { label: 'Total Amount Used', value: '—', muted: true },
-        { label: 'Total Amount Refunded', value: '—', muted: true },
-        { label: 'Deposit Balance', value: '—', muted: true },
+        { label: 'Amount Deposited', value: '-', muted: true },
+        { label: 'Total Amount Used', value: '-', muted: true },
+        { label: 'Total Amount Refunded', value: '-', muted: true },
+        { label: 'Deposit Balance', value: '-', muted: true },
         { label: 'Total Bill', value: fmtKES(total) },
         { label: 'Amount Due', value: fmtKES(total), strong: true },
     ];
@@ -698,7 +698,7 @@ function BillPaymentDetails({ total }) {
     );
 }
 
-// Bill Items grid — one row per prescribed line, matched to a stock batch. The
+// Bill Items grid: one row per prescribed line, matched to a stock batch. The
 // pharmacist sets the quantity and marks each line packed before dispensing.
 function BillItemsTable({ rows, packed, onToggle, onQty }) {
     return (
@@ -746,7 +746,7 @@ function BillItemsTable({ rows, packed, onToggle, onQty }) {
                                         <span className="inline-flex items-center gap-1 text-2xs text-rose-600"><AlertCircle size={12} /> No stock match</span>
                                     )}
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums text-ink-600 dark:text-ink-300">{batch ? fmtKES(batch.unit_price) : '—'}</td>
+                                <td className="px-3 py-2 text-right tabular-nums text-ink-600 dark:text-ink-300">{batch ? fmtKES(batch.unit_price) : '-'}</td>
                                 <td className="px-3 py-2 text-right">
                                     <input type="number" min="0" max={batch?.quantity ?? undefined}
                                         aria-label={`Quantity for ${line.drug}`}
@@ -754,7 +754,7 @@ function BillItemsTable({ rows, packed, onToggle, onQty }) {
                                         onChange={(e) => onQty(idx, e.target.value)}
                                         className="input py-1 w-20 text-right disabled:opacity-50" />
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums font-medium text-ink-800 dark:text-ink-200">{amount ? fmtKES(amount) : '—'}</td>
+                                <td className="px-3 py-2 text-right tabular-nums font-medium text-ink-800 dark:text-ink-200">{amount ? fmtKES(amount) : '-'}</td>
                                 <td className="px-3 py-2 text-center">
                                     <input type="checkbox" checked={!!packed[idx]} disabled={!batch}
                                         aria-label={`Mark ${line.drug} packed`}
@@ -970,13 +970,13 @@ function TransactionsTab() {
                         ) : rows.map((r) => (
                             <tr key={r.dispense_id}>
                                 <td className="px-3 py-1.5 whitespace-nowrap">
-                                    {r.dispensed_at ? new Date(r.dispensed_at).toLocaleString() : '—'}
+                                    {r.dispensed_at ? new Date(r.dispensed_at).toLocaleString() : '-'}
                                 </td>
                                 <td className="px-3 py-1.5">{r.item_name}</td>
                                 <td className="px-3 py-1.5 text-right">{r.quantity}</td>
                                 <td className="px-3 py-1.5 text-right font-mono">{Number(r.total_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                 <td className="px-3 py-1.5">{r.patient_id ? `#${r.patient_id}` : 'Walk-in'}</td>
-                                <td className="px-3 py-1.5">{r.payment_method || '—'}</td>
+                                <td className="px-3 py-1.5">{r.payment_method || '-'}</td>
                                 <td className="px-3 py-1.5">
                                     <span
                                         aria-label={`Invoice status: ${r.invoice_status}`}
@@ -987,7 +987,7 @@ function TransactionsTab() {
                                         'bg-ink-50 dark:bg-ink-900/40 text-ink-600 dark:text-ink-400'
                                     )}>{r.invoice_status}</span>
                                 </td>
-                                <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{r.cashier || '—'}</td>
+                                <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{r.cashier || '-'}</td>
                                 <td className="px-3 py-1.5 text-right">
                                     <button type="button" onClick={() => printReceipt(r.dispense_id)}
                                             className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
@@ -1059,14 +1059,14 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                     setMpesaError(r.data?.mpesa_result_desc || 'Cancelled by the customer.');
                 }
             } catch {
-                // Transient — keep polling until the countdown ends.
+                // Transient: keep polling until the countdown ends.
             }
         }, POLL_MS);
 
         return () => { clearInterval(tick); clearInterval(poll); };
     }, [mpesaStatus, dispenseId, onSettled]);
 
-    // Live push — flips the modal the instant the webhook settles, ahead of
+    // Live push: flips the modal the instant the webhook settles, ahead of
     // the next poll. Polling above stays as the fallback.
     usePaymentSocket(mpesaStatus === 'waiting', (data) => {
         if (mpesaStatus !== 'waiting' || data.dispense_id !== dispenseId) return;

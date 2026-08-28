@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 /**
- * ErrorState — the "this did not load" state for any collection surface.
+ * ErrorState: the "this did not load" state for any collection surface.
  *
  *  The fourth of the four states every list, table, board and panel ships:
  *  empty (EmptyState), loading (SkeletonTable), error (this), and denied

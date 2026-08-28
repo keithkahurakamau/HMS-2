@@ -1,4 +1,4 @@
-/* Budgeting — create budgets, edit per-account/period amounts on a grid,
+/* Budgeting: create budgets, edit per-account/period amounts on a grid,
  * and compare against posted actuals. Backed by /api/accounting/budgets. */
 import React, { useEffect, useReducer, useRef, useState } from 'react';
 import { apiClient } from '../../api/client';
@@ -68,7 +68,7 @@ export default function BudgetingTab() {
                                         {b.status}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2 text-ink-500 dark:text-ink-400 truncate max-w-xs">{b.notes || '—'}</td>
+                                <td className="px-4 py-2 text-ink-500 dark:text-ink-400 truncate max-w-xs">{b.notes || '-'}</td>
                                 <td className="px-4 py-2 text-right">
                                     <button type="button" onClick={() => setSelectedId(b.budget_id)}
                                             className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
@@ -222,7 +222,7 @@ function BudgetGrid({ budget, accounts, periods }) {
     // and not a shared module-scope singleton that could be mutated across instances).
     // Seeded once from the budget at mount via a lazy initializer. The parent
     // renders us with key={budget.budget_id}, so selecting a different budget
-    // remounts this grid and re-seeds from the new lines — instead of an effect
+    // remounts this grid and re-seeds from the new lines, instead of an effect
     // resetting state when the budget prop changes (no-adjust-state-on-prop-change).
     const [values, setValues] = useState(() => {
         const v = {};
@@ -271,7 +271,7 @@ function BudgetGrid({ budget, accounts, periods }) {
     return (
         <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2 border-b border-ink-100 dark:border-ink-800 text-xs text-ink-500 dark:text-ink-400">
-                <span>Edit any cell — changes save automatically.</span>
+                <span>Edit any cell, changes save automatically.</span>
                 {savedAt && <span className="text-emerald-600">Saved {savedAt.toLocaleTimeString()}</span>}
             </div>
             <div className="overflow-x-auto">
@@ -379,7 +379,7 @@ function VsActualView({ budgetId, periods }) {
                                         {formatAmount(r.variance)}
                                     </td>
                                     <td className="px-4 py-2 text-right text-ink-500 dark:text-ink-400">
-                                        {r.variance_pct == null ? '—' : `${Number(r.variance_pct).toFixed(1)}%`}
+                                        {r.variance_pct == null ? '-' : `${Number(r.variance_pct).toFixed(1)}%`}
                                     </td>
                                 </tr>
                             ))}

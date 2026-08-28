@@ -6,16 +6,15 @@ import { apiClient } from '../../api/client';
 /**
  * Per-user permission overrides editor.
  *
- * Mental model: every permission has one of three states for this user —
- *   • inherit — uses the role's default (no override row stored)
- *   • grant   — force-on, even if the role doesn't include it
- *   • revoke  — force-off, even if the role includes it
+ * Mental model: every permission has one of three states for this user,  *   • inherit, uses the role's default (no override row stored)
+ *   • grant, force-on, even if the role doesn't include it
+ *   • revoke, force-off, even if the role includes it
  *
  * The Admin role can't be overridden (wildcard by design); we render a
  * read-only banner if the target user is an Admin.
  */
 // The initial fetch loads the catalogue + the user's saved overrides and flips
-// the loading flag — one logical unit, so it lives in a single reducer.
+// the loading flag: one logical unit, so it lives in a single reducer.
 const initialLoad = { data: null, permissions: [], loading: true };
 function loadReducer(state, action) {
     switch (action.type) {
@@ -217,7 +216,7 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                                                             {p.codename}
                                                         </p>
                                                         <p className="text-2xs text-slate-500 dark:text-ink-400 truncate mt-0.5">
-                                                            {p.description || '—'}
+                                                            {p.description || '-'}
                                                         </p>
                                                         <div className="flex gap-1.5 mt-1 flex-wrap">
                                                             {fromRole && (

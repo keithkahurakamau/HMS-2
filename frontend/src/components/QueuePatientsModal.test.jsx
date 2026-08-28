@@ -65,7 +65,7 @@ describe('filtering', () => {
         const user = userEvent.setup();
         setup();
         await user.type(screen.getByLabelText(/Filter queued patients/i), 'Cynthia');
-        // Third in the queue — must not renumber to 1 just because it's alone.
+        // Third in the queue: must not renumber to 1 just because it's alone.
         expect(screen.getByRole('cell', { name: '3' })).toBeInTheDocument();
     });
 });
@@ -90,7 +90,7 @@ describe('actions', () => {
         const user = userEvent.setup();
         const h = setup();
         await user.click(screen.getByRole('button', { name: /Remove all from queue/i }));
-        // First click only asks — clearing everyone is not undoable from the UI.
+        // First click only asks: clearing everyone is not undoable from the UI.
         expect(h.onClearQueue).not.toHaveBeenCalled();
         expect(screen.getByText(/Remove all 3 patients/i)).toBeInTheDocument();
 

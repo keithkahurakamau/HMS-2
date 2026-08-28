@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { NOTIFICATION_CATEGORY_ICONS, NOTIFICATION_CATEGORY_STYLE } from '../constants/notificationCategories';
 
 /* ──────────────────────────────────────────────────────────────────────────
- * NotificationToast — the live "sneak peek" popup for a just-arrived
+ * NotificationToast: the live "sneak peek" popup for a just-arrived
  * notification (see useNotificationSocket). Rendered via react-hot-toast's
  * toast.custom(), which handles the auto-dismiss timer itself; this
  * component is just the card. Clicking it behaves like clicking the same

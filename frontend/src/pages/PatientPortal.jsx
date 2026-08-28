@@ -369,7 +369,7 @@ function PortalPreview({ icon, label }) {
 }
 
 /*
- * ValidatedField — text/date input with inline validation micro-interactions.
+ * ValidatedField: text/date input with inline validation micro-interactions.
  * The ring shifts green when the value is valid (after the field is touched)
  * and red with a message when it is wrong, so a patient gets immediate, calm
  * feedback while typing rather than a single error on submit.

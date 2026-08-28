@@ -121,7 +121,7 @@ export default function RolesManager() {
     const savePerms = async () => {
         if (!activeRole) return;
         if (activeRole.name === 'Admin') {
-            toast.error('Admin permissions cannot be edited — they cover everything.');
+            toast.error('Admin permissions cannot be edited, they cover everything.');
             return;
         }
         setSavingPerms(true);
@@ -205,7 +205,7 @@ export default function RolesManager() {
                                 const isActive = r.role_id === activeRoleId;
                                 return (
                                     <li key={r.role_id}>
-                                        {/* Clickable row containing a Delete button — a native <button> can't nest another, so role="button" is the correct pattern here. */}
+                                        {/* Clickable row containing a Delete button, a native <button> can't nest another, so role="button" is the correct pattern here. */}
                                         {/* react-doctor-disable-next-line react-doctor/prefer-tag-over-role */}
                                         <div role="button" tabIndex={0}
                                             onClick={() => setActiveRoleId(r.role_id)}
@@ -263,7 +263,7 @@ export default function RolesManager() {
                                     </div>
                                     {activeRole.name === 'Admin' ? (
                                         <span className="text-xs font-bold text-slate-500 dark:text-ink-400 flex items-center gap-1">
-                                            <Lock size={12} /> Locked — full access
+                                            <Lock size={12} /> Locked, full access
                                         </span>
                                     ) : (
                                         <button type="button"

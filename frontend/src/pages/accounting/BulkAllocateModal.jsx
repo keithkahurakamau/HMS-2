@@ -8,7 +8,7 @@ import { ModalShell, ModalActions, Field } from './ui';
 import { formatAmount } from './format';
 
 // The editable form is one logical unit (per-item amounts + a notes field),
-// so it lives in a single reducer rather than separate useState slices — one
+// so it lives in a single reducer rather than separate useState slices, one
 // dispatch = one render, and the transitions are testable in isolation.
 const initialForm = { amounts: {}, notes: '' }; // amounts: item_id → string
 function formReducer(state, action) {
@@ -124,8 +124,8 @@ export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
                             {items.map(it => (
                                 <tr key={it.item_id}>
                                     <td className="px-3 py-1.5 font-mono text-xs">{it.schedule_number}</td>
-                                    <td className="px-3 py-1.5">{it.patient_name || '—'}</td>
-                                    <td className="px-3 py-1.5">{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '—')}</td>
+                                    <td className="px-3 py-1.5">{it.patient_name || '-'}</td>
+                                    <td className="px-3 py-1.5">{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '-')}</td>
                                     <td className="px-3 py-1.5 text-right font-mono">{formatAmount(it.remaining)}</td>
                                     <td className="px-2 py-1">
                                         <input type="number" step="0.01" min="0" max={it.remaining}
