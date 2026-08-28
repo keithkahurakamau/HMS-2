@@ -27,17 +27,25 @@ import { useActivePatient } from '../context/PatientContext';
 // modal whether picking a specific staff member is required, optional, or
 // not applicable. Billing → cashier role; Wards/Pharmacy/Lab/Radiology
 // → their respective clinical role; Clinical → Doctor.
+// Quiet by default, brand on hover. See the note on the route chips below.
+const ROUTE_CHIP =
+    'bg-white dark:bg-ink-900 text-ink-600 dark:text-ink-300 ' +
+    'border-ink-200 dark:border-ink-700 ' +
+    'hover:bg-brand-50 hover:text-brand-700 hover:border-brand-200 ' +
+    'dark:hover:bg-brand-500/10 dark:hover:text-brand-300 dark:hover:border-brand-500/30 ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
+
 const ROUTE_TARGETS = [
-    { department: 'Triage',       label: 'Triage',    icon: HeartPulse,  role: 'Nurse',           assignment: 'optional', accent: 'bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200' },
-    { department: 'Consultation', label: 'Clinical Desk', icon: Stethoscope, role: 'Doctor',       assignment: 'optional', accent: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200' },
-    { department: 'Laboratory',   label: 'Laboratory', icon: TestTube,    role: 'Lab Technician',  assignment: 'optional', accent: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' },
-    { department: 'Radiology',    label: 'Radiology', icon: Image,       role: 'Radiologist',     assignment: 'optional', accent: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200' },
-    { department: 'Pharmacy',     label: 'Pharmacy',  icon: Pill,        role: 'Pharmacist',      assignment: 'optional', accent: 'bg-accent-50 text-accent-700 hover:bg-accent-100 border-accent-200' },
-    { department: 'Billing',      label: 'Billing',   icon: CreditCard,  role: 'Receptionist',    assignment: 'optional', accent: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },
-    { department: 'Wards',        label: 'Wards',     icon: Bed,         role: 'Nurse',           assignment: 'optional', accent: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200' },
-    { department: 'Maternity',    label: 'Maternity', icon: Baby,        role: 'Nurse',           assignment: 'optional', accent: 'bg-pink-50 text-pink-700 hover:bg-pink-100 border-pink-200' },
-    { department: 'Dialysis',     label: 'Dialysis',  icon: Droplet,     role: 'Nurse',           assignment: 'optional', accent: 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border-cyan-200' },
-    { department: 'Theatre',      label: 'Theatre',   icon: Scissors,    role: 'Doctor',          assignment: 'optional', accent: 'bg-violet-50 text-violet-700 hover:bg-violet-100 border-violet-200' },
+    { department: 'Triage',       label: 'Triage',    icon: HeartPulse,  role: 'Nurse',           assignment: 'optional', accent: ROUTE_CHIP },
+    { department: 'Consultation', label: 'Clinical Desk', icon: Stethoscope, role: 'Doctor',       assignment: 'optional', accent: ROUTE_CHIP },
+    { department: 'Laboratory',   label: 'Laboratory', icon: TestTube,    role: 'Lab Technician',  assignment: 'optional', accent: ROUTE_CHIP },
+    { department: 'Radiology',    label: 'Radiology', icon: Image,       role: 'Radiologist',     assignment: 'optional', accent: ROUTE_CHIP },
+    { department: 'Pharmacy',     label: 'Pharmacy',  icon: Pill,        role: 'Pharmacist',      assignment: 'optional', accent: ROUTE_CHIP },
+    { department: 'Billing',      label: 'Billing',   icon: CreditCard,  role: 'Receptionist',    assignment: 'optional', accent: ROUTE_CHIP },
+    { department: 'Wards',        label: 'Wards',     icon: Bed,         role: 'Nurse',           assignment: 'optional', accent: ROUTE_CHIP },
+    { department: 'Maternity',    label: 'Maternity', icon: Baby,        role: 'Nurse',           assignment: 'optional', accent: ROUTE_CHIP },
+    { department: 'Dialysis',     label: 'Dialysis',  icon: Droplet,     role: 'Nurse',           assignment: 'optional', accent: ROUTE_CHIP },
+    { department: 'Theatre',      label: 'Theatre',   icon: Scissors,    role: 'Doctor',          assignment: 'optional', accent: ROUTE_CHIP },
 ];
 
 const initialsOf = (patient) => {
