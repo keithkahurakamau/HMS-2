@@ -294,6 +294,12 @@
            bg-ink-50 dark:bg-ink-900
            border-b border-ink-200 dark:border-ink-800;
     height: var(--row-h);
+  }
+  /* Opt-in, and only valid when the table sits inside its own scroll container.
+     Applied by hand rather than by default, because sticky resolves against the
+     nearest scrolling ancestor: on a table that just flows down the page the
+     header detaches and floats over the page header. */
+  .table-clean.table-sticky thead th {
     position: sticky;
     top: 0;
     z-index: 1;

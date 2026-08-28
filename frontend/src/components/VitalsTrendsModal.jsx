@@ -75,7 +75,7 @@ export default function VitalsTrendsModal({ patient, onClose }) {
                         </p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="table-clean">
+                            <table className="table-clean table-sticky">
                                 <thead>
                                     <tr className="text-left text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 border-b border-ink-200 dark:border-ink-800 bg-ink-50/60 dark:bg-ink-800/40">
                                         <th scope="col" className="px-4 py-2.5">Date</th>

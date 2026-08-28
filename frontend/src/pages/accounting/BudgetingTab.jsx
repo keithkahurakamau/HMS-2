@@ -275,7 +275,7 @@ function BudgetGrid({ budget, accounts, periods }) {
                 {savedAt && <span className="text-emerald-600">Saved {savedAt.toLocaleTimeString()}</span>}
             </div>
             <div className="overflow-x-auto">
-                <table className="table-clean">
+                <table className="table-clean table-sticky">
                     <thead>
                         <tr>
                             <th className="font-medium sticky left-0 bg-ink-50/60 dark:bg-ink-800/40 z-10 min-w-[220px]">Account</th>

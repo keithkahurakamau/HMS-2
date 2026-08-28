@@ -297,7 +297,7 @@ export default function Inventory() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="table-clean min-w-[600px]">
+                    <table className="table-clean table-sticky min-w-[600px]">
                         <thead>
                             <tr>
                                 <th>Item details</th>

@@ -948,7 +948,7 @@ function TransactionsTab() {
             </div>
 
             <div className="overflow-x-auto border border-ink-200/70 rounded-lg">
-                <table className="table-clean">
+                <table className="table-clean table-sticky">
                     <thead>
                         <tr>
                             <th className="font-medium">Date</th>

@@ -665,7 +665,7 @@ export default function Laboratory() {
 
                                                 {consumedItems.length > 0 ? (
                                                     <div className="card-flush overflow-x-auto">
-                                                        <table className="table-clean min-w-[400px]">
+                                                        <table className="table-clean table-sticky min-w-[400px]">
                                                             <thead>
                                                                 <tr>
                                                                     <th>Item &amp; batch</th>
@@ -738,7 +738,7 @@ export default function Laboratory() {
                     </div>
 
                     <div data-tour="lab-catalog" className="flex-1 overflow-auto">
-                        <table className="table-clean min-w-[700px]">
+                        <table className="table-clean table-sticky min-w-[700px]">
                             <thead>
                                 <tr>
                                     <th>Test</th>

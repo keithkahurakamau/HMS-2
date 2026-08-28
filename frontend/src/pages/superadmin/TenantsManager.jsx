@@ -227,7 +227,7 @@ export default function TenantsManager() {
                     </div>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="table-clean">
+                    <table className="table-clean table-sticky">
                         <thead>
                             <tr>
                                 <th>Tenant</th>

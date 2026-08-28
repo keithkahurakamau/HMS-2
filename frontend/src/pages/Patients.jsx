@@ -640,7 +640,7 @@ export default function Patients() {
             {/* ── Desktop table (md+) ─────────────────────────────────────── */}
             <div className="hidden md:block card overflow-visible">
                 <div className="overflow-x-auto overflow-y-visible">
-                    <table className="table-clean">
+                    <table className="table-clean table-sticky">
                         <thead>
                             <tr>
                                 <th>Patient</th>

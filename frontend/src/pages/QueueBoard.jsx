@@ -144,7 +144,7 @@ function LiveQueue() {
 
             {/* Table */}
             <div className="flex-1 overflow-auto custom-scrollbar">
-                <table className="table-clean min-w-[860px]">
+                <table className="table-clean table-sticky min-w-[860px]">
                     <thead>
                         <tr>
                             <th>Q.No</th>

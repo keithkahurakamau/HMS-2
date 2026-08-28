@@ -390,7 +390,7 @@ export default function Wards() {
 
                                 {cart.length > 0 && (
                                     <div className="mb-4 card-flush overflow-x-auto">
-                                        <table className="table-clean min-w-[400px]">
+                                        <table className="table-clean table-sticky min-w-[400px]">
                                             <thead>
                                                 <tr>
                                                     <th>Item to administer</th>

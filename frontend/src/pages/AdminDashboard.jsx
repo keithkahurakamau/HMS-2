@@ -245,7 +245,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex-1 overflow-auto">
-                        <table className="table-clean min-w-[800px]">
+                        <table className="table-clean table-sticky min-w-[800px]">
                             <thead>
                                 <tr>
                                     <th>Staff Member</th>
@@ -349,7 +349,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex-1 overflow-auto">
-                        <table className="table-clean min-w-[800px]">
+                        <table className="table-clean table-sticky min-w-[800px]">
                             <thead>
                                 <tr>
                                     <th>Service / Test Name</th>
@@ -404,7 +404,7 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500 mt-1">Tracks all critical CREATE, UPDATE, and DELETE operations across the hospital infrastructure.</p>
                     </div>
                     <div className="flex-1 overflow-auto">
-                        <table className="table-clean min-w-[800px]">
+                        <table className="table-clean table-sticky min-w-[800px]">
                             <thead>
                                 <tr>
                                     <th>Timestamp (UTC)</th>

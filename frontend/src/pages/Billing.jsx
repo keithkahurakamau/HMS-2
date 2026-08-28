@@ -311,7 +311,7 @@ export default function Billing() {
                                 <div>
                                     <h3 className="section-eyebrow mb-3 border-b border-ink-100 dark:border-ink-800 pb-2">Itemized breakdown</h3>
                                     <div className="card-flush overflow-hidden overflow-x-auto">
-                                        <table className="table-clean min-w-[500px]">
+                                        <table className="table-clean table-sticky min-w-[500px]">
                                             <thead>
                                                 <tr>
                                                     <th>Description</th>
@@ -455,7 +455,7 @@ export default function Billing() {
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 bg-ink-50/40 custom-scrollbar">
                             <div className="card overflow-hidden overflow-x-auto">
-                                <table className="table-clean min-w-[900px]">
+                                <table className="table-clean table-sticky min-w-[900px]">
                                     <thead className="sticky top-0">
                                         <tr>
                                             <th>Timestamp</th>

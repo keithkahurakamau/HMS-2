@@ -333,7 +333,7 @@ export default function Cheques() {
             {/* Table */}
             <div className="card overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="table-clean min-w-[900px]">
+                    <table className="table-clean table-sticky min-w-[900px]">
                         <thead>
                             <tr>
                                 <th>Cheque #</th>

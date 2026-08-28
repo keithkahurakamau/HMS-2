@@ -374,7 +374,7 @@ export default function Radiology() {
                     </div>
 
                     <div data-tour="radio-catalog" className="flex-1 overflow-auto">
-                        <table className="table-clean min-w-[700px]">
+                        <table className="table-clean table-sticky min-w-[700px]">
                             <thead>
                                 <tr>
                                     <th>Exam</th>

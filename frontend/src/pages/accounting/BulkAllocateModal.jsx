@@ -110,7 +110,7 @@ export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
                 <div className="p-6 text-sm text-ink-500 dark:text-ink-400">No claim items with an unallocated balance.</div>
             ) : (
                 <div className="border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
-                    <table className="table-clean">
+                    <table className="table-clean table-sticky">
                         <thead>
                             <tr>
                                 <th className="font-medium">Claim</th>

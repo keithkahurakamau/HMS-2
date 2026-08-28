@@ -137,7 +137,7 @@ export default function SessionBoard({ order, onChanged }) {
 
       {(order.observations || []).length > 0 && (
         <div className="overflow-x-auto rounded-xl border border-ink-200/70 dark:border-ink-800">
-          <table className="table-clean">
+          <table className="table-clean table-sticky">
             <thead>
               <tr><th>Time</th><th>BP</th><th>Pulse</th><th>UF mL</th></tr>
             </thead>

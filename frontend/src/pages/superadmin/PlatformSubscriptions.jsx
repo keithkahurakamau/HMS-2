@@ -339,7 +339,7 @@ function TxnTable({ txns, tenants }) {
     }
     return (
         <div className="overflow-x-auto">
-            <table className="table-clean">
+            <table className="table-clean table-sticky">
                 <thead>
                     <tr>
                         <th>Tenant</th><th>Amount</th>

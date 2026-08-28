@@ -248,7 +248,7 @@ export default function UsersManager() {
 
                                 {/* Desktop table */}
                                 <div className="hidden lg:block overflow-x-auto">
-                                    <table className="table-clean">
+                                    <table className="table-clean table-sticky">
                                         <thead>
                                             <tr>
                                                 <th>Name</th>

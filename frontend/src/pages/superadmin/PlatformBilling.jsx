@@ -149,7 +149,7 @@ export default function PlatformBilling() {
 
                 {/* Desktop table */}
                 <div className="hidden md:block overflow-x-auto">
-                    <table className="table-clean">
+                    <table className="table-clean table-sticky">
                         <thead>
                             <tr>
                                 <th>Tenant</th>
