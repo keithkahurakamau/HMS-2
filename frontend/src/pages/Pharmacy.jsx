@@ -422,15 +422,15 @@ export default function Pharmacy() {
             />
             {/* GLOBAL PHARMACY HEADER & TABS */}
             <div data-tour="pharmacy-tabs" className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
-                <div role="tablist" aria-label="Pharmacy mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
-                    <button type="button" role="tab" aria-selected={activeTab === 'rx'} onClick={() => setActiveTab('rx')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'rx' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
-                        <Pill size={16} className={activeTab === 'rx' ? 'text-brand-600' : 'text-ink-400'} /> Rx Fulfillment
+                <div role="tablist" aria-label="Pharmacy mode" className="segmented max-w-md">
+                    <button type="button" role="tab" aria-selected={activeTab === 'rx'} onClick={() => setActiveTab('rx')} className={`segmented-option ${activeTab === 'rx' ? 'segmented-option-active' : ''}`}>
+                        <Pill size={16} className={activeTab === 'rx' ? 'text-brand-600 dark:text-brand-400' : 'text-ink-400'} /> Rx Fulfillment
                     </button>
-                    <button type="button" role="tab" aria-selected={activeTab === 'otc'} onClick={() => setActiveTab('otc')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'otc' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
-                        <Store size={16} className={activeTab === 'otc' ? 'text-accent-600' : 'text-ink-400'} /> OTC Point of Sale
+                    <button type="button" role="tab" aria-selected={activeTab === 'otc'} onClick={() => setActiveTab('otc')} className={`segmented-option ${activeTab === 'otc' ? 'segmented-option-active' : ''}`}>
+                        <Store size={16} className={activeTab === 'otc' ? 'text-accent-600 dark:text-accent-400' : 'text-ink-400'} /> OTC Point of Sale
                     </button>
-                    <button type="button" role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'transactions' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
-                        <History size={16} className={activeTab === 'transactions' ? 'text-brand-600' : 'text-ink-400'} /> Transactions
+                    <button type="button" role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`segmented-option ${activeTab === 'transactions' ? 'segmented-option-active' : ''}`}>
+                        <History size={16} className={activeTab === 'transactions' ? 'text-brand-600 dark:text-brand-400' : 'text-ink-400'} /> Transactions
                     </button>
                 </div>
                 <div className="text-right px-3 text-xs font-semibold text-ink-500">

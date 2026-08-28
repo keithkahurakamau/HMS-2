@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    ChevronLeft, ChevronRight, X, Sparkles, CheckCircle2,
+    ChevronLeft, ChevronRight, X, CheckCircle2,
     ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Compass,
 } from 'lucide-react';
 import { useJourney } from '../context/JourneyContext';
@@ -193,64 +193,58 @@ export default function JourneyOverlay() {
                 role="dialog"
                 aria-label={step.title}
             >
-                <div className="bg-gradient-to-br from-brand-500 via-teal-500 to-accent-500 p-[1.5px] rounded-2xl">
-                    <div className="rounded-[14px] glass-card p-5 backdrop-blur-2xl">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                            <div className="flex items-center gap-2.5">
-                                <span className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shrink-0">
-                                    <Compass size={17} />
+                <div className="overlay-surface overflow-hidden">
+                    {/* Progress reads as one continuous bar rather than a row of
+                        dots: with eight-step tours the dots became noise, and a
+                        bar says how far along you are at a glance. */}
+                    <div className="h-1 w-full bg-ink-100 dark:bg-ink-800" aria-hidden="true">
+                        <div
+                            className="h-full bg-brand-600 dark:bg-brand-400"
+                            style={{
+                                width: `${((stepIdx + 1) / total) * 100}%`,
+                                transition: 'width var(--dur-slow) var(--ease-out)',
+                            }}
+                        />
+                    </div>
+
+                    <div className="p-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-300">
+                                <Compass size={13} aria-hidden="true" />
+                                Guided tour
+                                <span className="text-ink-400 dark:text-ink-500" aria-hidden="true">/</span>
+                                <span className="tnum text-ink-500 dark:text-ink-400">
+                                    {stepIdx + 1} of {total}
                                 </span>
-                                <div>
-                                    <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-700">
-                                        Guided tour
-                                    </div>
-                                    <div className="text-2xs font-semibold text-ink-500">
-                                        Step {stepIdx + 1} of {total}
-                                    </div>
-                                </div>
-                            </div>
+                            </p>
                             <button
                                 type="button"
                                 onClick={skipCurrent}
                                 aria-label="Skip this tour"
-                                className="p-1 rounded-md text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition-colors cursor-pointer"
+                                className="-m-1 p-1 rounded-md text-ink-400 hover:text-ink-700 hover:bg-ink-100 dark:text-ink-500 dark:hover:text-ink-200 dark:hover:bg-ink-800 transition-colors cursor-pointer"
                             >
                                 <X size={16} />
                             </button>
                         </div>
 
-                        <h3 className="text-base font-semibold text-ink-900 tracking-tight flex items-start gap-2">
-                            <Sparkles size={14} className="text-teal-500 shrink-0 mt-1" />
-                            <span>{step.title}</span>
+                        <h3 className="mt-3 text-[1.0625rem] font-semibold leading-snug tracking-tight text-ink-900 dark:text-ink-100 text-balance">
+                            {step.title}
                         </h3>
-                        <p className="mt-2 text-sm text-ink-700 leading-relaxed">{step.body}</p>
+                        <p className="mt-1.5 text-sm leading-relaxed text-ink-600 dark:text-ink-300">
+                            {step.body}
+                        </p>
 
                         {step.tip && (
-                            <div className="mt-3 rounded-xl bg-brand-50/70 ring-1 ring-brand-100 px-3 py-2 text-xs text-brand-800">
-                                <span className="font-semibold">Tip, </span>{step.tip}
-                            </div>
+                            <p className="mt-3 rounded-lg border-l-2 border-brand-500 bg-brand-50 dark:bg-brand-500/10 px-3 py-2 text-xs text-brand-800 dark:text-brand-200">
+                                <span className="font-semibold">Tip: </span>{step.tip}
+                            </p>
                         )}
 
-                        <div className="mt-4 flex items-center gap-1.5" aria-hidden="true">
-                            {activeSteps.map((_, i) => (
-                                <span
-                                    key={i}
-                                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                                        i === stepIdx
-                                            ? 'w-8 bg-gradient-to-r from-brand-500 to-teal-500'
-                                            : i < stepIdx
-                                                ? 'w-1.5 bg-brand-300'
-                                                : 'w-1.5 bg-ink-200'
-                                    }`}
-                                />
-                            ))}
-                        </div>
-
-                        <div className="mt-4 flex items-center justify-between gap-2">
+                        <div className="mt-5 flex items-center justify-between gap-2 border-t border-ink-100 dark:border-ink-800 pt-3">
                             <button
                                 type="button"
                                 onClick={skipAll}
-                                className="text-xs font-medium text-ink-500 hover:text-ink-900 transition-colors cursor-pointer"
+                                className="text-xs font-medium text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100 transition-colors cursor-pointer"
                             >
                                 Skip all tours
                             </button>
@@ -259,7 +253,7 @@ export default function JourneyOverlay() {
                                     <button
                                         type="button"
                                         onClick={() => setStepIdx(i => Math.max(0, i - 1))}
-                                        className="btn-secondary text-xs px-3 py-1.5"
+                                        className="btn btn-secondary btn-xs"
                                     >
                                         <ChevronLeft size={13} /> Back
                                     </button>
@@ -268,7 +262,7 @@ export default function JourneyOverlay() {
                                     <button
                                         type="button"
                                         onClick={() => setStepIdx(i => Math.min(total - 1, i + 1))}
-                                        className="btn-primary text-xs px-3 py-1.5"
+                                        className="btn btn-primary btn-xs"
                                     >
                                         Next <ChevronRight size={13} />
                                     </button>
@@ -276,7 +270,7 @@ export default function JourneyOverlay() {
                                     <button
                                         type="button"
                                         onClick={completeCurrent}
-                                        className="btn-primary text-xs px-3 py-1.5"
+                                        className="btn btn-primary btn-xs"
                                     >
                                         <CheckCircle2 size={13} /> Got it
                                     </button>

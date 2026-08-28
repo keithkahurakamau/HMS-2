@@ -433,14 +433,14 @@ export default function Laboratory() {
 
             {/* Tabs */}
             <div data-tour="lab-tabs" className="card p-2 flex items-center justify-between shrink-0">
-                <div role="tablist" aria-label="Laboratory mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
+                <div role="tablist" aria-label="Laboratory mode" className="segmented max-w-md">
                     <button type="button" role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
-                        <Microscope size={16} className={activeTab === 'queue' ? 'text-brand-600' : 'text-ink-400'} /> Lab Operations
+                            className={`segmented-option ${activeTab === 'queue' ? 'segmented-option-active' : ''}`}>
+                        <Microscope size={16} className={activeTab === 'queue' ? 'text-brand-600 dark:text-brand-400' : 'text-ink-400'} /> Lab Operations
                     </button>
                     <button type="button" role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
-                        <FileDigit size={16} className={activeTab === 'catalog' ? 'text-accent-600' : 'text-ink-400'} /> Test Catalog
+                            className={`segmented-option ${activeTab === 'catalog' ? 'segmented-option-active' : ''}`}>
+                        <FileDigit size={16} className={activeTab === 'catalog' ? 'text-accent-600 dark:text-accent-400' : 'text-ink-400'} /> Test Catalog
                     </button>
                 </div>
             </div>

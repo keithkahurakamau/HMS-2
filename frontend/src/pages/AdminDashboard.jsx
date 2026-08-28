@@ -151,7 +151,7 @@ export default function AdminDashboard() {
             />
             {/* HEADER & TABS: unified pill row, single accent for active state */}
             <div data-tour="admin-tabs" className="card p-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between shrink-0 gap-2">
-                <div role="tablist" aria-label="Admin sections" className="flex flex-wrap bg-ink-100/70 p-1 rounded-xl w-full lg:w-auto lg:flex-1 gap-1">
+                <div role="tablist" aria-label="Admin sections" className="segmented flex-wrap w-full lg:w-auto lg:flex-1">
                     {[
                         { key: 'overview',    label: 'Overview',         icon: LayoutDashboard },
                         { key: 'staff',       label: 'Directory',        icon: Users },
@@ -167,12 +167,9 @@ export default function AdminDashboard() {
                                 role="tab"
                                 aria-selected={isActive}
                                 onClick={() => setActiveTab(key)}
-                                className={`flex-1 min-w-[7rem] flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all
-                                            ${isActive
-                                                ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70'
-                                                : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 hover:bg-white/60'}`}
+                                className={`segmented-option flex-1 min-w-[7rem] ${isActive ? 'segmented-option-active' : ''}`}
                             >
-                                <Icon size={15} className={isActive ? 'text-brand-600' : 'text-ink-400'} />
+                                <Icon size={15} className={isActive ? 'text-brand-600 dark:text-brand-400' : 'text-ink-400'} />
                                 {label}
                             </button>
                         );
