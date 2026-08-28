@@ -7,9 +7,10 @@ import {
     ArrowDownCircle, ArrowUpCircle, XCircle, Eye, Send, Ban,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Cheque Register — incoming + outgoing                                     */
+/*  Cheque Register: incoming + outgoing                                     */
 /*                                                                            */
 /*  Incoming lifecycle: Received → Deposited → Cleared (posts Payment) |     */
 /*                                            Bounced | Cancelled            */
@@ -32,7 +33,7 @@ const STATUS_META = {
 const DRAWER_TYPES = ['Insurance', 'Employer', 'Patient', 'Government', 'Other'];
 const PAYEE_TYPES  = ['Supplier', 'Staff', 'Refund', 'Government', 'Other'];
 
-// Direction-aware form defaults — populated when the user picks
+// Direction-aware form defaults: populated when the user picks
 // Incoming or Outgoing on the create modal. Keeps the form fields
 // strictly mutually exclusive so the backend's validation never
 // trips on an accidental mixed-payload.
@@ -57,7 +58,7 @@ export default function Cheques() {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [drawerFilter, setDrawerFilter] = useState('');
-    // Direction tab — 'incoming' | 'outgoing'. Drives both the list filter
+    // Direction tab: 'incoming' | 'outgoing'. Drives both the list filter
     // and the create-modal default. Switching the tab refetches.
     const [direction, setDirection] = useState('incoming');
 
@@ -214,7 +215,7 @@ export default function Cheques() {
 
     /* ─── Derived ─── */
 
-    // Direction-aware KPI strip — incoming shows received/in-transit/cleared/
+    // Direction-aware KPI strip: incoming shows received/in-transit/cleared/
     // bounced; outgoing shows issued/in-transit/cleared/returned.
     const kpiTiles = useMemo(() => (
         direction === 'incoming'
@@ -238,7 +239,7 @@ export default function Cheques() {
                 eyebrow="Finance"
                 icon={Banknote}
                 title="Cheque Register"
-                subtitle="Track every cheque from receipt through clearance — including bounces."
+                subtitle="Track every cheque from receipt through clearance, including bounces."
                 actions={
                     <>
                         <button type="button" onClick={fetchAll} className="btn-secondary cursor-pointer"><RefreshCw size={15} /> Refresh</button>
@@ -249,29 +250,25 @@ export default function Cheques() {
                 }
             />
 
-            {/* Direction tabs — incoming (received) vs outgoing (issued).
+            {/* Direction tabs: incoming (received) vs outgoing (issued).
                 Sticky inside the page so the user can scan a long table
                 without losing the tab strip. */}
-            <div data-tour="cheque-direction-tabs" className="inline-flex p-1 rounded-2xl bg-ink-100/70 dark:bg-ink-800/40 ring-1 ring-ink-200/60 dark:ring-ink-800 shadow-soft">
+            <div data-tour="cheque-direction-tabs" role="tablist" aria-label="Cheque direction" className="segmented w-auto">
                 <button
                     type="button"
                     onClick={() => switchDirection('incoming')}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                        direction === 'incoming'
-                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
-                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-ink-800/50'
-                    }`}
+                    role="tab"
+                    aria-selected={direction === 'incoming'}
+                    className={`segmented-option ${direction === 'incoming' ? 'segmented-option-active' : ''}`}
                 >
                     <ArrowDownCircle size={15} /> Incoming
                 </button>
                 <button
                     type="button"
                     onClick={() => switchDirection('outgoing')}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                        direction === 'outgoing'
-                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
-                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-ink-800/50'
-                    }`}
+                    role="tab"
+                    aria-selected={direction === 'outgoing'}
+                    className={`segmented-option ${direction === 'outgoing' ? 'segmented-option-active' : ''}`}
                 >
                     <ArrowUpCircle size={15} /> Outgoing
                 </button>
@@ -336,7 +333,7 @@ export default function Cheques() {
             {/* Table */}
             <div className="card overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="table-clean min-w-[900px]">
+                    <table className="table-clean table-sticky min-w-[900px]">
                         <thead>
                             <tr>
                                 <th>Cheque #</th>
@@ -351,8 +348,7 @@ export default function Cheques() {
                         <tbody>
                             {isLoading ? (
                                 <tr><td colSpan="7" className="text-center py-10 text-ink-400">
-                                    <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Loading…
-                                </td></tr>
+                                    <SkeletonTable rows={4} cols={3} label="Loading" /></td></tr>
                             ) : cheques.length === 0 ? (
                                 <tr><td colSpan="7" className="text-center py-10 text-ink-500 dark:text-ink-400">No cheques match the current filters.</td></tr>
                             ) : cheques.map(c => {
@@ -364,7 +360,7 @@ export default function Cheques() {
                                     <tr key={c.cheque_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
                                         <td className="font-mono text-xs font-semibold text-brand-700 dark:text-brand-400">{c.cheque_number}</td>
                                         <td>
-                                            <div className="font-medium text-ink-900 dark:text-white">{counterparty || '—'}</div>
+                                            <div className="font-medium text-ink-900 dark:text-white">{counterparty || '-'}</div>
                                             <div className="text-2xs text-ink-500 dark:text-ink-400">{counterpartyType}</div>
                                         </td>
                                         <td>
@@ -374,7 +370,7 @@ export default function Cheques() {
                                         <td className="font-mono text-sm">{c.currency} {Number(c.amount).toLocaleString()}</td>
                                         <td className="text-xs text-ink-500 dark:text-ink-400">
                                             <Calendar size={11} className="inline mr-1 text-ink-400" />
-                                            {counterpartyDate ? new Date(counterpartyDate).toLocaleDateString() : '—'}
+                                            {counterpartyDate ? new Date(counterpartyDate).toLocaleDateString() : '-'}
                                         </td>
                                         <td><span className={meta.badge}>{c.status}</span></td>
                                         <td data-tour="cheque-row-actions" className="text-right">
@@ -441,7 +437,7 @@ export default function Cheques() {
             {isNewOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsNewOpen(false)} />
-                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
                                 <span className="section-eyebrow">Finance</span>
@@ -462,7 +458,7 @@ export default function Cheques() {
                                     onClick={() => setNewDraft(EMPTY_INCOMING)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                                         newDraft.direction === 'incoming'
-                                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white'
+                                            ? 'bg-brand-600 text-white'
                                             : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'
                                     }`}
                                 >
@@ -472,7 +468,7 @@ export default function Cheques() {
                                     onClick={() => setNewDraft(EMPTY_OUTGOING)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                                         newDraft.direction === 'outgoing'
-                                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white'
+                                            ? 'bg-brand-600 text-white'
                                             : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'
                                     }`}
                                 >
@@ -492,7 +488,7 @@ export default function Cheques() {
                                            onChange={e => setNewDraft({ ...newDraft, date_on_cheque: e.target.value })} />
                                 </div>
 
-                                {/* Counterparty block — drawer for incoming, payee for outgoing */}
+                                {/* Counterparty block: drawer for incoming, payee for outgoing */}
                                 {newDraft.direction === 'incoming' ? (
                                     <>
                                         <div className="col-span-2">
@@ -595,7 +591,7 @@ export default function Cheques() {
             {active && !actionPanel && (
                 <div className="fixed inset-0 z-40 flex justify-end pointer-events-none">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setActive(null)} />
-                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right pointer-events-auto">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right pointer-events-auto">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
                                 <span className="section-eyebrow">Cheque</span>
@@ -613,8 +609,8 @@ export default function Cheques() {
                             </div>
                             <Field label="Bank" value={`${active.bank_name}${active.bank_branch ? ` · ${active.bank_branch}` : ''}`} />
                             <Field label="Drawer type" value={active.drawer_type} />
-                            <Field label="Date on cheque" value={active.date_on_cheque ? new Date(active.date_on_cheque).toLocaleDateString() : '—'} />
-                            <Field label="Received on" value={active.date_received ? new Date(active.date_received).toLocaleString() : '—'} />
+                            <Field label="Date on cheque" value={active.date_on_cheque ? new Date(active.date_on_cheque).toLocaleDateString() : '-'} />
+                            <Field label="Received on" value={active.date_received ? new Date(active.date_received).toLocaleString() : '-'} />
                             {active.deposit_date && <Field label="Deposited" value={`${new Date(active.deposit_date).toLocaleString()}${active.deposit_account ? ` → ${active.deposit_account}` : ''}`} />}
                             {active.clearance_date && <Field label="Cleared" value={new Date(active.clearance_date).toLocaleString()} />}
                             {active.bounce_reason && <Field label="Bounce reason" value={active.bounce_reason} accent="rose" />}
@@ -630,7 +626,7 @@ export default function Cheques() {
             {/* ── Action panels ── */}
             {actionPanel && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/60 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md p-6 animate-slide-up">
+                    <div className="bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-md p-6 animate-slide-up">
                         <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-1 capitalize">{actionPanel} cheque</h3>
                         <p className="text-xs text-ink-500 dark:text-ink-400 mb-4">#{active?.cheque_number} · KES {Number(active?.amount).toLocaleString()}</p>
 

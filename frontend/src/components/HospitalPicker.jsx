@@ -9,11 +9,11 @@ import toast from 'react-hot-toast';
 import CountUp from './CountUp';
 
 /*
- * HospitalPicker — the multi-tenant "find your hospital" step, extracted from
+ * HospitalPicker: the multi-tenant "find your hospital" step, extracted from
  * the old standalone /portal page so it can live as a section on the Landing
  * page. Selecting a hospital records the tenant in localStorage (so the API
  * client attaches X-Tenant-ID on the next call) and routes the visitor to
- * `nextPath` — /login for staff, /patient for the patient portal.
+ * `nextPath`, /login for staff, /patient for the patient portal.
  *
  * Premium landing language (lp-*) so it matches the rest of the page.
  */

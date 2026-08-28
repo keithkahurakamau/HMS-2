@@ -1,7 +1,7 @@
 import React from 'react';
 import { History, Check, X } from 'lucide-react';
 
-// How long ago `date` was, in the coarse "3 minutes ago" style — no new
+// How long ago `date` was, in the coarse "3 minutes ago" style, no new
 // dependency, just enough precision for a recovery prompt.
 function timeAgo(date) {
     const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
@@ -15,7 +15,7 @@ function timeAgo(date) {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
- * DraftRecoveryBanner — paired with useDraftSafetyNet. Shown wherever a
+ * DraftRecoveryBanner: paired with useDraftSafetyNet. Shown wherever a
  * hasSavedDraft is true; lets the clinician see there's unsaved work waiting
  * and explicitly choose to bring it back (verbatim) or drop it. Never
  * decides for them.
@@ -28,7 +28,7 @@ export default function DraftRecoveryBanner({ savedAt, onRestore, onDiscard, lab
                 <p className="text-sm text-amber-800 dark:text-amber-200">
                     <span className="font-semibold">Unsaved {label} found</span>
                     {savedAt && <span className="text-amber-700 dark:text-amber-300"> from {timeAgo(savedAt)}</span>}
-                    — restore them?
+, restore them?
                 </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">

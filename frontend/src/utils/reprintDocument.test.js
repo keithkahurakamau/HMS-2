@@ -94,7 +94,7 @@ describe('visit summary rendering', () => {
     it('omits vitals that were never recorded', () => {
         const out = html();
         expect(out).toContain('118/76');
-        // temperature is null — no empty "Temperature —" row.
+        // temperature is null: no empty "Temperature , " row.
         expect(out).not.toContain('Temperature');
     });
 

@@ -50,7 +50,7 @@ function dataReducer(state, action) {
     }
 }
 
-// The five inbox filters — one object, so each change is a single dispatch.
+// The five inbox filters: one object, so each change is a single dispatch.
 const initialFilters = { search: '', statusFilter: 'Open', categoryFilter: '', priorityFilter: '', deskFilter: '' };
 function filtersReducer(state, action) {
     switch (action.type) {
@@ -101,7 +101,7 @@ export default function SupportInbox() {
             const res = await apiClient.get('/public/superadmin/tickets/summary');
             dispatchData({ type: 'setSummary', value: res.data || {} });
         } catch {
-            // Summary is decorative — silently degrade if it fails.
+            // Summary is decorative: silently degrade if it fails.
         }
     };
 
@@ -180,7 +180,7 @@ export default function SupportInbox() {
                 }
             />
 
-            {/* KPI row — filterable */}
+            {/* KPI row: filterable */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {STATUSES.map(s => {
                     const count = summary[s] || 0;
@@ -191,7 +191,7 @@ export default function SupportInbox() {
                             type="button"
                             onClick={() => dispatchFilters({ type: 'set', field: 'statusFilter', value: s })}
                             aria-pressed={isActive}
-                            className={`text-left rounded-2xl p-4 border transition-colors cursor-pointer ${
+                            className={`text-left rounded-xl p-4 border transition-colors cursor-pointer ${
                                 isActive
                                     ? 'bg-brand-50 border-brand-200 dark:bg-brand-500/10 dark:border-brand-500/20 ring-2 ring-brand-500/20'
                                     : 'card hover:bg-ink-50 dark:hover:bg-ink-800/50'
@@ -204,7 +204,7 @@ export default function SupportInbox() {
                 })}
             </div>
 
-            {/* Desk tabs — Support / Finance / Technical */}
+            {/* Desk tabs: Support / Finance / Technical */}
             <div className="flex gap-2 flex-wrap" role="tablist" aria-label="Support desks">
                 {['', ...Object.keys(DESKS)].map(d => {
                     const Icon = d ? DESKS[d].icon : LifeBuoy;
@@ -387,7 +387,7 @@ export default function SupportInbox() {
                                     const isPlatform = m.author_kind === 'platform';
                                     return (
                                         <div key={m.message_id} className={`flex ${isPlatform ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-3 border ${
+                                            <div className={`max-w-[85%] sm:max-w-[80%] rounded-xl p-3 border ${
                                                 isPlatform
                                                     ? 'bg-brand-50 border-brand-200 dark:bg-brand-500/10 dark:border-brand-500/20'
                                                     : 'bg-white border-ink-200 dark:bg-ink-900 dark:border-ink-800'

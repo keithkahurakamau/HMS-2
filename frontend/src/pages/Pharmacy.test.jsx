@@ -174,7 +174,7 @@ beforeEach(() => {
 });
 
 // ── 1. Tab navigation ────────────────────────────────────────────────────────
-describe('Pharmacy — tab navigation', () => {
+describe('Pharmacy: tab navigation', () => {
     it('renders with Rx tab active by default and switches to OTC when clicked', async () => {
         const user = userEvent.setup();
         renderWithProviders(<Pharmacy />);
@@ -220,7 +220,7 @@ describe('Pharmacy — tab navigation', () => {
 });
 
 // ── 2. Rx tab ────────────────────────────────────────────────────────────────
-describe('Pharmacy — Rx fulfillment tab', () => {
+describe('Pharmacy: Rx fulfillment tab', () => {
     it('fetches /clinical/prescriptions/pending on mount and renders the queue', async () => {
         renderWithProviders(<Pharmacy />);
 
@@ -310,7 +310,7 @@ describe('Pharmacy — Rx fulfillment tab', () => {
 });
 
 // ── 3. OTC inventory + cart ──────────────────────────────────────────────────
-describe('Pharmacy — OTC inventory & cart', () => {
+describe('Pharmacy: OTC inventory & cart', () => {
     async function openOtc(user) {
         renderWithProviders(<Pharmacy />);
         await waitFor(() =>
@@ -377,7 +377,7 @@ describe('Pharmacy — OTC inventory & cart', () => {
         const user = userEvent.setup();
         await openOtc(user);
 
-        // Cetirizine has stock=2 — click Add three times and the third
+        // Cetirizine has stock=2, click Add three times and the third
         // attempt should be rejected.
         const cetirizineCard = (await screen.findByText('Cetirizine 10mg')).closest('div');
         const cardWithButton = cetirizineCard.parentElement?.parentElement;
@@ -410,7 +410,7 @@ describe('Pharmacy — OTC inventory & cart', () => {
 //                  /payment-status until invoice_status='Paid' or mpesa_status='Success'.
 //
 // These tests exercise that flow end-to-end via the OTC bar.
-describe('Pharmacy — payment flow', () => {
+describe('Pharmacy: payment flow', () => {
     async function addToCartAndGetTotal(user, batchIdx = 0) {
         renderWithProviders(<Pharmacy />);
         await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/pharmacy/inventory'));
@@ -637,7 +637,7 @@ describe('Pharmacy — payment flow', () => {
 });
 
 // ── 5. Transactions ledger ───────────────────────────────────────────────────
-describe('Pharmacy — transactions ledger', () => {
+describe('Pharmacy: transactions ledger', () => {
     async function openTransactions(user) {
         renderWithProviders(<Pharmacy />);
         await waitFor(() =>

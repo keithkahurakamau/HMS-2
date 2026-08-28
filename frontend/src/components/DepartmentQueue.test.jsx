@@ -78,7 +78,7 @@ describe('DepartmentQueue', () => {
         apiClient.get.mockResolvedValueOnce({ data: [] });
         const { container } = renderWithProviders(<DepartmentQueue department="Pharmacy" inline />);
         await waitFor(() => expect(apiClient.get).toHaveBeenCalled());
-        // No empty-state box, no "routed from triage" header — just nothing.
+        // No empty-state box, no "routed from triage" header, just nothing.
         expect(screen.queryByText(/no patients routed here/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/routed from triage/i)).not.toBeInTheDocument();
         expect(container).toBeEmptyDOMElement();

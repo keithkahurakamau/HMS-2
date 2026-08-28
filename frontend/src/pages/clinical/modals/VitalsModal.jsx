@@ -17,7 +17,7 @@ const FIELDS = [
 ];
 
 /** Vitals grid with a live BMI readout. Edits a local copy and hands it back
- *  via `onSave` — the encounter stays the single source of truth in the shell. */
+ *  via `onSave`, the encounter stays the single source of truth in the shell. */
 export default function VitalsModal({ vitals, onSave, onClose }) {
     const [form, setForm] = useState(() => ({ ...vitals }));
     const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
@@ -42,7 +42,7 @@ export default function VitalsModal({ vitals, onSave, onClose }) {
             </div>
             <div className="rounded-xl bg-ink-50 dark:bg-ink-800/60 px-4 py-2.5 text-sm">
                 <span className="text-ink-500 dark:text-ink-400">BMI: </span>
-                <span className="font-semibold text-ink-800 dark:text-ink-200">{bmi ?? '—'}</span>
+                <span className="font-semibold text-ink-800 dark:text-ink-200">{bmi ?? '-'}</span>
                 {bmi && <span className="text-ink-400 dark:text-ink-500"> kg/m²</span>}
             </div>
         </Modal>

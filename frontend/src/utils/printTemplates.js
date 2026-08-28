@@ -3,7 +3,7 @@
 //
 // Each function takes the page's existing data shape and produces a body HTML
 // fragment to hand to printDocument(). Templates are intentionally tolerant of
-// missing fields — they render '—' rather than throwing if optional values
+// missing fields: they render '-' rather than throwing if optional values
 // are absent.
 
 import { printDocument, printUtils } from './printDocument';
@@ -11,7 +11,7 @@ import { printDocument, printUtils } from './printDocument';
 const { esc, header, footer } = printUtils;
 
 const orDash = (value) => {
-  if (value === null || value === undefined || value === '') return '—';
+  if (value === null || value === undefined || value === '') return '-';
   return esc(value);
 };
 
@@ -21,7 +21,7 @@ const formatKES = (n) => {
 };
 
 const formatDate = (value) => {
-  if (!value) return '—';
+  if (!value) return '-';
   const d = new Date(value);
   if (isNaN(d.getTime())) return esc(value);
   return d.toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: '2-digit' });
@@ -49,7 +49,7 @@ export const printInvoice = (invoice) => {
   `).join('') : `<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No line items recorded.</td></tr>`;
 
   const body = `
-    ${header({ docType, docNumber: `INV-${invoice.invoice_id ?? '—'}` })}
+    ${header({ docType, docNumber: `INV-${invoice.invoice_id ?? '-'}` })}
 
     <h1 class="doc-title">${esc(docType)}</h1>
     <div class="doc-subtitle">
@@ -291,7 +291,7 @@ export const printPatientCard = (patient) => {
       </div>
     </div>
 
-    ${footer('Confidential — for use by registered hospital staff only.')}
+    ${footer('Confidential, for use by registered hospital staff only.')}
   `;
 
   printDocument(`Patient ${patient.outpatient_no || ''}`, body);
@@ -334,7 +334,7 @@ export const printMedicalHistory = ({ patient, entries = [], consents = [] }) =>
       <ul class="clean">
         ${consents.map((c) => `
           <li>
-            <b>${esc(c.consent_type)}</b> — ${c.consent_given ? 'Given' : 'Withheld'}
+            <b>${esc(c.consent_type)}</b>, ${c.consent_given ? 'Given' : 'Withheld'}
             <span style="color:#94a3b8;font-size:10px;"> (${esc(c.consent_method || '')})</span>
             ${c.notes ? `<div style="color:#475569;">${esc(c.notes)}</div>` : ''}
           </li>
@@ -354,7 +354,7 @@ export const printMedicalHistory = ({ patient, entries = [], consents = [] }) =>
     ${sectionsHtml || '<div class="panel"><i style="color:#94a3b8;">No medical history entries on file.</i></div>'}
     ${consentHtml}
 
-    ${footer('KDPA — Confidential. Patient health information.')}
+    ${footer('KDPA, Confidential. Patient health information.')}
   `;
 
   printDocument(`History ${patient.outpatient_no || ''}`, body);
@@ -424,7 +424,7 @@ export const printRadiologyReport = ({ patient, request, result, radiologist }) 
   const body = `
     ${header({ docType: 'Radiology Report', docNumber: `RAD-${request.request_id ?? ''}` })}
 
-    <h1 class="doc-title">${esc(request.modality || 'Radiology')} — ${esc(request.body_part || '')}</h1>
+    <h1 class="doc-title">${esc(request.modality || 'Radiology')}, ${esc(request.body_part || '')}</h1>
     <div class="doc-subtitle">
       <span class="badge ${result ? 'paid' : 'pending'}">${result ? 'Reported' : orDash(request.status)}</span>
     </div>

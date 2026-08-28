@@ -7,7 +7,7 @@ import IcdDiagnosisPicker from '../../components/IcdDiagnosisPicker';
 import { FORMULATIONS, FREQUENCIES, parseAssessPlan, serializeAssessPlan } from '../../utils/clinicalForms';
 
 /**
- * Encounter Notes tab — the SOAP chart for the active encounter. Fully
+ * Encounter Notes tab: the SOAP chart for the active encounter. Fully
  * controlled: `value` carries the encounter state the shell owns, `on` carries
  * the handlers. Extracted verbatim from the legacy Clinical Desk so behaviour
  * (submit targets, draft safety-net, guided-tour anchors) is unchanged.
@@ -50,7 +50,7 @@ export default function EncounterNotesTab({ value, on }) {
                         <input id="clinic-cc" type="text" value={complaintInput}
                             onChange={(e) => on.setComplaintInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); on.addComplaint(); } }}
-                            className="input flex-1" placeholder="e.g. Severe headache for 3 days — press Enter to add" />
+                            className="input flex-1" placeholder="e.g. Severe headache for 3 days, press Enter to add" />
                         <button type="button" onClick={on.addComplaint} className="btn-secondary shrink-0 px-3"><Plus size={15} /> Add</button>
                     </div>
                     {complaints.length > 0 && (
@@ -72,7 +72,7 @@ export default function EncounterNotesTab({ value, on }) {
                         <input id="clinic-exam" type="text" value={examInput}
                             onChange={(e) => on.setExamInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); on.addExam(); } }}
-                            className="input flex-1" placeholder="e.g. Chest: clear air entry bilaterally — press Enter to add" />
+                            className="input flex-1" placeholder="e.g. Chest: clear air entry bilaterally: press Enter to add" />
                         <button type="button" onClick={on.addExam} className="btn-secondary shrink-0 px-3"><Plus size={15} /> Add</button>
                     </div>
                     {physicalExams.length > 0 && (
@@ -121,7 +121,7 @@ export default function EncounterNotesTab({ value, on }) {
                         <button type="button" onClick={on.addMedication} className="btn-secondary px-3 py-1.5 text-xs shrink-0"><Plus size={13} /> Add medication</button>
                     </div>
                     {medications.length === 0 ? (
-                        <p className="text-xs text-ink-500 dark:text-ink-400 italic">No medications yet — click “Add medication” to start prescribing.</p>
+                        <p className="text-xs text-ink-500 dark:text-ink-400 italic">No medications yet, click “Add medication” to start prescribing.</p>
                     ) : (
                         <div className="space-y-2">
                             {medications.map((med, idx) => (

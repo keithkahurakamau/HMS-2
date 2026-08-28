@@ -63,7 +63,7 @@ export default function Login() {
 
     return (
         <div className="min-h-screen w-full grid lg:grid-cols-5 bg-ink-50">
-            {/* ============== Brand panel (left, lg+) — flat teal, calm ============== */}
+            {/* ============== Brand panel (left, lg+), flat teal, calm ============== */}
             <aside className="hidden lg:flex lg:col-span-2 relative overflow-hidden bg-[#023535] text-white">
                 {/* Tenant background image, when uploaded, dimmed under the panel tint. */}
                 {hasTenantBg && (

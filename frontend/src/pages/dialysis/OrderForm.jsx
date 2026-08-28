@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createOrder } from './api';
 import { errorText } from './errors';
 
-// key, label, [step] — number inputs; Number()'d and omitted when blank.
+// key, label, [step], number inputs; Number()'d and omitted when blank.
 const RX = [
   ['dialyzer', 'Dialyzer'], ['membrane_type', 'Membrane'], ['priming', 'Priming'],
   ['k_bath', 'K+ bath'], ['dialysate_calcium', 'Dialysate Ca'],
@@ -81,7 +81,7 @@ export default function OrderForm({ patientId = '', onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm p-4"
          role="dialog" aria-modal="true" aria-label="New dialysis session">
-      <form onSubmit={submit} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated">
+      <form onSubmit={submit} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-overlay">
         <h3 className="text-base font-semibold text-ink-900 dark:text-white">New dialysis session</h3>
         {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
 
@@ -100,7 +100,7 @@ export default function OrderForm({ patientId = '', onClose, onSaved }) {
           <Card title="Anticoagulation">
             <Field label="Type" value={form.anticoag_type} onChange={set('anticoag_type')}>
               <select value={form.anticoag_type} onChange={set('anticoag_type')} className="input mt-1 w-full">
-                {ANTICOAG.map((o) => <option key={o} value={o}>{o || '—'}</option>)}
+                {ANTICOAG.map((o) => <option key={o} value={o}>{o || '-'}</option>)}
               </select>
             </Field>
             <Field label="Loading dose" value={form.heparin_loading_dose} onChange={set('heparin_loading_dose')} />

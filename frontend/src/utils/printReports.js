@@ -1,4 +1,4 @@
-// Printable clinical reports — Visit Summary, Examination Report, All-Visits.
+// Printable clinical reports: Visit Summary, Examination Report, All-Visits.
 //
 // Built over existing encounter data: the Visit Summary and Examination Report
 // render the in-progress (or resumed) encounter held in the Clinical Desk;
@@ -10,11 +10,11 @@ import { printDocument, printUtils } from './printDocument';
 
 const { esc, header, footer } = printUtils;
 
-const orDash = (v) => (v != null && v !== '' ? esc(v) : '—');
+const orDash = (v) => (v != null && v !== '' ? esc(v) : '-');
 const fmtDate = (v) => {
-  if (!v) return '—';
+  if (!v) return '-';
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 };
 
 const patientPanel = (patient = {}) => `
@@ -48,12 +48,12 @@ const listPanel = (title, items = []) => {
   const clean = (items || []).filter((i) => i != null && String(i).trim() !== '');
   const body = clean.length
     ? `<ol style="margin:6px 0 0;padding-left:20px;">${clean.map((i) => `<li>${esc(i)}</li>`).join('')}</ol>`
-    : '<div class="value">—</div>';
+    : '<div class="value">, </div>';
   return `<div class="panel"><h3>${esc(title)}</h3>${body}</div>`;
 };
 
 const impressionsPanel = (encounter = {}) => {
-  const codes = (encounter.icdCodes || []).map((c) => c.code ? `${c.code} — ${c.description}` : c.description);
+  const codes = (encounter.icdCodes || []).map((c) => c.code ? `${c.code}, ${c.description}` : c.description);
   const freeText = (encounter.diagnosis || '').trim();
   const parts = [...codes];
   if (freeText) parts.push(freeText);
@@ -66,11 +66,11 @@ const doctorFollowUp = (encounter = {}) => `
     <div class="grid-2">
       <div class="field"><div class="label">Clinician</div><div class="value">${orDash(encounter.doctorName)}</div></div>
       <div class="field"><div class="label">Visit date</div><div class="value">${fmtDate(encounter.date)}</div></div>
-      <div class="field"><div class="label">Next follow-up</div><div class="value">${encounter.followUp?.appointment_date ? fmtDate(encounter.followUp.appointment_date) : '—'}</div></div>
+      <div class="field"><div class="label">Next follow-up</div><div class="value">${encounter.followUp?.appointment_date ? fmtDate(encounter.followUp.appointment_date) : '-'}</div></div>
     </div>
   </div>`;
 
-/** Full visit summary — everything captured this encounter. */
+/** Full visit summary: everything captured this encounter. */
 export const printVisitSummary = ({ patient = {}, encounter = {} }) => {
   const meds = (encounter.medications || []).filter((m) => (m.drug || '').trim());
   const medRows = meds.length
@@ -86,7 +86,7 @@ export const printVisitSummary = ({ patient = {}, encounter = {} }) => {
     : '<tr><td colspan="6" style="text-align:center;color:#64748b;">No medications prescribed</td></tr>';
 
   const body = `
-    ${header({ docType: 'Visit Summary', docNumber: '—' })}
+    ${header({ docType: 'Visit Summary', docNumber: '-' })}
     <h1 class="doc-title">Visit Summary</h1>
     ${patientPanel(patient)}
     ${doctorFollowUp(encounter)}
@@ -102,15 +102,15 @@ export const printVisitSummary = ({ patient = {}, encounter = {} }) => {
         <tbody>${medRows}</tbody>
       </table>
     </div>
-    ${footer('Visit summary — for the patient’s records.')}
+    ${footer('Visit summary, for the patient’s records.')}
   `;
   printDocument('Visit Summary', body);
 };
 
-/** Examination-focused report — vitals, findings, impressions. */
+/** Examination-focused report: vitals, findings, impressions. */
 export const printExaminationReport = ({ patient = {}, encounter = {} }) => {
   const body = `
-    ${header({ docType: 'Examination Report', docNumber: '—' })}
+    ${header({ docType: 'Examination Report', docNumber: '-' })}
     <h1 class="doc-title">Examination Report</h1>
     ${patientPanel(patient)}
     ${doctorFollowUp(encounter)}
@@ -123,7 +123,7 @@ export const printExaminationReport = ({ patient = {}, encounter = {} }) => {
   printDocument('Examination Report', body);
 };
 
-/** All-visits register — the patient's full record list. */
+/** All-visits register: the patient's full record list. */
 export const printAllVisits = ({ patient = {}, visits = [] }) => {
   const rows = (visits || []).length
     ? visits.map((v) => `
@@ -137,7 +137,7 @@ export const printAllVisits = ({ patient = {}, visits = [] }) => {
     : '<tr><td colspan="5" style="text-align:center;color:#64748b;">No recorded visits</td></tr>';
 
   const body = `
-    ${header({ docType: 'Visit History', docNumber: '—' })}
+    ${header({ docType: 'Visit History', docNumber: '-' })}
     <h1 class="doc-title">All Visits</h1>
     ${patientPanel(patient)}
     <div class="panel">
@@ -152,7 +152,7 @@ export const printAllVisits = ({ patient = {}, visits = [] }) => {
   printDocument('All Visits', body);
 };
 
-/** Laboratory report — the patient's ordered tests and any results. */
+/** Laboratory report: the patient's ordered tests and any results. */
 export const printLabReport = ({ patient = {}, tests = [] }) => {
   const rows = (tests || []).length
     ? tests.map((t) => `
@@ -165,7 +165,7 @@ export const printLabReport = ({ patient = {}, tests = [] }) => {
     : '<tr><td colspan="4" style="text-align:center;color:#64748b;">No lab tests</td></tr>';
 
   const body = `
-    ${header({ docType: 'Laboratory Report', docNumber: '—' })}
+    ${header({ docType: 'Laboratory Report', docNumber: '-' })}
     <h1 class="doc-title">Laboratory Report</h1>
     ${patientPanel(patient)}
     <div class="panel">
@@ -175,12 +175,12 @@ export const printLabReport = ({ patient = {}, tests = [] }) => {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    ${footer('Laboratory report — for the patient’s records.')}
+    ${footer('Laboratory report, for the patient’s records.')}
   `;
   printDocument('Laboratory Report', body);
 };
 
-/** Theatre report — the patient's surgical cases. */
+/** Theatre report: the patient's surgical cases. */
 export const printTheatreReport = ({ patient = {}, cases = [] }) => {
   const rows = (cases || []).length
     ? cases.map((c) => `
@@ -195,7 +195,7 @@ export const printTheatreReport = ({ patient = {}, cases = [] }) => {
     : '<tr><td colspan="6" style="text-align:center;color:#64748b;">No surgical cases</td></tr>';
 
   const body = `
-    ${header({ docType: 'Theatre Report', docNumber: '—' })}
+    ${header({ docType: 'Theatre Report', docNumber: '-' })}
     <h1 class="doc-title">Theatre Report</h1>
     ${patientPanel(patient)}
     <div class="panel">
@@ -205,7 +205,7 @@ export const printTheatreReport = ({ patient = {}, cases = [] }) => {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    ${footer('Theatre report — for the patient’s records.')}
+    ${footer('Theatre report, for the patient’s records.')}
   `;
   printDocument('Theatre Report', body);
 };

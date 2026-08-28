@@ -22,7 +22,7 @@ export default function Wards() {
     const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
     // Ward/bed setup: create wards, add beds (single or bulk).
     const [isSetupOpen, setIsSetupOpen] = useState(false);
-    // A non-occupied bed the user clicked — opens the status/delete sheet
+    // A non-occupied bed the user clicked, opens the status/delete sheet
     // (this is also the only way a "Cleaning" bed returns to "Available").
     const [setupBed, setSetupBed] = useState(null);
     
@@ -116,7 +116,7 @@ export default function Wards() {
     const [clinicalNote, setClinicalNote] = useState('');
     const [isSavingNote, setIsSavingNote] = useState(false);
 
-    // Local draft safety net — a shift handover mid-observation shouldn't
+    // Local draft safety net: a shift handover mid-observation shouldn't
     // cost the nurse what they'd already typed. Keyed by admission_id so a
     // note started for one patient's bed can never surface on another's.
     const clinicalNoteDraftKey = activeBed?.admission_id ? `wardsLog:${activeBed.admission_id}` : null;
@@ -299,7 +299,7 @@ export default function Wards() {
             {isAdmitModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsAdmitModalOpen(false)} />
-                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-brand-600 to-brand-700 text-white shrink-0">
                             <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-200">New admission</span>
                             <h2 className="text-lg font-semibold mt-1 flex items-center gap-2"><UserPlus size={20} className="text-brand-200" /> Admit patient</h2>
@@ -353,7 +353,7 @@ export default function Wards() {
             {activeBed && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setActiveBed(null)} />
-                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
 
                         <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-blue-600 to-blue-700 text-white shrink-0">
                             <div className="flex justify-between items-start">
@@ -390,7 +390,7 @@ export default function Wards() {
 
                                 {cart.length > 0 && (
                                     <div className="mb-4 card-flush overflow-x-auto">
-                                        <table className="table-clean min-w-[400px]">
+                                        <table className="table-clean table-sticky min-w-[400px]">
                                             <thead>
                                                 <tr>
                                                     <th>Item to administer</th>
@@ -493,7 +493,7 @@ export default function Wards() {
 /*  Ward & bed setup modal.                                                   */
 /*                                                                            */
 /*  Two tabs: create a new ward (name + capacity) or add beds to an existing  */
-/*  ward — a single named bed, or a bulk run auto-numbered after a prefix.    */
+/*  ward: a single named bed, or a bulk run auto-numbered after a prefix.    */
 /*  Beds land "Available" so they're immediately allocatable from /admit.     */
 /* ────────────────────────────────────────────────────────────────────────── */
 function WardSetupModal({ wards, onClose, onSaved }) {
@@ -514,7 +514,7 @@ function WardSetupModal({ wards, onClose, onSaved }) {
         setSaving(true);
         try {
             await apiClient.post('/wards/', { name: wardForm.name.trim(), capacity });
-            toast.success(`Ward "${wardForm.name.trim()}" created — now add its beds.`);
+            toast.success(`Ward "${wardForm.name.trim()}" created, now add its beds.`);
             onSaved();
         } catch (error) {
             toast.error(error.response?.data?.detail || 'Could not create ward.');
@@ -549,10 +549,10 @@ function WardSetupModal({ wards, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md overflow-hidden flex flex-col">
+            <div className="relative bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-md overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                        <div className="size-9 rounded-xl bg-brand-600 text-white flex items-center justify-center">
                             <Bed size={17} />
                         </div>
                         <div>
@@ -656,7 +656,7 @@ function WardSetupModal({ wards, onClose, onSaved }) {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Bed action sheet — status changes for non-occupied beds.                  */
+/*  Bed action sheet: status changes for non-occupied beds.                  */
 /*                                                                            */
 /*  This is also the housekeeping loop: discharge flags a bed "Cleaning" and  */
 /*  this sheet is how it returns to "Available" for the next allocation.      */
@@ -696,7 +696,7 @@ function BedActionModal({ bed, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-xs overflow-hidden">
+            <div className="relative bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-xs overflow-hidden">
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <div>
                         <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Bed {bed.number}</h3>

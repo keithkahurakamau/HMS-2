@@ -145,13 +145,13 @@ def webhook_health():
     # callback path is dead; in dev they are advisory.
     blockers: list[str] = []
     if not base:
-        blockers.append("PUBLIC_BASE_URL is not set — STK push will 500 before any callback.")
+        blockers.append("PUBLIC_BASE_URL is not set. STK push will 500 before any callback.")
     elif is_prod and not base_https:
         blockers.append("PUBLIC_BASE_URL must be https:// in production.")
     if is_prod and not secret_set:
-        blockers.append("PAYHERO_WEBHOOK_SECRET is empty — every callback returns 500 in production.")
+        blockers.append("PAYHERO_WEBHOOK_SECRET is empty. Every callback returns 500 in production.")
     if is_prod and not nets:
-        blockers.append("PAYHERO_WEBHOOK_CIDRS is empty — every callback returns 500 in production.")
+        blockers.append("PAYHERO_WEBHOOK_CIDRS is empty. Every callback returns 500 in production.")
 
     callback_template = (
         f"{base.rstrip('/')}/api/payments/payhero/callback/{{tenant_db}}" if base else None

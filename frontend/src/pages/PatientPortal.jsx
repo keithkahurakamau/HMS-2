@@ -6,6 +6,7 @@ import {
     HeartPulse, ShieldCheck, CalendarDays, Receipt, ClipboardList,
     LogOut, Activity, ArrowLeft, AlertCircle, Lock, CheckCircle2, Sparkles,
 } from 'lucide-react';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 const TABS = [
     { key: 'profile',      label: 'Profile',      icon: HeartPulse },
@@ -129,7 +130,7 @@ export default function PatientPortal() {
                 <aside className="hidden lg:flex lg:col-span-2 relative overflow-hidden bg-[#023535] text-white">
                     <div className="relative z-10 flex flex-col justify-between w-full p-12 xl:p-16">
                         <div className="flex items-center gap-3">
-                            <span className="inline-flex items-center justify-center size-11 rounded-2xl bg-white/10 ring-1 ring-white/20">
+                            <span className="inline-flex items-center justify-center size-11 rounded-xl bg-white/10 ring-1 ring-white/20">
                                 <HeartPulse size={22} className="text-[#9cc9c9]" />
                             </span>
                             <div>
@@ -161,7 +162,7 @@ export default function PatientPortal() {
                 <main className="lg:col-span-3 flex flex-col justify-center items-center px-5 py-12 sm:px-10 relative lp-bg-ice">
                     {/* Mobile brand bar */}
                     <div className="lg:hidden w-full max-w-md mb-8 flex items-center gap-3">
-                        <span className="inline-flex items-center justify-center size-12 rounded-2xl bg-[#008080]">
+                        <span className="inline-flex items-center justify-center size-12 rounded-xl bg-[#008080]">
                             <HeartPulse size={22} className="text-white" />
                         </span>
                         <div>
@@ -277,9 +278,7 @@ export default function PatientPortal() {
 
             <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
                 {!profile ? (
-                    <div className="flex items-center gap-2 text-ink-400">
-                        <Activity className="animate-spin" size={16} /> Loading…
-                    </div>
+                    <SkeletonTable rows={4} cols={2} label="Loading your profile" />
                 ) : activeTab === 'profile' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in">
                         {[
@@ -369,7 +368,7 @@ function PortalPreview({ icon, label }) {
 }
 
 /*
- * ValidatedField — text/date input with inline validation micro-interactions.
+ * ValidatedField: text/date input with inline validation micro-interactions.
  * The ring shifts green when the value is valid (after the field is touched)
  * and red with a message when it is wrong, so a patient gets immediate, calm
  * feedback while typing rather than a single error on submit.

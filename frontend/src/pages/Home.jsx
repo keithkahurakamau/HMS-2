@@ -139,7 +139,7 @@ export default function Home() {
     return (
         <div className="space-y-6 pb-8">
             {/* Greeting banner */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-teal-700 text-white p-6 sm:p-8 shadow-elevated animate-slide-up">
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-brand-600 via-brand-700 to-teal-700 text-white p-6 sm:p-8 shadow-overlay animate-slide-up">
                 <div className="absolute inset-0 bg-aurora opacity-40 pointer-events-none" />
                 <div className="absolute -top-20 -right-16 size-72 rounded-full bg-white/10 blur-3xl pointer-events-none animate-blob-breathe" />
                 <p className="relative text-2xs font-semibold uppercase tracking-[0.18em] text-brand-200">
@@ -173,7 +173,7 @@ export default function Home() {
                         return (
                             <Link key={a.to} to={a.to}
                                 style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'both' }}
-                                className="group card p-4 hover:-translate-y-0.5 hover:shadow-elevated transition-all animate-slide-up">
+                                className="group card p-4 hover:-translate-y-0.5 hover:shadow-overlay transition-all animate-slide-up">
                                 <div className={`size-10 rounded-xl flex items-center justify-center ring-1 ${TONE[a.tone]}`}>
                                     <Icon size={19} />
                                 </div>

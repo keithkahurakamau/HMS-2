@@ -38,7 +38,7 @@ import { useActivePatient } from '../context/PatientContext';
 import { useAuth } from '../context/AuthContext';
 import useDraftSafetyNet from '../hooks/useDraftSafetyNet';
 
-// Prescription pick-lists — kept at module scope so the dropdowns are stable.
+// Prescription pick-lists: kept at module scope so the dropdowns are stable.
 const FORMULATIONS = ["Tablet", "Capsule", "Syrup", "Suspension", "Injection", "Cream / Ointment", "Drops", "Inhaler", "Suppository", "Other"];
 const FREQUENCIES = ["OD (once daily)", "BD (twice daily)", "TDS (three times daily)", "QDS (four times daily)", "PRN (as needed)", "STAT (immediately)", "Nocte (at night)"];
 const blankMed = () => ({ _uid: crypto.randomUUID(), drug: '', formulation: 'Tablet', dosage: '', frequency: '', duration: '' });
@@ -55,7 +55,7 @@ export default function ClinicalDesk() {
     // DoctorV2 IA: which workspace tab is showing, and the Actions ▾ modals.
     const [activeTab, setActiveTab] = useState('notes'); // 'notes' | 'history'
     const [assessPlan, setAssessPlan] = useState(''); // serialized assessment_plan
-    // One Actions ▾ modal at a time — 'files' | 'vitals' | 'rx' | 'assess' |
+    // One Actions ▾ modal at a time, 'files' | 'vitals' | 'rx' | 'assess' |
     // 'queue' | 'appts' | 'admission' | null.
     const [actionModal, setActionModal] = useState(null);
     const closeActionModal = () => setActionModal(null);
@@ -63,17 +63,17 @@ export default function ClinicalDesk() {
     // --- FORM STATE ---
     const [vitals, setVitals] = useState({ weight: '', height: '', bp: '', hr: '', rr: '', temp: '', spo2: '', glucose: '' });
     const [clinicalNotes, setClinicalNotes] = useState({ hpi: '', diagnosis: '', internal_notes: '' });
-    // Chief complaint is now a list — a patient can present with several.
+    // Chief complaint is now a list, a patient can present with several.
     const [complaints, setComplaints] = useState([]);
     const [complaintInput, setComplaintInput] = useState('');
-    // Physical examination is a list too — one entry per system/finding
+    // Physical examination is a list too, one entry per system/finding
     // (e.g. "Chest: clear air entry bilaterally"). Persists "; "-joined in
     // physical_examination, same convention as chief complaints.
     const [physicalExams, setPhysicalExams] = useState([]);
     const [examInput, setExamInput] = useState('');
     // Structured, numbered prescription rows routed to Pharmacy.
     const [medications, setMedications] = useState([]);
-    // Multi-diagnosis chips — [{code, description}] for catalogue picks or
+    // Multi-diagnosis chips: [{code, description}] for catalogue picks or
     // {code: null, description, custom: true} for custom (note) diagnoses;
     // first entry is primary. Type-ahead against the ~74k-row CMS ICD-10-CM
     // catalogue lives in IcdDiagnosisPicker, which owns its own state.
@@ -95,7 +95,7 @@ export default function ClinicalDesk() {
     // --- DRAFT / RETURNED ENCOUNTER RESUME ---
     // `resumable` holds the doctor's latest unfinished record for the active
     // patient (drives the banner); `resumeRecordId` is set once the doctor
-    // resumes it — or saves any draft — so /clinical/submit updates that row
+    // resumes it: or saves any draft: so /clinical/submit updates that row
     // in place instead of inserting a duplicate per save.
     const [resumable, setResumable] = useState(null);
     const [resumeRecordId, setResumeRecordId] = useState(null);
@@ -107,7 +107,7 @@ export default function ClinicalDesk() {
     // "Select date…" to the scheduled date/time.
     const [pendingFollowUp, setPendingFollowUp] = useState(null);
 
-    // Inline patient-history popup — { entry_type } | null. entry_type null
+    // Inline patient-history popup: { entry_type } | null. entry_type null
     // means "full chart". Lets the doctor glance at history without leaving
     // this in-progress encounter.
     const [historyModal, setHistoryModal] = useState(null);
@@ -115,8 +115,8 @@ export default function ClinicalDesk() {
     // --- LOCAL DRAFT SAFETY NET ---
     // Client-side companion to the server-side draft/resume above: that one
     // covers "doctor explicitly saved a draft and comes back later, any
-    // device"; this covers the gap before that first explicit save — an
-    // accidental navigation, a browser crash, a closed tab — on this device.
+    // device"; this covers the gap before that first explicit save, an
+    // accidental navigation, a browser crash, a closed tab, on this device.
     // Keyed by queue_id so one patient's unsaved text can never surface on
     // another patient's form.
     const encounterDraftKey = activePatient?.queue_id ? `clinicalDesk:${activePatient.queue_id}` : null;
@@ -171,7 +171,7 @@ export default function ClinicalDesk() {
             const response = await apiClient.get('/billing/consultation-fee/me');
             setMyFee(response.data);
         } catch {
-            // Non-blocking — the server still resolves the right fee at charge time.
+            // Non-blocking: the server still resolves the right fee at charge time.
         }
     };
 
@@ -221,7 +221,7 @@ export default function ClinicalDesk() {
         resumeAppliedRef.current = false;
     };
 
-    // Remove a single patient from the queue without charting them — e.g. they
+    // Remove a single patient from the queue without charting them, e.g. they
     // left before being seen. Soft-completes the queue entry server-side so the
     // visit stays in history but stops showing as "waiting".
     const handleRemoveFromQueue = async (item) => {
@@ -236,7 +236,7 @@ export default function ClinicalDesk() {
         }
     };
 
-    // End-of-clinic-day checkout — clears every patient still waiting in the
+    // End-of-clinic-day checkout: clears every patient still waiting in the
     // Consultation queue so leftover, never-seen patients don't roll into
     // tomorrow's list.
     const handleEndClinicDay = async () => {
@@ -245,8 +245,8 @@ export default function ClinicalDesk() {
             const res = await apiClient.post('/queue/end-of-day', { department: 'Consultation' });
             const n = res.data?.checked_out ?? 0;
             toast.success(n > 0
-                ? `Clinic closed — ${n} patient(s) checked out of the queue.`
-                : 'Clinic closed — the queue was already empty.');
+                ? `Clinic closed, ${n} patient(s) checked out of the queue.`
+                : 'Clinic closed: the queue was already empty.');
             clearWorkspace();
             fetchQueue();
         } catch (error) {
@@ -284,12 +284,12 @@ export default function ClinicalDesk() {
         setResumeRecordId(null);
         resumeAppliedRef.current = false;
         // Pre-fill from the nurse's triage so the doctor doesn't re-key vitals.
-        // Fire-and-forget — a missing/absent triage just leaves the form blank.
+        // Fire-and-forget: a missing/absent triage just leaves the form blank.
         prefillFromTriage(patientItem.patient_id);
         // Surface any unfinished Draft/Returned encounter for this patient so
         // the doctor can pick up where they left off instead of re-charting.
         fetchResumable(patientItem.patient_id);
-        // Default to ON — a consultation that ends at "Send to billing" with
+        // Default to ON: a consultation that ends at "Send to billing" with
         // no fee posts no invoice and the patient never surfaces in the
         // cashier's queue, which is the most common bug report from
         // receptionists. Doctors who need to waive the fee can uncheck.
@@ -301,15 +301,15 @@ export default function ClinicalDesk() {
 
     // Pulls the most recent nurse triage for this patient and drops the vitals
     // straight into the encounter form. This is the payoff of the triage
-    // module — the doctor opens the chart and the numbers are already there.
+    // module: the doctor opens the chart and the numbers are already there.
     const prefillFromTriage = async (patientId) => {
         if (!patientId) return;
         try {
             const res = await apiClient.get(`/triage/patients/${patientId}/latest`);
             const t = res.data;
-            if (!t) return; // never triaged — leave the form blank
+            if (!t) return; // never triaged: leave the form blank
             // The doctor resumed an unfinished encounter while this fetch was
-            // in flight — that form state wins over the triage prefill.
+            // in flight: that form state wins over the triage prefill.
             if (resumeAppliedRef.current) return;
             setVitals({
                 weight: t.weight_kg ?? '',
@@ -325,19 +325,19 @@ export default function ClinicalDesk() {
             }
             toast.success('Vitals pre-filled from triage.', { icon: '🩺' });
         } catch (err) {
-            // Triage is a convenience prefill, not a hard dependency — stay quiet
+            // Triage is a convenience prefill, not a hard dependency, stay quiet
             // on failure (e.g. doctor's role lacks triage:read on an old tenant).
         }
     };
 
     // Looks up the doctor's own latest Draft/Returned record for the patient.
-    // Only feeds the banner — nothing is applied until the doctor clicks Resume.
+    // Only feeds the banner: nothing is applied until the doctor clicks Resume.
     const fetchResumable = async (patientId) => {
         try {
             const res = await apiClient.get(`/clinical/patients/${patientId}/resumable`);
             if (res.data?.record) setResumable(res.data.record);
         } catch {
-            // Non-blocking — the doctor just charts a fresh encounter.
+            // Non-blocking: the doctor just charts a fresh encounter.
         }
     };
 
@@ -356,7 +356,7 @@ export default function ClinicalDesk() {
         setResumeRecordId(resumable.record_id);
         resumeAppliedRef.current = true;
         setResumable(null);
-        toast.success('Unfinished encounter loaded — saving will update it in place.', { icon: '📋' });
+        toast.success('Unfinished encounter loaded: saving will update it in place.', { icon: '📋' });
     };
 
     // --- ACTION HANDLERS ---
@@ -457,7 +457,7 @@ export default function ClinicalDesk() {
             // never surface there. Require either the fee or an explicit
             // ack the doctor knows another bill already exists.
             if (!chargeConsultation) {
-                return 'Re-enable the consultation fee, or charge a service from Billing — otherwise the cashier won\'t see this patient.';
+                return 'Re-enable the consultation fee, or charge a service from Billing, otherwise the cashier won\'t see this patient.';
             }
             if (!hasDx && !hasCc) {
                 return 'Record at least a chief complaint or diagnosis before billing.';
@@ -498,7 +498,7 @@ export default function ClinicalDesk() {
             height_cm: vitals.height ? parseFloat(vitals.height) : null,
             blood_glucose: vitals.glucose ? parseFloat(vitals.glucose) : null,
 
-            // Clinical Notes — multiple complaints persist as a single
+            // Clinical Notes: multiple complaints persist as a single
             // "; "-joined string (no schema change); splitComplaints() reverses it.
             chief_complaint: complaints.join('; '),
             history_of_present_illness: clinicalNotes.hpi,
@@ -506,8 +506,7 @@ export default function ClinicalDesk() {
             // Catalogue codes → icd10_code; custom (note) entries + the
             // free-text field → diagnosis. See utils/diagnosisMapping.js.
             ...buildDiagnosisFields(icdCodes, clinicalNotes.diagnosis),
-            // Structured prescriptions serialise to JSON in treatment_plan —
-            // this is what the Pharmacy queue parses back into rows.
+            // Structured prescriptions serialise to JSON in treatment_plan,             // this is what the Pharmacy queue parses back into rows.
             treatment_plan: medications.some((m) => m.drug.trim())
                 ? JSON.stringify(medications.filter((m) => m.drug.trim()).map(({ _uid, ...m }) => m))
                 : null,
@@ -517,24 +516,23 @@ export default function ClinicalDesk() {
         try {
             const res = await apiClient.post('/clinical/submit', payload);
 
-            // The record is now durably saved server-side (or finalised) —
-            // the local safety net for this queue_id has done its job.
+            // The record is now durably saved server-side (or finalised),             // the local safety net for this queue_id has done its job.
             clearLocalDraft();
 
-            // Consultation fee posts on Billed/Pharmacy/Completed only — never
+            // Consultation fee posts on Billed/Pharmacy/Completed only, never
             // on Draft. For Pharmacy + Completed the checkbox still gates it
             // (a follow-up encounter might not warrant a new fee). For Billed
             // the validator already forced the checkbox on, so this branch
             // posts unconditionally for that path.
             if (chargeConsultation && targetStatus !== 'Draft') {
-                // No amount sent — the server bills the doctor's own saved fee.
+                // No amount sent: the server bills the doctor's own saved fee.
                 await apiClient.post('/billing/consultation-fee', {
                     patient_id: activePatient.patient_id
                 });
             }
 
             if (targetStatus === 'Pharmacy') toast.success('Record saved and routed to Pharmacy.');
-            else if (targetStatus === 'Billed') toast.success('Record saved — patient is now in the Billing queue.');
+            else if (targetStatus === 'Billed') toast.success('Record saved: patient is now in the Billing queue.');
             else if (targetStatus === 'Draft') {
                 toast.success('Draft saved.');
                 // Lock further saves onto this row so repeated "Save draft"
@@ -558,7 +556,7 @@ export default function ClinicalDesk() {
             // Friendlier message when the KDPA S.30 gate fires server-side
             // (means no active Treatment consent on file for the patient).
             if (typeof detail === 'string' && /consent/i.test(detail)) {
-                toast.error('No active Treatment consent on file — click "Record consent" first.');
+                toast.error('No active Treatment consent on file, click "Record consent" first.');
             } else {
                 toast.error(detail);
             }
@@ -587,7 +585,7 @@ export default function ClinicalDesk() {
         }
     };
 
-    // Consolidated Actions ▾ menu — grouped and permission-gated. Items the
+    // Consolidated Actions ▾ menu, grouped and permission-gated. Items the
     // doctor lacks permission for are hidden; empty groups disappear.
     const actionGroups = [
         { label: 'Clinical', items: [
@@ -625,7 +623,7 @@ export default function ClinicalDesk() {
                 eyebrow="Consultation"
                 icon={Stethoscope}
                 title="Clinical Desk"
-                subtitle="Run encounters end-to-end — vitals, diagnosis, prescriptions, and orders."
+                subtitle="Run encounters end-to-end. Vitals, diagnosis, prescriptions, and orders."
             />
 
             {/* TOP PANEL: patient details + consultation queue (DoctorV2 IA) */}
@@ -670,7 +668,7 @@ export default function ClinicalDesk() {
                     </div>
                 ) : (
                     <>
-                        {/* Tab bar — Encounter Notes / Patient History + consent + Actions ▾ */}
+                        {/* Tab bar: Encounter Notes / Patient History + consent + Actions ▾ */}
                         <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-3 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 z-10">
                             <div className="flex gap-1 bg-ink-100/70 dark:bg-ink-800/70 p-1 rounded-xl">
                                 {[
@@ -678,7 +676,7 @@ export default function ClinicalDesk() {
                                     { id: 'history', label: 'Patient History' },
                                 ].map((t) => (
                                     <button type="button" key={t.id} onClick={() => setActiveTab(t.id)}
-                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === t.id ? 'bg-white dark:bg-ink-900 text-brand-700 dark:text-brand-300 shadow-soft' : 'text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200'}`}>
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === t.id ? 'bg-white dark:bg-ink-900 text-brand-700 dark:text-brand-300' : 'text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200'}`}>
                                         {t.label}
                                     </button>
                                 ))}
@@ -688,7 +686,7 @@ export default function ClinicalDesk() {
                                     type="button"
                                     data-tour="clinical-consent"
                                     onClick={() => setIsConsentOpen(true)}
-                                    title={hasRecordedConsent ? 'Consent recorded — click to re-record' : 'Record KDPA Section 30 treatment consent'}
+                                    title={hasRecordedConsent ? 'Consent recorded: click to re-record' : 'Record KDPA Section 30 treatment consent'}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ring-1 ${
                                         hasRecordedConsent
                                             ? 'bg-emerald-50 dark:bg-emerald-500/10 ring-emerald-200 dark:ring-emerald-500/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/15'
@@ -703,7 +701,7 @@ export default function ClinicalDesk() {
 
                         <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
 
-                            {/* Unfinished-encounter banner — offers to re-hydrate
+                            {/* Unfinished-encounter banner: offers to re-hydrate
                                 the form from the doctor's own Draft/Returned
                                 record instead of charting from scratch. */}
                             {resumable && (
@@ -740,7 +738,7 @@ export default function ClinicalDesk() {
                                 </div>
                             )}
 
-                            {/* Local draft safety net — unsaved typing recovered from this
+                            {/* Local draft safety net: unsaved typing recovered from this
                                 device (see useDraftSafetyNet). Independent of the
                                 server-side banner above: this covers the interval before
                                 the first explicit save. */}
@@ -791,7 +789,7 @@ export default function ClinicalDesk() {
                                             onViewTrends: () => setIsTrendsOpen(true),
                                             setAssessPlan }}
                                     />
-                                    {/* Documents, order sets and care pathways — kept as
+                                    {/* Documents, order sets and care pathways, kept as
                                         contextual panels alongside the encounter. */}
                                     <div className="grid gap-4 md:grid-cols-2 items-start">
                                         <ClinicalExtrasPanel patient={activePatient} onApplyOrderSet={handleApplyOrderSet} />
@@ -821,7 +819,7 @@ export default function ClinicalDesk() {
                                 <button type="button" data-tour="clinical-forward-pharmacy" onClick={() => handleClinicalSubmit('Pharmacy')} disabled={isSubmitting} className="btn-success">
                                     <Pill size={15} /> Forward to pharmacy
                                 </button>
-                                <button type="button" data-tour="clinical-finalize" onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 dark:bg-ink-700 text-white hover:bg-ink-900 dark:hover:bg-ink-600 shadow-soft">
+                                <button type="button" data-tour="clinical-finalize" onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 dark:bg-ink-700 text-white hover:bg-ink-900 dark:hover:bg-ink-600">
                                     <FileSignature size={15} /> Finalize &amp; sign
                                 </button>
                             </div>
@@ -830,7 +828,7 @@ export default function ClinicalDesk() {
                 )}
             </div>
 
-            {/* Lab + imaging order modals — only rendered when a patient is
+            {/* Lab + imaging order modals, only rendered when a patient is
                 active so the modals always have a target to POST against. */}
             {activePatient && isLabModalOpen && (
                 <LabOrderModal
@@ -895,7 +893,7 @@ export default function ClinicalDesk() {
                 />
             )}
 
-            {/* DoctorV2 Actions ▾ modals — one at a time via actionModal */}
+            {/* DoctorV2 Actions ▾ modals, one at a time via actionModal */}
             {activePatient && actionModal === 'files' && (
                 <FilesModal patient={activePatient} recordId={resumeRecordId} onClose={closeActionModal} />
             )}
@@ -929,12 +927,12 @@ export default function ClinicalDesk() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Consultation fee modal — doctor self-service pricing.                     */
+/*  Consultation fee modal: doctor self-service pricing.                     */
 /*                                                                            */
 /*  PUTs /billing/consultation-fee/me, which upserts a per-doctor row in the  */
 /*  master price list (service code CONSULT-DR-<id>). The charge endpoint     */
 /*  resolves the fee server-side from that row, so this editor is the single  */
-/*  source of truth — the client never sends an amount when charging.         */
+/*  source of truth: the client never sends an amount when charging.         */
 /* ────────────────────────────────────────────────────────────────────────── */
 function ConsultationFeeModal({ current, onClose, onSaved }) {
     const [amount, setAmount] = useState(current?.amount ? String(current.amount) : '');
@@ -961,10 +959,10 @@ function ConsultationFeeModal({ current, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-sm overflow-hidden flex flex-col">
+            <div className="relative bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-sm overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                        <div className="size-9 rounded-xl bg-brand-600 text-white flex items-center justify-center">
                             <Receipt size={17} />
                         </div>
                         <div>
@@ -991,7 +989,7 @@ function ConsultationFeeModal({ current, onClose, onSaved }) {
                             placeholder="e.g. 1500"
                         />
                         <p className="text-2xs text-ink-500 dark:text-ink-400 mt-1">
-                            Saved to the hospital price list under your name — admins can also
+                            Saved to the hospital price list under your name, admins can also
                             see and adjust it from Accounting → Config → Price list.
                         </p>
                     </div>
@@ -1011,7 +1009,7 @@ function ConsultationFeeModal({ current, onClose, onSaved }) {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Consent modal — KDPA Section 30 Treatment consent.                        */
+/*  Consent modal: KDPA Section 30 Treatment consent.                        */
 /*                                                                            */
 /*  Local to ClinicalDesk so the doctor can record consent without leaving    */
 /*  the encounter. POSTs /medical-history/consent with consent_type=          */
@@ -1024,10 +1022,10 @@ function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="relative bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                        <div className="size-9 rounded-xl bg-brand-600 text-white flex items-center justify-center">
                             <ShieldCheck size={17} />
                         </div>
                         <div>
@@ -1217,7 +1215,7 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
             aria-modal="true"
             aria-labelledby="followup-title"
         >
-            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay w-full max-w-xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
                 <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0">
                         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">Schedule follow-up</p>
@@ -1269,7 +1267,7 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
                             ) : (
                                 doctors.map(d => (
                                     <option key={d.user_id} value={d.user_id}>
-                                        {d.full_name}{d.specialization ? ` — ${d.specialization}` : ''}
+                                        {d.full_name}{d.specialization ? `, ${d.specialization}` : ''}
                                     </option>
                                 ))
                             )}
@@ -1304,7 +1302,7 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
 
                     <div className="rounded-lg border border-ink-200 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/40">
                         <div className="px-3 py-2 border-b border-ink-200 dark:border-ink-800 flex items-center justify-between text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400">
-                            <span>Doctor's bookings on {date || '—'}</span>
+                            <span>Doctor's bookings on {date || '-'}</span>
                             {busy && <Activity size={12} className="animate-spin text-brand-600" aria-hidden="true" />}
                         </div>
                         {bookings.length === 0 ? (
@@ -1314,7 +1312,7 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
                                 {bookings.map(b => {
                                     const d = b.appointment_date ? new Date(b.appointment_date) : null;
                                     const pad = (n) => String(n).padStart(2, '0');
-                                    const slot = d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '—';
+                                    const slot = d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '-';
                                     const isYou = b.patient_id === patient.patient_id;
                                     return (
                                         <li key={b.appointment_id} className="px-3 py-1.5 flex items-center justify-between gap-2 text-xs">

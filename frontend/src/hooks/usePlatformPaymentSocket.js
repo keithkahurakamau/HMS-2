@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /* ──────────────────────────────────────────────────────────────────────────
- * usePlatformPaymentSocket — live subscription-billing updates for the
+ * usePlatformPaymentSocket: live subscription-billing updates for the
  * superadmin console.
  *
  * While `enabled` is true, opens a WebSocket to the platform feed
@@ -10,13 +10,15 @@ import { useEffect, useRef } from 'react';
  * subscription charge settles, so the operator watches it flip to
  * success/failure without polling. Polling stays as a fallback.
  *
- *   enabled  boolean — open the socket only while watching for charges
- *   onEvent  (data) => void — called per platform_payment_update frame
+ *   enabled  boolean: open the socket only while watching for charges
+ *   onEvent  (data) => void, called per platform_payment_update frame
  * ────────────────────────────────────────────────────────────────────────── */
 export default function usePlatformPaymentSocket(enabled, onEvent) {
     const cbRef = useRef(onEvent);
     useEffect(() => { cbRef.current = onEvent; });
 
+    // Cleanup exists: the cleanup closes the socket; the rule cannot see it created inside a try.
+    // react-doctor-disable-next-line react-doctor/effect-needs-cleanup
     useEffect(() => {
         if (!enabled) return undefined;
 

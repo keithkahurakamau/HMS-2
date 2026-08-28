@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 
 /* High-grade decorative WebGL (OpenGL ES) layer for the hero.
 
-   Renders a real 3D wireframe MESH terrain — a perspective-projected grid
+   Renders a real 3D wireframe MESH terrain, a perspective-projected grid
    whose vertices are displaced every frame by layered sine surfaces, drawn
    as additively-blended glowing lines + node points, tinted with the
    MediFleet brand palette (deep teal → cyan → emerald) and dissolved into
@@ -19,7 +19,7 @@ import React, { useEffect, useRef } from 'react';
      • Grid density adapts to viewport; DPR capped at 2; resizes with parent.
      • Single rAF loop, no React re-renders. Full GL teardown on unmount,
        including WEBGL_lose_context.
-     • aria-hidden + pointer-events-none — purely cosmetic.
+     • aria-hidden + pointer-events-none, purely cosmetic.
 */
 
 const VERT_SRC = `
@@ -35,7 +35,7 @@ const float SPAN_X = 26.0;   // mesh width
 const float Z_NEAR =  5.0;   // nearest row (below camera)
 const float Z_FAR  = -30.0;  // farthest row (toward horizon)
 
-// Layered sine surface — cheap, smooth, and continuously flowing.
+// Layered sine surface: cheap, smooth, and continuously flowing.
 float surface(vec2 w, float t) {
   float y = 0.0;
   y += sin(w.x * 0.45 + t)              * 0.90;
@@ -312,7 +312,7 @@ export default function WebGLHero({ className = '' }) {
       gl.uniformMatrix4fv(uProj, false, projMat);
     };
 
-    // Cursor parallax — lerp the camera's x toward the pointer.
+    // Cursor parallax: lerp the camera's x toward the pointer.
     let tx = 0, mx = 0;
     const onMove = (e) => { tx = (e.clientX / window.innerWidth - 0.5) * 2; };
 

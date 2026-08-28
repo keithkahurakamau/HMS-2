@@ -6,7 +6,7 @@
 // render, fire window.print(), and close on completion or cancel.
 //
 // Self-containing the HTML means the live app's CSS can never bleed into the
-// printed output — every document looks the same regardless of which page
+// printed output: every document looks the same regardless of which page
 // triggered it.
 //
 // Tenant letterhead
@@ -16,7 +16,7 @@
 // top of that artwork instead of the generic MediFleet header/footer, so
 // invoices, prescriptions, lab reports and the rest all come out on the
 // clinic's own paper. `setPrintBranding()` is called by BrandingContext
-// whenever branding loads, which keeps this module synchronous — printing must
+// whenever branding loads, which keeps this module synchronous, printing must
 // stay inside the user's click gesture or the browser blocks the popup.
 
 const SHARED_PRINT_STYLES = `
@@ -316,7 +316,7 @@ export const hasLetterhead = () => letterhead !== null;
 
    The artwork has to do two things on a multi-page document: repeat on every
    sheet, and *reserve* the space it occupies so body text never runs beneath
-   it. `position: fixed` only does the first — it paints over the flow, and
+   it. `position: fixed` only does the first. It paints over the flow, and
    `@page` margins with negative offsets proved unreliable in Chromium's print
    pipeline (the artwork drifted into the middle of the page).
 
@@ -326,7 +326,7 @@ export const hasLetterhead = () => letterhead !== null;
    engines, so it is what we rely on.
 
    Both bands show the *same* stored full-page artwork, cropped with
-   `overflow: hidden` — the top band reveals its first `top`mm, the bottom band
+   `overflow: hidden`, the top band reveals its first `top`mm, the bottom band
    is pulled up so only its last `bottom`mm shows. Cropping in CSS means
    changing a margin re-crops instantly with no re-upload and no canvas work. */
 const letterheadStyles = (lh) => `
@@ -335,13 +335,13 @@ const letterheadStyles = (lh) => `
 
   html, body { padding: 0; margin: 0; }
 
-  /* Painted artwork — the WHOLE sheet, fixed so Chromium repeats it on every
+  /* Painted artwork: the WHOLE sheet, fixed so Chromium repeats it on every
      page, pinned to the physical paper edges (possible because the page margin
      is 0).
 
      It is deliberately not cropped to the margins. Cropping coupled "how much
      artwork shows" to "where content sits", so shrinking the margins silently
-     sliced the letterhead away — a 0 mm bottom margin erased the footer
+     sliced the letterhead away: a 0 mm bottom margin erased the footer
      entirely while Branding Studio still previewed the full page. The margins
      below now position content and nothing else, so what prints always matches
      the preview. */
@@ -360,7 +360,7 @@ const letterheadStyles = (lh) => `
     display: block;
   }
 
-  /* Reserved space — thead/tfoot repeat on every page AND reserve their
+  /* Reserved space: thead/tfoot repeat on every page AND reserve their
      height in the flow, which fixed positioning alone cannot do. They hold
      empty spacers; the artwork above is what the reader actually sees. */
   .letterhead-doc {
@@ -394,7 +394,7 @@ const buildDocument = (title, bodyHtml) => {
   // Two mechanisms, because neither alone is enough: the fixed sheet paints the
   // full artwork on every page, and the thead/tfoot spacers reserve the top and
   // bottom margins in the flow so text never runs over the header or footer
-  // design — on the first page, the last page, and every page between.
+  // design: on the first page, the last page, and every page between.
   const content = lh
     ? `<div class="letterhead-sheet" aria-hidden="true"><img src="${lh.image}" alt="" /></div>
 <table class="letterhead-doc">
@@ -485,7 +485,7 @@ export const printDocumentWithBranding = (title, bodyHtml, printTemplates) => {
   }
 };
 
-/** Serialised print HTML — used by tests and the on-screen letterhead preview. */
+/** Serialised print HTML: used by tests and the on-screen letterhead preview. */
 export const buildPrintHtml = (title, bodyHtml) => buildDocument(title, bodyHtml);
 
 export const printUtils = {

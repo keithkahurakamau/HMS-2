@@ -14,7 +14,7 @@ import PageHeader from '../../components/PageHeader';
 /*  MRR/ARR, 30-day growth, active user totals across tenants, and ticket     */
 /*  queue depth. Falls back to a skeleton while loading and to an inline      */
 /*  warning if the backend partially fails (e.g. a single tenant DB is        */
-/*  unreachable — the rest of the metrics stay accurate).                     */
+/*  unreachable: the rest of the metrics stay accurate).                     */
 /* ────────────────────────────────────────────────────────────────────────── */
 
 const TILE_ACCENTS = {
@@ -27,7 +27,7 @@ const TILE_ACCENTS = {
 const KES = (n) => `KES ${Number(n || 0).toLocaleString('en-KE')}`;
 
 const formatRelative = (iso) => {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const then = new Date(iso).getTime();
     const diff = Date.now() - then;
     const m = Math.floor(diff / 60000);
@@ -122,7 +122,7 @@ export default function SuperAdminDashboard() {
             />
 
             {/* Inline partial-data warning. Shown when at least one tenant DB
-                failed to count users — the rest of the metrics are still good. */}
+                failed to count users: the rest of the metrics are still good. */}
             {overview?.users?.errors?.length > 0 && (
                 <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-900 dark:text-amber-200 rounded-xl p-3 text-xs flex items-start gap-2">
                     <AlertTriangle size={14} className="text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />

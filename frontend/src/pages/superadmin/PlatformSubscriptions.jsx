@@ -10,7 +10,7 @@ import PasswordInput from '../../components/PasswordInput';
 import usePlatformPaymentSocket from '../../hooks/usePlatformPaymentSocket';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Superadmin — Subscription Billing (the platform's OWN Pay Hero rail).     */
+/*  Superadmin: Subscription Billing (the platform's OWN Pay Hero rail).     */
 /*                                                                            */
 /*  This is the ONLY rail where MediFleet receives money. The operator        */
 /*  provisions MediFleet's own Pay Hero account, charges a tenant's           */
@@ -81,7 +81,7 @@ export default function PlatformSubscriptions() {
         })();
     }, []);
 
-    // Live settlement feed — merge incoming frames into the transactions list.
+    // Live settlement feed: merge incoming frames into the transactions list.
     usePlatformPaymentSocket(true, (evt) => {
         setTxns(prev => {
             const idx = prev.findIndex(t => t.id === evt.transaction_id || t.external_reference === evt.external_reference);
@@ -90,7 +90,7 @@ export default function PlatformSubscriptions() {
             next[idx] = { ...next[idx], status: evt.status, receipt_number: evt.receipt_number, result_desc: evt.result_desc };
             return next;
         });
-        if (evt.status === 'Success') toast.success(`Subscription settled — receipt ${evt.receipt_number || ''}`);
+        if (evt.status === 'Success') toast.success(`Subscription settled, receipt ${evt.receipt_number || ''}`);
         else if (evt.status === 'Failed') toast.error(`Subscription charge failed: ${evt.result_desc || ''}`);
     });
 
@@ -159,10 +159,10 @@ export default function PlatformSubscriptions() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Config */}
-                <div data-tour="sub-config" className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+                <div data-tour="sub-config" className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-6 space-y-5">
                     <SectionHead icon={Wallet} title="Your MediFleet Pay Hero account" />
                     <p className="text-xs text-ink-500 dark:text-ink-400 -mt-3">
-                        These are MediFleet's OWN account values — subscription proceeds settle to MediFleet's bank.
+                        These are MediFleet's OWN account values, subscription proceeds settle to MediFleet's bank.
                     </p>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -203,7 +203,7 @@ export default function PlatformSubscriptions() {
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Bank">
                             <select className="input" value={form.settlement_bank_code} onChange={set('settlement_bank_code')}>
-                                <option value="">— select bank —</option>
+                                <option value="">, select bank, </option>
                                 {banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
                             </select>
                         </Field>
@@ -231,11 +231,11 @@ export default function PlatformSubscriptions() {
 
                 {/* Charge a tenant */}
                 <div data-tour="sub-charge" className="space-y-4">
-                    <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5 space-y-3">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5 space-y-3">
                         <SectionHead icon={Phone} title="Charge a tenant" />
                         <Field label="Tenant">
                             <select className="input" value={chargeTenant} onChange={e => setChargeTenant(e.target.value)}>
-                                <option value="">— select tenant —</option>
+                                <option value="">, select tenant, </option>
                                 {tenants.map(t => <option key={t.id || t.tenant_id} value={numericId(t)}>{t.name}</option>)}
                             </select>
                         </Field>
@@ -248,7 +248,7 @@ export default function PlatformSubscriptions() {
                         </button>
                         <div className="grid grid-cols-2 gap-3 pt-1">
                             <Field label="Amount (KES)"><input aria-label="Amount (KES)" className="input" type="number" value={chargeAmount} onChange={e => setChargeAmount(e.target.value)} placeholder="18500" /></Field>
-                            <Field label="Period label"><input aria-label="Period label" className="input" value={chargePeriod} onChange={e => setChargePeriod(e.target.value)} placeholder="May 2026 — Standard" /></Field>
+                            <Field label="Period label"><input aria-label="Period label" className="input" value={chargePeriod} onChange={e => setChargePeriod(e.target.value)} placeholder="May 2026, Standard" /></Field>
                         </div>
                         <div className="flex gap-2 pt-1">
                             <button type="button" onClick={() => charge(false)} disabled={charging || !health?.ready}
@@ -268,7 +268,7 @@ export default function PlatformSubscriptions() {
             </div>
 
             {/* Live activity */}
-            <div data-tour="sub-activity" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+            <div data-tour="sub-activity" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl overflow-hidden">
                 <div className="p-4 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white inline-flex items-center gap-2">
                         <Activity size={16} className="text-accent-600 dark:text-accent-400" /> Subscription activity
@@ -285,12 +285,12 @@ export default function PlatformSubscriptions() {
 
 function SubsGuide() {
     return (
-        <div data-tour="sub-guide" className="bg-accent-50 dark:bg-accent-500/10 border border-accent-200 dark:border-accent-500/20 rounded-2xl p-5">
+        <div data-tour="sub-guide" className="bg-accent-50 dark:bg-accent-500/10 border border-accent-200 dark:border-accent-500/20 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-accent-900 dark:text-accent-200 mb-2 inline-flex items-center gap-2">
                 <Wallet size={16} /> This is the only money you receive
             </h3>
             <p className="text-sm text-accent-900/90 dark:text-accent-200/90 leading-relaxed">
-                Hospital patient payments never touch you — they settle to each hospital's own bank.
+                Hospital patient payments never touch you, they settle to each hospital's own bank.
                 <strong> Subscriptions are the one inbound rail:</strong> you charge a tenant's billing
                 phone via M-Pesa and the money lands in <strong>MediFleet's own Pay Hero account</strong>,
                 then your settlement bank. Configure your account once below, set each tenant's billing
@@ -304,7 +304,7 @@ function HealthBanner({ health }) {
     if (!health) return null;
     if (health.ready) {
         return (
-            <div data-tour="sub-health" className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl p-4 text-sm text-emerald-800 dark:text-emerald-300 inline-flex items-start gap-2 w-full">
+            <div data-tour="sub-health" className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-4 text-sm text-emerald-800 dark:text-emerald-300 inline-flex items-start gap-2 w-full">
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
                 <div>
                     <span className="font-semibold">Ready to collect subscriptions.</span>
@@ -314,8 +314,8 @@ function HealthBanner({ health }) {
         );
     }
     return (
-        <div data-tour="sub-health" className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 text-sm text-amber-900 dark:text-amber-200 w-full">
-            <div className="font-semibold inline-flex items-center gap-2 mb-1"><AlertCircle size={16} /> Not ready yet — finish these first</div>
+        <div data-tour="sub-health" className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4 text-sm text-amber-900 dark:text-amber-200 w-full">
+            <div className="font-semibold inline-flex items-center gap-2 mb-1"><AlertCircle size={16} /> Not ready yet, finish these first</div>
             <ul className="list-disc pl-5 text-xs space-y-0.5">
                 {(health.blockers || []).map((b) => <li key={b}>{b}</li>)}
             </ul>
@@ -339,23 +339,23 @@ function TxnTable({ txns, tenants }) {
     }
     return (
         <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-                <thead className="bg-ink-50 text-ink-600 text-2xs uppercase tracking-[0.14em]">
+            <table className="table-clean table-sticky">
+                <thead>
                     <tr>
-                        <th className="px-5 py-3">Tenant</th><th className="px-5 py-3">Amount</th>
-                        <th className="px-5 py-3">Period</th><th className="px-5 py-3">Status</th>
-                        <th className="px-5 py-3">Receipt</th><th className="px-5 py-3">When</th>
+                        <th>Tenant</th><th>Amount</th>
+                        <th>Period</th><th>Status</th>
+                        <th>Receipt</th><th>When</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100 text-ink-700">
+                <tbody>
                     {txns.map(t => (
                         <tr key={t.id} className="hover:bg-ink-50">
-                            <td className="px-5 py-3"><span className="inline-flex items-center gap-1.5"><Building2 size={14} className="text-ink-400" />{nameFor(t.tenant_id)}</span></td>
-                            <td className="px-5 py-3 font-mono text-xs">KES {(t.amount || 0).toLocaleString('en-KE')}</td>
-                            <td className="px-5 py-3 text-xs">{t.period_label || '—'}</td>
-                            <td className={`px-5 py-3 font-semibold text-xs ${STATUS_TONE[t.status] || 'text-ink-500'}`}>{t.status}</td>
-                            <td className="px-5 py-3 font-mono text-xs">{t.receipt_number || '—'}</td>
-                            <td className="px-5 py-3 text-xs text-ink-500">{t.initiated_at ? new Date(t.initiated_at).toLocaleString() : '—'}</td>
+                            <td><span className="inline-flex items-center gap-1.5"><Building2 size={14} className="text-ink-400" />{nameFor(t.tenant_id)}</span></td>
+                            <td className="font-mono text-xs">KES {(t.amount || 0).toLocaleString('en-KE')}</td>
+                            <td className="text-xs">{t.period_label || '-'}</td>
+                            <td className={`font-semibold text-xs ${STATUS_TONE[t.status] || 'text-ink-500'}`}>{t.status}</td>
+                            <td className="font-mono text-xs">{t.receipt_number || '-'}</td>
+                            <td className="text-xs text-ink-500">{t.initiated_at ? new Date(t.initiated_at).toLocaleString() : '-'}</td>
                         </tr>
                     ))}
                 </tbody>

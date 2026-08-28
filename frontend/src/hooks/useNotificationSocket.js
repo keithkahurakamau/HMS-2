@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /* ──────────────────────────────────────────────────────────────────────────
- * useNotificationSocket — live push for the notification bell.
+ * useNotificationSocket: live push for the notification bell.
  *
  * While `enabled` is true and a userId is known, opens an authenticated
  * WebSocket to /ws/notifications/{userId}. `notify()` (backend/app/utils/
@@ -12,12 +12,11 @@ import { useEffect, useRef } from 'react';
  *
  * Mirrors usePaymentSocket.js's connect/cleanup shape.
  *
- *   enabled  boolean — open the socket only while the bell is mounted/live
- *   userId   the signed-in user's id (matches the JWT the cookie carries —
- *            the server closes the socket if these don't match)
- *   role     optional — opts into role-channel broadcasts (e.g. every Lab
+ *   enabled  boolean: open the socket only while the bell is mounted/live
+ *   userId   the signed-in user's id (matches the JWT the cookie carries,  *            the server closes the socket if these don't match)
+ *   role     optional: opts into role-channel broadcasts (e.g. every Lab
  *            Technician notified of a new STAT order)
- *   onEvent  (data) => void — called per `type: "notification"` frame
+ *   onEvent  (data) => void, called per `type: "notification"` frame
  * ────────────────────────────────────────────────────────────────────────── */
 export default function useNotificationSocket(enabled, userId, role, onEvent) {
     // Keep the latest callback in a ref so the socket effect doesn't need to
@@ -27,8 +26,7 @@ export default function useNotificationSocket(enabled, userId, role, onEvent) {
     useEffect(() => { cbRef.current = onEvent; });
 
     useEffect(() => {
-        // A single cleanup function owns whatever this effect allocates —
-        // `socket` stays null on any bailout path (disabled, no userId,
+        // A single cleanup function owns whatever this effect allocates,         // `socket` stays null on any bailout path (disabled, no userId,
         // constructor throws) so cleanup is unconditional and guaranteed
         // rather than living behind an early `return undefined`.
         let socket = null;
@@ -45,7 +43,7 @@ export default function useNotificationSocket(enabled, userId, role, onEvent) {
                     try { data = JSON.parse(evt.data); } catch { return; }
                     if (data && data.type === 'notification') cbRef.current?.(data);
                 };
-                // Swallow errors — polling is the safety net.
+                // Swallow errors: polling is the safety net.
                 socket.onerror = () => {};
             } catch {
                 socket = null; // fall back to polling

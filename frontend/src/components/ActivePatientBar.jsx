@@ -4,11 +4,11 @@ import { X, User, AlertTriangle, Droplet, History, Stethoscope, FlaskConical } f
 import { useActivePatient } from '../context/PatientContext';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Active patient bar — renders above the main outlet whenever a patient    */
+/*  Active patient bar: renders above the main outlet whenever a patient    */
 /*  has been opened. Provides a constant "who am I working on" affordance     */
 /*  plus shortcuts to the chart and clinical queue.                           */
 /*                                                                            */
-/*  Keep this bar SHORT — it spans every page, every device. Anything that    */
+/*  Keep this bar SHORT: it spans every page, every device. Anything that    */
 /*  doesn't help the clinician immediately identify the patient and reach    */
 /*  their most-common destinations belongs on the chart itself, not here.    */
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -38,7 +38,7 @@ export default function ActivePatientBar() {
     return (
         <section
             aria-label="Active patient"
-            className="sticky top-0 z-20 -mx-3 sm:-mx-4 lg:-mx-5 mb-3 px-3 sm:px-4 lg:px-5 py-2.5 bg-brand-50/95 dark:bg-brand-500/10 border-b border-brand-200 dark:border-brand-500/20 backdrop-blur-md shadow-soft"
+            className="sticky top-0 z-20 -mx-3 sm:-mx-4 lg:-mx-5 mb-3 px-3 sm:px-4 lg:px-5 py-2.5 bg-brand-50/95 dark:bg-brand-500/10 border-b border-brand-200 dark:border-brand-500/20 backdrop-blur-md"
         >
             <div className="flex items-center gap-3 min-w-0">
                 {/* Avatar */}

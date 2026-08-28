@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import Modal from './Modal';
 import { listFiles, uploadFile, downloadFile, deleteFile } from '../../../api/clinicalFiles';
 
-const MAX_BYTES = 2 * 1024 * 1024; // 2 MB binary — matches the server's ~2.8 MB base64 cap.
+const MAX_BYTES = 2 * 1024 * 1024; // 2 MB binary: matches the server's ~2.8 MB base64 cap.
 const err = (e, fallback) => toast.error(e?.response?.data?.detail || fallback);
 
 const prettySize = (bytes) => {
@@ -21,7 +21,7 @@ const readAsDataUrl = (file) => new Promise((resolve, reject) => {
     reader.readAsDataURL(file);
 });
 
-// Pure — fetches the file blob then triggers a browser download. No component
+// Pure: fetches the file blob then triggers a browser download. No component
 // state, so it lives at module scope.
 const downloadAttachment = (f) => {
     downloadFile(f.file_id)
@@ -37,7 +37,7 @@ const downloadAttachment = (f) => {
 };
 
 /**
- * Patient file attachments — upload documents/images, list them, download or
+ * Patient file attachments: upload documents/images, list them, download or
  * delete. Files are stored base64-in-DB; the size guard mirrors the server cap.
  * `recordId` (optional) links an upload to the current encounter.
  */
@@ -59,7 +59,7 @@ export default function FilesModal({ patient, recordId = null, onClose }) {
         const file = e.target.files?.[0];
         if (inputRef.current) inputRef.current.value = ''; // allow re-picking the same file
         if (!file) return;
-        if (file.size > MAX_BYTES) { toast.error('File too large — max 2 MB per attachment.'); return; }
+        if (file.size > MAX_BYTES) { toast.error('File too large: max 2 MB per attachment.'); return; }
         setUploading(true);
         readAsDataUrl(file)
             .then((data) => uploadFile({

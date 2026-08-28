@@ -8,7 +8,7 @@ const PRIORITIES = ['Elective', 'Emergency'];
 const err = (e, fallback) => toast.error(e?.response?.data?.detail || fallback);
 
 /**
- * Theatre request — books a surgical case for the patient via POST /theatre/cases.
+ * Theatre request: books a surgical case for the patient via POST /theatre/cases.
  * Minimal request form (procedure, diagnosis, priority, optional schedule); the
  * theatre team fills in room/surgeon later. Shared by the Clinical Desk + Triage.
  */

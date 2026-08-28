@@ -80,7 +80,7 @@ describe('recordToFormState', () => {
 
     it('blanks the free-text field when diagnosis is just the catalogue-description fallback', () => {
         // buildDiagnosisFields writes the joined descriptions into `diagnosis`
-        // when no custom text was entered — resuming shouldn't duplicate them
+        // when no custom text was entered, resuming shouldn't duplicate them
         // into the free-text input alongside the rebuilt chips.
         const fs = recordToFormState({
             ...RECORD,

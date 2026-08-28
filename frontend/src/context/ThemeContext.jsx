@@ -3,8 +3,8 @@ import React, { createContext, use, useEffect, useState, useCallback } from 'rea
 const ThemeContext = createContext(null);
 
 // Two independent theme scopes:
-//   • `hms_theme`        — the tenant workspace (/app/*), client-controlled.
-//   • `hms_admin_theme`  — the platform back-office (/superadmin/*). Operator's
+//   • `hms_theme`, the tenant workspace (/app/*), client-controlled.
+//   • `hms_admin_theme`, the platform back-office (/superadmin/*). Operator's
 //                          own preference, deliberately NOT tied to any tenant
 //                          client's choice so the console looks the same no
 //                          matter which hospital the operator was just in.
@@ -18,7 +18,7 @@ const readTheme = (key, fallback = 'system') => {
 };
 
 // Writes the resolved theme to <html>. Exported so the route-aware applier in
-// App.jsx owns the DOM write — dark mode is scoped to the workspace, while
+// App.jsx owns the DOM write, dark mode is scoped to the workspace, while
 // public/auth pages are always rendered light regardless of stored/OS theme.
 export const applyDocumentTheme = (resolved) => {
     const root = document.documentElement;

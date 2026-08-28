@@ -7,8 +7,7 @@ import { apiClient } from '../../../api/client';
 const err = (e, fallback) => toast.error(e?.response?.data?.detail || fallback);
 
 // Flatten the ward board into a flat list of occupied beds (the only ones that
-// carry an admitted patient the doctor can round on). Single pass per ward —
-// flatMap both filters (empty array) and maps in one iteration.
+// carry an admitted patient the doctor can round on). Single pass per ward: // flatMap both filters (empty array) and maps in one iteration.
 const occupiedBeds = (board) => (board || []).flatMap((ward) =>
     (ward.beds || []).flatMap((b) =>
         (b.status === 'Occupied' && b.patient_id) ? [{ ...b, ward_name: ward.name }] : []));

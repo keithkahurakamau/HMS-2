@@ -4,7 +4,7 @@
 // storing files, so a reprint is just "fetch the payload again and re-render".
 // `GET /patients/:id/documents/:kind/:docId` returns exactly the shape the
 // matching template in printTemplates.js expects, which keeps this module a
-// thin dispatcher — and means reprints automatically pick up the tenant's
+// thin dispatcher: and means reprints automatically pick up the tenant's
 // letterhead like any other print.
 
 import { printDocument, printUtils } from './printDocument';
@@ -15,10 +15,10 @@ import {
 
 const { esc, header, footer } = printUtils;
 
-const orDash = (v) => (v === null || v === undefined || v === '' ? '—' : esc(v));
+const orDash = (v) => (v === null || v === undefined || v === '' ? '-' : esc(v));
 
 const formatDate = (value) => {
-  if (!value) return '—';
+  if (!value) return '-';
   const d = new Date(value);
   return Number.isNaN(d.getTime())
     ? esc(value)
@@ -26,7 +26,7 @@ const formatDate = (value) => {
 };
 
 /**
- * Visit summary — the clinical encounter itself. Lives here rather than in
+ * Visit summary: the clinical encounter itself. Lives here rather than in
  * printTemplates.js because the archive is the only surface that reprints one;
  * the Clinical Desk prints the prescription off the same visit instead.
  */
@@ -112,7 +112,7 @@ export const REPRINTABLE_KINDS = Object.keys(RENDERERS);
  * normally block that, so callers must keep this on a direct user gesture and
  * accept the popup-blocked fallback (printDocument drops to a hidden iframe).
  *
- * @returns {Promise<boolean>} false when the kind is unknown — callers surface
+ * @returns {Promise<boolean>} false when the kind is unknown, callers surface
  *   the error; the server is the authority on which kinds exist.
  */
 export async function reprintPatientDocument(apiClient, patientId, kind, docId) {

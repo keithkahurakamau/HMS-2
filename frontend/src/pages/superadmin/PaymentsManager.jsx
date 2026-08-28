@@ -9,11 +9,11 @@ import PageHeader from '../../components/PageHeader';
 import PasswordInput from '../../components/PasswordInput';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Superadmin — M-Pesa / Pay Hero provisioning.                              */
+/*  Superadmin: M-Pesa / Pay Hero provisioning.                              */
 /*                                                                            */
 /*  Only the platform operator is linked with Pay Hero. Here the operator     */
 /*  wires each hospital's Pay Hero channel + credentials (and can set the     */
-/*  till + bank during onboarding). Hospitals never see any of this — their   */
+/*  till + bank during onboarding). Hospitals never see any of this, their   */
 /*  own page only shows whether M-Pesa is live.                               */
 /* ────────────────────────────────────────────────────────────────────────── */
 
@@ -122,13 +122,13 @@ export default function PaymentsManager() {
                 eyebrow="Platform"
                 icon={Smartphone}
                 title="M-Pesa Provisioning"
-                subtitle="Wire each hospital's Pay Hero channel + credentials. Hospitals never see this — only whether their M-Pesa is live."
+                subtitle="Wire each hospital's Pay Hero channel + credentials. Hospitals never see this: only whether their M-Pesa is live."
                 tone="brand"
             />
 
             <ProvisioningGuide />
 
-            <div data-tour="prov-hospital" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5">
+            <div data-tour="prov-hospital" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5">
                 <label htmlFor="pay-hospital" className="block text-xs font-semibold text-ink-600 dark:text-ink-400 mb-1.5 inline-flex items-center gap-1.5">
                     <Building2 size={14} className="text-brand-600" /> Hospital
                 </label>
@@ -138,7 +138,7 @@ export default function PaymentsManager() {
                     value={selected || ''}
                     onChange={(e) => loadConfig(e.target.value)}
                 >
-                    <option value="">— select a hospital —</option>
+                    <option value="">, select a hospital, </option>
                     {tenants.map((t) => (
                         <option key={t.id || t.tenant_id} value={numericId(t)}>{t.name}</option>
                     ))}
@@ -146,16 +146,16 @@ export default function PaymentsManager() {
             </div>
 
             {!selected ? (
-                <div className="bg-white dark:bg-ink-900 border border-dashed border-ink-200 dark:border-ink-800 rounded-2xl p-12 text-center text-ink-400">
+                <div className="bg-white dark:bg-ink-900 border border-dashed border-ink-200 dark:border-ink-800 rounded-xl p-12 text-center text-ink-400">
                     <Smartphone size={40} className="mx-auto mb-3 text-ink-300 dark:text-ink-600" />
                     <p className="text-sm font-medium text-ink-500 dark:text-ink-400">Select a hospital to manage its M-Pesa wiring.</p>
                 </div>
             ) : loadingCfg ? (
-                <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-8 text-sm text-ink-500 dark:text-ink-400">Loading…</div>
+                <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-8 text-sm text-ink-500 dark:text-ink-400">Loading…</div>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Editor */}
-                    <div className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+                    <div className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-6 space-y-5">
                         <SectionHead icon={Hash} title="Hospital Safaricom shortcode" />
                         <div className="grid grid-cols-2 gap-3">
                             <Field label="Shortcode (PayBill / Till)">
@@ -219,7 +219,7 @@ export default function PaymentsManager() {
                             <Field label="Bank">
                                 <select className="input" value={form.settlement_bank_code}
                                         onChange={e => setForm({ ...form, settlement_bank_code: e.target.value })}>
-                                    <option value="">— select bank —</option>
+                                    <option value="">, select bank, </option>
                                     {banks.map(b => (<option key={b.code} value={b.code}>{b.name}</option>))}
                                 </select>
                             </Field>
@@ -257,7 +257,7 @@ export default function PaymentsManager() {
                     <div className="space-y-4">
                         <StatusCard config={config} />
 
-                        <div data-tour="prov-test" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5 space-y-3">
+                        <div data-tour="prov-test" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5 space-y-3">
                             <SectionHead icon={Send} title="Send a test prompt" />
                             <p className="text-xs text-ink-500 dark:text-ink-400">
                                 Real KES&nbsp;1 STK push using this hospital's saved wiring.
@@ -289,14 +289,14 @@ export default function PaymentsManager() {
 
 function ProvisioningGuide() {
     return (
-        <div data-tour="prov-guide" className="bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/20 rounded-2xl p-5">
+        <div data-tour="prov-guide" className="bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/20 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-brand-900 dark:text-brand-200 mb-2 inline-flex items-center gap-2">
                 <Wallet size={16} /> How hospital payments are wired (the operator model)
             </h3>
             <p className="text-sm text-brand-900/90 dark:text-brand-200/90 leading-relaxed mb-2">
                 Each hospital owns its <strong>own Pay Hero account</strong>. Patient money flows
                 patient → that hospital's Pay Hero account → that hospital's bank. <strong>MediFleet
-                never holds hospital money</strong> — the platform only triggers the STK push (using
+                never holds hospital money</strong>, the platform only triggers the STK push (using
                 the hospital's credentials) and relays the live status back to their screens.
             </p>
             <ol className="list-decimal pl-5 text-sm text-brand-900/90 dark:text-brand-200/90 space-y-1">
@@ -305,7 +305,7 @@ function ProvisioningGuide() {
                 <li>Saving a channel id flips their M-Pesa to live. Send a KES 1 test to confirm end-to-end.</li>
             </ol>
             <p className="text-xs text-brand-700 dark:text-brand-300 mt-2">
-                Your own MediFleet account (for collecting subscriptions) is configured separately under <strong>Subscription Billing</strong> — that's the only money you receive.
+                Your own MediFleet account (for collecting subscriptions) is configured separately under <strong>Subscription Billing</strong>, that's the only money you receive.
             </p>
         </div>
     );
@@ -314,7 +314,7 @@ function ProvisioningGuide() {
 function StatusCard({ config }) {
     if (!config?.configured) {
         return (
-            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-5 text-sm text-amber-800 dark:text-amber-300 inline-flex items-start gap-2">
+            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-5 text-sm text-amber-800 dark:text-amber-300 inline-flex items-start gap-2">
                 <AlertCircle size={16} className="mt-0.5" />
                 <div>
                     <div className="font-semibold">Nothing saved yet</div>
@@ -324,7 +324,7 @@ function StatusCard({ config }) {
         );
     }
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-5 text-sm space-y-2">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5 text-sm space-y-2">
             {config.mpesa_active ? (
                 <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-300"><CheckCircle2 size={16} /> M-Pesa live</div>
             ) : (

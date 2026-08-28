@@ -1,4 +1,4 @@
-// Custom SVG partograph — no chart library, consistent with the bundle-size
+// Custom SVG partograph: no chart library, consistent with the bundle-size
 // budget. Geometry is exported pure so tests can pin the WHO line positions.
 const PLOT = { x0: 60, x1: 700, y0: 40, y1: 300, hours: 12, maxCm: 10 };
 
@@ -77,7 +77,7 @@ export default function PartographChart({ entries = [], activeStart = null }) {
 
       {/* FHR strip (340–400 y-band; the backend accepts 40–240 bpm on partograph
           entries, wider than the 60–200 this formula maps into the band, so
-          the plotted y is clamped to [340, 400] below — an extreme value sits
+          the plotted y is clamped to [340, 400] below, an extreme value sits
           at the band edge instead of drifting past it) */}
       <text x={PLOT.x0} y={334} fontSize="10" className="fill-ink-500 dark:fill-ink-400">FHR</text>
       {fhr.map((e) => {
@@ -89,7 +89,7 @@ export default function PartographChart({ entries = [], activeStart = null }) {
       {!activeStart && (
         <text x="380" y="180" textAnchor="middle" fontSize="12"
               className="fill-ink-500 dark:fill-ink-400">
-          Active labor not started — chart begins at the first ≥4 cm entry.
+          Active labor not started: chart begins at the first ≥4 cm entry.
         </text>
       )}
     </svg>

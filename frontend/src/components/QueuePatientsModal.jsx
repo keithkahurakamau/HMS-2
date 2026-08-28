@@ -12,7 +12,7 @@ import { departmentLabel } from '../utils/departments';
  * rows. This lists the whole queue, searchable, and offers the two actions
  * that were otherwise buried: remove one patient, or clear the queue.
  *
- * Presentational — removal is delegated to the page, which already owns the
+ * Presentational: removal is delegated to the page, which already owns the
  * queue refresh and the workspace it may need to clear.
  */
 
@@ -57,7 +57,7 @@ export default function QueuePatientsModal({
                     <div className="flex items-center gap-2 min-w-0">
                         <span className="text-brand-600"><Users size={17} /></span>
                         <h2 id="queue-patients-title" className="text-sm font-semibold text-ink-900 dark:text-white tracking-tight truncate">
-                            {label} — all patients waiting
+                            {label}, all patients waiting
                         </h2>
                         <span className="badge-neutral shrink-0">{queue.length}</span>
                     </div>
@@ -95,28 +95,28 @@ export default function QueuePatientsModal({
                             No patient matches “{search}”.
                         </p>
                     ) : (
-                        <table className="w-full text-sm">
+                        <table className="table-inline">
                             <thead>
                                 <tr className="text-2xs uppercase tracking-wider text-ink-500 dark:text-ink-400 text-left">
-                                    <th className="py-1.5 pr-3 font-medium">Q.No</th>
-                                    <th className="py-1.5 pr-3 font-medium">OP number</th>
-                                    <th className="py-1.5 pr-3 font-medium">Patient</th>
-                                    <th className="py-1.5 pr-3 font-medium">From</th>
-                                    <th className="py-1.5 pr-3 font-medium">Waiting</th>
-                                    <th className="py-1.5 font-medium text-right">Remove</th>
+                                    <th>Q.No</th>
+                                    <th>OP number</th>
+                                    <th>Patient</th>
+                                    <th>From</th>
+                                    <th>Waiting</th>
+                                    <th className="num">Remove</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                                 {visible.map((item) => {
                                     const mins = minutesWaiting(item.joined_at);
-                                    // Position in the real queue, not the filtered view — a
+                                    // Position in the real queue, not the filtered view, a
                                     // filtered row must still show its true place in line.
                                     const position = queue.indexOf(item) + 1;
                                     return (
                                         <tr key={item.queue_id}>
-                                            <td className="py-2 pr-3 text-ink-500 dark:text-ink-400 tabular-nums">{position}</td>
-                                            <td className="py-2 pr-3 font-mono text-xs text-ink-600 dark:text-ink-300">{item.outpatient_no || '—'}</td>
-                                            <td className="py-2 pr-3">
+                                            <td className="text-ink-500 dark:text-ink-400 tabular-nums">{position}</td>
+                                            <td className="font-mono text-xs text-ink-600 dark:text-ink-300">{item.outpatient_no || '-'}</td>
+                                            <td>
                                                 <button type="button"
                                                     onClick={() => { onSelectPatient?.(item); onClose(); }}
                                                     className="font-medium text-ink-800 dark:text-ink-200 hover:text-brand-600 dark:hover:text-brand-400 text-left flex items-center gap-2">
@@ -126,11 +126,11 @@ export default function QueuePatientsModal({
                                                     )}
                                                 </button>
                                             </td>
-                                            <td className="py-2 pr-3 text-ink-600 dark:text-ink-300">{item.triage_time || '—'}</td>
-                                            <td className="py-2 pr-3 text-ink-600 dark:text-ink-300 tabular-nums">
-                                                {mins == null ? '—' : `${mins} min`}
+                                            <td className="text-ink-600 dark:text-ink-300">{item.triage_time || '-'}</td>
+                                            <td className="text-ink-600 dark:text-ink-300 tabular-nums">
+                                                {mins == null ? '-' : `${mins} min`}
                                             </td>
-                                            <td className="py-2 text-right">
+                                            <td className="num">
                                                 {onRemoveFromQueue && (
                                                     <button type="button" onClick={() => onRemoveFromQueue(item)}
                                                         aria-label={`Remove ${item.patient_name} from queue`}
@@ -147,7 +147,7 @@ export default function QueuePatientsModal({
                     )}
                 </div>
 
-                {/* Footer — bulk clear */}
+                {/* Footer: bulk clear */}
                 <div className="px-5 py-3.5 border-t border-ink-100 dark:border-ink-800 bg-ink-50/50 dark:bg-ink-800/30">
                     {confirmingClear ? (
                         // Two-step rather than window.confirm: removing everyone waiting is

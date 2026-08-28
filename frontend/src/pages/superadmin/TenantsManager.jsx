@@ -64,7 +64,7 @@ export default function TenantsManager() {
 
     // Canonical module catalogue from the backend. Drives the curated package
     // editor below so superadmins can't typo a module key and silently fail
-    // to gate anything. Falls back to [] on error — the UI shows just the
+    // to gate anything. Falls back to [] on error, the UI shows just the
     // legacy free-text editor in that case.
     const [moduleCatalogue, setModuleCatalogue] = useState([]);
     const [moduleSearch, setModuleSearch] = useState('');
@@ -114,7 +114,7 @@ export default function TenantsManager() {
 
     useEffect(() => {
         fetchTenants();
-        // Catalogue rarely changes — fetched once per session.
+        // Catalogue rarely changes: fetched once per session.
         apiClient.get('/public/superadmin/module-catalogue')
             .then((res) => setModuleCatalogue(res.data || []))
             .catch(() => setModuleCatalogue([]));
@@ -126,7 +126,7 @@ export default function TenantsManager() {
         setIsLoading(true);
         try {
             // Superadmin view should see suspended tenants too, so they can
-            // reactivate them — public picker callers omit this flag.
+            // reactivate them: public picker callers omit this flag.
             const res = await apiClient.get('/public/hospitals?include_inactive=true');
             setTenants(res.data);
         } catch (error) {
@@ -227,17 +227,17 @@ export default function TenantsManager() {
                     </div>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
+                    <table className="table-clean table-sticky">
+                        <thead>
                             <tr>
-                                <th className="px-6 py-3">Tenant</th>
-                                <th className="px-6 py-3">Domain routing</th>
-                                <th className="px-6 py-3">Database node</th>
-                                <th className="px-6 py-3">Subscription tier</th>
-                                <th className="px-6 py-3 text-center">Actions</th>
+                                <th>Tenant</th>
+                                <th>Domain routing</th>
+                                <th>Database node</th>
+                                <th>Subscription tier</th>
+                                <th className="text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-200">
+                        <tbody>
                             {isLoading ? (
                                 <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500 dark:text-ink-400">Loading global registry…</td></tr>
                             ) : filteredTenants.map(tenant => {
@@ -250,7 +250,7 @@ export default function TenantsManager() {
                                 }[tenant.theme_color] || 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300';
                                 return (
                                     <tr key={tenant.id} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors group">
-                                        <td className="px-6 py-4">
+                                        <td>
                                             <div className="flex items-center gap-3">
                                                 <div className={`size-9 rounded-xl flex items-center justify-center border ${themeRing}`}>
                                                     <Building2 size={16} />
@@ -258,21 +258,21 @@ export default function TenantsManager() {
                                                 <span className="font-semibold text-ink-900 dark:text-white group-hover:text-brand-700 transition-colors">{tenant.name}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-mono text-xs text-ink-600 dark:text-ink-400">{tenant.domain}</td>
-                                        <td className="px-6 py-4">
+                                        <td className="font-mono text-xs text-ink-600 dark:text-ink-400">{tenant.domain}</td>
+                                        <td>
                                             <div className="flex items-center gap-2">
                                                 <Database size={13} className="text-ink-500" aria-hidden="true" />
                                                 <span className="font-mono text-xs text-accent-700">{tenant.db_name}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td>
                                             {tenant.is_premium ? (
                                                 <span className="badge-warn">Premium</span>
                                             ) : (
                                                 <span className="badge-neutral">Standard</span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="text-center">
                                             <div className="flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                                                 <button type="button" onClick={() => openEdit(tenant)} aria-label={`Edit ${tenant.name}`}
                                                     className="p-2 hover:bg-ink-100 rounded-lg text-ink-500 hover:text-ink-900 transition-colors cursor-pointer" title="Edit configuration">
@@ -302,7 +302,7 @@ export default function TenantsManager() {
                     aria-modal="true"
                     aria-labelledby="edit-tenant-title"
                 >
-                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-4xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay w-full max-w-4xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
                         <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-center shrink-0 gap-3">
                             <div className="min-w-0">
                                 <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700 dark:text-brand-400">Tenant configuration</p>
@@ -407,7 +407,7 @@ export default function TenantsManager() {
 
                                     {moduleCatalogue.length === 0 ? (
                                         <p className="text-xs text-ink-500 dark:text-ink-400 italic bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-lg p-3">
-                                            Module catalogue unavailable — use the custom-flag editor on the right.
+                                            Module catalogue unavailable: use the custom-flag editor on the right.
                                         </p>
                                     ) : (
                                         <>
@@ -550,7 +550,7 @@ export default function TenantsManager() {
                             <div className="p-5 sm:p-6 space-y-4 border-t border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                            {/* Custom flags — escape hatch for ad-hoc keys that aren't in the
+                            {/* Custom flags: escape hatch for ad-hoc keys that aren't in the
                                 canonical module catalogue. Most operators won't need this; it's
                                 here so forward-compat with new flags doesn't require a frontend
                                 redeploy. */}
@@ -626,7 +626,7 @@ export default function TenantsManager() {
                                 <div className="flex items-center justify-between mb-3">
                                     <div>
                                         <p className="text-2xs font-semibold text-ink-700 dark:text-ink-200 uppercase tracking-[0.14em]">Plan limits</p>
-                                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Numeric caps — max_users, storage_gb, max_patients…</p>
+                                        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Numeric caps. Max_users, storage_gb, max_patients…</p>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -714,14 +714,14 @@ export default function TenantsManager() {
                 </div>
             )}
 
-            {/* One-time provisioning result — shows admin temp password.
+            {/* One-time provisioning result: shows admin temp password.
                 Kept amber-accented because this is a one-shot warning surface:
                 "save this now, you won't see it again." The amber band reads as
                 "important, time-sensitive" against the otherwise neutral light
                 surfaces. */}
             {provisionResult && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/40 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay w-full max-w-lg overflow-hidden animate-slide-up">
                         <div className="px-6 py-4 border-b border-amber-100 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10">
                             <h2 className="text-base font-semibold text-amber-900 dark:text-amber-300 tracking-tight">Tenant ready &mdash; admin temporary password</h2>
                             <p className="text-xs text-amber-800 dark:text-amber-400 mt-1">Shown once. Deliver to the admin via a secure channel.</p>
@@ -762,7 +762,7 @@ export default function TenantsManager() {
             {/* Provision Modal */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/80 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-lg overflow-hidden animate-slide-up">
+                    <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay w-full max-w-lg overflow-hidden animate-slide-up">
                         <div className="px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-center">
                             <h2 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">Provision new tenant</h2>
                             <button type="button" onClick={() => setIsAddModalOpen(false)} aria-label="Close" className="p-2 rounded-lg text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-ink-800/50 transition-colors cursor-pointer"><X size={18} /></button>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-// Static tone lookups — module scope so they're allocated once, not rebuilt
+// Static tone lookups at module scope so they're allocated once, not rebuilt
 // every render. On dark surfaces (superadmin console) the chip backgrounds
 // become translucent overlays that read crisply on ink-950.
 // Light tones carry `dark:` companions so a workspace page header (default
@@ -25,7 +25,7 @@ const DARK_TONES = {
 };
 
 /**
- * PageHeader — the uniform header surface every page in the workspace renders.
+ * PageHeader: the uniform header surface every page in the workspace renders.
  *
  *  Why this component exists
  *  -------------------------
@@ -46,7 +46,7 @@ const DARK_TONES = {
  *  - icon:      Lucide icon component, rendered inside a tinted chip.
  *  - title:     Main page title.
  *  - subtitle:  One-line description. Optional.
- *  - meta:      Right-side info chip (e.g. "Last sync 12s ago"). Optional.
+ *  - meta:      Right-side info chip (for example "Last sync 12s ago"). Optional.
  *  - actions:   Right-side action buttons (use .btn-* classes). Optional.
  *  - tone:      brand | teal | accent | neutral | warning. Affects icon chip
  *               and eyebrow accent.
@@ -79,7 +79,7 @@ export default function PageHeader({
                             {eyebrow}
                         </span>
                     )}
-                    <h1 className={`text-lg sm:text-xl font-semibold tracking-tight leading-tight ${
+                    <h1 className={`text-xl font-semibold tracking-tight leading-tight ${
                         isDark ? 'text-white' : 'text-ink-900 dark:text-white'
                     }`}>
                         {title}

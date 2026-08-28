@@ -29,7 +29,7 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 // Patients.jsx is *not* imported here, but the print template lives in the
-// same utils module the codebase touches — keep the mock so test setup is
+// same utils module the codebase touches, keep the mock so test setup is
 // consistent across the suite.
 vi.mock('../utils/printTemplates', () => ({
     printPatientCard: vi.fn(),
@@ -45,7 +45,7 @@ import Appointments from './Appointments';
 
 // A datetime-local value safely in the future, recomputed each run. The form's
 // datetime input carries a `min="now"` constraint, so a hardcoded calendar date
-// silently becomes invalid once that day passes — submission is then blocked by
+// silently becomes invalid once that day passes, submission is then blocked by
 // HTML5 validation and never reaches apiClient.post. Deriving from Date.now()
 // keeps the test date-stable.
 const futureApptDt = (() => {
@@ -110,7 +110,7 @@ beforeEach(() => {
 /*  Tests                                                              */
 /* ------------------------------------------------------------------ */
 
-describe('<Appointments /> — list rendering', () => {
+describe('<Appointments />, list rendering', () => {
     it('renders the page header + status badges when GET resolves with rows', async () => {
         wireDirectory({
             appointments: [
@@ -133,7 +133,7 @@ describe('<Appointments /> — list rendering', () => {
         expect(screen.getByText(/mary achieng/i)).toBeInTheDocument();
 
         // Status text appears both inside the badge span on each card AND as
-        // <option> values in the filter dropdown — so use getAllByText and
+        // <option> values in the filter dropdown, so use getAllByText and
         // assert at least one match per status. Badge presence is implied by
         // the card rendering above.
         expect(screen.getAllByText('Scheduled').length).toBeGreaterThan(0);
@@ -151,7 +151,7 @@ describe('<Appointments /> — list rendering', () => {
     });
 });
 
-describe('<Appointments /> — filter bar', () => {
+describe('<Appointments />, filter bar', () => {
     it('changing the status filter refetches with the matching query param', async () => {
         const user = userEvent.setup();
         wireDirectory({ appointments: [] });
@@ -167,7 +167,7 @@ describe('<Appointments /> — filter bar', () => {
         apiClient.get.mockClear();
         wireDirectory({ appointments: [] }); // re-prime after clear
 
-        // Status select — labels in this page aren't htmlFor-linked, so we
+        // Status select: labels in this page aren't htmlFor-linked, so we
         // identify it by the "Any status" placeholder option it owns.
         const statusSelect = Array.from(document.querySelectorAll('select'))
             .find((s) => s.querySelector('option[value=""]')?.textContent === 'Any status');
@@ -193,7 +193,7 @@ describe('<Appointments /> — filter bar', () => {
         apiClient.get.mockClear();
         wireDirectory({ appointments: [] });
 
-        // The filter bar exposes two `<input type="date">` controls — "From"
+        // The filter bar exposes two `<input type="date">` controls, "From"
         // (pre-filled with today via todayISO()) and "To" (blank). Labels are
         // not htmlFor-linked, so query directly by type attribute. The order
         // in the DOM is from → to.
@@ -215,7 +215,7 @@ describe('<Appointments /> — filter bar', () => {
     });
 });
 
-describe('<Appointments /> — create form', () => {
+describe('<Appointments />, create form', () => {
     it('opens the form, requires patient + doctor + date, and POSTs to /appointments/', async () => {
         const user = userEvent.setup();
         wireDirectory({
@@ -242,7 +242,7 @@ describe('<Appointments /> — create form', () => {
         await user.selectOptions(patientSelect, '10');
         await user.selectOptions(doctorSelect, '20');
 
-        // The datetime-local input — find by type attribute.
+        // The datetime-local input: find by type attribute.
         const dt = document.querySelector('input[type="datetime-local"]');
         expect(dt).toBeTruthy();
         await user.type(dt, futureApptDt);
@@ -279,14 +279,14 @@ describe('<Appointments /> — create form', () => {
 
         // The submit button is a `type="submit"` inside the form. Required HTML5
         // attributes on the selects/inputs block submission entirely before our
-        // own validation runs — so the post must NOT have been called.
+        // own validation runs: so the post must NOT have been called.
         await user.click(screen.getByRole('button', { name: /^book appointment$/i }));
 
         expect(apiClient.post).not.toHaveBeenCalled();
     });
 });
 
-describe('<Appointments /> — status update', () => {
+describe('<Appointments />, status update', () => {
     it('clicking "Confirm" PATCHes /appointments/{id}/status with { status: "Confirmed" }', async () => {
         const user = userEvent.setup();
         const appt = mkAppt({ appointment_id: 77, status: 'Scheduled' });
@@ -341,7 +341,7 @@ describe('<Appointments /> — status update', () => {
     });
 });
 
-describe('<Appointments /> — cancel', () => {
+describe('<Appointments />, cancel', () => {
     it('confirms via window.confirm and DELETEs /appointments/{id} on accept', async () => {
         const user = userEvent.setup();
         const appt = mkAppt({ appointment_id: 88, status: 'Scheduled' });
@@ -377,7 +377,7 @@ describe('<Appointments /> — cancel', () => {
     });
 });
 
-describe('<Appointments /> — conflict surfacing', () => {
+describe('<Appointments />, conflict surfacing', () => {
     it('shows the backend detail as an error toast when create returns 409', async () => {
         const user = userEvent.setup();
         wireDirectory({

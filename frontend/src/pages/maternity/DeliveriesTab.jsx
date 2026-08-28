@@ -11,7 +11,7 @@ export default function DeliveriesTab() {
   const [selected, setSelected] = useState(null);
   const [showDelivery, setShowDelivery] = useState(null);
   const [showPnc, setShowPnc] = useState(false);
-  // A Delivered episode is closed from here, not the ANC tab — the ANC tab
+  // A Delivered episode is closed from here, not the ANC tab, the ANC tab
   // only lists Active episodes, so without this the lifecycle after delivery
   // (PNC visits → discharge) would never terminate.
   const [showClose, setShowClose] = useState(false);
@@ -23,7 +23,7 @@ export default function DeliveriesTab() {
   // Tracks the episode_id of the most recently requested detail so that a
   // late-resolving (out-of-order) fetch for a since-abandoned selection can
   // never overwrite the deliveries/newborns shown for whichever episode is
-  // selected now — a delivery/newborn list must never render under the
+  // selected now: a delivery/newborn list must never render under the
   // wrong patient's name.
   const requestedEpisodeIdRef = useRef(null);
 
@@ -57,7 +57,7 @@ export default function DeliveriesTab() {
   }, []);
 
   // `episodeId` is captured at click time (see call site) rather than read
-  // from `selected` inside .then — if the user switches to viewing a
+  // from `selected` inside .then: if the user switches to viewing a
   // different episode while this request is in flight, `selected` (and
   // requestedEpisodeIdRef) will have moved on by the time this resolves.
   // Re-opening the now-stale `episodeId` here would discard whatever
@@ -80,7 +80,7 @@ export default function DeliveriesTab() {
     <div className="grid gap-4 md:grid-cols-2">
       <section
         aria-label="Active pregnancies"
-        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4"
+        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4"
       >
         <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Active pregnancies</h2>
         {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
@@ -106,7 +106,7 @@ export default function DeliveriesTab() {
 
       <section
         aria-label="Delivered episodes"
-        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4"
+        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4"
       >
         <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Delivered</h2>
         <ul className="mt-3 divide-y divide-ink-100 dark:divide-ink-800">
@@ -130,7 +130,7 @@ export default function DeliveriesTab() {
       {selected && (
         <section
           aria-label="Delivery detail"
-          className="md:col-span-2 rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4"
+          className="md:col-span-2 rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4"
         >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-900 dark:text-white">{selected.patient_name}</h2>
@@ -163,26 +163,26 @@ export default function DeliveriesTab() {
                 {d.mode} · {new Date(d.delivered_at).toLocaleString()} · Mother: {d.mother_status}
                 {d.blood_loss_ml != null ? ` · Blood loss ${d.blood_loss_ml} ml` : ''}
               </p>
-              <table className="mt-2 w-full text-sm">
+              <table className="mt-2 table-inline">
                 <thead>
-                  <tr className="text-left text-ink-500 dark:text-ink-400">
-                    <th className="py-1 pr-2 font-medium">#</th>
-                    <th className="py-1 pr-2 font-medium">Sex</th>
-                    <th className="py-1 pr-2 font-medium">Weight (g)</th>
-                    <th className="py-1 pr-2 font-medium">APGAR</th>
-                    <th className="py-1 pr-2 font-medium">Outcome</th>
-                    <th className="py-1 font-medium">Patient</th>
+                  <tr>
+                    <th>#</th>
+                    <th>Sex</th>
+                    <th>Weight (g)</th>
+                    <th>APGAR</th>
+                    <th>Outcome</th>
+                    <th>Patient</th>
                   </tr>
                 </thead>
                 <tbody className="text-ink-900 dark:text-white">
                   {(d.newborns || []).map((n) => (
                     <tr key={n.newborn_id} className="border-t border-ink-100 dark:border-ink-800">
-                      <td className="py-1 pr-2">{n.birth_order}</td>
-                      <td className="py-1 pr-2">{n.sex}</td>
-                      <td className="py-1 pr-2">{n.weight_g ?? '—'}</td>
-                      <td className="py-1 pr-2">{n.apgar_1 ?? '—'}/{n.apgar_5 ?? '—'}</td>
-                      <td className="py-1 pr-2">{n.outcome}</td>
-                      <td className="py-1">
+                      <td>{n.birth_order}</td>
+                      <td>{n.sex}</td>
+                      <td>{n.weight_g ?? '-'}</td>
+                      <td>{n.apgar_1 ?? '-'}/{n.apgar_5 ?? '-'}</td>
+                      <td>{n.outcome}</td>
+                      <td>
                         {n.registered_patient_id ? (
                           <span className="text-ink-500 dark:text-ink-400">Patient #{n.registered_patient_id}</span>
                         ) : (
@@ -208,24 +208,24 @@ export default function DeliveriesTab() {
           )}
 
           <h3 className="mt-4 text-sm font-semibold text-ink-900 dark:text-white">PNC visits</h3>
-          <table className="mt-2 w-full text-sm">
+          <table className="mt-2 table-inline">
             <thead>
-              <tr className="text-left text-ink-500 dark:text-ink-400">
-                <th className="py-1 pr-2 font-medium">#</th>
-                <th className="py-1 pr-2 font-medium">Date</th>
-                <th className="py-1 pr-2 font-medium">BP</th>
-                <th className="py-1 pr-2 font-medium">Involution</th>
-                <th className="py-1 font-medium">Feeding</th>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>BP</th>
+                <th>Involution</th>
+                <th>Feeding</th>
               </tr>
             </thead>
             <tbody className="text-ink-900 dark:text-white">
               {pncVisits.map((v) => (
                 <tr key={v.visit_id} className="border-t border-ink-100 dark:border-ink-800">
-                  <td className="py-1 pr-2">{v.visit_number}</td>
-                  <td className="py-1 pr-2">{v.visit_date}</td>
-                  <td className="py-1 pr-2">{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '—'}</td>
-                  <td className="py-1 pr-2">{v.involution ?? '—'}</td>
-                  <td className="py-1">{v.feeding ?? '—'}</td>
+                  <td>{v.visit_number}</td>
+                  <td>{v.visit_date}</td>
+                  <td>{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '-'}</td>
+                  <td>{v.involution ?? '-'}</td>
+                  <td>{v.feeding ?? '-'}</td>
                 </tr>
               ))}
               {pncVisits.length === 0 && (
@@ -259,7 +259,7 @@ export default function DeliveriesTab() {
           onClose={() => setShowClose(false)}
           onClosed={() => {
             // A closed episode is neither Active nor Delivered, so it drops
-            // out of both lists — clear the detail rather than re-fetching an
+            // out of both lists: clear the detail rather than re-fetching an
             // episode the user can no longer act on.
             setShowClose(false);
             setSelected(null);

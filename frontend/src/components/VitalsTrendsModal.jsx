@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Activity, TrendingUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
+import { SkeletonTable } from './ui/Skeleton';
 
 const COLUMNS = [
     { key: 'blood_pressure', label: 'BP' },
@@ -43,7 +44,7 @@ export default function VitalsTrendsModal({ patient, onClose }) {
             aria-modal="true"
             aria-labelledby="vitals-trends-title"
         >
-            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-3xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-overlay w-full max-w-3xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
                 <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0">
                         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700 flex items-center gap-1.5">
@@ -67,15 +68,14 @@ export default function VitalsTrendsModal({ patient, onClose }) {
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     {isLoading ? (
                         <div className="text-center py-10 text-ink-500 dark:text-ink-400">
-                            <Activity className="animate-spin inline mr-2 text-brand-600" size={18} aria-hidden="true" /> Loading vitals history…
-                        </div>
+                            <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                     ) : rows.length === 0 ? (
                         <p className="text-center py-10 text-sm text-ink-500 dark:text-ink-400">
                             No past vitals recorded for this patient yet.
                         </p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="table-clean table-sticky">
                                 <thead>
                                     <tr className="text-left text-2xs font-semibold uppercase tracking-[0.14em] text-ink-600 dark:text-ink-400 border-b border-ink-200 dark:border-ink-800 bg-ink-50/60 dark:bg-ink-800/40">
                                         <th scope="col" className="px-4 py-2.5">Date</th>
@@ -84,17 +84,17 @@ export default function VitalsTrendsModal({ patient, onClose }) {
                                         ))}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                                <tbody>
                                     {rows.map((r) => (
                                         <tr key={r.record_id} className="text-ink-800 dark:text-ink-200">
-                                            <td className="px-4 py-2 whitespace-nowrap text-xs text-ink-500 dark:text-ink-400">
+                                            <td className="whitespace-nowrap text-xs text-ink-500 dark:text-ink-400">
                                                 {r.recorded_at
                                                     ? new Date(r.recorded_at).toLocaleDateString([], { dateStyle: 'medium' })
-                                                    : '—'}
+                                                    : '-'}
                                             </td>
                                             {COLUMNS.map((c) => (
                                                 <td key={c.key} className="px-3 py-2 whitespace-nowrap font-mono text-xs">
-                                                    {r[c.key] ?? '—'}
+                                                    {r[c.key] ?? '-'}
                                                 </td>
                                             ))}
                                         </tr>
@@ -102,7 +102,7 @@ export default function VitalsTrendsModal({ patient, onClose }) {
                                 </tbody>
                             </table>
                             <p className="px-4 py-2.5 text-2xs text-ink-500 dark:text-ink-400">
-                                Oldest reading first — read down the table to follow the trend.
+                                Oldest reading first: read down the table to follow the trend.
                             </p>
                         </div>
                     )}

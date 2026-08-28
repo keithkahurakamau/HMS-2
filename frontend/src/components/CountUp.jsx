@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 /**
- * CountUp — animated integer that ticks 0 → `to` once the element scrolls
+ * CountUp: animated integer that ticks 0 → `to` once the element scrolls
  * into view (40% visibility). Uses IntersectionObserver so we don't burn
  * requestAnimationFrame cycles on counters the user will never see.
  * Snaps to `to` immediately when prefers-reduced-motion is set.
