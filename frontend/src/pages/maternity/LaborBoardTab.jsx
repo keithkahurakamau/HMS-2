@@ -149,19 +149,19 @@ export default function LaborBoardTab() {
                 <PartographChart entries={chart.entries} activeStart={chart.active_labor_started_at} />
               </div>
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="table-inline">
                   <thead>
-                    <tr className="text-left text-ink-500 dark:text-ink-400">
-                      <th className="py-1 pr-2 font-medium">Time</th>
-                      <th className="py-1 pr-2 font-medium">Dilation</th>
-                      <th className="py-1 pr-2 font-medium">Descent</th>
-                      <th className="py-1 pr-2 font-medium">Contractions</th>
-                      <th className="py-1 pr-2 font-medium">FHR</th>
-                      <th className="py-1 pr-2 font-medium">Liquor</th>
-                      <th className="py-1 pr-2 font-medium">BP</th>
-                      <th className="py-1 pr-2 font-medium">Pulse</th>
-                      <th className="py-1 pr-2 font-medium">Temp</th>
-                      <th className="print:hidden py-1 font-medium">Action</th>
+                    <tr>
+                      <th>Time</th>
+                      <th>Dilation</th>
+                      <th>Descent</th>
+                      <th>Contractions</th>
+                      <th>FHR</th>
+                      <th>Liquor</th>
+                      <th>BP</th>
+                      <th>Pulse</th>
+                      <th>Temp</th>
+                      <th className="print:hidden">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -174,7 +174,7 @@ export default function LaborBoardTab() {
                             : 'text-ink-900 dark:text-white'
                         }`}
                       >
-                        <td className="py-1 pr-2">
+                        <td>
                           {new Date(e.recorded_at).toLocaleString()}
                           {e.superseded && (
                             <span className="no-underline ml-2 inline-block rounded-full bg-ink-100 dark:bg-ink-800 px-1.5 py-0.5 text-[10px] font-medium text-ink-600 dark:text-ink-400">
@@ -182,17 +182,17 @@ export default function LaborBoardTab() {
                             </span>
                           )}
                         </td>
-                        <td className="py-1 pr-2">{e.cervical_dilation_cm ?? '—'}</td>
-                        <td className="py-1 pr-2">{e.descent_fifths ?? '—'}</td>
-                        <td className="py-1 pr-2">{e.contractions_per_10min ?? '—'}</td>
-                        <td className="py-1 pr-2">{e.fetal_heart_rate ?? '—'}</td>
-                        <td className="py-1 pr-2">{e.liquor ?? '—'}</td>
-                        <td className="py-1 pr-2">
+                        <td>{e.cervical_dilation_cm ?? '—'}</td>
+                        <td>{e.descent_fifths ?? '—'}</td>
+                        <td>{e.contractions_per_10min ?? '—'}</td>
+                        <td>{e.fetal_heart_rate ?? '—'}</td>
+                        <td>{e.liquor ?? '—'}</td>
+                        <td>
                           {e.maternal_bp_systolic != null ? `${e.maternal_bp_systolic}/${e.maternal_bp_diastolic ?? '—'}` : '—'}
                         </td>
-                        <td className="py-1 pr-2">{e.maternal_pulse ?? '—'}</td>
-                        <td className="py-1 pr-2">{e.temperature_c ?? '—'}</td>
-                        <td className="print:hidden py-1">
+                        <td>{e.maternal_pulse ?? '—'}</td>
+                        <td>{e.temperature_c ?? '—'}</td>
+                        <td className="print:hidden">
                           {!e.superseded && (
                             <button
                               type="button"

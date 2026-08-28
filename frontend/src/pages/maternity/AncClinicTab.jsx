@@ -142,24 +142,24 @@ export default function AncClinicTab() {
                 </button>
               </div>
             </div>
-            <table className="mt-3 w-full text-sm">
+            <table className="mt-3 table-inline">
               <thead>
-                <tr className="text-left text-ink-500 dark:text-ink-400">
-                  <th className="py-1 pr-2 font-medium">#</th>
-                  <th className="py-1 pr-2 font-medium">Date</th>
-                  <th className="py-1 pr-2 font-medium">GA (wk)</th>
-                  <th className="py-1 pr-2 font-medium">BP</th>
-                  <th className="py-1 font-medium">FHR</th>
+                <tr>
+                  <th>#</th>
+                  <th>Date</th>
+                  <th>GA (wk)</th>
+                  <th>BP</th>
+                  <th>FHR</th>
                 </tr>
               </thead>
               <tbody className="text-ink-900 dark:text-white">
                 {ancVisits.map((v) => (
                   <tr key={v.visit_id} className="border-t border-ink-100 dark:border-ink-800">
-                    <td className="py-1 pr-2">{v.visit_number}</td>
-                    <td className="py-1 pr-2">{v.visit_date}</td>
-                    <td className="py-1 pr-2">{v.gestation_weeks ?? '—'}</td>
-                    <td className="py-1 pr-2">{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '—'}</td>
-                    <td className="py-1">{v.fetal_heart_rate ?? '—'}</td>
+                    <td>{v.visit_number}</td>
+                    <td>{v.visit_date}</td>
+                    <td>{v.gestation_weeks ?? '—'}</td>
+                    <td>{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '—'}</td>
+                    <td>{v.fetal_heart_rate ?? '—'}</td>
                   </tr>
                 ))}
                 {ancVisits.length === 0 && (

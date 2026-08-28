@@ -163,26 +163,26 @@ export default function DeliveriesTab() {
                 {d.mode} · {new Date(d.delivered_at).toLocaleString()} · Mother: {d.mother_status}
                 {d.blood_loss_ml != null ? ` · Blood loss ${d.blood_loss_ml} ml` : ''}
               </p>
-              <table className="mt-2 w-full text-sm">
+              <table className="mt-2 table-inline">
                 <thead>
-                  <tr className="text-left text-ink-500 dark:text-ink-400">
-                    <th className="py-1 pr-2 font-medium">#</th>
-                    <th className="py-1 pr-2 font-medium">Sex</th>
-                    <th className="py-1 pr-2 font-medium">Weight (g)</th>
-                    <th className="py-1 pr-2 font-medium">APGAR</th>
-                    <th className="py-1 pr-2 font-medium">Outcome</th>
-                    <th className="py-1 font-medium">Patient</th>
+                  <tr>
+                    <th>#</th>
+                    <th>Sex</th>
+                    <th>Weight (g)</th>
+                    <th>APGAR</th>
+                    <th>Outcome</th>
+                    <th>Patient</th>
                   </tr>
                 </thead>
                 <tbody className="text-ink-900 dark:text-white">
                   {(d.newborns || []).map((n) => (
                     <tr key={n.newborn_id} className="border-t border-ink-100 dark:border-ink-800">
-                      <td className="py-1 pr-2">{n.birth_order}</td>
-                      <td className="py-1 pr-2">{n.sex}</td>
-                      <td className="py-1 pr-2">{n.weight_g ?? '—'}</td>
-                      <td className="py-1 pr-2">{n.apgar_1 ?? '—'}/{n.apgar_5 ?? '—'}</td>
-                      <td className="py-1 pr-2">{n.outcome}</td>
-                      <td className="py-1">
+                      <td>{n.birth_order}</td>
+                      <td>{n.sex}</td>
+                      <td>{n.weight_g ?? '—'}</td>
+                      <td>{n.apgar_1 ?? '—'}/{n.apgar_5 ?? '—'}</td>
+                      <td>{n.outcome}</td>
+                      <td>
                         {n.registered_patient_id ? (
                           <span className="text-ink-500 dark:text-ink-400">Patient #{n.registered_patient_id}</span>
                         ) : (
@@ -208,24 +208,24 @@ export default function DeliveriesTab() {
           )}
 
           <h3 className="mt-4 text-sm font-semibold text-ink-900 dark:text-white">PNC visits</h3>
-          <table className="mt-2 w-full text-sm">
+          <table className="mt-2 table-inline">
             <thead>
-              <tr className="text-left text-ink-500 dark:text-ink-400">
-                <th className="py-1 pr-2 font-medium">#</th>
-                <th className="py-1 pr-2 font-medium">Date</th>
-                <th className="py-1 pr-2 font-medium">BP</th>
-                <th className="py-1 pr-2 font-medium">Involution</th>
-                <th className="py-1 font-medium">Feeding</th>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>BP</th>
+                <th>Involution</th>
+                <th>Feeding</th>
               </tr>
             </thead>
             <tbody className="text-ink-900 dark:text-white">
               {pncVisits.map((v) => (
                 <tr key={v.visit_id} className="border-t border-ink-100 dark:border-ink-800">
-                  <td className="py-1 pr-2">{v.visit_number}</td>
-                  <td className="py-1 pr-2">{v.visit_date}</td>
-                  <td className="py-1 pr-2">{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '—'}</td>
-                  <td className="py-1 pr-2">{v.involution ?? '—'}</td>
-                  <td className="py-1">{v.feeding ?? '—'}</td>
+                  <td>{v.visit_number}</td>
+                  <td>{v.visit_date}</td>
+                  <td>{v.bp_systolic ? `${v.bp_systolic}/${v.bp_diastolic}` : '—'}</td>
+                  <td>{v.involution ?? '—'}</td>
+                  <td>{v.feeding ?? '—'}</td>
                 </tr>
               ))}
               {pncVisits.length === 0 && (

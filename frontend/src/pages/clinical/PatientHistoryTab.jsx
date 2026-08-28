@@ -67,24 +67,24 @@ export default function PatientHistoryTab({ patientId, onOpenHistory, onPrintAll
                     <p className="text-sm text-ink-500 dark:text-ink-400 italic">No recorded visits for this patient.</p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <table className="table-inline">
                             <thead>
                                 <tr className="text-2xs uppercase tracking-wider text-ink-500 dark:text-ink-400 text-left border-b border-ink-100 dark:border-ink-800">
-                                    <th className="py-2 pr-3 font-medium">Date</th>
-                                    <th className="py-2 pr-3 font-medium">Chief complaint</th>
-                                    <th className="py-2 pr-3 font-medium">ICD-10</th>
-                                    <th className="py-2 pr-3 font-medium">BP</th>
-                                    <th className="py-2 font-medium">Status</th>
+                                    <th>Date</th>
+                                    <th>Chief complaint</th>
+                                    <th>ICD-10</th>
+                                    <th>BP</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
                                 {visits.map((v) => (
                                     <tr key={v.record_id}>
-                                        <td className="py-2 pr-3 text-ink-600 dark:text-ink-300 whitespace-nowrap">{fmt(v.created_at)}</td>
-                                        <td className="py-2 pr-3 text-ink-800 dark:text-ink-200">{v.chief_complaint || '—'}</td>
-                                        <td className="py-2 pr-3 text-ink-600 dark:text-ink-300">{v.icd10_code || '—'}</td>
-                                        <td className="py-2 pr-3 text-ink-600 dark:text-ink-300">{v.blood_pressure || '—'}</td>
-                                        <td className="py-2"><span className="badge-neutral text-2xs">{v.record_status}</span></td>
+                                        <td className="text-ink-600 dark:text-ink-300 whitespace-nowrap">{fmt(v.created_at)}</td>
+                                        <td className="text-ink-800 dark:text-ink-200">{v.chief_complaint || '—'}</td>
+                                        <td className="text-ink-600 dark:text-ink-300">{v.icd10_code || '—'}</td>
+                                        <td className="text-ink-600 dark:text-ink-300">{v.blood_pressure || '—'}</td>
+                                        <td><span className="badge-neutral text-2xs">{v.record_status}</span></td>
                                     </tr>
                                 ))}
                             </tbody>

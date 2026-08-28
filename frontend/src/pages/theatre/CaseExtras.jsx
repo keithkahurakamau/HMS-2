@@ -123,18 +123,18 @@ export default function CaseExtras({ caseObj, onChanged }) {
           <h4 className="text-sm font-semibold text-ink-900 dark:text-white">Post-op recovery</h4>
           {(caseObj.recovery_observations || []).length > 0 && (
             <div className="mt-2 overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-ink-500 dark:text-ink-400">
-                  <tr><th className="py-1">Time</th><th className="py-1">BP</th><th className="py-1">Pulse</th><th className="py-1">SpO₂</th><th className="py-1">Pain</th></tr>
+              <table className="table-inline">
+                <thead>
+                  <tr><th>Time</th><th>BP</th><th>Pulse</th><th>SpO₂</th><th>Pain</th></tr>
                 </thead>
                 <tbody>
                   {caseObj.recovery_observations.map((o) => (
                     <tr key={o.obs_id} className="border-t border-ink-100 dark:border-ink-800">
-                      <td className="py-1 text-ink-500 dark:text-ink-400">{o.recorded_at ? new Date(o.recorded_at).toLocaleTimeString() : '—'}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{o.bp_systolic ?? '—'}/{o.bp_diastolic ?? '—'}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{o.pulse ?? '—'}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{o.spo2 ?? '—'}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{o.pain_score ?? '—'}</td>
+                      <td className="text-ink-500 dark:text-ink-400">{o.recorded_at ? new Date(o.recorded_at).toLocaleTimeString() : '—'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{o.bp_systolic ?? '—'}/{o.bp_diastolic ?? '—'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{o.pulse ?? '—'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{o.spo2 ?? '—'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{o.pain_score ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
