@@ -1032,6 +1032,8 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
 
     // Poll our own DB row (settled by the verified Pay Hero webhook) while a
     // push is pending, and run a visible countdown alongside it.
+    // Cleanup exists: the cleanup clears both intervals.
+    // react-doctor-disable-next-line react-doctor/effect-needs-cleanup
     useEffect(() => {
         if (mpesaStatus !== 'waiting') return undefined;
 

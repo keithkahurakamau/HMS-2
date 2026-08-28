@@ -66,6 +66,10 @@ export default function SystemStatus() {
     const [rtt, setRtt] = useState(null);
     const [checkedAt, setCheckedAt] = useState(null);
     const timer = useRef(null);
+    // Everything the effect must be able to tear down: the in-flight request
+    // and its timeout. Without this an unmount mid-probe leaves the fetch
+    // running and the component sets state after it is gone.
+    const inflight = useRef({ controller: null, timeout: null, alive: true });
 
     const probe = useCallback(async () => {
         if (!navigator.onLine) {
@@ -75,24 +79,33 @@ export default function SystemStatus() {
         }
         const started = performance.now();
         const controller = new AbortController();
+        // react-doctor-disable-next-line react-doctor/effect-needs-cleanup -- the effect cleanup aborts the controller and clears this timeout
         const abort = setTimeout(() => controller.abort(), TIMEOUT_MS);
+        inflight.current.controller = controller;
+        inflight.current.timeout = abort;
         try {
             const res = await fetch(PROBE_URL, { cache: 'no-store', signal: controller.signal });
             const elapsed = Math.round(performance.now() - started);
+            if (!inflight.current.alive) return;
             setRtt(elapsed);
             setCheckedAt(new Date());
             if (!res.ok) setState('unreachable');
             else setState(elapsed > SLOW_MS ? 'slow' : 'online');
         } catch {
+            if (!inflight.current.alive) return;
             setRtt(null);
             setCheckedAt(new Date());
             setState('unreachable');
         } finally {
             clearTimeout(abort);
+            inflight.current.timeout = null;
+            inflight.current.controller = null;
         }
     }, []);
 
     useEffect(() => {
+        const live = inflight.current;
+        live.alive = true;
         probe();
         timer.current = setInterval(() => {
             // Skip the poll while the tab is hidden: nobody is reading the pill,
@@ -108,7 +121,10 @@ export default function SystemStatus() {
         window.addEventListener('offline', onOffline);
         document.addEventListener('visibilitychange', onVisible);
         return () => {
+            live.alive = false;
             clearInterval(timer.current);
+            if (live.timeout) clearTimeout(live.timeout);
+            live.controller?.abort();
             window.removeEventListener('online', onOnline);
             window.removeEventListener('offline', onOffline);
             document.removeEventListener('visibilitychange', onVisible);

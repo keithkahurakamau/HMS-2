@@ -103,6 +103,8 @@ export default function Messages() {
     useEffect(() => { fetchMessages(activeId); }, [activeId, fetchMessages]);
 
     // ---------- live updates via WebSocket ----------
+    // Cleanup exists: the cleanup closes the socket; the rule cannot see it created inside a try.
+    // react-doctor-disable-next-line react-doctor/effect-needs-cleanup
     useEffect(() => {
         if (!me) return undefined;
         let socket;

@@ -17,6 +17,8 @@ export default function usePlatformPaymentSocket(enabled, onEvent) {
     const cbRef = useRef(onEvent);
     useEffect(() => { cbRef.current = onEvent; });
 
+    // Cleanup exists: the cleanup closes the socket; the rule cannot see it created inside a try.
+    // react-doctor-disable-next-line react-doctor/effect-needs-cleanup
     useEffect(() => {
         if (!enabled) return undefined;
 

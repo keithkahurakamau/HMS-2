@@ -43,6 +43,8 @@ export default function JourneyOverlay() {
 
     const step = activeSteps[stepIdx] || null;
 
+    // Cleanup exists: the cleanup removes every listener it adds.
+    // react-doctor-disable-next-line react-doctor/effect-needs-cleanup
     useEffect(() => {
         if (!step) { setTarget(null); return; }
         const update = () => {
