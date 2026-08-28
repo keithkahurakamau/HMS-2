@@ -99,18 +99,30 @@
    Component classes — reusable design primitives
    --------------------------------------------------------------------- */
 @layer components {
-  /* Surfaces */
+  /* Surfaces.
+
+     Border first: a card is anchored to the page, so it earns a border, not a
+     shadow. Shadow is reserved for surfaces that genuinely float, which is
+     what .overlay-surface is for. Consumers supply their own padding
+     (`card p-5`, `card p-4`), so these rules stay padding-free. */
   .card {
-    @apply bg-white border border-ink-200/70 rounded-2xl shadow-soft;
+    @apply bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl;
   }
   .card-flush {
-    @apply bg-white border border-ink-200/70 rounded-2xl;
+    @apply bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl;
   }
+  /* Kept as an alias so the 242 existing call sites keep working. Elevation is
+     no longer what distinguishes it; use .overlay-surface if it truly floats. */
   .card-elevated {
-    @apply bg-white border border-ink-200/60 rounded-2xl shadow-elevated;
+    @apply bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl;
   }
+  /* Marketing surfaces only. Do not use inside the workspace. */
   .card-glass {
     @apply bg-white/70 backdrop-blur-xl border border-white/60 rounded-2xl shadow-soft;
+  }
+  /* Modals, popovers, dropdowns, toasts: things that float above the page. */
+  .overlay-surface {
+    @apply bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay;
   }
 
   /* Section headers used in pages */
@@ -145,128 +157,87 @@
    * Ghost is transparent until hover, when it materialises into the
    * glass family for visual continuity.
    */
+  /* Buttons are flat and bordered. The previous treatment layered a
+     backdrop-filter, a five-stop inset shadow stack and a hover lift, which is
+     the single loudest "dated" signal in the app and the most expensive thing
+     on the compositor. What replaces it: solid fill, real height from the
+     density token, and a press that responds immediately.
+
+     Transitions stay on cheap properties only, and are CSS rather than
+     keyframes so an interrupted hover reverses from where it is. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-semibold
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold
            select-none cursor-pointer
            focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500
            disabled:opacity-50 disabled:cursor-not-allowed;
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    /* Scope the transition to cheap properties only. Using `transition-all`
-       here made the browser also animate backdrop-filter/filter on hover,
-       thrashing the compositor layer and causing flicker/stutter app-wide. */
-    transition: transform 200ms ease, box-shadow 200ms ease,
-                background 200ms ease, background-color 200ms ease,
-                color 200ms ease, border-color 200ms ease;
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.55),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.08),
-      0 1px 1px rgba(15, 23, 42, 0.04),
-      0 6px 14px -2px rgba(15, 23, 42, 0.10);
-  }
-  .btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.65),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.10),
-      0 2px 4px rgba(15, 23, 42, 0.06),
-      0 12px 28px -6px rgba(15, 23, 42, 0.20);
+    height: var(--ctl-h);
+    transition: background-color var(--dur) var(--ease-out),
+                border-color var(--dur) var(--ease-out),
+                color var(--dur) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
   }
   .btn:active:not(:disabled) {
-    transform: translateY(0) scale(0.97);
-    transition-duration: 90ms;
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    transform: none;
   }
 
+  /* Solid fills, no sheen overlay. Cyan is the primary action and nothing
+     else, so .btn-primary is the only button carrying it. */
   .btn-primary {
-    @apply btn text-white;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(8, 145, 178) 0%, rgb(13, 148, 136) 100%);
+    @apply btn bg-brand-600 text-white border border-brand-600;
   }
   .btn-primary:hover:not(:disabled) {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(6, 165, 196) 0%, rgb(15, 165, 152) 100%);
+    @apply bg-brand-700 border-brand-700;
   }
 
   .btn-secondary {
-    @apply btn text-ink-800;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
-      rgba(255, 255, 255, 0.55);
+    @apply btn bg-white dark:bg-ink-900 text-ink-800 dark:text-ink-200
+           border border-ink-300 dark:border-ink-700;
   }
   .btn-secondary:hover:not(:disabled) {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 50%),
-      rgba(255, 255, 255, 0.70);
+    @apply bg-ink-50 dark:bg-ink-800 border-ink-400 dark:border-ink-600;
   }
 
   .btn-ghost {
-    @apply btn text-ink-600;
-    background: transparent;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: none;
+    @apply btn bg-transparent text-ink-600 dark:text-ink-400 border border-transparent;
   }
   .btn-ghost:hover:not(:disabled) {
-    @apply text-ink-900;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
-      rgba(255, 255, 255, 0.55);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.65),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.10),
-      0 2px 4px rgba(15, 23, 42, 0.06),
-      0 12px 28px -6px rgba(15, 23, 42, 0.20);
+    @apply bg-ink-100 dark:bg-ink-800 text-ink-900 dark:text-ink-100;
   }
 
   .btn-danger {
-    @apply btn text-white;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(220, 38, 38) 0%, rgb(185, 28, 28) 100%);
+    @apply btn bg-status-critical text-white border border-status-critical;
   }
   .btn-danger:hover:not(:disabled) {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(239, 68, 68) 0%, rgb(220, 38, 38) 100%);
+    @apply bg-red-700 border-red-700;
   }
 
-  /* Low-emphasis destructive action — text/border only until hover. Used for
-     inline row actions (e.g. disable account) where a full red fill would be
-     too loud in a dense table. */
+  /* Low-emphasis destructive action: text and border only until hover. Used for
+     inline row actions (for example disable account) where a full red fill
+     would be too loud in a dense table. */
   .btn-danger-ghost {
-    @apply btn text-rose-600;
-    background: transparent;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: inset 0 0 0 1px rgba(225, 29, 72, 0.25);
+    @apply btn bg-transparent text-rose-600 dark:text-rose-400
+           border border-rose-200 dark:border-rose-900;
   }
   .btn-danger-ghost:hover:not(:disabled) {
-    @apply text-rose-700;
-    background: rgba(244, 63, 94, 0.08);
+    @apply text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40
+           border-rose-300 dark:border-rose-800;
   }
 
-  /* Compact button — for inline/table row actions. Pairs with any btn-* skin. */
+  /* Compact button for inline and table row actions. Pairs with any btn-* skin.
+     Overrides the density height rather than adding vertical padding to it. */
   .btn-xs {
-    @apply gap-1.5 px-2.5 py-1.5 text-xs rounded-lg;
+    @apply gap-1.5 px-2.5 text-xs rounded-md;
+    height: 1.75rem;
   }
 
   .btn-success {
-    @apply btn text-white;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(16, 185, 129) 0%, rgb(5, 150, 105) 100%);
+    @apply btn bg-status-ok text-white border border-status-ok;
   }
   .btn-success:hover:not(:disabled) {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(34, 197, 144) 0%, rgb(8, 168, 119) 100%);
+    @apply bg-emerald-700 border-emerald-700;
   }
 
   /* Inputs */
@@ -313,15 +284,6 @@
     @apply text-2xl sm:text-3xl font-semibold text-ink-900 tracking-tight;
   }
 
-  /* Tab pill row (used on AdminDashboard) */
-  .tab-pill {
-    @apply inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium
-           text-ink-300 hover:text-white transition-colors;
-  }
-  .tab-pill-active {
-    @apply bg-white/10 text-white shadow-soft ring-1 ring-white/15;
-  }
-
   /* Sidebar nav links */
   .nav-link {
     @apply relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
@@ -335,21 +297,98 @@
     @apply absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-brand-400;
   }
 
-  /* Tables */
+  /* Tables.
+
+     Row height comes from the density token, so the same markup is roomy on
+     the portal and tight in a clinical worklist. Numerals are tabular
+     throughout: in a column of figures, proportional digits stop the eye
+     comparing magnitudes down the column. Headers stick so a long worklist
+     keeps its column meaning while scrolling. */
   .table-clean {
-    @apply w-full text-left text-sm text-ink-700;
+    @apply w-full text-left text-sm text-ink-700 dark:text-ink-300;
+    font-variant-numeric: tabular-nums;
   }
-  .table-clean thead {
-    @apply text-2xs uppercase tracking-wider text-ink-500 bg-ink-50/60;
-  }
-  .table-clean th {
-    @apply px-6 py-3 font-semibold;
+  .table-clean thead th {
+    @apply px-4 text-2xs uppercase tracking-wider font-semibold
+           text-ink-500 dark:text-ink-400
+           bg-ink-50 dark:bg-ink-900
+           border-b border-ink-200 dark:border-ink-800;
+    height: var(--row-h);
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
   .table-clean tbody tr {
-    @apply border-t border-ink-100/80 hover:bg-ink-50/50 transition-colors;
+    @apply border-b border-ink-100 dark:border-ink-800/60;
+    transition: background-color var(--dur-fast) var(--ease-out);
+  }
+  .table-clean tbody tr:hover {
+    @apply bg-ink-50/70 dark:bg-ink-800/40;
   }
   .table-clean td {
-    @apply px-6 py-4;
+    @apply px-4 align-middle;
+    height: var(--row-h);
+  }
+  /* Right-align numeric columns so decimal points line up. */
+  .table-clean th.num, .table-clean td.num {
+    @apply text-right;
+  }
+
+  /* ---------------------------------------------------------------------
+     Type scale.
+
+     Six steps: 12 / 14 / 16 / 20 / 24 / 32. Tailwind's own fontSize scale is
+     deliberately NOT overridden, because moving `text-lg` from 18px to 20px
+     would silently reflow all 198 files at once with no way to review it.
+     These named utilities let pages migrate onto the scale deliberately.
+     --------------------------------------------------------------------- */
+  .t-caption  { @apply text-xs font-medium tracking-wide text-ink-500 dark:text-ink-400; }
+  .t-body     { @apply text-sm text-ink-700 dark:text-ink-300; }
+  .t-body-lg  { @apply text-base text-ink-700 dark:text-ink-300; }
+  .t-title    { @apply text-[1.25rem] font-semibold tracking-tight text-ink-900 dark:text-ink-100; }
+  .t-heading  { @apply text-[1.5rem] font-semibold tracking-tight text-ink-900 dark:text-ink-100; }
+  .t-display  { @apply font-display text-[2rem] font-semibold tracking-tight text-ink-900 dark:text-ink-100; }
+
+  /* ---------------------------------------------------------------------
+     Required states.
+
+     Every collection surface ships four: empty, loading, error, denied.
+     --------------------------------------------------------------------- */
+  .skeleton {
+    @apply rounded bg-ink-100 dark:bg-ink-800;
+    animation: skeleton-pulse 1.4s ease-in-out infinite;
+  }
+
+  .empty {
+    @apply flex flex-col items-center justify-center gap-3 py-12 text-center;
+  }
+
+  /* Form field wrapper: label, control, hint and error in one rhythm. */
+  .field {
+    @apply flex flex-col gap-1.5;
+  }
+  .field > label {
+    @apply text-sm font-medium text-ink-700 dark:text-ink-300;
+  }
+  .field .field-hint {
+    @apply text-xs text-ink-500 dark:text-ink-400;
+  }
+  .field .field-error {
+    @apply text-xs text-status-critical;
+  }
+}
+
+@layer utilities {
+  /* Tabular numerals. Mandatory on tables, vitals, money and counts. */
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none; }
   }
 }
 
