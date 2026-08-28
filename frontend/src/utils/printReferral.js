@@ -1,5 +1,5 @@
 
-// Printable referral letter template — typed | blank-patient | blank.
+// Printable referral letter template: typed | blank-patient | blank.
 //
 // Split out of printTemplates.js (which was over the 500-line limit) so
 // each file stays focused. Same conventions as the other templates: tolerant
@@ -28,7 +28,7 @@ export const printReferralLetter = ({ mode = 'typed', referral = {}, patient = {
     </div>`;
 
   const body = `
-    ${header({ docType: 'Referral Letter', docNumber: typed && referral.referral_id ? `REF-${referral.referral_id}` : '—' })}
+    ${header({ docType: 'Referral Letter', docNumber: typed && referral.referral_id ? `REF-${referral.referral_id}` : '-' })}
 
     <h1 class="doc-title">Referral Letter</h1>
     ${typed ? `<div class="doc-subtitle">Urgency: <span class="badge ${referral.urgency === 'Routine' ? 'paid' : 'pending'}">${esc(referral.urgency || 'Routine')}</span></div>`

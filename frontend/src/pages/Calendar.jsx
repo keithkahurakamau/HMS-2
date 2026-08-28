@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
+import { SkeletonTable } from '../components/ui/Skeleton';
 import {
     CalendarDays, ChevronLeft, ChevronRight, Plus, X, Activity,
     Stethoscope, CalendarPlus, Trash2, RefreshCw,
@@ -248,7 +249,7 @@ export default function Calendar() {
                     </div>
 
                     {loading ? (
-                        <div className="text-center py-8 text-ink-400"><Activity className="animate-spin mx-auto mb-2" size={18} /> Loading…</div>
+                        <div className="py-4"><SkeletonTable rows={3} cols={2} label="Loading calendar" /></div>
                     ) : selectedItems.length === 0 ? (
                         <p className="text-sm text-ink-500 dark:text-ink-400 py-6 text-center">Nothing scheduled.</p>
                     ) : (
@@ -350,10 +351,10 @@ function EventModal({ initial, defaultDate, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md overflow-hidden flex flex-col">
+            <div className="relative overlay-surface w-full max-w-md overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800">
                     <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                        <div className="size-9 rounded-xl bg-brand-600 text-white flex items-center justify-center">
                             <CalendarPlus size={17} />
                         </div>
                         <h3 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">

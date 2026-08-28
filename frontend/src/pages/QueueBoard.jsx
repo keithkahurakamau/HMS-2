@@ -6,20 +6,21 @@ import {
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import PageHeader from '../components/PageHeader';
+import { SkeletonTable } from '../components/ui/Skeleton';
 import { departmentLabel } from '../utils/departments';
 
 const LIVE_REFRESH_MS = 15000; // re-pull the live board every 15s
 
-/* ─── Pure display helpers (module scope — not rebuilt per render) ─────────── */
+/* ─── Pure display helpers (module scope, not rebuilt per render) ─────────── */
 
 const fmtClock = (iso) => {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return Number.isNaN(d.getTime()) ? '-' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
 const fmtDuration = (seconds) => {
-    if (seconds == null || seconds < 0) return '—';
+    if (seconds == null || seconds < 0) return '-';
     const s = Math.floor(seconds);
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
@@ -64,13 +65,13 @@ export default function QueueBoard() {
             />
 
             <div className="card p-2 flex items-center shrink-0">
-                <div role="tablist" aria-label="Queue board mode" className="flex bg-ink-100/70 dark:bg-ink-800/70 p-1 rounded-xl w-full max-w-md">
+                <div role="tablist" aria-label="Queue board mode" className="segmented max-w-md">
                     <button type="button" role="tab" aria-selected={tab === 'live'} onClick={() => setTab('live')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${tab === 'live' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                        className={`segmented-option ${tab === 'live' ? 'segmented-option-active' : ''}`}>
                         <Activity size={16} className={tab === 'live' ? 'text-brand-600' : 'text-ink-400'} /> Live queue
                     </button>
                     <button type="button" role="tab" aria-selected={tab === 'day'} onClick={() => setTab('day')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${tab === 'day' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                        className={`segmented-option ${tab === 'day' ? 'segmented-option-active' : ''}`}>
                         <MapPin size={16} className={tab === 'day' ? 'text-accent-600' : 'text-ink-400'} /> Day &middot; Footprints
                     </button>
                 </div>
@@ -101,7 +102,7 @@ function LiveQueue() {
         } catch (err) {
             if (!quiet) toast.error(err.response?.data?.detail || 'Could not load the live queue.');
         } finally {
-            // Unconditional reset — a quiet refresh never set it true, so this is
+            // Unconditional reset: a quiet refresh never set it true, so this is
             // a no-op there (React bails on an unchanged value).
             setIsLoading(false);
         }
@@ -121,11 +122,12 @@ function LiveQueue() {
         <div className="flex-1 min-h-0 card overflow-hidden flex flex-col">
             {/* Toolbar */}
             <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-3 border-b border-ink-100 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/30">
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div role="group" aria-label="Filter by department" className="flex flex-wrap items-center gap-1.5">
                     {departments.map((d) => (
                         <button type="button" key={d} onClick={() => setDept(d)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dept === d ? 'bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300 ring-1 ring-brand-200 dark:ring-brand-500/30' : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800'}`}>
-                            {d === 'All' ? 'All' : departmentLabel(d)}{d !== 'All' && <span className="ml-1 text-ink-400">{rows.filter((r) => r.to_department === d).length}</span>}
+                            aria-pressed={dept === d}
+                            className={`chip ${dept === d ? 'chip-active' : ''}`}>
+                            {d === 'All' ? 'All' : departmentLabel(d)}{d !== 'All' && <span className="chip-count">{rows.filter((r) => r.to_department === d).length}</span>}
                         </button>
                     ))}
                 </div>
@@ -142,22 +144,24 @@ function LiveQueue() {
 
             {/* Table */}
             <div className="flex-1 overflow-auto custom-scrollbar">
-                <table className="w-full text-sm min-w-[860px]">
-                    <thead className="sticky top-0 bg-white dark:bg-ink-900 z-10 text-2xs uppercase tracking-wider text-ink-500 dark:text-ink-400 border-b border-ink-100 dark:border-ink-800">
-                        <tr className="text-left">
-                            <th className="px-4 py-2.5 font-medium">Q.No</th>
-                            <th className="px-4 py-2.5 font-medium">Patient</th>
-                            <th className="px-4 py-2.5 font-medium">Scheme</th>
-                            <th className="px-4 py-2.5 font-medium">From &rarr; To (room)</th>
-                            <th className="px-4 py-2.5 font-medium">Joined</th>
-                            <th className="px-4 py-2.5 font-medium">Waiting</th>
-                            <th className="px-4 py-2.5 font-medium">Priority</th>
-                            <th className="px-4 py-2.5 font-medium">Staff</th>
+                <table className="table-clean table-sticky min-w-[860px]">
+                    <thead>
+                        <tr>
+                            <th>Q.No</th>
+                            <th>Patient</th>
+                            <th>Scheme</th>
+                            <th>From &rarr; To (room)</th>
+                            <th>Joined</th>
+                            <th>Waiting</th>
+                            <th>Priority</th>
+                            <th>Staff</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {isLoading ? (
-                            <tr><td colSpan={8} className="px-4 py-10 text-center text-ink-400"><Activity size={20} className="animate-spin inline mr-2 text-brand-500" /> Loading the floor…</td></tr>
+                            <tr><td colSpan={8}>
+                                <SkeletonTable rows={6} cols={8} label="Loading the floor" />
+                            </td></tr>
                         ) : visible.length === 0 ? (
                             <tr><td colSpan={8} className="px-4 py-12 text-center text-ink-500">
                                 <Users size={32} className="mx-auto mb-2 text-ink-300" />
@@ -167,30 +171,30 @@ function LiveQueue() {
                             const waited = secondsSince(r.joined_at, nowMs);
                             const longWait = waited != null && waited > 30 * 60; // >30 min
                             return (
-                                <tr key={r.queue_id} className="hover:bg-ink-50/60 dark:hover:bg-ink-800/40">
-                                    <td className="px-4 py-2.5 font-mono text-ink-500 dark:text-ink-400">#{r.queue_id}</td>
-                                    <td className="px-4 py-2.5">
+                                <tr key={r.queue_id}>
+                                    <td className="font-mono text-ink-500 dark:text-ink-400">#{r.queue_id}</td>
+                                    <td>
                                         <span className="font-medium text-ink-900 dark:text-ink-100">{r.patient_name}</span>
-                                        <span className="block text-2xs font-mono text-ink-400">{r.outpatient_no || '—'}</span>
+                                        <span className="block text-2xs font-mono text-ink-400">{r.outpatient_no || '-'}</span>
                                     </td>
-                                    <td className="px-4 py-2.5">
+                                    <td>
                                         <span className="inline-flex items-center gap-1 text-xs text-ink-600 dark:text-ink-300">
                                             <CreditCard size={12} className="text-ink-400" /> {r.scheme}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-2.5">
+                                    <td>
                                         <span className="inline-flex items-center gap-1.5 text-xs">
                                             <span className="text-ink-500 dark:text-ink-400">{r.from_department ? departmentLabel(r.from_department) : 'Arrival'}</span>
                                             <ArrowRight size={12} className="text-ink-400 shrink-0" />
                                             <span className="font-medium text-ink-800 dark:text-ink-200">{departmentLabel(r.to_department)}</span>
                                         </span>
                                     </td>
-                                    <td className="px-4 py-2.5 text-ink-600 dark:text-ink-300 whitespace-nowrap">{fmtClock(r.joined_at)}</td>
-                                    <td className={`px-4 py-2.5 whitespace-nowrap tabular-nums font-medium ${longWait ? 'text-rose-600 dark:text-rose-400' : 'text-ink-700 dark:text-ink-200'}`}>
+                                    <td className="text-ink-600 dark:text-ink-300 whitespace-nowrap">{fmtClock(r.joined_at)}</td>
+                                    <td className={`whitespace-nowrap font-medium ${longWait ? 'text-rose-600 dark:text-rose-400' : 'text-ink-700 dark:text-ink-200'}`}>
                                         <Clock size={11} className="inline mr-1 -mt-0.5" />{fmtDuration(waited)}
                                     </td>
-                                    <td className="px-4 py-2.5"><span className={`${acuityBadge(r.acuity_level)} text-2xs`}>{acuityLabel(r.acuity_level)}</span></td>
-                                    <td className="px-4 py-2.5 text-ink-600 dark:text-ink-400">{r.assigned_to || <span className="text-ink-400 italic">Unclaimed</span>}</td>
+                                    <td><span className={`${acuityBadge(r.acuity_level)} text-2xs`}>{acuityLabel(r.acuity_level)}</span></td>
+                                    <td className="text-ink-600 dark:text-ink-400">{r.assigned_to || <span className="text-ink-400 italic">Unclaimed</span>}</td>
                                 </tr>
                             );
                         })}
@@ -253,7 +257,7 @@ function DayFootprints() {
             {/* List */}
             <div className="flex-1 overflow-auto custom-scrollbar p-3 sm:p-4 space-y-2">
                 {isLoading ? (
-                    <div className="py-10 text-center text-ink-400"><Activity size={20} className="animate-spin inline mr-2 text-brand-500" /> Loading the day…</div>
+                    <div className="py-6"><SkeletonTable rows={4} cols={4} label="Loading the day" /></div>
                 ) : patients.length === 0 ? (
                     <div className="py-12 text-center text-ink-500">
                         <MapPin size={32} className="mx-auto mb-2 text-ink-300" />
@@ -269,7 +273,7 @@ function DayFootprints() {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <span className="font-medium text-ink-900 dark:text-ink-100 truncate">{p.patient_name}</span>
-                                        <span className="text-2xs font-mono text-ink-400">{p.outpatient_no || '—'}</span>
+                                        <span className="text-2xs font-mono text-ink-400">{p.outpatient_no || '-'}</span>
                                         {p.dealt_with && <span className="badge-success text-2xs">Dealt with</span>}
                                         {p.still_active && <span className="badge-warn text-2xs">On queue</span>}
                                     </div>

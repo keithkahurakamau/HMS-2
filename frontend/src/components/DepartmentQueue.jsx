@@ -4,18 +4,18 @@ import toast from 'react-hot-toast';
 import { Users, Clock, X, UserMinus } from 'lucide-react';
 
 /**
- * DepartmentQueue — patients routed to a department via the generic
+ * DepartmentQueue: patients routed to a department via the generic
  * PatientQueue, with per-row remove (checkout) and cancel actions.
  *
  * Two render modes:
- *   • default — a standalone card with its own header + empty state.
- *   • inline  — bare rows meant to sit at the TOP of a module's native
+ *   • default, a standalone card with its own header + empty state.
+ *   • inline, bare rows meant to sit at the TOP of a module's native
  *     worklist (Pharmacy/Lab/Radiology), so routed patients appear in the
  *     same queue as the real work items, each tagged "Routed". Renders
  *     nothing when there are no routed patients (no redundant empty box).
  *
  * Props:
- *   department  {string}    required — filters the queue endpoint
+ *   department  {string}    required, filters the queue endpoint
  *   title       {string?}   heading override (default mode only)
  *   inline      {boolean?}  render as inline rows inside a parent list
  *   onChange    {function?} called after a successful remove or cancel
@@ -86,7 +86,7 @@ export default function DepartmentQueue({ department, title, inline = false, onC
     );
 
     // Inline: a tagged strip at the top of the module's native worklist.
-    // Nothing to show when no patient was routed here — stay out of the way.
+    // Nothing to show when no patient was routed here, stay out of the way.
     if (inline) {
         if (loading || rows.length === 0) return null;
         return (

@@ -3,7 +3,7 @@ import {
     setPrintBranding, hasLetterhead, buildPrintHtml, printUtils,
 } from './printDocument';
 
-// A 1x1 JPEG is enough — nothing decodes it, but it exercises the allow-list.
+// A 1x1 JPEG is enough, nothing decodes it, but it exercises the allow-list.
 const IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////2wBDAf//////////////////////////////////////////wAARCAABAAEDASIA';
 
 const letterheadCfg = (over = {}) => ({
@@ -49,7 +49,7 @@ describe('letterhead activation', () => {
     });
 
     it('rejects margins that individually pass but together leave no printable area', () => {
-        // 150 + 150 > 297 mm of A4 height — each value is in range on its own.
+        // 150 + 150 > 297 mm of A4 height, each value is in range on its own.
         setPrintBranding(letterheadCfg({ margin_top_mm: 150, margin_bottom_mm: 150 }));
         expect(hasLetterhead()).toBe(false);
     });
@@ -72,7 +72,7 @@ describe('letterhead activation', () => {
 
 describe('letterhead page layout', () => {
     // thead/tfoot is what makes the artwork both repeat per page AND reserve
-    // its height. `position: fixed` only repeats — content ran underneath it.
+    // its height. `position: fixed` only repeats, content ran underneath it.
     it('paints the whole sheet, fixed to the paper edges', () => {
         setPrintBranding(letterheadCfg());
         const html = buildPrintHtml('Invoice', '<p>x</p>');
@@ -84,7 +84,7 @@ describe('letterhead page layout', () => {
 
     // Regression: cropping the artwork to the margins meant a 0 mm bottom
     // margin erased the footer design while Branding Studio still previewed
-    // the full page — the letterhead looked "applied" but printed as nothing.
+    // the full page: the letterhead looked "applied" but printed as nothing.
     it('prints the full artwork even at near-zero margins', () => {
         setPrintBranding(letterheadCfg({ margin_top_mm: 3, margin_bottom_mm: 0, margin_side_mm: 1 }));
         const html = buildPrintHtml('Invoice', '<p>x</p>');
@@ -103,7 +103,7 @@ describe('letterhead page layout', () => {
         expect(html).toMatch(/<thead>[\s\S]*letterhead-spacer top[\s\S]*<\/thead>/);
         expect(html).toMatch(/<tfoot>[\s\S]*letterhead-spacer bottom[\s\S]*<\/tfoot>/);
         expect(html).toMatch(/<tbody><tr><td><p>MARKER<\/p><\/td><\/tr><\/tbody>/);
-        // Spacers are empty — the fixed bands carry the visible artwork.
+        // Spacers are empty: the fixed bands carry the visible artwork.
         expect(html).toContain('<div class="letterhead-spacer top"></div>');
     });
 

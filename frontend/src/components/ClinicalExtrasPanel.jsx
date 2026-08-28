@@ -12,13 +12,13 @@ const ITEM_TYPES = ['Lab', 'Radiology', 'Drug'];
 const today = () => new Date().toISOString().slice(0, 10);
 const err = (e, fallback) => toast.error(e?.response?.data?.detail || fallback);
 
-/** Shared modal shell — portaled to <body> so it escapes the workspace card's
+/** Shared modal shell: portaled to <body> so it escapes the workspace card's
  *  stacking context and always sits above the queue bar and page chrome. */
 function Modal({ title, icon: Icon, onClose, children, footer, wide = false }) {
     return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 backdrop-blur-sm p-4"
             onClick={onClose} role="presentation">
-            <div className={`bg-white dark:bg-ink-900 rounded-2xl shadow-xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] flex flex-col`}
+            <div className={`bg-white dark:bg-ink-900 rounded-2xl shadow-overlay w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] flex flex-col`}
                 onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white flex items-center gap-2">
@@ -39,7 +39,7 @@ function Modal({ title, icon: Icon, onClose, children, footer, wide = false }) {
 /** Sick note as a proper printed document, so it inherits the letterhead. */
 function printSickNote(patient, form, days) {
     const esc = printUtils.esc;
-    const dash = (v) => (v === null || v === undefined || v === '' ? '—' : esc(v));
+    const dash = (v) => (v === null || v === undefined || v === '' ? '-' : esc(v));
     const body = `
       ${printUtils.header({ docType: 'Sick Note' })}
 
@@ -213,7 +213,7 @@ function OrderSetsModal({ onApply, onClose }) {
     const [draft, setDraft] = useState({ name: '', description: '', items: [blankItem()] });
     const [saving, setSaving] = useState(false);
 
-    // No synchronous setState here — initial `loading` is already true, and the
+    // No synchronous setState here: initial `loading` is already true, and the
     // reload after a save just refreshes the list in place.
     const load = () => {
         apiClient.get('/clinical-extras/order-sets')
@@ -293,7 +293,7 @@ function OrderSetsModal({ onApply, onClose }) {
 }
 
 /**
- * Clinical-desk extras — the Doctor's-panel outputs (sick notes, optical Rx,
+ * Clinical-desk extras: the Doctor's-panel outputs (sick notes, optical Rx,
  * external requests, reusable order sets). `onApplyOrderSet` receives the
  * chosen set so the parent can pre-fill orders (Drug items → medications).
  */

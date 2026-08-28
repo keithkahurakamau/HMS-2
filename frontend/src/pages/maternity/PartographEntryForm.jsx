@@ -17,7 +17,7 @@ const EMPTY_FORM = {
 };
 
 // The partograph is append-only by design: this same form both creates a
-// fresh entry and — when `correctingEntry` is supplied — appends a NEW entry
+// fresh entry and: when `correctingEntry` is supplied, appends a NEW entry
 // carrying `corrects_entry_id` that supersedes it. Nothing is ever mutated
 // or deleted; see maternity_labor.py module docstring.
 export default function PartographEntryForm({ laborId, correctingEntry = null, onClose, onSaved }) {
@@ -56,7 +56,7 @@ export default function PartographEntryForm({ laborId, correctingEntry = null, o
   };
 
   const heading = correctingEntry
-    ? `Correct entry — originally recorded ${new Date(correctingEntry.recorded_at).toLocaleString()}`
+    ? `Correct entry, originally recorded ${new Date(correctingEntry.recorded_at).toLocaleString()}`
     : 'New partograph entry';
 
   return (
@@ -66,11 +66,11 @@ export default function PartographEntryForm({ laborId, correctingEntry = null, o
       aria-modal="true"
       aria-label={correctingEntry ? 'Correct partograph entry' : 'New partograph entry'}
     >
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated max-h-[90vh] overflow-y-auto">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-overlay max-h-[90vh] overflow-y-auto">
         <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{heading}</h3>
         {correctingEntry && (
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-            This saves a NEW entry that supersedes the one above — the original stays on the
+            This saves a NEW entry that supersedes the one above, the original stays on the
             chart, shown struck through.
           </p>
         )}

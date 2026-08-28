@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('./printDocument', () => ({
     printDocument: vi.fn(),
     printUtils: {
-        // Real escaping — the "escapes HTML" test depends on it.
+        // Real escaping: the "escapes HTML" test depends on it.
         esc: (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
         hospital: () => 'Test Hospital',
         header: ({ docType, docNumber }) => `<div class="hdr">${docType} ${docNumber}</div>`,

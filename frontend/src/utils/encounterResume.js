@@ -8,7 +8,7 @@ export const splitComplaints = (s) => (s || '')
     .flatMap((c) => { const t = c.trim(); return t ? [t] : []; });
 
 // Structured prescriptions serialise as a JSON array in treatment_plan.
-// Legacy free-text plans have no structured rows to rebuild — they parse
+// Legacy free-text plans have no structured rows to rebuild, they parse
 // to [] and the doctor re-enters medications if still needed.
 const parseMedications = (treatmentPlan) => {
     if (!treatmentPlan) return [];

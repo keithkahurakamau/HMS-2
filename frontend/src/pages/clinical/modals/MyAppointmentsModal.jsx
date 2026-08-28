@@ -10,7 +10,7 @@ const dayBounds = () => {
     const end = new Date(); end.setHours(23, 59, 59, 999);
     return { from: start.toISOString(), to: end.toISOString() };
 };
-const timeOf = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—');
+const timeOf = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-');
 
 /** Today's appointments for the signed-in doctor. `onPick(appt)` lets the shell
  *  pull the chosen patient into the encounter. */
@@ -27,7 +27,7 @@ export default function MyAppointmentsModal({ doctorId, onPick, onClose }) {
     }, [doctorId]);
 
     return (
-        <Modal title="My appointments — today" icon={CalendarDays} onClose={onClose} size="lg"
+        <Modal title="My appointments, today" icon={CalendarDays} onClose={onClose} size="lg"
             footer={<button type="button" onClick={onClose} className="btn-secondary">Close</button>}>
             {loading ? (
                 <p className="text-sm text-ink-500 dark:text-ink-400">Loading…</p>

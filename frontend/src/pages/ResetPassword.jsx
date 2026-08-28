@@ -28,7 +28,7 @@ export default function ResetPassword() {
     // Emailed links carry the tenant (?tenant=<id>) because reset tokens live
     // in the tenant DB. Restore it into localStorage so the apiClient
     // interceptor attaches X-Tenant-ID and /auth/reset-password hits the right
-    // database — even for a user landing fresh with no hospital selected.
+    // database: even for a user landing fresh with no hospital selected.
     useEffect(() => {
         const tenant = searchParams.get('tenant');
         if (tenant) localStorage.setItem('hms_tenant_id', tenant);
@@ -60,7 +60,7 @@ export default function ResetPassword() {
         <div className="min-h-screen bg-ink-50 flex items-center justify-center p-4 sm:p-8">
             <div className="w-full max-w-md animate-slide-up">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center size-14 rounded-2xl bg-[#008080] shadow-soft">
+                    <div className="inline-flex items-center justify-center size-14 rounded-xl bg-[#008080]">
                         <ShieldCheck size={28} className="text-white" />
                     </div>
                     <h1 className="mt-5 font-display text-2xl font-semibold text-ink-900 tracking-tight">Reset your password</h1>

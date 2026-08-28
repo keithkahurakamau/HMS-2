@@ -32,6 +32,29 @@ async def websocket_endpoint(
         manager.disconnect(websocket, user_id)
 
 
+# NOTE: the literal /platform route MUST stay above the parameterised
+# /{tenant_db} route. Starlette matches in registration order, so with the
+# parameterised route first every superadmin connection was captured by it
+# as tenant_db="platform", failed the tenant-cookie check and closed.
+@router.websocket("/ws/payments/platform")
+async def platform_payments_websocket(websocket: WebSocket):
+    """Superadmin-scoped live feed for subscription billing.
+
+    Authenticated by the ``superadmin_token`` cookie. The platform webhook
+    publishes ``platform_payment_update`` frames the instant a subscription
+    charge settles, so the operator watches it complete without polling.
+    """
+    is_connected = await manager.connect_platform_payment(websocket)
+    if not is_connected:
+        return
+    topic = "payment:platform"
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect_topic(websocket, topic)
+
+
 @router.websocket("/ws/payments/{tenant_db}")
 async def payments_websocket(websocket: WebSocket, tenant_db: str):
     """Tenant-scoped live payment feed for the cashier / pharmacy checkout.
@@ -46,25 +69,6 @@ async def payments_websocket(websocket: WebSocket, tenant_db: str):
     if not is_connected:
         return
     topic = f"payment:{tenant_db}"
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect_topic(websocket, topic)
-
-
-@router.websocket("/ws/payments/platform")
-async def platform_payments_websocket(websocket: WebSocket):
-    """Superadmin-scoped live feed for subscription billing.
-
-    Authenticated by the ``superadmin_token`` cookie. The platform webhook
-    publishes ``platform_payment_update`` frames the instant a subscription
-    charge settles, so the operator watches it complete without polling.
-    """
-    is_connected = await manager.connect_platform_payment(websocket)
-    if not is_connected:
-        return
-    topic = "payment:platform"
     try:
         while True:
             await websocket.receive_text()

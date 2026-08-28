@@ -8,33 +8,33 @@ import React, { useEffect, useRef } from 'react';
    per item. These are intentional design decisions, not accidental costs. */
 
 /**
- * PremiumBackground — fixed full-viewport layer with multiple animated
+ * PremiumBackground: fixed full-viewport layer with multiple animated
  * sources working together so the page never reads as a static white
  * surface.
  *
  *  Composition (top-to-bottom in z-order)
  *  --------------------------------------
- *   • bg-mesh-anim    — three-stop radial gradient on a 200% canvas,
+ *   • bg-mesh-anim, three-stop radial gradient on a 200% canvas,
  *                       slides via mesh-shift keyframe. Always-on base
  *                       colour so the page never goes white between
  *                       blob coverage zones.
- *   • Halo            — full-bleed conic gradient (cyan→teal→emerald→
+ *   • Halo, full-bleed conic gradient (cyan→teal→emerald→
  *                       transparent), rotates with halo-spin (90s loop).
  *                       Gives a quiet, continuous colour wash.
- *   • Three blobs     — radial gradients at fixed anchor points,
+ *   • Three blobs, radial gradients at fixed anchor points,
  *                       parallax-follow the cursor with damped lerp.
- *   • Particle field  — 14 small glowing dots orbiting on the
+ *   • Particle field, 14 small glowing dots orbiting on the
  *                       particle-orbit keyframe with twinkle. Wrapped
  *                       in a layer that parallax-shifts with the cursor
  *                       so the field tilts as you move.
- *   • Spotlight       — soft white-cyan disc, plus-lighter blend,
+ *   • Spotlight, soft white-cyan disc, plus-lighter blend,
  *                       tracks cursor 1:1.
- *   • Grain           — 32×32 hairline grid texture at 2% opacity for
+ *   • Grain, 32×32 hairline grid texture at 2% opacity for
  *                       "paper" feel.
  *
  *  Performance
  *  -----------
- *   • Every animated property is `transform` or `opacity` — composited,
+ *   • Every animated property is `transform` or `opacity`, composited,
  *     never triggers layout.
  *   • Single rAF loop in JS mutates refs directly. No React re-renders.
  *   • Particles use plain CSS animation (per-particle inline duration +
@@ -42,7 +42,7 @@ import React, { useEffect, useRef } from 'react';
  *
  *  Accessibility
  *  -------------
- *   • Honors `prefers-reduced-motion: reduce` — rAF never starts; CSS
+ *   • Honors `prefers-reduced-motion: reduce`, rAF never starts; CSS
  *     animations get neutralised by the universal-selector rule in
  *     index.css.
  *   • `aria-hidden`, `pointer-events: none` throughout.
@@ -126,7 +126,7 @@ export default function PremiumBackground() {
             blob2.style.transform = `translate3d(${(0.5 - mx) * 60}px, ${(0.5 - my) * 60}px, 0)`;
             blob3.style.transform = `translate3d(${(mx - 0.5) * 35}px, ${(my - 0.5) * 35}px, 0)`;
 
-            // Particle field parallax — the whole layer shifts subtly so
+            // Particle field parallax: the whole layer shifts subtly so
             // the dots tilt as you move. Per-particle CSS animation keeps
             // running independently.
             particles.style.transform = `translate3d(${(mx - 0.5) * 25}px, ${(my - 0.5) * 25}px, 0)`;
@@ -159,79 +159,79 @@ export default function PremiumBackground() {
             {/* Static-ish base mesh wash */}
             <div className="absolute inset-0 bg-mesh-anim animate-mesh-shift" />
 
-            {/* Slow-spin conic halo — gives constant background colour
+            {/* Slow-spin conic halo: gives constant background colour
                 rotation even when the user isn't moving. 90s/loop so it
                 never reads as "spinning," just quietly alive. */}
             <div
                 className="absolute -inset-[20%]"
                 style={{
                     background: 'conic-gradient(from 0deg at 50% 50%, rgba(34, 211, 238, 0.18) 0%, rgba(45, 212, 191, 0.16) 25%, rgba(110, 231, 183, 0.14) 50%, transparent 65%, rgba(34, 211, 238, 0.18) 100%)',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-long-transition-duration
                     animation: 'halo-spin 90s linear infinite',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-permanent-will-change
                     willChange: 'transform',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-large-animated-blur
                     filter: 'blur(60px)',
                 }}
             />
 
-            {/* Parallax blob 1 — cyan, forward parallax */}
+            {/* Parallax blob 1: cyan, forward parallax */}
             <div
                 ref={blob1Ref}
                 className="absolute top-[8%] left-[10%] size-[42rem] rounded-full"
                 style={{
                     background: 'radial-gradient(circle, rgba(34, 211, 238, 0.45) 0%, rgba(34, 211, 238, 0.12) 30%, transparent 65%)',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-permanent-will-change
                     willChange: 'transform',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-large-animated-blur
                     filter: 'blur(30px)',
                 }}
             />
-            {/* Parallax blob 2 — teal, inverse parallax */}
+            {/* Parallax blob 2: teal, inverse parallax */}
             <div
                 ref={blob2Ref}
                 className="absolute bottom-[8%] right-[8%] size-[38rem] rounded-full"
                 style={{
                     background: 'radial-gradient(circle, rgba(45, 212, 191, 0.42) 0%, rgba(45, 212, 191, 0.10) 35%, transparent 70%)',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-permanent-will-change
                     willChange: 'transform',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-large-animated-blur
                     filter: 'blur(30px)',
                 }}
             />
-            {/* Parallax blob 3 — emerald, slow forward parallax */}
+            {/* Parallax blob 3: emerald, slow forward parallax */}
             <div
                 ref={blob3Ref}
                 className="absolute top-[40%] left-[55%] size-[34rem] rounded-full"
                 style={{
                     background: 'radial-gradient(circle, rgba(110, 231, 183, 0.36) 0%, rgba(110, 231, 183, 0.08) 35%, transparent 70%)',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-permanent-will-change
                     willChange: 'transform',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-large-animated-blur
                     filter: 'blur(30px)',
                 }}
             />
 
-            {/* Particle field — wrapped in a single layer so the whole
+            {/* Particle field: wrapped in a single layer so the whole
                 field can parallax with the cursor without touching each
                 particle's individual orbit. */}
-            {/* continuously cursor-parallaxed layer — intentional (see top comment) */}
+            {/* continuously cursor-parallaxed layer: intentional (see top comment) */}
             {/* react-doctor-disable-next-line react-doctor/no-permanent-will-change */}
             <div ref={particlesRef} className="absolute inset-0" style={{ willChange: 'transform' }}>
                 {PARTICLES.map(([left, top, size, hueIdx, dur, delay, twinkleDur, direction], i) => (
                     <span
                         key={i}
                         className="absolute rounded-full block"
-                        // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                        // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                         // react-doctor-disable-next-line react-doctor/no-inline-exhaustive-style
                         style={{
                             left: `${left}%`,
@@ -241,7 +241,7 @@ export default function PremiumBackground() {
                             background: PARTICLE_HUES[hueIdx],
                             boxShadow: `0 0 ${size * 2}px ${PARTICLE_HUES[hueIdx]}, 0 0 ${size * 4}px ${PARTICLE_HUES[hueIdx].replace(/[\d.]+\)$/, '0.3)')}`,
                             animation: `particle-orbit ${dur}s ease-in-out ${delay}s infinite ${direction}, twinkle ${twinkleDur}s ease-in-out ${delay}s infinite`,
-                            // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                            // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                             // react-doctor-disable-next-line react-doctor/no-permanent-will-change
                             willChange: 'transform, opacity',
                         }}
@@ -255,7 +255,7 @@ export default function PremiumBackground() {
                 className="absolute top-0 left-0 size-[60rem] rounded-full"
                 style={{
                     background: 'radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, rgba(34, 211, 238, 0.08) 25%, transparent 55%)',
-                    // continuously-animated/parallaxed decorative layer — intentional (see top comment)
+                    // continuously-animated/parallaxed decorative layer: intentional (see top comment)
                     // react-doctor-disable-next-line react-doctor/no-permanent-will-change
                     willChange: 'transform',
                     transform: 'translate3d(50vw, 50vh, 0) translate(-50%, -50%)',
@@ -263,7 +263,7 @@ export default function PremiumBackground() {
                 }}
             />
 
-            {/* Hairline grid texture overlay — 2.5% opacity "paper" feel */}
+            {/* Hairline grid texture overlay: 2.5% opacity "paper" feel */}
             <div
                 className="absolute inset-0 opacity-[0.025] mix-blend-multiply"
                 style={{

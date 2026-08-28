@@ -1,6 +1,6 @@
 import React from 'react';
 
-// Static tone lookups — declared at module scope so they're allocated once
+// Static tone lookups, declared at module scope so they're allocated once
 // instead of rebuilt on every render (a fresh object each render defeats any
 // memoization downstream). They reference no props/state.
 // Light tones carry `dark:` companions so tiles on a workspace page (which
@@ -30,7 +30,7 @@ const DELTA_COLORS = {
 };
 
 /**
- * StatTile — the canonical KPI / metric card.
+ * StatTile: the canonical KPI and metric card.
  *
  *  Used everywhere a page shows a small fixed-precision number with context.
  *  Picks colors from the unified tone scale so a dashboard reads as one
@@ -44,7 +44,7 @@ const DELTA_COLORS = {
  *   - hint:       Optional one-liner below the value (preferred over delta
  *                 for context that isn't a comparison).
  *   - tone:       brand | teal | accent | warning | rose | neutral.
- *   - surface:    light (default) | dark — pick dark on the superadmin console.
+ *   - surface:    light (default) | dark. Pick dark on the superadmin console.
  *   - onClick:    If provided, the tile becomes a button. Default is static.
  */
 export default function StatTile({
@@ -71,11 +71,11 @@ export default function StatTile({
         <Wrapper
             {...wrapperProps}
             className={[
-                'group flex flex-col gap-4 p-5 sm:p-6 rounded-2xl transition-all duration-200 ring-1 ring-inset',
+                'group flex flex-col gap-4 p-card rounded-xl ring-1 ring-inset',
                 isDark
                     ? 'bg-white/[0.04] backdrop-blur-md ring-white/10 hover:bg-white/[0.06] text-white'
-                    : 'bg-white ring-ink-200/70 shadow-soft hover:shadow-elevated text-ink-900 dark:bg-white/[0.04] dark:ring-white/10 dark:hover:bg-white/[0.06] dark:text-white',
-                onClick ? 'text-left cursor-pointer hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25' : '',
+                    : 'bg-white ring-ink-200 hover:bg-ink-50 text-ink-900 dark:bg-white/[0.04] dark:ring-white/10 dark:hover:bg-white/[0.06] dark:text-white',
+                onClick ? 'text-left cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25' : '',
             ].join(' ')}
         >
             <div className="flex items-start justify-between gap-3">
@@ -85,14 +85,14 @@ export default function StatTile({
                     </div>
                 )}
                 {delta != null && (
-                    <span className={`text-xs font-semibold ${deltaColor}`}>{delta}</span>
+                    <span className={`tnum text-xs font-semibold ${deltaColor}`}>{delta}</span>
                 )}
             </div>
             <div>
                 <p className={`text-2xs font-semibold uppercase tracking-[0.12em] ${isDark ? 'text-ink-400' : 'text-ink-500 dark:text-ink-400'}`}>
                     {label}
                 </p>
-                <p className={`text-2xl sm:text-3xl font-semibold tracking-tight mt-1 ${isDark ? 'text-white' : 'text-ink-900 dark:text-white'}`}>
+                <p className={`tnum text-2xl sm:text-3xl font-semibold tracking-tight mt-1 ${isDark ? 'text-white' : 'text-ink-900 dark:text-white'}`}>
                     {value}
                 </p>
                 {hint && (

@@ -7,23 +7,24 @@ import {
 import { apiClient } from '../api/client';
 import VisitHistoryList from './VisitHistoryList';
 import { ENTRY_TYPES, ENTRY_TYPE_COLOR_CLASSES, ENTRY_TYPE_TO_CHART_FIELD } from '../constants/medicalHistoryEntryTypes';
+import { SkeletonTable } from './ui/Skeleton';
 
 /* ──────────────────────────────────────────────────────────────────────────
- * PatientHistoryModal — Clinical Desk's inline, read-only view of a
+ * PatientHistoryModal: Clinical Desk's inline, read-only view of a
  * patient's medical chart. Opens over the encounter form (nothing in the
  * in-progress SOAP notes is touched) instead of navigating away to
  * /app/medical-history. Fetches the same GET /medical-history/{id}/chart
- * endpoint the full Medical History page uses — no backend change, no
+ * endpoint the full Medical History page uses, no backend change, no
  * separate source of truth.
  *
  * This view never writes. A doctor who needs to add/edit/delete an entry,
  * print, or manage consents follows the "Open full record" link, which is
  * the same deep-link the old toolbar buttons used to navigate to directly.
  *
- *   patientId       required — whose chart to load
+ *   patientId       required: whose chart to load
  *   initialSection  optional ENTRY_TYPES key to auto-expand + scroll to.
  *                   Omitted/null expands every section (full-chart view).
- *   onClose         required — close handler
+ *   onClose         required: close handler
  * ────────────────────────────────────────────────────────────────────────── */
 export default function PatientHistoryModal({ patientId, initialSection = null, onClose }) {
     const navigate = useNavigate();
@@ -77,7 +78,7 @@ export default function PatientHistoryModal({ patientId, initialSection = null, 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-label="Patient medical history">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-overlay w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -89,7 +90,7 @@ export default function PatientHistoryModal({ patientId, initialSection = null, 
                         {chart && (
                             <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                                 <span className="font-mono">{chart.opd_number}</span>
-                                <span>Blood group: <span className="font-semibold text-ink-700 dark:text-ink-200">{chart.blood_group || '—'}</span></span>
+                                <span>Blood group: <span className="font-semibold text-ink-700 dark:text-ink-200">{chart.blood_group || '-'}</span></span>
                             </p>
                         )}
                     </div>
@@ -100,7 +101,7 @@ export default function PatientHistoryModal({ patientId, initialSection = null, 
 
                 <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
                     {isLoading ? (
-                        <div className="text-center py-10 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={22} /> Loading medical history&hellip;</div>
+                        <div className="text-center py-10 text-ink-400"><SkeletonTable rows={4} cols={3} label="Loading" /></div>
                     ) : loadError ? (
                         <div className="text-center py-10 text-ink-400">Could not load this patient's history.</div>
                     ) : (

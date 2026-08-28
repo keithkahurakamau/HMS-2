@@ -34,7 +34,7 @@ describe('IcdDiagnosisPicker', () => {
         await user.type(input, 'E11');
         await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith(
             '/clinical/icd10/search', { params: { q: 'E11' } }));
-        // Match the dropdown row by its description — /E11\.9/ alone would
+        // Match the dropdown row by its description, /E11\.9/ alone would
         // also match a chip's "Remove diagnosis E11.9" button.
         await user.click(await screen.findByRole('option', { name: /without complications/i }));
         expect(screen.getByText('E11.9')).toBeInTheDocument();
@@ -152,7 +152,7 @@ describe('IcdDiagnosisPicker', () => {
         await user.type(input, 'E11');
         await screen.findByRole('option', { name: /without complications/i });
         await user.keyboard('{ArrowDown}{Enter}');
-        // Assert the chip specifically — the dropdown row also contains "E11.9".
+        // Assert the chip specifically: the dropdown row also contains "E11.9".
         expect(screen.getByRole('button', { name: /remove diagnosis E11\.9/i })).toBeInTheDocument();
     });
 

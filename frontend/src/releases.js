@@ -9,8 +9,8 @@ export const RELEASES = [
         date: '2026-07-20',
         title: 'Patient history without leaving the desk, and safer note-taking',
         changes: [
-            'Clinical Desk: view a patient\'s full medical history (surgical, family, social, immunizations, allergies, past visits) in a popup without leaving your in-progress encounter — click the expand icon or any history button.',
-            'Clinical notes are now protected against interruptions — if you\'re called away or the browser closes before you save, your typed notes are recovered with a one-click "Restore" prompt when you come back. Applies to Clinical Desk, Medical History entries, Triage notes, Wards clinical log, and referral letters.',
+            'Clinical Desk: view a patient\'s full medical history (surgical, family, social, immunizations, allergies, past visits) in a popup without leaving your in-progress encounter, click the expand icon or any history button.',
+            'Clinical notes are now protected against interruptions, if you\'re called away or the browser closes before you save, your typed notes are recovered with a one-click "Restore" prompt when you come back. Applies to Clinical Desk, Medical History entries, Triage notes, Wards clinical log, and referral letters.',
         ],
     },
     {

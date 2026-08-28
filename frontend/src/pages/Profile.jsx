@@ -6,7 +6,7 @@ import PageHeader from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
 
 // Roles for whom the clinical-identity fields (specialization, licence) make
-// sense — others don't see them.
+// sense: others don't see them.
 const CLINICAL_ROLES = ['Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist'];
 
 export default function Profile() {

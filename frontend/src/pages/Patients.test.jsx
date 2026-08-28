@@ -10,7 +10,7 @@ import { renderWithProviders } from '../test/renderWithProviders';
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-// apiClient — the only network surface the page touches.
+// apiClient: the only network surface the page touches.
 vi.mock('../api/client', () => ({
     apiClient: {
         get:    vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('../api/client', () => ({
     isTenantRedirect: vi.fn(() => false),
 }));
 
-// react-hot-toast — assert success / error pathways without rendering toasts.
+// react-hot-toast: assert success / error pathways without rendering toasts.
 // The default export is callable (toast('msg', opts)) with .success/.error
 // attached, mirroring the real module.
 vi.mock('react-hot-toast', () => {
@@ -32,7 +32,7 @@ vi.mock('react-hot-toast', () => {
     return { default: toast };
 });
 
-// Print template — Patients.jsx imports `printPatientCard`. Keep it a no-op
+// Print template: Patients.jsx imports `printPatientCard`. Keep it a no-op
 // so the JSDOM print surface (which would otherwise throw) stays quiet.
 vi.mock('../utils/printTemplates', () => ({
     printPatientCard: vi.fn(),
@@ -90,7 +90,7 @@ beforeEach(() => {
     apiClient.delete.mockResolvedValue({ data: {} });
     apiClient.patch.mockResolvedValue({ data: {} });
 
-    // sessionStorage is shared across renders by the PatientProvider — wipe it.
+    // sessionStorage is shared across renders by the PatientProvider, wipe it.
     if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
 });
 
@@ -102,17 +102,17 @@ afterEach(() => {
 /*  Tests                                                              */
 /* ------------------------------------------------------------------ */
 
-describe('<Patients /> — directory shell', () => {
+describe('<Patients />, directory shell', () => {
     it('renders the page header and the empty state when no patients come back', async () => {
         renderWithProviders(<Patients />);
 
-        // Header — sourced from PageHeader, no test-id required.
+        // Header: sourced from PageHeader, no test-id required.
         expect(
             await screen.findByRole('heading', { name: /patient directory/i, level: 1 }),
         ).toBeInTheDocument();
         expect(screen.getByText(/front desk/i)).toBeInTheDocument();
 
-        // Empty state — desktop table renders the "No patients match" copy. The
+        // Empty state: desktop table renders the "No patients match" copy. The
         // mobile card list renders the same copy, so use findAllBy to accept
         // either or both.
         const empty = await screen.findAllByText(/no patients match the current filters/i);
@@ -137,13 +137,13 @@ describe('<Patients /> — directory shell', () => {
 
         renderWithProviders(<Patients />);
 
-        // surname + other_names appear (possibly twice — desktop + mobile cards).
+        // surname + other_names appear (possibly twice, desktop + mobile cards).
         const mwangi = await screen.findAllByText(/Mwangi, Aisha/);
         expect(mwangi.length).toBeGreaterThan(0);
         const otieno = screen.getAllByText(/Otieno, Brian/);
         expect(otieno.length).toBeGreaterThan(0);
 
-        // OP numbers — exact text content.
+        // OP numbers: exact text content.
         expect(screen.getAllByText('OP-0001').length).toBeGreaterThan(0);
         expect(screen.getAllByText('OP-0002').length).toBeGreaterThan(0);
 
@@ -154,11 +154,11 @@ describe('<Patients /> — directory shell', () => {
     });
 });
 
-describe('<Patients /> — search', () => {
+describe('<Patients />, search', () => {
     it('debounces the search input and refetches with the typed query in the request params', async () => {
         // userEvent v14 + vi.useFakeTimers deadlocks (its internal setTimeout
         // races vi's queue). Use real timers and let `waitFor` poll for the
-        // debounced call — the page debounces at 350ms.
+        // debounced call: the page debounces at 350ms.
         const user = userEvent.setup();
         apiClient.get.mockImplementation((url) =>
             url === '/patients/count' ? okCount(0) : okList([]));
@@ -176,7 +176,7 @@ describe('<Patients /> — search', () => {
         const search = screen.getByLabelText(/search patients/i);
         await user.type(search, 'foo');
 
-        // Debounce window is 350ms — waitFor polls until the list call fires
+        // Debounce window is 350ms: waitFor polls until the list call fires
         // with the typed query in params.
         await waitFor(() => {
             const newCalls = apiClient.get.mock.calls.slice(initialCallCount);
@@ -189,7 +189,7 @@ describe('<Patients /> — search', () => {
     });
 });
 
-describe('<Patients /> — view details', () => {
+describe('<Patients />, view details', () => {
     it('opens the read-only details modal from the patient name with the full record', async () => {
         const rows = [mkPatient({
             patient_id: 1, surname: 'Mwangi', other_names: 'Aisha', outpatient_no: 'OP-0001',
@@ -218,7 +218,7 @@ describe('<Patients /> — view details', () => {
     });
 });
 
-describe('<Patients /> — registered-on date filter', () => {
+describe('<Patients />, registered-on date filter', () => {
     it('filters by registration day via the Today shortcut (sends registered_from/to)', async () => {
         apiClient.get.mockImplementation((url) =>
             url === '/patients/count' ? okCount(0) : okList([]));
@@ -239,7 +239,7 @@ describe('<Patients /> — registered-on date filter', () => {
     });
 });
 
-describe('<Patients /> — registration modal', () => {
+describe('<Patients />, registration modal', () => {
     it('opens the registration drawer and POSTs to /patients/ on submit', async () => {
         const user = userEvent.setup();
         apiClient.get.mockImplementation(() => okList([]));
@@ -305,7 +305,7 @@ describe('<Patients /> — registration modal', () => {
         await user.click(screen.getByRole('button', { name: /register patient & generate outpatient number/i }));
 
         await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
-        // POST still goes through — no blocking.
+        // POST still goes through: no blocking.
         expect(apiClient.post.mock.calls[0][0]).toBe('/patients/');
         // The no-ID warning toast fires (default callable form).
         await waitFor(() => {
@@ -329,7 +329,7 @@ describe('<Patients /> — registration modal', () => {
         await user.type(document.querySelector('input[name="other_names"]'), 'Mercy');
         await user.type(document.getElementById('reg-dob'),                  '1995-06-06');
         await user.type(document.querySelector('input[name="telephone_1"]'), '+254711111111');
-        // Type a number, then switch ID Type to None — it must not be carried.
+        // Type a number, then switch ID Type to None, it must not be carried.
         await user.type(document.getElementById('reg-id-number'), '12345678');
         await user.selectOptions(document.getElementById('reg-id-type'), 'None');
 
@@ -353,7 +353,7 @@ describe('<Patients /> — registration modal', () => {
         renderWithProviders(<Patients />);
         await user.click(await screen.findByRole('button', { name: /register patient/i }));
 
-        // Touch only one of the required fields — surname stays blank.
+        // Touch only one of the required fields, surname stays blank.
         await user.type(document.querySelector('input[name="other_names"]'), 'OnlyName');
 
         await user.click(
@@ -362,7 +362,7 @@ describe('<Patients /> — registration modal', () => {
 
         // Required-field guard means handleSubmit is never reached.
         expect(apiClient.post).not.toHaveBeenCalled();
-        // And the modal is still open — the heading is still in the doc.
+        // And the modal is still open, the heading is still in the doc.
         expect(screen.getByRole('heading', { name: /patient registration/i })).toBeInTheDocument();
     });
 
@@ -391,7 +391,7 @@ describe('<Patients /> — registration modal', () => {
     });
 });
 
-describe('<Patients /> — soft delete', () => {
+describe('<Patients />, soft delete', () => {
     it('confirms via window.confirm and DELETEs the patient on accept', async () => {
         const user = userEvent.setup();
         const row = mkPatient({ patient_id: 7, outpatient_no: 'OP-0007', surname: 'Njoki' });
@@ -447,7 +447,7 @@ describe('<Patients /> — soft delete', () => {
     });
 });
 
-describe('<Patients /> — route to queue', () => {
+describe('<Patients />, route to queue', () => {
     it('opens the route picker, POSTs to /patients/{id}/route and fires a success toast', async () => {
         const user = userEvent.setup();
         const row = mkPatient({ patient_id: 11, surname: 'Achieng', other_names: 'Mary' });
@@ -465,10 +465,10 @@ describe('<Patients /> — route to queue', () => {
         const clinicalChips = await screen.findAllByRole('button', { name: /send achieng to clinical/i });
         await user.click(clinicalChips[0]);
 
-        // RouteToModal opens — header titled "Route to Clinical".
+        // RouteToModal opens: header titled "Route to Clinical".
         expect(await screen.findByText(/route to clinical/i)).toBeInTheDocument();
 
-        // Click "Send to Clinical" — the modal's submit button.
+        // Click "Send to Clinical": the modal's submit button.
         const send = await screen.findByRole('button', { name: /send to clinical/i });
         await user.click(send);
 
@@ -537,7 +537,7 @@ describe('<Patients /> — route to queue', () => {
     });
 });
 
-describe('<Patients /> — view history', () => {
+describe('<Patients />, view history', () => {
     it('clicking "View history" promotes the patient into the active context and navigates to /app/medical-history', async () => {
         const user = userEvent.setup();
         const row = mkPatient({ patient_id: 42, surname: 'Wairimu', other_names: 'Joy' });
@@ -558,7 +558,7 @@ describe('<Patients /> — view history', () => {
         // The page navigates via react-router. With MemoryRouter we verify the
         // active patient was promoted into the cross-module context by checking
         // sessionStorage. For privacy, PatientContext persists ONLY an opaque
-        // record ref (no PHI) under `hms_active_patient_ref` — `{ ref, at }`.
+        // record ref (no PHI) under `hms_active_patient_ref`, `{ ref, at }`.
         await waitFor(() => {
             const raw = sessionStorage.getItem('hms_active_patient_ref');
             expect(raw).toBeTruthy();

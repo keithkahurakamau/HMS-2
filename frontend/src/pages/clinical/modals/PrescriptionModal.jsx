@@ -46,7 +46,7 @@ export default function PrescriptionModal({ medications, onSave, onClose }) {
                             <label htmlFor={`rx-freq-${m._uid}`} className="label text-2xs">Frequency</label>
                             <select id={`rx-freq-${m._uid}`} className="input py-1.5 text-sm" value={m.frequency}
                                 onChange={(e) => update(m._uid, 'frequency', e.target.value)}>
-                                <option value="">—</option>
+                                <option value="">, </option>
                                 {FREQUENCIES.map((f) => <option key={f} value={f}>{f}</option>)}
                             </select>
                         </div>

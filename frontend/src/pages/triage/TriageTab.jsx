@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Activity, Plus, X, Stethoscope, ClipboardList, AlertTriangle } from 'lucide-react';
 import DraftRecoveryBanner from '../../components/DraftRecoveryBanner';
 
-// Common pick-lists (free text still allowed via the datalists) — parity with
+// Common pick-lists (free text still allowed via the datalists), parity with
 // MedicentreV3's Body System / Procedure dropdowns.
 const BODY_SYSTEMS = ['CNS', 'CVS', 'Respiratory', 'GIT', 'Genitourinary', 'Musculoskeletal', 'Skin', 'ENT', 'Eyes', 'Endocrine'];
 const PROCEDURES = ['Dressing', 'Injection', 'Nebulization', 'Cannulation', 'Catheterization', 'Suturing', 'Wound cleaning', 'Oxygen therapy', 'Blood transfusion'];
@@ -18,7 +18,7 @@ const ACUITY_LEVELS = [
 ];
 
 /**
- * Triage tab — the nurse's assessment for the active patient. Fully controlled:
+ * Triage tab: the nurse's assessment for the active patient. Fully controlled:
  * `value` carries the state the Triage shell owns, `on` the handlers. Extracted
  * verbatim from the legacy Triage page so behaviour (draft safety-net, submit
  * gating, guided-tour anchors) is unchanged.
@@ -133,7 +133,7 @@ export default function TriageTab({ value, on }) {
                                 {systemicExam.map((s, idx) => (
                                     <li key={s._uid} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
                                         <span className="font-semibold text-ink-800 dark:text-ink-200">{s.body_system}</span>
-                                        {s.remark && <span className="text-ink-600 dark:text-ink-400 truncate">— {s.remark}</span>}
+                                        {s.remark && <span className="text-ink-600 dark:text-ink-400 truncate">, {s.remark}</span>}
                                         {s.is_anomalous && <span className="badge-danger text-2xs inline-flex items-center gap-1"><AlertTriangle size={10} /> Anomalous</span>}
                                         <button type="button" onClick={() => on.removeSystemic(idx)} aria-label={`Remove ${s.body_system} finding`} className="ml-auto text-ink-400 hover:text-rose-600 shrink-0"><X size={14} /></button>
                                     </li>
@@ -169,7 +169,7 @@ export default function TriageTab({ value, on }) {
                                 {procedures.map((pr, idx) => (
                                     <li key={pr._uid} className="flex items-center gap-2 text-sm bg-ink-50 dark:bg-ink-800/60 rounded-lg px-3 py-1.5">
                                         <span className="font-semibold text-ink-800 dark:text-ink-200">{pr.procedure}</span>
-                                        {pr.remark && <span className="text-ink-600 dark:text-ink-400 truncate">— {pr.remark}</span>}
+                                        {pr.remark && <span className="text-ink-600 dark:text-ink-400 truncate">, {pr.remark}</span>}
                                         <button type="button" onClick={() => on.removeProcedure(idx)} aria-label={`Remove ${pr.procedure}`} className="ml-auto text-ink-400 hover:text-rose-600 shrink-0"><X size={14} /></button>
                                     </li>
                                 ))}

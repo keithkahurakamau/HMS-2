@@ -88,7 +88,7 @@ describe('DeliveriesTab', () => {
   });
 
   // Regression: the ANC tab only lists Active episodes, so a Delivered
-  // episode was previously unclosable from anywhere in the UI — the
+  // episode was previously unclosable from anywhere in the UI, the
   // lifecycle never terminated after delivery.
   it('closes a delivered episode from the delivery detail panel', async () => {
     api.getEpisode.mockResolvedValue({

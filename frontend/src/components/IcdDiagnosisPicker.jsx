@@ -10,7 +10,7 @@ const MAX_CODES = 10;
  * diagnosis. Parent owns the list via `codes` / `onChange`.
  *
  * Besides catalogue codes, the typed text can always be added as a custom
- * diagnosis ({ code: null, description, custom: true }) — rendered with a
+ * diagnosis ({ code: null, description, custom: true }), rendered with a
  * "Note" badge. Custom entries persist into the free-text `diagnosis`
  * column, never `icd10_code` (see utils/diagnosisMapping.js), because the
  * history endpoints parse `icd10_code` as a comma-separated code list.
@@ -155,7 +155,7 @@ export default function IcdDiagnosisPicker({ codes, onChange }) {
                     id={listboxId}
                     role="listbox"
                     aria-label="Diagnosis suggestions"
-                    className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-elevated max-h-48 overflow-y-auto custom-scrollbar"
+                    className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay max-h-48 overflow-y-auto custom-scrollbar"
                 >
                     {results.map((r, idx) => (
                         <button
@@ -168,7 +168,7 @@ export default function IcdDiagnosisPicker({ codes, onChange }) {
                             onClick={() => addCode(r)}
                             className={`${optionClass(idx)} dark:text-ink-200`}
                         >
-                            <span className="font-mono font-semibold">{r.code}</span> — {r.description}
+                            <span className="font-mono font-semibold">{r.code}</span>, {r.description}
                         </button>
                     ))}
                     {results.length === 0 && (

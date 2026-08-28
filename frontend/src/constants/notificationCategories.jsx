@@ -2,7 +2,7 @@ import { Info, AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 // Shared between NotificationBell.jsx (the inbox) and NotificationToast.jsx
 // (the live sneak-peek popup) so both render the same category exactly the
-// same way — one icon/colour mapping, not two that can drift apart.
+// same way: one icon/colour mapping, not two that can drift apart.
 export const NOTIFICATION_CATEGORY_ICONS = {
     info: Info,
     success: CheckCircle2,
@@ -10,7 +10,7 @@ export const NOTIFICATION_CATEGORY_ICONS = {
     critical: AlertCircle,
 };
 
-// Map each category to a tinted icon container — the rail/icon colour is the
+// Map each category to a tinted icon container, the rail/icon colour is the
 // only place categories should differ. Cards themselves stay neutral so the
 // overall inbox doesn't feel like a Christmas tree.
 export const NOTIFICATION_CATEGORY_STYLE = {

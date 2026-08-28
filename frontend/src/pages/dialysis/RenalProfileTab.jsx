@@ -49,7 +49,7 @@ export default function RenalProfileTab() {
             <h4 className="text-sm font-semibold text-ink-900 dark:text-white">Vascular access</h4>
             <ul className="mt-2 space-y-1 text-sm text-ink-700 dark:text-ink-300">
               {profile.accesses.map((a) => (
-                <li key={a.access_id}>• {a.type}{a.site ? ` — ${a.site}` : ''} <span className="text-ink-400">({a.status})</span></li>
+                <li key={a.access_id}>• {a.type}{a.site ? `, ${a.site}` : ''} <span className="text-ink-400">({a.status})</span></li>
               ))}
               {profile.accesses.length === 0 && <li className="text-ink-400">None recorded.</li>}
             </ul>
@@ -81,16 +81,16 @@ export default function RenalProfileTab() {
           <section className="rounded-xl border border-ink-200/70 dark:border-ink-800 p-4" aria-label="Adequacy trend">
             <h4 className="text-sm font-semibold text-ink-900 dark:text-white">Adequacy trend</h4>
             {profile.adequacy_trend.length ? (
-              <table className="mt-2 w-full text-left text-sm">
-                <thead className="text-xs uppercase text-ink-500 dark:text-ink-400">
-                  <tr><th className="py-1">Session</th><th className="py-1">URR %</th><th className="py-1">Kt/V</th></tr>
+              <table className="mt-2 table-inline">
+                <thead>
+                  <tr><th>Session</th><th>URR %</th><th>Kt/V</th></tr>
                 </thead>
                 <tbody>
                   {profile.adequacy_trend.map((a) => (
                     <tr key={a.order_id} className="border-t border-ink-100 dark:border-ink-800">
-                      <td className="py-1 text-ink-800 dark:text-ink-200">#{a.order_id}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{a.urr ?? '—'}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{a.kt_v ?? '—'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">#{a.order_id}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{a.urr ?? '-'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{a.kt_v ?? '-'}</td>
                     </tr>
                   ))}
                 </tbody>

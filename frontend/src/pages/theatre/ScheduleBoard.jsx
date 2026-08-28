@@ -37,7 +37,7 @@ export default function ScheduleBoard() {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Theatre schedule — {board.date}</h3>
+      <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Theatre schedule, {board.date}</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {board.rooms.map((r) => (
           <div key={r.room_id} className="rounded-xl border border-ink-200/70 dark:border-ink-800 p-4">

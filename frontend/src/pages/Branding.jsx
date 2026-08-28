@@ -10,9 +10,10 @@ import { Link } from 'react-router-dom';
 import Logo, { TenantLogo } from '../components/Logo';
 import PageHeader from '../components/PageHeader';
 import LetterheadStudio, { LETTERHEAD_DEFAULTS } from '../components/LetterheadStudio';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 /**
- * Branding Studio — hospital admins customise their workspace identity.
+ * Branding Studio: hospital admins customise their workspace identity.
  *
  *  - Upload a custom logo (PNG/JPG/SVG, max 600 KB after compression).
  *  - Upload a sign-in background image (max 800 KB after compression).
@@ -20,7 +21,7 @@ import LetterheadStudio, { LETTERHEAD_DEFAULTS } from '../components/LetterheadS
  *  - Configure printed-document templates (header, footer, layout style).
  *
  *  Today: images are stored base64-encoded in the master ``tenants`` row.
- *  Tomorrow: the same column will hold a Cloudinary URL — the UI doesn't
+ *  Tomorrow: the same column will hold a Cloudinary URL, the UI doesn't
  *  change.
  */
 
@@ -93,7 +94,7 @@ export default function Branding() {
                 },
             };
 
-            // Letterhead: only ship the artwork when it actually changed — it is
+            // Letterhead: only ship the artwork when it actually changed, it is
             // ~100 KB of base64 and the server carries the stored copy forward
             // when `image` is omitted.
             const letterhead = draft.print_templates?.letterhead;
@@ -127,8 +128,7 @@ export default function Branding() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-24 text-ink-400 dark:text-ink-500">
-                <Activity className="animate-spin mr-2" size={20} /> Loading branding…
-            </div>
+                <SkeletonTable rows={4} cols={3} label="Loading" /></div>
         );
     }
 
@@ -171,7 +171,7 @@ export default function Branding() {
                         onClear={() => set('logo_data_url', null)}
                         maxBytes={MAX_LOGO_BYTES}
                         aspect="square"
-                        emptyHint="No custom logo — the MediFleet mark is shown."
+                        emptyHint="No custom logo, the MediFleet mark is shown."
                     />
                 </Section>
 
@@ -189,7 +189,7 @@ export default function Branding() {
                         onClear={() => set('background_data_url', null)}
                         maxBytes={MAX_BG_BYTES}
                         aspect="wide"
-                        emptyHint="No background — the cyan/teal gradient is used."
+                        emptyHint="No background, the cyan/teal gradient is used."
                     />
                 </Section>
 
@@ -293,7 +293,7 @@ export default function Branding() {
                     span="md:col-span-12"
                     icon={<FileText size={16} />}
                     title="Letterhead"
-                    desc="Upload your own printed stationery and every document — invoices, prescriptions, lab and radiology reports, patient cards, admission slips and medical histories — prints on it."
+                    desc="Upload your own printed stationery and every document. Invoices, prescriptions, lab and radiology reports, patient cards, admission slips and medical histories, prints on it."
                 >
                     <LetterheadStudio
                         value={draft.print_templates?.letterhead || LETTERHEAD_DEFAULTS}
@@ -350,7 +350,7 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
         if (!file) return;
         setError(null);
         if (file.size > maxBytes * 1.5) {
-            setError(`Image is ${Math.round(file.size / 1024)} KB — please compress to under ${Math.round(maxBytes / 1024)} KB.`);
+            setError(`Image is ${Math.round(file.size / 1024)} KB, please compress to under ${Math.round(maxBytes / 1024)} KB.`);
             return;
         }
         const reader = new FileReader();
@@ -361,7 +361,7 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
                 return;
             }
             if (dataUrl.length > maxBytes) {
-                setError(`Encoded image is ${Math.round(dataUrl.length / 1024)} KB — compress further or pick a smaller image.`);
+                setError(`Encoded image is ${Math.round(dataUrl.length / 1024)} KB, compress further or pick a smaller image.`);
                 return;
             }
             onChange(dataUrl);
@@ -374,7 +374,7 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
 
     return (
         <div className="space-y-3">
-            <div className={`relative ${aspectClass} rounded-2xl border border-dashed border-ink-300 dark:border-ink-700 bg-ink-50/40 dark:bg-ink-800/40 overflow-hidden flex items-center justify-center group`}>
+            <div className={`relative ${aspectClass} rounded-xl border border-dashed border-ink-300 dark:border-ink-700 bg-ink-50/40 dark:bg-ink-800/40 overflow-hidden flex items-center justify-center group`}>
                 {value ? (
                     <>
                         <img src={value} alt="Preview" className="absolute inset-0 w-full h-full object-contain bg-white" />
@@ -382,14 +382,14 @@ function ImageDrop({ value, onChange, onClear, maxBytes, aspect = 'wide', emptyH
                             <button
                                 type="button"
                                 onClick={() => inputRef.current?.click()}
-                                className="px-3 py-2 rounded-lg bg-white dark:bg-ink-800 text-ink-800 dark:text-ink-100 text-xs font-semibold shadow-soft hover:bg-brand-50 dark:hover:bg-ink-700 cursor-pointer flex items-center gap-1.5"
+                                className="px-3 py-2 rounded-lg bg-white dark:bg-ink-800 text-ink-800 dark:text-ink-100 text-xs font-semibold hover:bg-brand-50 dark:hover:bg-ink-700 cursor-pointer flex items-center gap-1.5"
                             >
                                 <Upload size={13} /> Replace
                             </button>
                             <button
                                 type="button"
                                 onClick={onClear}
-                                className="px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold shadow-soft hover:bg-rose-700 cursor-pointer flex items-center gap-1.5"
+                                className="px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 cursor-pointer flex items-center gap-1.5"
                             >
                                 <Trash2 size={13} /> Remove
                             </button>
@@ -429,7 +429,7 @@ function ColorField({ label, value, placeholder, onChange }) {
     return (
         <div className="flex items-center gap-3">
             <div
-                className="size-10 rounded-xl border border-ink-200 dark:border-ink-700 shadow-soft shrink-0"
+                className="size-10 rounded-xl border border-ink-200 dark:border-ink-700 shrink-0"
                 style={{ backgroundColor: isValid && value ? value : '#f1f5f9' }}
             />
             <div className="flex-1">
@@ -457,7 +457,7 @@ function ColorField({ label, value, placeholder, onChange }) {
 function PreviewCard({ logo, background, primary, accent }) {
     const tenantName = localStorage.getItem('hms_tenant_name') || 'Your Hospital';
     return (
-        <div className="rounded-2xl border border-ink-200 overflow-hidden shadow-soft bg-white">
+        <div className="rounded-xl border border-ink-200 overflow-hidden bg-white">
             <div className="grid lg:grid-cols-5">
                 {/* Left brand panel */}
                 <div
@@ -501,7 +501,7 @@ function PreviewCard({ logo, background, primary, accent }) {
                         <button
                             type="button"
                             disabled
-                            className="w-full h-10 rounded-lg text-white font-semibold text-sm shadow-soft"
+                            className="w-full h-10 rounded-lg text-white font-semibold text-sm"
                             style={{
                                 background: primary
                                     ? `linear-gradient(135deg, ${primary}, ${accent || primary})`

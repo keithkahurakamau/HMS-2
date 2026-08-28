@@ -37,7 +37,7 @@ export default function CaseForm({ patientId = '', onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm p-4"
          role="dialog" aria-modal="true" aria-label="New surgical case">
-      <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated">
+      <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-overlay">
         <h3 className="text-base font-semibold text-ink-900 dark:text-white">New surgical case</h3>
         {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         <div className="mt-4 grid grid-cols-2 gap-3">

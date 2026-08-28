@@ -3,12 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import EncounterNotesTab from './EncounterNotesTab';
 
-// Stub the ICD picker — it hits the terminology API, out of scope here.
+// Stub the ICD picker: it hits the terminology API, out of scope here.
 vi.mock('../../components/IcdDiagnosisPicker', () => ({ default: () => <div>icd-picker</div> }));
 
 const baseValue = {
     vitals: { bp: '', hr: '', rr: '', temp: '', spo2: '', glucose: '', weight: '', height: '' },
-    bmi: '—',
+    bmi: '-',
     complaints: [], complaintInput: '', clinicalNotes: { hpi: '', diagnosis: '', internal_notes: '' },
     physicalExams: [], examInput: '', icdCodes: [], medications: [],
     assessPlan: '', pendingFollowUp: null, chargeConsultation: false, myFee: { amount: 1000 },

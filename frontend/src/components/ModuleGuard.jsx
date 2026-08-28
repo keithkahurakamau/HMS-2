@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, LifeBuoy, Sparkles } from 'lucide-react';
+import { Lock, LifeBuoy } from 'lucide-react';
 import { useModules } from '../context/ModuleContext';
+import { Skeleton } from './ui/Skeleton';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Route-level entitlement guard.                                            */
@@ -41,9 +42,17 @@ export default function ModuleGuard({ moduleKey, children }) {
     const { hasModule, loading } = useModules();
 
     if (loading) {
+        // A placeholder shaped like the card that is about to appear, rather
+        // than a decorative spinner. The layout stays still when it resolves.
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Sparkles className="animate-pulse text-brand-500" size={28} aria-label="Loading module" />
+            <div className="min-h-[70vh] flex items-center justify-center p-6">
+                <div className="max-w-xl w-full card p-8" role="status" aria-live="polite">
+                    <span className="sr-only">Loading module</span>
+                    <Skeleton className="mx-auto size-14 rounded-full" />
+                    <Skeleton className="mx-auto mt-4 h-6 w-3/4" />
+                    <Skeleton className="mx-auto mt-3 h-4 w-full" />
+                    <Skeleton className="mx-auto mt-2 h-4 w-5/6" />
+                </div>
             </div>
         );
     }
@@ -78,28 +87,24 @@ export function UpgradeRequired({ moduleKey, label }) {
 
     return (
         <div className="min-h-[70vh] flex items-center justify-center p-6">
-            <div className="max-w-xl w-full bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-700 rounded-2xl shadow-xl p-8 text-center">
+            <div className="max-w-xl w-full card p-8 text-center">
                 <div className="mx-auto size-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
-                    <Lock className="text-amber-600" size={26} aria-hidden />
+                    <Lock className="text-status-warn" size={26} aria-hidden />
                 </div>
-                <h2 className="text-2xl font-semibold mb-2">
+                <h2 className="t-heading mb-2">
                     {resolvedLabel} isn't part of your current package
                 </h2>
-                <p className="text-ink-600 dark:text-ink-300 mb-6">
+                <p className="t-body mb-6">
                     This module is sold as an add-on. Contact the MediFleet support team
                     to upgrade and unlock <span className="font-medium">{resolvedLabel}</span> for
-                    your hospital — we'll have it switched on in minutes.
+                    your hospital, and we'll have it switched on in minutes.
                 </p>
-                <button
-                    type="button"
-                    onClick={goToSupport}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium transition"
-                >
+                <button type="button" onClick={goToSupport} className="btn btn-primary">
                     <LifeBuoy size={18} aria-hidden />
                     Contact MediFleet Support to upgrade
                 </button>
-                <p className="text-xs text-ink-500 dark:text-ink-400 mt-4">
-                    Your request opens a ticket with our team in the Support module — no email needed.
+                <p className="t-caption mt-4">
+                    Your request opens a ticket with our team in the Support module, so no email is needed.
                 </p>
             </div>
         </div>

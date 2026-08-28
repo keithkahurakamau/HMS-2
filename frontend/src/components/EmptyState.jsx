@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * EmptyState — the "nothing here yet" card.
+ * EmptyState: the "nothing here yet" card.
  *
  *  Replaces the half-dozen variations of "centered icon + headline + helper
  *  text + maybe a button" sprinkled through the pages. Stays in the same
@@ -13,7 +13,7 @@ import React from 'react';
  *   - body:      One-or-two-sentence helper text (optional).
  *   - action:    Optional <button>/<Link> rendered below body.
  *   - tone:      brand | teal | accent | warning | rose | neutral.
- *   - surface:   light (default) | dark — flip to dark on the superadmin console.
+ *   - surface:   light (default) | dark. Flip to dark on the superadmin console.
  *   - dense:     If true, removes top/bottom padding so the empty state slots
  *                into smaller containers (e.g. inside a list column).
  */
@@ -39,7 +39,7 @@ export default function EmptyState({
                 neutral: 'bg-white/[0.06] text-ink-200 ring-white/10',
             }[tone];
         }
-        // Light surface (workspace default) — `dark:` companions so the empty
+        // Light surface (workspace default). `dark:` companions so the empty
         // state flips with the app theme. The dark branch above is for the
         // always-dark superadmin console (surface="dark").
         return {
@@ -55,13 +55,13 @@ export default function EmptyState({
     return (
         <div
             className={[
-                'rounded-2xl border border-dashed text-center',
+                'rounded-xl border border-dashed text-center',
                 isDark ? 'border-white/10 bg-white/[0.02]' : 'border-ink-300 bg-white/60 dark:border-white/10 dark:bg-white/[0.02]',
                 dense ? 'p-6' : 'p-10 sm:p-14',
             ].join(' ')}
         >
             {Icon && (
-                <div className={`mx-auto size-14 rounded-2xl flex items-center justify-center ring-1 ring-inset ${chip}`}>
+                <div className={`mx-auto size-14 rounded-xl flex items-center justify-center ring-1 ring-inset ${chip}`}>
                     <Icon size={22} aria-hidden="true" />
                 </div>
             )}

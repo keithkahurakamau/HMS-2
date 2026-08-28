@@ -41,10 +41,19 @@ export default function ActionsMenu({ groups, has, disabled = false }) {
         // Caret sits under the trigger's centre, measured from the panel's right edge.
         const panelRightX = window.innerWidth - right;
         const caretRight = clamp(panelRightX - (r.left + r.width / 2) - 6, 14, PANEL_W - 26);
+        // Cap the panel to the room actually available on the side it opens
+        // toward. A flat max-height (70vh) ignores this, so a long menu that
+        // flips upward grows straight past the top of the viewport and its
+        // first items get sliced off.
+        const maxHeight = Math.max(
+            120,
+            (flip ? r.top : window.innerHeight - r.bottom) - 10 - MARGIN,
+        );
         setPos({
             right,
             caretRight,
             flip,
+            maxHeight,
             top: flip ? undefined : r.bottom + 10,
             bottom: flip ? window.innerHeight - r.top + 10 : undefined,
         });
@@ -53,7 +62,7 @@ export default function ActionsMenu({ groups, has, disabled = false }) {
     useEffect(() => {
         if (!open) return undefined;
         // Position is measured in the click handler before opening (a DOM read,
-        // not effect state) — here we just animate in and track viewport changes.
+        // not effect state): here we just animate in and track viewport changes.
         const raf = requestAnimationFrame(() => setShown(true));
         const onDoc = (e) => {
             if (menuRef.current?.contains(e.target) || btnRef.current?.contains(e.target)) return;
@@ -87,8 +96,8 @@ export default function ActionsMenu({ groups, has, disabled = false }) {
             </button>
             {open && pos && createPortal(
                 <div ref={menuRef} role="menu"
-                    style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, right: pos.right, width: PANEL_W }}
-                    className={`z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-xl py-2 custom-scrollbar
+                    style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, right: pos.right, width: PANEL_W, maxHeight: pos.maxHeight }}
+                    className={`z-50 overflow-y-auto rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-overlay py-2 custom-scrollbar
                         transition duration-100 ease-out ${pos.flip ? 'origin-bottom-right' : 'origin-top-right'}
                         ${shown ? 'opacity-100 scale-100 translate-y-0' : `opacity-0 scale-95 ${pos.flip ? 'translate-y-1' : '-translate-y-1'}`}`}>
                     {/* Caret pointing back at the trigger (up when below it, down when flipped above) */}
