@@ -14,6 +14,7 @@ import WhatsNew from '../WhatsNew';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
 import ActivePatientBar from '../ActivePatientBar';
+import SystemStatus from '../SystemStatus';
 import { TenantLogo } from '../Logo';
 import { useBranding } from '../../context/BrandingContext';
 
@@ -252,13 +253,7 @@ export default function MainLayout() {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="hidden sm:flex items-center gap-2 pl-2.5 pr-3 py-1.5 bg-accent-50 dark:bg-accent-700/15 ring-1 ring-inset ring-accent-100 dark:ring-accent-700/30 rounded-full">
-                            <span className="relative flex size-2">
-                                <span className="animate-pulse-soft absolute inline-flex h-full w-full rounded-full bg-accent-500 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full size-2 bg-accent-600"></span>
-                            </span>
-                            <span className="text-2xs font-semibold text-accent-700 dark:text-accent-400 uppercase tracking-wider">System Online</span>
-                        </div>
+                        <SystemStatus />
                         {currentJourneyKey && (
                             <button
                                 type="button"

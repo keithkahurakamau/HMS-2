@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, CreditCard, Settings,
-    ShieldAlert, LogOut, Search, Activity, Users, LifeBuoy,
+    ShieldAlert, LogOut, Search, Users, LifeBuoy,
     Menu, X, Smartphone, Wallet, KeyRound,
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/superAdminAuth';
@@ -10,6 +10,7 @@ import { apiClient } from '../../api/client';
 import { useJourney } from '../../context/JourneyContext';
 import Logo from '../Logo';
 import ThemeToggle from '../ThemeToggle';
+import PlatformHealth from '../PlatformHealth';
 
 // Route → tour-journey map for the on-first-visit walkthrough, mirroring the
 // tenant MainLayout convention. Prefix match handles any nested paths. Only
@@ -164,10 +165,7 @@ export default function SuperAdminLayout() {
                         >
                             <Menu size={20} aria-hidden="true" />
                         </button>
-                        <div className="hidden sm:flex items-center gap-2 pl-2.5 pr-3 py-1.5 bg-accent-50 dark:bg-accent-500/10 ring-1 ring-accent-100 dark:ring-accent-500/20 rounded-full">
-                            <Activity size={14} className="text-accent-600 dark:text-accent-400" aria-hidden="true" />
-                            <span className="text-2xs font-semibold text-accent-700 dark:text-accent-300 uppercase tracking-wider whitespace-nowrap">All systems operational</span>
-                        </div>
+                        <PlatformHealth />
                     </div>
 
                     <div className="flex items-center gap-3">

@@ -383,3 +383,17 @@ def root():
         "status": "Operational",
         "timestamp": time.time()
     }
+
+
+# The same payload under /api, which is the only prefix the browser can reach:
+# the Vite dev proxy and the production rewrites both forward /api and nothing
+# else. The workspace status indicator polls this to report whether the API is
+# actually reachable, so it must stay unauthenticated and free of DB work.
+@app.get("/api/health")
+def api_health():
+    return {
+        "system": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "status": "Operational",
+        "timestamp": time.time()
+    }
