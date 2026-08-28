@@ -186,7 +186,7 @@ export default function Messages() {
             />
             <div className="flex flex-1 min-h-0 gap-4 flex-col md:flex-row">
             {/* Sidebar: full width on mobile (stacks above thread), fixed-width on tablet+. */}
-            <aside data-tour="msg-list" className={`md:w-80 shrink-0 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden ${activeId ? 'hidden md:flex' : 'flex'}`}>
+            <aside data-tour="msg-list" className={`md:w-80 shrink-0 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl overflow-hidden ${activeId ? 'hidden md:flex' : 'flex'}`}>
                 <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                     <div>
                         <h2 className="text-sm font-semibold text-ink-900 dark:text-white tracking-tight">Conversations</h2>
@@ -268,7 +268,7 @@ export default function Messages() {
             </aside>
 
             {/* Main panel */}
-            <section data-tour="msg-thread" className={`flex-1 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden ${activeId ? 'flex' : 'hidden md:flex'}`}>
+            <section data-tour="msg-thread" className={`flex-1 flex flex-col bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl overflow-hidden ${activeId ? 'flex' : 'hidden md:flex'}`}>
                 {!activeConv ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-ink-400 p-8">
                         <MessageSquare size={40} className="mb-3 opacity-40" aria-hidden="true" />
@@ -323,7 +323,7 @@ export default function Messages() {
                                                         {sender.full_name}
                                                     </span>
                                                 )}
-                                                <div className={`rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                                                <div className={`rounded-xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words ${
                                                     mine
                                                         ? 'bg-brand-600 text-white rounded-br-sm'
                                                         : 'bg-white dark:bg-ink-800 text-ink-900 dark:text-white border border-ink-100 dark:border-ink-700 rounded-bl-sm'
@@ -463,7 +463,7 @@ function NewConversationModal({ kind, onClose, onCreated }) {
 
     return (
         <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-lg bg-white dark:bg-ink-900 rounded-2xl shadow-elevated overflow-hidden">
+            <div className="w-full max-w-lg bg-white dark:bg-ink-900 rounded-xl shadow-overlay overflow-hidden">
                 <div className="px-5 py-4 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
                         {kind === 'direct' ? 'New direct message' : 'New group chat'}

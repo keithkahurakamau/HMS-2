@@ -163,13 +163,13 @@ export default function Radiology() {
             {/* Patients routed here via the shared queue (sent to Radiology) */}
             <DepartmentQueue department="Radiology" inline />
             <div data-tour="radio-tabs" className="card p-2 flex items-center justify-between shrink-0">
-                <div role="tablist" className="flex bg-ink-100/70 dark:bg-ink-800/40 p-1 rounded-xl w-full max-w-md">
+                <div role="tablist" className="segmented max-w-md">
                     <button type="button" role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-soft ring-1 ring-ink-200/70 dark:ring-ink-800' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'}`}>
+                            className={`segmented-option ${activeTab === 'queue' ? 'segmented-option-active' : ''}`}>
                         <Radio size={16} className={activeTab === 'queue' ? 'text-brand-600' : 'text-ink-400'} /> Reading room
                     </button>
                     <button type="button" role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-soft ring-1 ring-ink-200/70 dark:ring-ink-800' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'}`}>
+                            className={`segmented-option ${activeTab === 'catalog' ? 'segmented-option-active' : ''}`}>
                         <FileDigit size={16} className={activeTab === 'catalog' ? 'text-accent-600' : 'text-ink-400'} /> Exam Catalog
                     </button>
                 </div>
@@ -418,7 +418,7 @@ export default function Radiology() {
             {editorOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
-                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
                                 <span className="section-eyebrow">{editing ? 'Edit exam' : 'New exam'}</span>

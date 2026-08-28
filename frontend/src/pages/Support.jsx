@@ -366,7 +366,7 @@ export default function Support() {
                                     const isPlatform = m.author_kind === 'platform';
                                     return (
                                         <div key={m.message_id} className={`flex ${isPlatform ? 'justify-start' : 'justify-end'}`}>
-                                            <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-3 border ${
+                                            <div className={`max-w-[85%] sm:max-w-[75%] rounded-xl p-3 border ${
                                                 isPlatform ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20' : 'bg-brand-50 dark:bg-brand-900/20 border-brand-200 dark:border-brand-500/20'
                                             }`}>
                                                 <div className="flex items-baseline justify-between gap-3 mb-1">
@@ -403,7 +403,7 @@ export default function Support() {
             {isNewOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => dispatchCompose({ type: 'close' })} />
-                    <div className="relative w-full max-w-xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="flex justify-between items-center p-5 border-b border-ink-100 dark:border-ink-800">
                             <h2 className="text-xl font-semibold flex items-center gap-2 dark:text-white"><LifeBuoy size={20} className="text-brand-600" /> Raise a ticket</h2>
                             <button type="button" onClick={() => dispatchCompose({ type: 'close' })} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">

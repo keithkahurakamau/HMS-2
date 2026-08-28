@@ -252,26 +252,22 @@ export default function Cheques() {
             {/* Direction tabs: incoming (received) vs outgoing (issued).
                 Sticky inside the page so the user can scan a long table
                 without losing the tab strip. */}
-            <div data-tour="cheque-direction-tabs" className="inline-flex p-1 rounded-2xl bg-ink-100/70 dark:bg-ink-800/40 ring-1 ring-ink-200/60 dark:ring-ink-800 shadow-soft">
+            <div data-tour="cheque-direction-tabs" role="tablist" aria-label="Cheque direction" className="segmented w-auto">
                 <button
                     type="button"
                     onClick={() => switchDirection('incoming')}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                        direction === 'incoming'
-                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
-                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-ink-800/50'
-                    }`}
+                    role="tab"
+                    aria-selected={direction === 'incoming'}
+                    className={`segmented-option ${direction === 'incoming' ? 'segmented-option-active' : ''}`}
                 >
                     <ArrowDownCircle size={15} /> Incoming
                 </button>
                 <button
                     type="button"
                     onClick={() => switchDirection('outgoing')}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                        direction === 'outgoing'
-                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white shadow-soft'
-                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-ink-800/50'
-                    }`}
+                    role="tab"
+                    aria-selected={direction === 'outgoing'}
+                    className={`segmented-option ${direction === 'outgoing' ? 'segmented-option-active' : ''}`}
                 >
                     <ArrowUpCircle size={15} /> Outgoing
                 </button>
@@ -441,7 +437,7 @@ export default function Cheques() {
             {isNewOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsNewOpen(false)} />
-                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-2xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
                                 <span className="section-eyebrow">Finance</span>
@@ -462,7 +458,7 @@ export default function Cheques() {
                                     onClick={() => setNewDraft(EMPTY_INCOMING)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                                         newDraft.direction === 'incoming'
-                                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white'
+                                            ? 'bg-brand-600 text-white'
                                             : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'
                                     }`}
                                 >
@@ -472,7 +468,7 @@ export default function Cheques() {
                                     onClick={() => setNewDraft(EMPTY_OUTGOING)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                                         newDraft.direction === 'outgoing'
-                                            ? 'bg-gradient-to-br from-brand-600 to-teal-500 text-white'
+                                            ? 'bg-brand-600 text-white'
                                             : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'
                                     }`}
                                 >
@@ -595,7 +591,7 @@ export default function Cheques() {
             {active && !actionPanel && (
                 <div className="fixed inset-0 z-40 flex justify-end pointer-events-none">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setActive(null)} />
-                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right pointer-events-auto">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right pointer-events-auto">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <div>
                                 <span className="section-eyebrow">Cheque</span>
@@ -630,7 +626,7 @@ export default function Cheques() {
             {/* ── Action panels ── */}
             {actionPanel && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/60 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md p-6 animate-slide-up">
+                    <div className="bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-md p-6 animate-slide-up">
                         <h3 className="text-lg font-semibold text-ink-900 dark:text-white mb-1 capitalize">{actionPanel} cheque</h3>
                         <p className="text-xs text-ink-500 dark:text-ink-400 mb-4">#{active?.cheque_number} · KES {Number(active?.amount).toLocaleString()}</p>
 

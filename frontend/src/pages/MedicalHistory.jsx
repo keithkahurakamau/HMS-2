@@ -226,7 +226,7 @@ export default function MedicalHistory() {
                             className="input pl-10"
                         />
                         {showSuggestions && suggestions.length > 0 && (
-                            <div className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-elevated max-h-64 overflow-y-auto top-full left-0 custom-scrollbar">
+                            <div className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay max-h-64 overflow-y-auto top-full left-0 custom-scrollbar">
                                 {suggestions.map(patient => (
                                     <button type="button" key={patient.patient_id}
                                         onMouseDown={() => {
@@ -272,7 +272,7 @@ export default function MedicalHistory() {
                 {chart && (
                     <>
                         {/* Patient Header Card */}
-                        <div className="bg-brand-gradient rounded-2xl p-5 sm:p-6 text-white shadow-elevated relative overflow-hidden">
+                        <div className="bg-brand-gradient rounded-xl p-5 sm:p-6 text-white shadow-overlay relative overflow-hidden">
                             <div className="absolute inset-0 bg-aurora opacity-30 pointer-events-none" />
                             <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div>
@@ -444,7 +444,7 @@ export default function MedicalHistory() {
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)} />
-                    <div className="relative w-full max-w-lg bg-white dark:bg-ink-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up max-h-[90vh]">
+                    <div className="relative w-full max-w-lg bg-white dark:bg-ink-900 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-slide-up max-h-[90vh]">
                         <div className="p-5 border-b border-slate-100 dark:border-ink-800 bg-slate-50 dark:bg-ink-800/40 flex justify-between items-center shrink-0">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editEntry ? 'Edit History Entry' : 'Add History Entry'}</h2>

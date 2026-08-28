@@ -236,9 +236,8 @@ export default function Inventory() {
                     const isActive = activeLocation.id === loc.id;
                     return (
                         <button type="button" key={loc.id} onClick={() => setActiveLocation(loc)}
-                            className={`flex items-center gap-2 py-2.5 px-5 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex-1 justify-center ${
-                                isActive ? 'bg-ink-900 dark:bg-ink-700 text-white shadow-soft' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-50 dark:hover:bg-ink-800/50'
-                            }`}>
+                            aria-pressed={isActive}
+                            className={`segmented-option whitespace-nowrap ${isActive ? 'segmented-option-active' : ''}`}>
                             <Icon size={16} className={isActive ? 'text-brand-300' : 'text-ink-400'} /> {loc.name}
                         </button>
                     );
@@ -334,7 +333,7 @@ export default function Inventory() {
             {isTransferModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsTransferModalOpen(false)} />
-                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-ink-800 to-ink-900 text-white shrink-0">
                             <h2 className="text-xl font-bold flex items-center gap-2"><ArrowRightLeft size={24} className="text-brand-400" /> Internal Transfer</h2>
                             <p className="text-sm text-slate-300 mt-1">Move stock from {activeLocation.name} to another department.</p>
@@ -383,7 +382,7 @@ export default function Inventory() {
 
                         <div className="p-5 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 flex gap-3 shrink-0">
                             <button type="button" onClick={() => setIsTransferModalOpen(false)} className="btn-secondary">Cancel</button>
-                            <button type="submit" form="transferForm" disabled={isTransferring} className="btn flex-1 bg-ink-800 text-white hover:bg-ink-900 dark:bg-ink-700 dark:hover:bg-ink-600 shadow-soft">
+                            <button type="submit" form="transferForm" disabled={isTransferring} className="btn flex-1 bg-ink-800 text-white hover:bg-ink-900 dark:bg-ink-700 dark:hover:bg-ink-600">
                                 {isTransferring ? 'Processing...' : 'Execute Transfer'}
                             </button>
                         </div>
@@ -395,7 +394,7 @@ export default function Inventory() {
             {isProcurementModalOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsProcurementModalOpen(false)} />
-                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-md bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-brand-600 to-brand-700 text-white shrink-0">
                             <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-200">Receive stock</span>
                             <h2 className="text-lg font-semibold mt-1 flex items-center gap-2"><Truck size={20} className="text-brand-200" /> External procurement</h2>
@@ -539,10 +538,10 @@ function LocationModal({ onClose, onSaved, onDeleted, locations }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md overflow-hidden flex flex-col">
+            <div className="relative bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-md overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800">
                     <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                        <div className="size-9 rounded-xl bg-brand-600 text-white flex items-center justify-center">
                             <Store size={17} />
                         </div>
                         <h3 className="text-base font-semibold text-ink-900 dark:text-white tracking-tight">Storage locations</h3>
@@ -610,7 +609,7 @@ function ExpiredStockModal({ onClose }) {
     return (
         <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-3xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+            <div className="relative w-full max-w-3xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                 <div className="p-5 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="size-9 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300 flex items-center justify-center"><CalendarClock size={18} /></div>

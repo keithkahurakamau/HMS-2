@@ -260,7 +260,7 @@ export default function Billing() {
                                 const active = activeInvoice?.invoice_id === inv.invoice_id;
                                 return (
                                     <div key={inv.invoice_id}
-                                        className={`w-full text-left card p-4 transition-all duration-150 ${active ? 'border-brand-400 ring-2 ring-brand-500/15 shadow-elevated' : 'hover:-translate-y-0.5 hover:shadow-elevated'}`}>
+                                        className={`w-full text-left card p-4 transition-all duration-150 ${active ? 'border-brand-400 ring-2 ring-brand-500/15 shadow-overlay' : 'hover:-translate-y-0.5 hover:shadow-overlay'}`}>
                                         <button type="button" className="w-full text-left" onClick={() => { resetMpesa(); setActiveInvoice(inv); }}>
                                             <div className="flex justify-between items-start mb-2">
                                                 <span className={inv.status === 'Pending M-Pesa' ? 'badge-success' : 'badge-warn'}>{inv.status}</span>
@@ -384,7 +384,7 @@ export default function Billing() {
                                         <button
                                             type="submit"
                                             disabled={isProcessing}
-                                            className={`w-full py-3.5 rounded-xl font-semibold text-white text-base flex items-center justify-center gap-2 transition-all shadow-soft ${
+                                            className={`w-full py-3.5 rounded-xl font-semibold text-white text-base flex items-center justify-center gap-2 transition-all ${
                                                 paymentMethod === 'M-Pesa' ? 'bg-gradient-to-b from-accent-500 to-accent-600 hover:from-accent-500 hover:to-accent-700' :
                                                 paymentMethod === 'Card'   ? 'bg-gradient-to-b from-purple-500 to-purple-600 hover:from-purple-500 hover:to-purple-700' :
                                                                               'bg-gradient-to-b from-brand-500 to-brand-600 hover:from-brand-500 hover:to-brand-700'
@@ -398,7 +398,7 @@ export default function Billing() {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-[calc(100vh-160px)] flex flex-col items-center justify-center border-2 border-dashed border-ink-200 dark:border-ink-800 rounded-2xl bg-white dark:bg-ink-900 text-ink-400">
+                        <div className="h-[calc(100vh-160px)] flex flex-col items-center justify-center border-2 border-dashed border-ink-200 dark:border-ink-800 rounded-xl bg-white dark:bg-ink-900 text-ink-400">
                             <Receipt size={56} className="mb-4 text-ink-300" />
                             <p className="text-base font-semibold text-ink-600 dark:text-ink-400">Select an invoice to process payment</p>
                             <p className="text-xs text-ink-400 mt-1">Pick from the queue on the left.</p>
@@ -410,7 +410,7 @@ export default function Billing() {
             {/* --- M-PESA PROCESSING OVERLAY (full-screen, matches pharmacy) --- */}
             {mpesaStatus && (
                 <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md">
+                    <div className="bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-md">
                         <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                             <div>
                                 <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100">M-Pesa payment</h3>
@@ -445,7 +445,7 @@ export default function Billing() {
             {isLedgerOpen && (
                 <div className="fixed inset-0 z-50 flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsLedgerOpen(false)} />
-                    <div className="relative w-full max-w-4xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-4xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="p-6 border-b border-ink-100 dark:border-ink-800 bg-gradient-to-br from-ink-900 to-ink-950 text-white shrink-0 flex justify-between items-center">
                             <div>
                                 <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2"><Smartphone size={20} className="text-accent-400" /> Payments Ledger</h2>

@@ -105,7 +105,7 @@ export default function MpesaSettings() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Editor */}
-                <div data-tour="mpesa-editor" className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+                <div data-tour="mpesa-editor" className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-6 space-y-5">
                     <div data-tour="mpesa-shortcode">
                     <SectionHead icon={Hash} title="Your Safaricom shortcode" />
                     <p className="text-xs text-ink-500 dark:text-ink-400 -mt-3">
@@ -187,7 +187,7 @@ export default function MpesaSettings() {
                 <div className="space-y-4">
                     <div data-tour="mpesa-status"><StatusCard config={config} loading={loading} /></div>
 
-                    <div data-tour="mpesa-test" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-5 space-y-3">
+                    <div data-tour="mpesa-test" className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5 space-y-3">
                         <SectionHead icon={Send} title="Send a test M-Pesa prompt" />
                         <p className="text-xs text-ink-500 dark:text-ink-400">
                             Sends a real KES&nbsp;1 prompt to the phone below. It doesn't
@@ -224,7 +224,7 @@ export default function MpesaSettings() {
 
 function MoneyFlowNote() {
     return (
-        <div data-tour="mpesa-flow" className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl p-5">
+        <div data-tour="mpesa-flow" className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-300 mb-2 inline-flex items-center gap-2">
                 <Wallet size={16} /> How your money flows
             </h3>
@@ -240,7 +240,7 @@ function MoneyFlowNote() {
 
 function MpesaChecklist() {
     return (
-        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-5">
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-2 inline-flex items-center gap-2">
                 <ShieldCheck size={16} /> Before you start
             </h3>
@@ -255,10 +255,10 @@ function MpesaChecklist() {
 }
 
 function StatusCard({ config, loading }) {
-    if (loading) return <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-5 text-sm text-ink-500 dark:text-ink-400">Loading…</div>;
+    if (loading) return <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5 text-sm text-ink-500 dark:text-ink-400">Loading…</div>;
     if (!config?.configured) {
         return (
-            <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-2xl p-5 text-sm text-rose-800 dark:text-rose-300 inline-flex items-start gap-2">
+            <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-xl p-5 text-sm text-rose-800 dark:text-rose-300 inline-flex items-start gap-2">
                 <AlertCircle size={16} className="mt-0.5" />
                 <div>
                     <div className="font-semibold">Not configured</div>
@@ -268,7 +268,7 @@ function StatusCard({ config, loading }) {
         );
     }
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-5 text-sm space-y-2">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-5 text-sm space-y-2">
             <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-300">
                 <CheckCircle2 size={16} /> Saved
             </div>
