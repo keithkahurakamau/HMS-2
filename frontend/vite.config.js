@@ -7,7 +7,11 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 export default defineConfig({
   plugins: [
     react(),
-    basicSsl()
+    // HTTPS in dev (self-signed) is the default, because several browser APIs
+    // the app uses are secure-context only. Set VITE_NO_HTTPS=1 to serve plain
+    // HTTP instead, which headless tooling needs: a self-signed certificate is
+    // rejected outright by Playwright.
+    ...(process.env.VITE_NO_HTTPS ? [] : [basicSsl()]),
   ],
   build: {
     rollupOptions: {
