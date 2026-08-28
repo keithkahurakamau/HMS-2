@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import Logo, { TenantLogo } from '../components/Logo';
 import PageHeader from '../components/PageHeader';
 import LetterheadStudio, { LETTERHEAD_DEFAULTS } from '../components/LetterheadStudio';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 /**
  * Branding Studio: hospital admins customise their workspace identity.
@@ -127,8 +128,7 @@ export default function Branding() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-24 text-ink-400 dark:text-ink-500">
-                <Activity className="animate-spin mr-2" size={20} /> Loading branding…
-            </div>
+                <SkeletonTable rows={4} cols={3} label="Loading" /></div>
         );
     }
 

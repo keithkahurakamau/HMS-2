@@ -6,6 +6,7 @@ import {
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import { reprintPatientDocument } from '../utils/reprintDocument';
+import { SkeletonTable } from './ui/Skeleton';
 
 /**
  * PatientDocumentsPanel: every document previously issued to a patient, with
@@ -122,8 +123,7 @@ export default function PatientDocumentsPanel({ patientId }) {
 
                 {isLoading ? (
                     <div className="flex items-center gap-2 text-sm text-ink-400 dark:text-ink-500 py-4">
-                        <Activity className="animate-spin" size={15} /> Loading documents…
-                    </div>
+                        <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                 ) : documents.length === 0 && !error ? (
                     <p className="text-sm text-ink-400 dark:text-ink-500 py-3">
                         No documents have been issued to this patient yet.

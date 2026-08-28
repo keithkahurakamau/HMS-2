@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Activity, TrendingUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
+import { SkeletonTable } from './ui/Skeleton';
 
 const COLUMNS = [
     { key: 'blood_pressure', label: 'BP' },
@@ -67,8 +68,7 @@ export default function VitalsTrendsModal({ patient, onClose }) {
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     {isLoading ? (
                         <div className="text-center py-10 text-ink-500 dark:text-ink-400">
-                            <Activity className="animate-spin inline mr-2 text-brand-600" size={18} aria-hidden="true" /> Loading vitals history…
-                        </div>
+                            <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                     ) : rows.length === 0 ? (
                         <p className="text-center py-10 text-sm text-ink-500 dark:text-ink-400">
                             No past vitals recorded for this patient yet.

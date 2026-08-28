@@ -7,6 +7,7 @@ import {
     MessageSquare, Calendar, CheckCircle2, AlertCircle, Clock, ShieldCheck,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 const STATUS_ICONS = {
     'Open':                 AlertCircle,
@@ -268,8 +269,7 @@ export default function Support() {
                 <div data-tour="support-list" className="col-span-12 lg:col-span-5 card overflow-hidden flex flex-col" style={{maxHeight: 'calc(100vh - 18rem)'}}>
                     {isLoading ? (
                         <div className="flex-1 flex items-center justify-center text-ink-400 p-10">
-                            <Activity className="animate-spin mr-2 text-brand-500" size={18} /> Loading…
-                        </div>
+                            <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                     ) : sortedTickets.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-ink-400 p-10 text-center">
                             <LifeBuoy size={36} className="mb-3 text-ink-300" />

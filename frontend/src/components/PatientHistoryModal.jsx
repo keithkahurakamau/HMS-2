@@ -7,6 +7,7 @@ import {
 import { apiClient } from '../api/client';
 import VisitHistoryList from './VisitHistoryList';
 import { ENTRY_TYPES, ENTRY_TYPE_COLOR_CLASSES, ENTRY_TYPE_TO_CHART_FIELD } from '../constants/medicalHistoryEntryTypes';
+import { SkeletonTable } from './ui/Skeleton';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * PatientHistoryModal: Clinical Desk's inline, read-only view of a
@@ -100,7 +101,7 @@ export default function PatientHistoryModal({ patientId, initialSection = null, 
 
                 <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-ink-50/40 dark:bg-ink-800/40 custom-scrollbar">
                     {isLoading ? (
-                        <div className="text-center py-10 text-ink-400"><Activity className="animate-spin mx-auto mb-2 text-brand-500" size={22} /> Loading medical history&hellip;</div>
+                        <div className="text-center py-10 text-ink-400"><SkeletonTable rows={4} cols={3} label="Loading" /></div>
                     ) : loadError ? (
                         <div className="text-center py-10 text-ink-400">Could not load this patient's history.</div>
                     ) : (

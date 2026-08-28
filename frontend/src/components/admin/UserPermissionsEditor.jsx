@@ -2,6 +2,7 @@ import React, { useEffect, useReducer, useState, useMemo } from 'react';
 import { X, Activity, ShieldCheck, Plus, Minus, RotateCcw, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
+import { SkeletonTable } from '../ui/Skeleton';
 
 /**
  * Per-user permission overrides editor.
@@ -164,8 +165,7 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
 
                 {loading ? (
                     <div className="flex-1 flex items-center justify-center py-16 text-slate-400 dark:text-ink-400">
-                        <Activity className="animate-spin mr-2" /> Loading…
-                    </div>
+                        <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                 ) : isAdmin ? (
                     <div className="p-8 text-center">
                         <ShieldCheck size={32} className="mx-auto mb-3 text-amber-500" />

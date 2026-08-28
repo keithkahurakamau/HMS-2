@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 // Build the WebSocket URL the same way the rest of the app talks to the API:
 // strip the /api suffix (apiClient uses baseURL '/api') and switch the scheme.
@@ -215,8 +216,7 @@ export default function Messages() {
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     {loadingList ? (
                         <div className="p-6 text-center text-ink-400 text-sm">
-                            <Activity className="animate-spin mx-auto mb-2" size={20} /> Loading…
-                        </div>
+                            <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                     ) : conversations.length === 0 ? (
                         <div className="p-6 text-center text-ink-400 text-sm">
                             <MessageSquare className="mx-auto mb-2 opacity-40" size={28} />

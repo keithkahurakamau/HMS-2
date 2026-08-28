@@ -7,6 +7,7 @@ import {
     ArrowDownCircle, ArrowUpCircle, XCircle, Eye, Send, Ban,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Cheque Register: incoming + outgoing                                     */
@@ -347,8 +348,7 @@ export default function Cheques() {
                         <tbody>
                             {isLoading ? (
                                 <tr><td colSpan="7" className="text-center py-10 text-ink-400">
-                                    <Activity className="animate-spin mx-auto mb-2 text-brand-500" size={20} /> Loading…
-                                </td></tr>
+                                    <SkeletonTable rows={4} cols={3} label="Loading" /></td></tr>
                             ) : cheques.length === 0 ? (
                                 <tr><td colSpan="7" className="text-center py-10 text-ink-500 dark:text-ink-400">No cheques match the current filters.</td></tr>
                             ) : cheques.map(c => {

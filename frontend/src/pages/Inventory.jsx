@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 // Each tenant defines its own location set in the DB. The API gives us
 // {location_id, name, description}; we map the well-known names to icons here
@@ -202,8 +203,7 @@ export default function Inventory() {
     if (!activeLocation) {
         return (
             <div className="flex items-center justify-center py-16 text-ink-400">
-                <Activity className="animate-spin mr-2" /> Loading inventory locations…
-            </div>
+                <SkeletonTable rows={4} cols={3} label="Loading" /></div>
         );
     }
 
@@ -308,7 +308,7 @@ export default function Inventory() {
                         </thead>
                         <tbody>
                             {isLoading ? (
-                                <tr><td colSpan="4" className="px-6 py-12 text-center text-ink-400"><Activity className="animate-spin mx-auto mb-2" size={20} /> Loading stock…</td></tr>
+                                <tr><td colSpan="4" className="px-6 py-12 text-center text-ink-400"><SkeletonTable rows={4} cols={3} label="Loading" /></td></tr>
                             ) : displayedInventory.length === 0 ? (
                                 <tr><td colSpan="4" className="px-6 py-12 text-center text-ink-400">No items found in {activeLocation.name}.</td></tr>
                             ) : (
@@ -636,7 +636,7 @@ function ExpiredStockModal({ onClose }) {
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     {loading ? (
-                        <div className="text-center py-12 text-ink-400"><Activity className="animate-spin mx-auto mb-2" size={18} /> Loading…</div>
+                        <div className="text-center py-12 text-ink-400"><SkeletonTable rows={4} cols={3} label="Loading" /></div>
                     ) : rows.length === 0 ? (
                         <div className="text-center py-16 text-ink-400">
                             <Package size={24} className="mx-auto mb-2 opacity-50" />

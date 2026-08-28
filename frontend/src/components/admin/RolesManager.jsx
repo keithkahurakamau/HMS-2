@@ -2,6 +2,7 @@ import React, { useEffect, useReducer, useState, useCallback } from 'react';
 import { ShieldCheck, Plus, Trash2, X, Lock, Activity, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
+import { SkeletonTable } from '../ui/Skeleton';
 
 // Friendly section labels for permission categories. Keys match the prefix
 // before the `:` in a codename (e.g. `mpesa:read` → "M-Pesa"). Unknown
@@ -194,8 +195,7 @@ export default function RolesManager() {
 
             {loading ? (
                 <div className="flex-1 flex items-center justify-center text-slate-400 dark:text-ink-400">
-                    <Activity className="animate-spin mr-2" /> Loading…
-                </div>
+                    <SkeletonTable rows={4} cols={3} label="Loading" /></div>
             ) : (
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
                     {/* Roles list */}

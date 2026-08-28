@@ -2,6 +2,7 @@ import React, { useEffect, useReducer, useState, useCallback } from 'react';
 import { Building2, Plus, Search, Trash2, Edit3, X, UserCheck, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
+import { SkeletonTable } from '../ui/Skeleton';
 
 // Departments + staff list + loading flag are loaded together by fetchAll.
 const initialDepts = { departments: [], staff: [], loading: true };
@@ -80,8 +81,7 @@ export default function DepartmentsManager() {
             <div className="flex-1 overflow-auto p-4">
                 {loading ? (
                     <div className="text-center py-12 text-slate-400 dark:text-ink-400">
-                        <Activity className="animate-spin mx-auto mb-2" /> Loading…
-                    </div>
+                        <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                 ) : filtered.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 dark:text-ink-400">
                         <Building2 size={32} className="mx-auto mb-2 opacity-40" />
