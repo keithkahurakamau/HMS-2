@@ -3,7 +3,7 @@ import { apiClient } from '../api/client';
 import { setPrintBranding } from '../utils/printDocument';
 
 /**
- * BrandingContext — single source of truth for the active tenant's branding.
+ * BrandingContext: single source of truth for the active tenant's branding.
  *
  *  Source of data
  *  --------------
@@ -48,7 +48,7 @@ export function safeImageUrl(url) {
 }
 
 // CSS colours land in `color:` declarations, so reject anything that isn't
-// a hex literal or a simple rgb()/hsl() functional form — that blocks
+// a hex literal or a simple rgb()/hsl() functional form, that blocks
 // "; background-image: url(evil); --x: " style breakouts.
 export function safeCssColor(value) {
     if (typeof value !== 'string') return null;
@@ -107,7 +107,7 @@ export function BrandingProvider({ children }) {
 
     // Inject brand colours + tenant background as CSS variables. Surfaces opt
     // in via the .bg-tenant utility (defined in index.css) and var(--brand-*).
-    // Every value is allow-listed before reaching the CSSOM — a tenant cannot
+    // Every value is allow-listed before reaching the CSSOM, a tenant cannot
     // smuggle `; background-image:url(javascript:...)` through a colour field.
     useEffect(() => {
         const root = document.documentElement;

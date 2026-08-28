@@ -42,7 +42,7 @@ export default function EpisodeForm({ initialPatientId, onClose, onSaved }) {
       aria-modal="true"
       aria-label="Enroll patient"
     >
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-overlay">
         <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Enroll patient</h3>
         {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         <label className="mt-3 block text-sm text-ink-700 dark:text-ink-300">

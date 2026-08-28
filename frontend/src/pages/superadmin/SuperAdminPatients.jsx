@@ -8,7 +8,7 @@ import {
 import PageHeader from '../../components/PageHeader';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Superadmin patient browser — READ-ONLY, end-to-end.                       */
+/*  Superadmin patient browser: READ-ONLY, end-to-end.                       */
 /*                                                                            */
 /*  No write paths exist. Every column is shown as text only. Cross-tenant    */
 /*  reads go through /api/public/superadmin/patients which iterates each      */
@@ -38,7 +38,7 @@ export default function SuperAdminPatients() {
                 const res = await apiClient.get('/public/hospitals?include_inactive=false');
                 setTenants(res.data || []);
             } catch {
-                // non-fatal — the picker just stays empty
+                // non-fatal: the picker just stays empty
             }
         })();
     }, []);
@@ -94,7 +94,7 @@ export default function SuperAdminPatients() {
             <PageHeader
                 eyebrow="Console"
                 icon={Users}
-                title="Patients — cross-tenant"
+                title="Patients, cross-tenant"
                 subtitle="Read-only browser across every active tenant database."
                 tone="brand"
                 meta={READONLY_BADGE}
@@ -178,28 +178,28 @@ export default function SuperAdminPatients() {
 
                                 {/* Desktop table */}
                                 <div className="hidden md:block overflow-x-auto">
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
+                                    <table className="table-clean table-sticky">
+                                        <thead>
                                             <tr>
-                                                <th className="px-5 py-3">OP #</th>
-                                                <th className="px-5 py-3">Name</th>
-                                                <th className="px-5 py-3">Sex / DOB</th>
-                                                <th className="px-5 py-3">Phone</th>
-                                                <th className="px-5 py-3">Town</th>
-                                                <th className="px-5 py-3">Registered</th>
-                                                <th className="px-5 py-3 text-right">View</th>
+                                                <th>OP #</th>
+                                                <th>Name</th>
+                                                <th>Sex / DOB</th>
+                                                <th>Phone</th>
+                                                <th>Town</th>
+                                                <th>Registered</th>
+                                                <th className="num">View</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-200">
+                                        <tbody>
                                             {rows.map(p => (
                                                 <tr key={`${p.tenant_id}:${p.patient_id}`} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors">
-                                                    <td className="px-5 py-3 font-mono text-xs text-brand-700">{p.outpatient_no}</td>
-                                                    <td className="px-5 py-3 font-semibold text-ink-900 dark:text-white">{p.surname}, {p.other_names}</td>
-                                                    <td className="px-5 py-3 text-xs">{p.sex} · {p.date_of_birth || '—'}</td>
-                                                    <td className="px-5 py-3 text-xs"><Phone size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.telephone_1 || '—'}</td>
-                                                    <td className="px-5 py-3 text-xs"><MapPin size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.town || '—'}</td>
-                                                    <td className="px-5 py-3 text-xs text-ink-500 dark:text-ink-400"><Calendar size={11} className="inline mr-1" aria-hidden="true" /> {p.registered_on ? new Date(p.registered_on).toLocaleDateString() : '—'}</td>
-                                                    <td className="px-5 py-3 text-right">
+                                                    <td className="font-mono text-xs text-brand-700">{p.outpatient_no}</td>
+                                                    <td className="font-semibold text-ink-900 dark:text-white">{p.surname}, {p.other_names}</td>
+                                                    <td className="text-xs">{p.sex} · {p.date_of_birth || '-'}</td>
+                                                    <td className="text-xs"><Phone size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.telephone_1 || '-'}</td>
+                                                    <td className="text-xs"><MapPin size={11} className="inline mr-1 text-ink-400" aria-hidden="true" /> {p.town || '-'}</td>
+                                                    <td className="text-xs text-ink-500 dark:text-ink-400"><Calendar size={11} className="inline mr-1" aria-hidden="true" /> {p.registered_on ? new Date(p.registered_on).toLocaleDateString() : '-'}</td>
+                                                    <td className="num">
                                                         <button
                                                             type="button"
                                                             onClick={() => openDetail(p)}
@@ -215,7 +215,7 @@ export default function SuperAdminPatients() {
                                     </table>
                                 </div>
 
-                                {/* Mobile card list — preserves info without horizontal scroll */}
+                                {/* Mobile card list: preserves info without horizontal scroll */}
                                 <ul className="md:hidden divide-y divide-ink-100 dark:divide-ink-800">
                                     {rows.map(p => (
                                         <li key={`${p.tenant_id}:${p.patient_id}-mb`} className="p-4">
@@ -223,9 +223,9 @@ export default function SuperAdminPatients() {
                                                 <div className="min-w-0">
                                                     <p className="font-semibold text-ink-900 dark:text-white truncate">{p.surname}, {p.other_names}</p>
                                                     <p className="text-xs text-brand-700 font-mono mt-0.5">{p.outpatient_no}</p>
-                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-1">{p.sex} · {p.date_of_birth || '—'}</p>
-                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-0.5 flex items-center gap-1"><Phone size={11} aria-hidden="true" /> {p.telephone_1 || '—'}</p>
-                                                    <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 flex items-center gap-1"><MapPin size={11} aria-hidden="true" /> {p.town || '—'}</p>
+                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-1">{p.sex} · {p.date_of_birth || '-'}</p>
+                                                    <p className="text-xs text-ink-600 dark:text-ink-400 mt-0.5 flex items-center gap-1"><Phone size={11} aria-hidden="true" /> {p.telephone_1 || '-'}</p>
+                                                    <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 flex items-center gap-1"><MapPin size={11} aria-hidden="true" /> {p.town || '-'}</p>
                                                 </div>
                                                 <button
                                                     type="button"
@@ -258,7 +258,7 @@ export default function SuperAdminPatients() {
                         onClick={() => setSelected(null)}
                         aria-hidden="true"
                     />
-                    <div className="relative w-full max-w-3xl h-full bg-white dark:bg-ink-900 border-l border-ink-200 dark:border-ink-800 shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-3xl h-full bg-white dark:bg-ink-900 border-l border-ink-200 dark:border-ink-800 shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex items-start justify-between gap-3 shrink-0">
                             <div className="min-w-0">
                                 <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-700">Read-only patient view</span>
@@ -282,7 +282,7 @@ export default function SuperAdminPatients() {
                             ) : detail ? (
                                 <div className="space-y-4">
                                     <div className="bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-200 rounded-xl p-3 text-2xs flex items-center gap-2">
-                                        <ShieldCheck size={13} aria-hidden="true" /> Read-only — no actions are exposed in this view.
+                                        <ShieldCheck size={13} aria-hidden="true" /> Read-only, no actions are exposed in this view.
                                     </div>
                                     <div className="card divide-y divide-ink-100 dark:divide-ink-800">
                                         {Object.entries(detail).flatMap(([k, v]) => k === 'tenant' ? [] : [

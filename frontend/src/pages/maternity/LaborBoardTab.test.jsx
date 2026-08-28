@@ -44,13 +44,13 @@ describe('LaborBoardTab', () => {
     await waitFor(() =>
       expect(screen.getByRole('img', { name: /partograph chart/i })).toBeInTheDocument()
     );
-    expect(screen.getByText(/Partograph — Achieng, Faith/)).toBeInTheDocument();
+    expect(screen.getByText(/Partograph: Achieng, Faith/)).toBeInTheDocument();
 
     // Select labor B; its fetch is still pending.
     await user.click(screen.getByText('Mwangi, Joy'));
 
     // The heading must flip to the newly selected patient immediately...
-    expect(screen.getByText(/Partograph — Mwangi, Joy/)).toBeInTheDocument();
+    expect(screen.getByText(/Partograph: Mwangi, Joy/)).toBeInTheDocument();
     // ...but A's stale chart must NOT still be on screen under B's name.
     expect(screen.queryByRole('img', { name: /partograph chart/i })).not.toBeInTheDocument();
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
@@ -64,7 +64,7 @@ describe('LaborBoardTab', () => {
     await waitFor(() =>
       expect(screen.getByRole('img', { name: /partograph chart/i })).toBeInTheDocument()
     );
-    expect(screen.getByText(/Partograph — Mwangi, Joy/)).toBeInTheDocument();
+    expect(screen.getByText(/Partograph: Mwangi, Joy/)).toBeInTheDocument();
   });
 
   it('start labor: lists active episodes in the modal and submits linkLabor with the chosen episode + admission', async () => {
@@ -135,7 +135,7 @@ describe('LaborBoardTab', () => {
 
   // Regression: the backend has handled corrects_entry_id since day one and
   // the chart already drew superseded points hollow, but no UI ever sent the
-  // field — so the append-only correction path was unreachable.
+  // field: so the append-only correction path was unreachable.
   it('corrects a partograph entry by appending a new one carrying corrects_entry_id', async () => {
     api.getPartograph.mockResolvedValue({
       labor_admission_id: 1,

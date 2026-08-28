@@ -9,7 +9,7 @@ import { useEffect } from 'react';
  * keeps those same tags correct as the user (or a JS-rendering crawler such
  * as Googlebot) navigates between routes.
  *
- * It mutates the existing head tags in place — never appends duplicates — so
+ * It mutates the existing head tags in place, never appends duplicates, so
  * there is always exactly one <title>, one canonical, and one of each meta.
  * That avoids the duplicate-canonical / conflicting-robots problems you'd get
  * from naively rendering metadata tags per route.

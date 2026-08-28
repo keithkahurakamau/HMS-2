@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /* ──────────────────────────────────────────────────────────────────────────
- * usePaymentSocket — live M-Pesa payment updates for the checkout screens.
+ * usePaymentSocket: live M-Pesa payment updates for the checkout screens.
  *
  * While `enabled` is true, opens an authenticated WebSocket to the tenant's
  * payment feed (/ws/payments/{tenant_db}). The webhook publishes a
@@ -9,8 +9,8 @@ import { useEffect, useRef } from 'react';
  * to success/failure without waiting for the next poll. Polling stays in place
  * as a fallback (no Redis multi-worker, dropped socket, etc.).
  *
- *   enabled  boolean — open the socket only while a push is in flight
- *   onEvent  (data) => void — called per payment_update frame
+ *   enabled  boolean: open the socket only while a push is in flight
+ *   onEvent  (data) => void, called per payment_update frame
  *
  * The tenant db_name is the same value the API client sends as X-Tenant-ID
  * (localStorage 'hms_tenant_id'); the cookie-based auth + server-side tenant
@@ -23,6 +23,8 @@ export default function usePaymentSocket(enabled, onEvent) {
     const cbRef = useRef(onEvent);
     useEffect(() => { cbRef.current = onEvent; });
 
+    // Cleanup exists: the cleanup closes the socket; the rule cannot see it created inside a try.
+    // react-doctor-disable-next-line react-doctor/effect-needs-cleanup
     useEffect(() => {
         if (!enabled) return undefined;
         const tenant = localStorage.getItem('hms_tenant_id');
@@ -44,7 +46,7 @@ export default function usePaymentSocket(enabled, onEvent) {
             try { data = JSON.parse(evt.data); } catch { return; }
             if (data && data.type === 'payment_update') cbRef.current?.(data);
         };
-        // Swallow errors — polling is the safety net.
+        // Swallow errors: polling is the safety net.
         socket.onerror = () => {};
 
         return () => {

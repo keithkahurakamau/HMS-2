@@ -59,7 +59,7 @@ export default function CaseExtras({ caseObj, onChanged }) {
         <ul className="mt-2 space-y-1 text-sm text-ink-700 dark:text-ink-300">
           {(caseObj.team_members || []).map((m) => (
             <li key={m.member_id} className="flex items-center justify-between gap-2">
-              <span>{m.name || `User #${m.user_id}`} <span className="text-ink-400">— {m.role}</span></span>
+              <span>{m.name || `User #${m.user_id}`} <span className="text-ink-400">, {m.role}</span></span>
               {!isTerminal && (
                 <button type="button" disabled={busy} onClick={() => run(() => removeTeamMember(caseObj.case_id, m.member_id))}
                         className="text-xs text-rose-600 dark:text-rose-400 hover:underline">remove</button>
@@ -89,7 +89,7 @@ export default function CaseExtras({ caseObj, onChanged }) {
         <h4 className="text-sm font-semibold text-ink-900 dark:text-white">Consumables &amp; implants</h4>
         <ul className="mt-2 space-y-1 text-sm text-ink-700 dark:text-ink-300">
           {(caseObj.consumables || []).map((c) => (
-            <li key={c.consumable_id}>• {c.item_name}{c.qty ? ` ×${c.qty}` : ''}{c.is_implant ? ` — implant${c.serial_no ? ` (${c.serial_no})` : ''}` : ''}</li>
+            <li key={c.consumable_id}>• {c.item_name}{c.qty ? ` ×${c.qty}` : ''}{c.is_implant ? `, implant${c.serial_no ? ` (${c.serial_no})` : ''}` : ''}</li>
           ))}
           {(caseObj.consumables || []).length === 0 && <li className="text-ink-400">None recorded.</li>}
         </ul>
@@ -123,18 +123,18 @@ export default function CaseExtras({ caseObj, onChanged }) {
           <h4 className="text-sm font-semibold text-ink-900 dark:text-white">Post-op recovery</h4>
           {(caseObj.recovery_observations || []).length > 0 && (
             <div className="mt-2 overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-ink-500 dark:text-ink-400">
-                  <tr><th className="py-1">Time</th><th className="py-1">BP</th><th className="py-1">Pulse</th><th className="py-1">SpO₂</th><th className="py-1">Pain</th></tr>
+              <table className="table-inline">
+                <thead>
+                  <tr><th>Time</th><th>BP</th><th>Pulse</th><th>SpO₂</th><th>Pain</th></tr>
                 </thead>
                 <tbody>
                   {caseObj.recovery_observations.map((o) => (
                     <tr key={o.obs_id} className="border-t border-ink-100 dark:border-ink-800">
-                      <td className="py-1 text-ink-500 dark:text-ink-400">{o.recorded_at ? new Date(o.recorded_at).toLocaleTimeString() : '—'}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{o.bp_systolic ?? '—'}/{o.bp_diastolic ?? '—'}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{o.pulse ?? '—'}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{o.spo2 ?? '—'}</td>
-                      <td className="py-1 text-ink-800 dark:text-ink-200">{o.pain_score ?? '—'}</td>
+                      <td className="text-ink-500 dark:text-ink-400">{o.recorded_at ? new Date(o.recorded_at).toLocaleTimeString() : '-'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{o.bp_systolic ?? '-'}/{o.bp_diastolic ?? '-'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{o.pulse ?? '-'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{o.spo2 ?? '-'}</td>
+                      <td className="text-ink-800 dark:text-ink-200">{o.pain_score ?? '-'}</td>
                     </tr>
                   ))}
                 </tbody>

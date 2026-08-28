@@ -11,6 +11,8 @@ import {
     Receipt, Search, Target, FileMinus, RefreshCw,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import Tabs from '../components/ui/Tabs';
+import { SkeletonTable } from '../components/ui/Skeleton';
 import BudgetingTab from './accounting/BudgetingTab';
 import NotesTab from './accounting/NotesTab';
 import BulkAllocateModal from './accounting/BulkAllocateModal';
@@ -61,21 +63,12 @@ export default function Accounting() {
                 tone="brand"
             />
 
-            <div data-tour="acc-tabs" className="flex flex-wrap gap-2 border-b border-ink-200/70 dark:border-ink-800">
-                {TABS.map(({ key, label, icon: Icon }) => (
-                    <button type="button"
-                        key={key}
-                        onClick={() => setTab(key)}
-                        className={
-                            'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ' +
-                            (tab === key
-                                ? 'border-brand-600 text-brand-700 dark:text-brand-300'
-                                : 'border-transparent text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200')
-                        }
-                    >
-                        <Icon size={16} /> {label}
-                    </button>
-                ))}
+            <div data-tour="acc-tabs">
+                <Tabs
+                    items={TABS.map(({ key, label, icon }) => ({ id: key, label, icon }))}
+                    activeId={tab}
+                    onChange={setTab}
+                />
             </div>
 
             {tab === 'coa'        && <ChartOfAccountsTab />}
@@ -126,7 +119,7 @@ function ChartOfAccountsTab() {
                 </button>
             </div>
 
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-2">
                 {loading ? (
                     <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
                 ) : tree.length === 0 ? (
@@ -248,9 +241,9 @@ function NewAccountModal({ flatAccounts, onClose, onSaved }) {
                 <Field label="Parent (optional)">
                     <select className="input" value={form.parent_id}
                             onChange={(e) => setForm({ ...form, parent_id: e.target.value })}>
-                        <option value="">— none —</option>
+                        <option value="">, none, </option>
                         {parents.map((a) =>
-                            <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                            <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
                 <label className="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-200">
@@ -327,21 +320,21 @@ function JournalEntriesTab() {
                 </button>
             </div>
 
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">#</th>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Currency</th>
-                            <th className="text-left px-4 py-2 font-medium">Reference</th>
-                            <th className="text-left px-4 py-2 font-medium">Memo</th>
-                            <th className="text-right px-4 py-2 font-medium">Total (Dr)</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th className="px-4 py-2" aria-label="Actions"></th>
+                            <th className="font-medium">#</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Currency</th>
+                            <th className="font-medium">Reference</th>
+                            <th className="font-medium">Memo</th>
+                            <th className="num font-medium">Total (Dr)</th>
+                            <th className="font-medium">Status</th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {loading ? (
                             <tr><td colSpan={8} className="px-4 py-6 text-ink-500 dark:text-ink-400">Loading...</td></tr>
                         ) : entries.length === 0 ? (
@@ -350,18 +343,18 @@ function JournalEntriesTab() {
                             const totalDr = (e.lines || []).reduce((s, l) => s + Number(l.debit || 0), 0);
                             return (
                                 <tr key={e.entry_id}>
-                                    <td className="px-4 py-2 font-mono text-xs">{e.entry_number}</td>
-                                    <td className="px-4 py-2">{e.entry_date}</td>
-                                    <td className="px-4 py-2">{e.currency_code}</td>
-                                    <td className="px-4 py-2">{e.reference || '—'}</td>
-                                    <td className="px-4 py-2 text-ink-600 dark:text-ink-400">{e.memo || '—'}</td>
-                                    <td className="px-4 py-2 text-right font-mono">{formatAmount(totalDr)}</td>
-                                    <td className="px-4 py-2">
+                                    <td className="font-mono text-xs">{e.entry_number}</td>
+                                    <td>{e.entry_date}</td>
+                                    <td>{e.currency_code}</td>
+                                    <td>{e.reference || '-'}</td>
+                                    <td className="text-ink-600 dark:text-ink-400">{e.memo || '-'}</td>
+                                    <td className="num font-mono">{formatAmount(totalDr)}</td>
+                                    <td>
                                         <span className={`text-xs px-2 py-0.5 rounded-md ${STATUS_BADGE[e.status]}`}>
                                             {e.status}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-2 text-right">
+                                    <td className="num">
                                         {e.status === 'draft' && (
                                             <button type="button" onClick={() => post(e.entry_id)}
                                                     className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 hover:underline">
@@ -463,7 +456,7 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                     <select className="input" value={form.currency_code}
                             onChange={(e) => setForm({ ...form, currency_code: e.target.value })}>
                         {currencies.map((c) =>
-                            <option key={c.currency_id} value={c.code}>{c.code} — {c.name}</option>)}
+                            <option key={c.currency_id} value={c.code}>{c.code}, {c.name}</option>)}
                     </select>
                 </Field>
                 <Field label="Reference">
@@ -479,46 +472,46 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
             </Field>
 
             <div className="mt-4 border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-3 py-2 font-medium">Account</th>
-                            <th className="text-right px-3 py-2 font-medium w-32">Debit</th>
-                            <th className="text-right px-3 py-2 font-medium w-32">Credit</th>
-                            <th className="text-left px-3 py-2 font-medium">Description</th>
+                            <th className="font-medium">Account</th>
+                            <th className="num font-medium w-32">Debit</th>
+                            <th className="num font-medium w-32">Credit</th>
+                            <th className="font-medium">Description</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {lines.map((l, idx) => (
                             <tr key={l._uid}>
-                                <td className="px-3 py-1.5">
+                                <td>
                                     <select className="input" value={l.account_id}
                                             onChange={(e) => setLine(idx, { account_id: e.target.value })}>
-                                        <option value="">—</option>
+                                        <option value="">, </option>
                                         {accounts.map((a) =>
                                             <option key={a.account_id} value={a.account_id}>
-                                                {a.code} — {a.name}
+                                                {a.code}, {a.name}
                                             </option>)}
                                     </select>
                                 </td>
-                                <td className="px-3 py-1.5">
+                                <td>
                                     <input type="number" step="0.01" className="input text-right"
                                            aria-label={`Debit, line ${idx + 1}`}
                                            value={l.debit}
                                            onChange={(e) => setLine(idx, { debit: e.target.value, credit: e.target.value ? '' : l.credit })} />
                                 </td>
-                                <td className="px-3 py-1.5">
+                                <td>
                                     <input type="number" step="0.01" className="input text-right"
                                            aria-label={`Credit, line ${idx + 1}`}
                                            value={l.credit}
                                            onChange={(e) => setLine(idx, { credit: e.target.value, debit: e.target.value ? '' : l.debit })} />
                                 </td>
-                                <td className="px-3 py-1.5">
+                                <td>
                                     <input className="input" aria-label={`Description, line ${idx + 1}`} value={l.description}
                                            onChange={(e) => setLine(idx, { description: e.target.value })} />
                                 </td>
-                                <td className="px-2">
+                                <td>
                                     {lines.length > 2 && (
                                         <button type="button" onClick={() => removeLine(idx)} className="text-ink-400 hover:text-rose-600">
                                             <X size={14} />
@@ -530,14 +523,14 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                     </tbody>
                     <tfoot className="bg-ink-50 dark:bg-ink-800/40">
                         <tr>
-                            <td className="px-3 py-2">
+                            <td>
                                 <button type="button" onClick={addLine}
                                         className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                                     <Plus size={12} /> Add line
                                 </button>
                             </td>
-                            <td className="px-3 py-2 text-right font-mono">{formatAmount(totals.dr)}</td>
-                            <td className="px-3 py-2 text-right font-mono">{formatAmount(totals.cr)}</td>
+                            <td className="num font-mono">{formatAmount(totals.dr)}</td>
+                            <td className="num font-mono">{formatAmount(totals.cr)}</td>
                             <td colSpan={2} className="px-3 py-2">
                                 {totals.balanced ? (
                                     <span className="text-xs text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-1">
@@ -587,7 +580,7 @@ function CurrenciesTab() {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Currencies */}
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl">
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Currencies</h3>
                     <button type="button" onClick={() => setOpenCur(true)}
@@ -613,7 +606,7 @@ function CurrenciesTab() {
             </div>
 
             {/* FX Rates */}
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl">
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Exchange rates</h3>
                     <button type="button" onClick={() => setOpenFx(true)}
@@ -711,14 +704,14 @@ function NewFxRateModal({ currencies, onClose, onSaved }) {
                 <Field label="From">
                     <select className="input" value={form.from_currency}
                             onChange={(e) => setForm({ ...form, from_currency: e.target.value })}>
-                        <option value="">—</option>
+                        <option value="">, </option>
                         {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
                 </Field>
                 <Field label="To">
                     <select className="input" value={form.to_currency}
                             onChange={(e) => setForm({ ...form, to_currency: e.target.value })}>
-                        <option value="">—</option>
+                        <option value="">, </option>
                         {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
                 </Field>
@@ -782,7 +775,7 @@ function SettingsTab() {
     if (!settings) return <div className="text-sm text-ink-500 dark:text-ink-400 p-6">Loading...</div>;
 
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5 max-w-2xl">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-6 space-y-5 max-w-2xl">
             <Field label="Base currency">
                 <input aria-label="Base currency" className="input bg-ink-50 dark:bg-ink-800/40" value={settings.base_currency_code} readOnly disabled />
                 <p className="text-xs text-ink-500 dark:text-ink-400 mt-1">
@@ -835,7 +828,7 @@ function ConfigurationTab() {
     const [section, setSection] = useState('suppliers');
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
-            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
+            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-2 h-fit">
                 <nav className="space-y-1">
                     {CONFIG_SECTIONS.map(({ key, label, icon: Icon }) => (
                         <button type="button" key={key}
@@ -884,30 +877,30 @@ function SuppliersSection() {
             <SectionHeader title="Suppliers" subtitle="Vendors you buy goods and services from."
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No suppliers yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Name</th>
-                            <th className="text-left px-4 py-2 font-medium">Contact</th>
-                            <th className="text-left px-4 py-2 font-medium">KRA PIN</th>
-                            <th className="text-right px-4 py-2 font-medium">Terms (days)</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Name</th>
+                            <th className="font-medium">Contact</th>
+                            <th className="font-medium">KRA PIN</th>
+                            <th className="num font-medium">Terms (days)</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((s) => (
                             <tr key={s.supplier_id}>
-                                <td className="px-4 py-1.5 font-medium">{s.name}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{s.contact_person || '—'}{s.email ? ` · ${s.email}` : ''}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{s.tax_pin || '—'}</td>
-                                <td className="px-4 py-1.5 text-right">{s.payment_terms_days}</td>
-                                <td className="px-4 py-1.5">
+                                <td className="font-medium">{s.name}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{s.contact_person || '-'}{s.email ? ` · ${s.email}` : ''}</td>
+                                <td className="font-mono text-xs">{s.tax_pin || '-'}</td>
+                                <td className="num">{s.payment_terms_days}</td>
+                                <td>
                                     <span className={'text-xs ' + (s.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {s.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="num">
                                     <button type="button" onClick={() => { setEditing(s); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
@@ -973,8 +966,8 @@ function SupplierModal({ initial, onClose, onSaved }) {
                 <Field label="Default payable account">
                     <select className="input" value={form.default_payable_account_id || ''}
                             onChange={(e) => setForm({ ...form, default_payable_account_id: e.target.value })}>
-                        <option value="">— default (2110 Accounts Payable) —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, default (2110 Accounts Payable), </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
                 {isEdit && (
@@ -1022,28 +1015,28 @@ function InsuranceSection() {
             <SectionHeader title="Insurance Providers" subtitle="Insurers your hospital accepts (NHIF, AAR, Jubilee, etc.)."
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No providers yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Name</th>
-                            <th className="text-left px-4 py-2 font-medium">Contact</th>
-                            <th className="text-left px-4 py-2 font-medium">Phone</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Name</th>
+                            <th className="font-medium">Contact</th>
+                            <th className="font-medium">Phone</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((p) => (
                             <tr key={p.provider_id}>
-                                <td className="px-4 py-1.5 font-medium">{p.name}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{p.contact_person || '—'}{p.email ? ` · ${p.email}` : ''}</td>
-                                <td className="px-4 py-1.5">{p.phone || '—'}</td>
-                                <td className="px-4 py-1.5">
+                                <td className="font-medium">{p.name}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{p.contact_person || '-'}{p.email ? ` · ${p.email}` : ''}</td>
+                                <td>{p.phone || '-'}</td>
+                                <td>
                                     <span className={'text-xs ' + (p.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {p.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="num">
                                     <button type="button" onClick={() => { setEditing(p); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
@@ -1102,8 +1095,8 @@ function ProviderModal({ initial, onClose, onSaved }) {
                     <Field label="Default receivable account">
                         <select className="input" value={form.default_receivable_account_id || ''}
                                 onChange={(e) => setForm({ ...form, default_receivable_account_id: e.target.value })}>
-                            <option value="">— default (1150 Insurance Receivable) —</option>
-                            {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                            <option value="">, default (1150 Insurance Receivable), </option>
+                            {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                         </select>
                     </Field>
                 </div>
@@ -1139,7 +1132,7 @@ function SchemesSection() {
     };
     useEffect(() => { load(); }, []);
 
-    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '—';
+    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '-';
 
     return (
         <div className="space-y-4">
@@ -1148,32 +1141,32 @@ function SchemesSection() {
                            disabled={providers.length === 0}
                            disabledMsg="Add an insurance provider first." />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No schemes yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Provider</th>
-                            <th className="text-left px-4 py-2 font-medium">Scheme</th>
-                            <th className="text-left px-4 py-2 font-medium">Code</th>
-                            <th className="text-right px-4 py-2 font-medium">Coverage limit</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Provider</th>
+                            <th className="font-medium">Scheme</th>
+                            <th className="font-medium">Code</th>
+                            <th className="num font-medium">Coverage limit</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((s) => (
                             <tr key={s.scheme_id}>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{providerName(s.provider_id)}</td>
-                                <td className="px-4 py-1.5 font-medium">{s.name}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{s.scheme_code || '—'}</td>
-                                <td className="px-4 py-1.5 text-right font-mono">
-                                    {s.coverage_limit ? formatAmount(s.coverage_limit) : '—'}
+                                <td className="text-ink-600 dark:text-ink-400">{providerName(s.provider_id)}</td>
+                                <td className="font-medium">{s.name}</td>
+                                <td className="font-mono text-xs">{s.scheme_code || '-'}</td>
+                                <td className="num font-mono">
+                                    {s.coverage_limit ? formatAmount(s.coverage_limit) : '-'}
                                 </td>
-                                <td className="px-4 py-1.5">
+                                <td>
                                     <span className={'text-xs ' + (s.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {s.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="num">
                                     <button type="button" onClick={() => { setEditing(s); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
@@ -1317,34 +1310,34 @@ function PriceListSection() {
                 </button>
             </div>
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No price items yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Code</th>
-                            <th className="text-left px-4 py-2 font-medium">Service</th>
-                            <th className="text-left px-4 py-2 font-medium">Category</th>
-                            <th className="text-right px-4 py-2 font-medium">Unit price</th>
-                            <th className="text-right px-4 py-2 font-medium">Tax %</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Code</th>
+                            <th className="font-medium">Service</th>
+                            <th className="font-medium">Category</th>
+                            <th className="num font-medium">Unit price</th>
+                            <th className="num font-medium">Tax %</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((p) => (
                             <tr key={p.price_id}>
-                                <td className="px-4 py-1.5 font-mono text-xs">{p.service_code}</td>
-                                <td className="px-4 py-1.5">{p.name}</td>
-                                <td className="px-4 py-1.5">
+                                <td className="font-mono text-xs">{p.service_code}</td>
+                                <td>{p.name}</td>
+                                <td>
                                     <span className="text-xs px-2 py-0.5 rounded-md bg-ink-50 dark:bg-ink-800/40 text-ink-700 dark:text-ink-200">{p.category}</span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right font-mono">{formatAmount(p.unit_price)}</td>
-                                <td className="px-4 py-1.5 text-right">{Number(p.tax_rate_pct).toFixed(1)}%</td>
-                                <td className="px-4 py-1.5">
+                                <td className="num font-mono">{formatAmount(p.unit_price)}</td>
+                                <td className="num">{Number(p.tax_rate_pct).toFixed(1)}%</td>
+                                <td>
                                     <span className={'text-xs ' + (p.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {p.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right whitespace-nowrap">
+                                <td className="num whitespace-nowrap">
                                     <button type="button" onClick={() => { setEditing(p); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                     <button type="button" onClick={() => deleteItem(p)}
@@ -1425,8 +1418,8 @@ function PriceModal({ initial, categories, onClose, onSaved }) {
                 <Field label="Revenue account">
                     <select className="input" value={form.revenue_account_id || ''}
                             onChange={(e) => setForm({ ...form, revenue_account_id: e.target.value })}>
-                        <option value="">— default (per ledger mapping) —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, default (per ledger mapping), </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
             </div>
@@ -1461,7 +1454,7 @@ function MappingsSection() {
     useEffect(() => { load(); }, []);
 
     const codeName = (id) => {
-        if (!id) return '— unset —';
+        if (!id) return ': unset: ';
         const a = accounts.find(x => x.account_id === id);
         return a ? `${a.code} ${a.name}` : `#${id}`;
     };
@@ -1472,28 +1465,28 @@ function MappingsSection() {
                 <h3 className="text-lg font-semibold text-ink-900 dark:text-white">Ledger Mappings</h3>
                 <p className="text-sm text-ink-600 dark:text-ink-400 mt-1">
                     These tell auto-posting (Phase 4) which accounts to use for each event. Defaults are seeded
-                    to match the default CoA — re-point them if you renamed or restructured accounts.
+                    to match the default CoA, re-point them if you renamed or restructured accounts.
                 </p>
             </div>
             <DataCard loading={loading} empty={catalogue.length === 0} emptyMsg="No mappings.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Source key</th>
-                            <th className="text-left px-4 py-2 font-medium">Description</th>
-                            <th className="text-left px-4 py-2 font-medium">Debit (Dr)</th>
-                            <th className="text-left px-4 py-2 font-medium">Credit (Cr)</th>
+                            <th className="font-medium">Source key</th>
+                            <th className="font-medium">Description</th>
+                            <th className="font-medium">Debit (Dr)</th>
+                            <th className="font-medium">Credit (Cr)</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {catalogue.map((c) => (
                             <tr key={c.source_key}>
-                                <td className="px-4 py-1.5 font-mono text-xs">{c.source_key}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{c.description}</td>
-                                <td className="px-4 py-1.5">{codeName(c.mapping?.debit_account_id)}</td>
-                                <td className="px-4 py-1.5">{codeName(c.mapping?.credit_account_id)}</td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="font-mono text-xs">{c.source_key}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{c.description}</td>
+                                <td>{codeName(c.mapping?.debit_account_id)}</td>
+                                <td>{codeName(c.mapping?.credit_account_id)}</td>
+                                <td className="num">
                                     {c.mapping ? (
                                         <button type="button" onClick={() => setEditing(c.mapping)}
                                                 className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
@@ -1542,15 +1535,15 @@ function MappingModal({ initial, accounts, onClose, onSaved }) {
                 <Field label="Debit account">
                     <select className="input" value={form.debit_account_id || ''}
                             onChange={(e) => setForm({ ...form, debit_account_id: e.target.value })}>
-                        <option value="">— unset —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, unset, </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
                 <Field label="Credit account">
                     <select className="input" value={form.credit_account_id || ''}
                             onChange={(e) => setForm({ ...form, credit_account_id: e.target.value })}>
-                        <option value="">— unset —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, unset, </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
             </div>
@@ -1577,9 +1570,9 @@ function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg }) {
 
 function DataCard({ loading, empty, emptyMsg, children }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+        <div className="card-flush overflow-hidden">
             {loading ? (
-                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
+                <div className="p-6"><SkeletonTable rows={4} cols={4} /></div>
             ) : empty ? (
                 <div className="p-6 text-sm text-ink-500 dark:text-ink-400">{emptyMsg}</div>
             ) : children}
@@ -1679,14 +1672,14 @@ function TransactionLogTab() {
 
     // Replays every source record (billing payments incl. cash, pharmacy,
     // Pay Hero, cheques) into the journal so the log shows ALL transactions
-    // that ever happened. Server-side it's idempotent — safe to re-run.
+    // that ever happened. Server-side it's idempotent: safe to re-run.
     const rebuildLog = async () => {
         if (!window.confirm('Sync the transaction log from all source records? This backfills any payment that is missing from the log. It never duplicates existing entries.')) return;
         setRebuilding(true);
         try {
             const res = await apiClient.post('/accounting/transaction-log/rebuild');
             const totals = res.data?.totals || {};
-            toast.success(`Sync complete — ${totals.posted ?? 0} transaction(s) in the log, ${totals.skipped ?? 0} skipped.`);
+            toast.success(`Sync complete. ${totals.posted ?? 0} transaction(s) in the log, ${totals.skipped ?? 0} skipped.`);
             load(0);
             setOffset(0);
         } catch (err) {
@@ -1702,7 +1695,7 @@ function TransactionLogTab() {
     return (
         <div className="space-y-4">
             {/* Filter bar */}
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-3 flex flex-wrap items-end gap-3">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-3 flex flex-wrap items-end gap-3">
                 <div className="relative flex-1 min-w-[180px]">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                     <input aria-label="Search entry no., reference, memo…"
@@ -1740,7 +1733,7 @@ function TransactionLogTab() {
                            className="text-sm rounded-lg border border-ink-200 dark:border-ink-800 px-2 py-2" />
                 </div>
                 <button type="button" onClick={rebuildLog} disabled={rebuilding}
-                        title="Backfill the log from billing, pharmacy, Pay Hero, and cheque records — shows every transaction, even ones made before auto-posting was configured."
+                        title="Backfill the log from billing, pharmacy, Pay Hero, and cheque records. Shows every transaction, even ones made before auto-posting was configured."
                         className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 text-sm font-medium text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-ink-800/50 disabled:opacity-60">
                     <RefreshCw size={15} className={rebuilding ? 'animate-spin' : ''} /> {rebuilding ? 'Syncing…' : 'Sync all transactions'}
                 </button>
@@ -1751,37 +1744,37 @@ function TransactionLogTab() {
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Entry #</th>
-                            <th className="text-left px-4 py-2 font-medium">Source</th>
-                            <th className="text-left px-4 py-2 font-medium">Reference</th>
-                            <th className="text-left px-4 py-2 font-medium">Memo</th>
-                            <th className="text-right px-4 py-2 font-medium">Amount</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Entry #</th>
+                            <th className="font-medium">Source</th>
+                            <th className="font-medium">Reference</th>
+                            <th className="font-medium">Memo</th>
+                            <th className="num font-medium">Amount</th>
+                            <th className="font-medium">Status</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {loading ? (
                             <tr><td colSpan={7} className="px-4 py-6 text-ink-500 dark:text-ink-400">Loading…</td></tr>
                         ) : rows.length === 0 ? (
                             <tr><td colSpan={7} className="px-4 py-6 text-ink-500 dark:text-ink-400">No transactions match these filters.</td></tr>
                         ) : rows.map((r) => (
                             <tr key={r.entry_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
-                                <td className="px-4 py-2 whitespace-nowrap">{r.entry_date}</td>
-                                <td className="px-4 py-2 font-mono text-xs">{r.entry_number}</td>
-                                <td className="px-4 py-2">
+                                <td className="whitespace-nowrap">{r.entry_date}</td>
+                                <td className="font-mono text-xs">{r.entry_number}</td>
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ring-1 ${SOURCE_TONE[r.source_label] || 'bg-ink-100 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 ring-ink-200 dark:ring-ink-800'}`}>
                                         {r.source_label}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2">{r.reference || '—'}</td>
-                                <td className="px-4 py-2 text-ink-600 dark:text-ink-400 max-w-[22rem] truncate" title={r.memo || ''}>{r.memo || '—'}</td>
-                                <td className="px-4 py-2 text-right font-mono whitespace-nowrap">{formatAmount(r.amount)}</td>
-                                <td className="px-4 py-2">
+                                <td>{r.reference || '-'}</td>
+                                <td className="text-ink-600 dark:text-ink-400 max-w-[22rem] truncate" title={r.memo || ''}>{r.memo || '-'}</td>
+                                <td className="num font-mono whitespace-nowrap">{formatAmount(r.amount)}</td>
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${STATUS_BADGE[r.status] || ''}`}>{r.status}</span>
                                 </td>
                             </tr>
@@ -1870,7 +1863,7 @@ function ReportsTab() {
 
     return (
         <div className="space-y-4">
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-4 flex flex-wrap items-end gap-3">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-4 flex flex-wrap items-end gap-3">
                 <Field label="Report">
                     <select className="input" value={report} onChange={(e) => setReport(e.target.value)}>
                         {REPORT_TYPES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
@@ -1934,7 +1927,7 @@ function exportReport(report, data) {
             ...data.assets.map(r => ({ section: 'Asset', ...r })),
             ...data.liabilities.map(r => ({ section: 'Liability', ...r })),
             ...data.equity.map(r => ({ section: 'Equity', ...r })),
-            { section: 'Equity', code: '—', name: 'Current Year Earnings', amount: data.current_year_earnings },
+            { section: 'Equity', code: '-', name: 'Current Year Earnings', amount: data.current_year_earnings },
         ];
         csvDownload(`balance-sheet-${data.as_of}.csv`, rows, [
             { key: 'section', label: 'Section' }, { key: 'code', label: 'Code' },
@@ -1957,46 +1950,46 @@ function exportReport(report, data) {
 
 function TrialBalanceView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Trial Balance — as of {data.as_of}</h3>
+                <h3 className="text-sm font-semibold">Trial Balance, as of {data.as_of}</h3>
                 <span className={'text-xs ' + (Number(data.totals.difference) === 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                     Difference: {formatAmount(data.totals.difference)}
                 </span>
             </div>
-            <table className="w-full text-sm">
-                <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+            <table className="table-clean">
+                <thead>
                     <tr>
-                        <th className="text-left px-4 py-2 font-medium">Code</th>
-                        <th className="text-left px-4 py-2 font-medium">Account</th>
-                        <th className="text-left px-4 py-2 font-medium">Type</th>
-                        <th className="text-right px-4 py-2 font-medium">Debit</th>
-                        <th className="text-right px-4 py-2 font-medium">Credit</th>
-                        <th className="text-right px-4 py-2 font-medium">Balance</th>
+                        <th className="font-medium">Code</th>
+                        <th className="font-medium">Account</th>
+                        <th className="font-medium">Type</th>
+                        <th className="num font-medium">Debit</th>
+                        <th className="num font-medium">Credit</th>
+                        <th className="num font-medium">Balance</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                <tbody>
                     {data.rows.length === 0 ? (
                         <tr><td colSpan={6} className="px-4 py-6 text-ink-500 dark:text-ink-400">No posted entries up to this date.</td></tr>
                     ) : data.rows.map(r => (
                         <tr key={r.account_id}>
-                            <td className="px-4 py-1.5 font-mono text-xs">{r.code}</td>
-                            <td className="px-4 py-1.5">{r.name}</td>
-                            <td className="px-4 py-1.5">
+                            <td className="font-mono text-xs">{r.code}</td>
+                            <td>{r.name}</td>
+                            <td>
                                 <span className={`text-xs px-2 py-0.5 rounded-md ${TYPE_TONE[r.account_type] || ''}`}>{r.account_type}</span>
                             </td>
-                            <td className="px-4 py-1.5 text-right font-mono">{formatAmount(r.debit)}</td>
-                            <td className="px-4 py-1.5 text-right font-mono">{formatAmount(r.credit)}</td>
-                            <td className="px-4 py-1.5 text-right font-mono font-semibold">{formatAmount(r.balance)}</td>
+                            <td className="num font-mono">{formatAmount(r.debit)}</td>
+                            <td className="num font-mono">{formatAmount(r.credit)}</td>
+                            <td className="num font-mono font-semibold">{formatAmount(r.balance)}</td>
                         </tr>
                     ))}
                 </tbody>
                 <tfoot className="bg-ink-50 dark:bg-ink-800/40">
                     <tr>
                         <td colSpan={3} className="px-4 py-2 font-semibold">Totals</td>
-                        <td className="px-4 py-2 text-right font-mono font-semibold">{formatAmount(data.totals.debit)}</td>
-                        <td className="px-4 py-2 text-right font-mono font-semibold">{formatAmount(data.totals.credit)}</td>
-                        <td className="px-4 py-2" aria-label="Actions"></td>
+                        <td className="num font-mono font-semibold">{formatAmount(data.totals.debit)}</td>
+                        <td className="num font-mono font-semibold">{formatAmount(data.totals.credit)}</td>
+                        <td aria-label="Actions"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -2006,9 +1999,9 @@ function TrialBalanceView({ data }) {
 
 function IncomeStatementView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-6 space-y-5">
             <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
-                Income Statement — {data.from_date} to {data.to_date}
+                Income Statement: {data.from_date} to {data.to_date}
             </h3>
 
             <Section label="Revenue" rows={data.revenue} total={data.total_revenue} totalTone="text-emerald-700 dark:text-emerald-300" />
@@ -2029,9 +2022,9 @@ function IncomeStatementView({ data }) {
 
 function BalanceSheetView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-6 space-y-5">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Balance Sheet — as of {data.as_of}</h3>
+                <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Balance Sheet, as of {data.as_of}</h3>
                 <span className={'text-xs ' + (data.balanced ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                     {data.balanced ? 'Balanced' : 'Out of balance'}
                 </span>
@@ -2046,7 +2039,7 @@ function BalanceSheetView({ data }) {
             <div className="pt-3 border-t border-ink-200 dark:border-ink-800">
                 <h4 className="text-xs font-semibold text-ink-600 dark:text-ink-400 uppercase mb-2">Equity</h4>
                 {data.equity.map(e => (
-                    <Row key={e.account_id} label={`${e.code} — ${e.name}`} value={e.amount} />
+                    <Row key={e.account_id} label={`${e.code}, ${e.name}`} value={e.amount} />
                 ))}
                 <Row label="Current Year Earnings" value={data.current_year_earnings} />
                 <Row label="Total Equity" value={data.total_equity} bold tone="text-violet-700 dark:text-violet-300" />
@@ -2061,9 +2054,9 @@ function BalanceSheetView({ data }) {
 
 function CashFlowView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-4">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-6 space-y-4">
             <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
-                Cash Flow — {data.from_date} to {data.to_date}
+                Cash Flow: {data.from_date} to {data.to_date}
             </h3>
             <Row label="Operating activities" value={data.operating} />
             <Row label="Investing activities" value={data.investing} />
@@ -2086,31 +2079,31 @@ function CashFlowView({ data }) {
 
 function DailyCollectionsView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">
-                    Daily Collections — {data.from_date} to {data.to_date}
+                    Daily Collections: {data.from_date} to {data.to_date}
                 </h3>
                 <span className="text-xs text-ink-700 dark:text-ink-200">Total: <span className="font-mono font-semibold">{formatAmount(data.total)}</span></span>
             </div>
-            <table className="w-full text-sm">
-                <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+            <table className="table-clean">
+                <thead>
                     <tr>
-                        <th className="text-left px-4 py-2 font-medium">Date</th>
-                        <th className="text-left px-4 py-2 font-medium">Code</th>
-                        <th className="text-left px-4 py-2 font-medium">Account</th>
-                        <th className="text-right px-4 py-2 font-medium">Amount</th>
+                        <th className="font-medium">Date</th>
+                        <th className="font-medium">Code</th>
+                        <th className="font-medium">Account</th>
+                        <th className="num font-medium">Amount</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                <tbody>
                     {data.rows.length === 0 ? (
                         <tr><td colSpan={4} className="px-4 py-6 text-ink-500 dark:text-ink-400">No cash collections in this window.</td></tr>
                     ) : data.rows.map((r) => (
                         <tr key={r.account_code}>
-                            <td className="px-4 py-1.5">{r.date}</td>
-                            <td className="px-4 py-1.5 font-mono text-xs">{r.account_code}</td>
-                            <td className="px-4 py-1.5">{r.account_name}</td>
-                            <td className="px-4 py-1.5 text-right font-mono">{formatAmount(r.amount)}</td>
+                            <td>{r.date}</td>
+                            <td className="font-mono text-xs">{r.account_code}</td>
+                            <td>{r.account_name}</td>
+                            <td className="num font-mono">{formatAmount(r.amount)}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -2131,7 +2124,7 @@ function Section({ label, rows, total, totalTone }) {
     return (
         <div>
             <h4 className="text-xs font-semibold text-ink-600 dark:text-ink-400 uppercase mb-2">{label}</h4>
-            {rows.map(r => <Row key={r.account_id} label={`${r.code} — ${r.name}`} value={r.amount} />)}
+            {rows.map(r => <Row key={r.account_id} label={`${r.code}, ${r.name}`} value={r.amount} />)}
             <Row label={`Total ${label}`} value={total} bold tone={totalTone} />
         </div>
     );
@@ -2176,7 +2169,7 @@ function DebtorsTab() {
     const [section, setSection] = useState('claims');
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
-            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
+            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-2 h-fit">
                 <nav className="space-y-1">
                     {DEBTORS_SECTIONS.map(({ key, label, icon: Icon }) => (
                         <button type="button" key={key}
@@ -2221,7 +2214,7 @@ function ClaimsSection() {
     };
     useEffect(() => { load(); }, []);
 
-    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '—';
+    const providerName = (id) => providers.find(p => p.provider_id === id)?.name || '-';
 
     const submit = async (id) => {
         try {
@@ -2263,38 +2256,38 @@ function ClaimsSection() {
                            disabledMsg="Add an insurance provider first (Configuration tab)." />
 
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No claim schedules yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Number</th>
-                            <th className="text-left px-4 py-2 font-medium">Provider</th>
-                            <th className="text-left px-4 py-2 font-medium">Period</th>
-                            <th className="text-right px-4 py-2 font-medium">Items</th>
-                            <th className="text-right px-4 py-2 font-medium">Claimed</th>
-                            <th className="text-right px-4 py-2 font-medium">Settled</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Number</th>
+                            <th className="font-medium">Provider</th>
+                            <th className="font-medium">Period</th>
+                            <th className="num font-medium">Items</th>
+                            <th className="num font-medium">Claimed</th>
+                            <th className="num font-medium">Settled</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(c => (
                             <tr key={c.schedule_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
-                                <td className="px-4 py-2 font-mono text-xs">
+                                <td className="font-mono text-xs">
                                     <button type="button" onClick={() => setSelected(c)} className="hover:underline">
                                         {c.schedule_number}
                                     </button>
                                 </td>
-                                <td className="px-4 py-2">{providerName(c.provider_id)}</td>
-                                <td className="px-4 py-2 text-ink-600 dark:text-ink-400">{c.period_from} → {c.period_to}</td>
-                                <td className="px-4 py-2 text-right">{c.items?.length || 0}</td>
-                                <td className="px-4 py-2 text-right font-mono">{formatAmount(c.total_amount)}</td>
-                                <td className="px-4 py-2 text-right font-mono">{c.settled_amount ? formatAmount(c.settled_amount) : '—'}</td>
-                                <td className="px-4 py-2">
+                                <td>{providerName(c.provider_id)}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{c.period_from} → {c.period_to}</td>
+                                <td className="num">{c.items?.length || 0}</td>
+                                <td className="num font-mono">{formatAmount(c.total_amount)}</td>
+                                <td className="num font-mono">{c.settled_amount ? formatAmount(c.settled_amount) : '-'}</td>
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${CLAIM_STATUS_BADGE[c.status]}`}>
                                         {c.status}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2 text-right space-x-2">
+                                <td className="num space-x-2">
                                     {c.status === 'draft' && (
                                         <button type="button" onClick={() => submit(c.schedule_id)}
                                                 className="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-sky-300 hover:underline">
@@ -2392,7 +2385,7 @@ function ClaimModal({ providers, onClose, onSaved }) {
                 <Field label="Scheme">
                     <select className="input" value={form.scheme_id}
                             onChange={(e) => setForm({ ...form, scheme_id: e.target.value })}>
-                        <option value="">— any/none —</option>
+                        <option value="">, any/none, </option>
                         {(form.provider_id ? schemes : []).map(s => <option key={s.scheme_id} value={s.scheme_id}>{s.name}</option>)}
                     </select>
                 </Field>
@@ -2407,30 +2400,30 @@ function ClaimModal({ providers, onClose, onSaved }) {
             </div>
 
             <div className="mt-4 border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-3 py-2 font-medium">Invoice ref</th>
-                            <th className="text-left px-3 py-2 font-medium">Patient</th>
-                            <th className="text-left px-3 py-2 font-medium">Member #</th>
-                            <th className="text-right px-3 py-2 font-medium w-32">Amount</th>
+                            <th className="font-medium">Invoice ref</th>
+                            <th className="font-medium">Patient</th>
+                            <th className="font-medium">Member #</th>
+                            <th className="num font-medium w-32">Amount</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((it, idx) => (
                             <tr key={it._uid}>
-                                <td className="px-3 py-1.5"><input className="input" aria-label="Invoice reference" value={it.invoice_reference}
+                                <td><input className="input" aria-label="Invoice reference" value={it.invoice_reference}
                                     onChange={e => setItem(idx, { invoice_reference: e.target.value })} /></td>
-                                <td className="px-3 py-1.5"><input className="input" aria-label="Patient name" value={it.patient_name}
+                                <td><input className="input" aria-label="Patient name" value={it.patient_name}
                                     onChange={e => setItem(idx, { patient_name: e.target.value })} /></td>
-                                <td className="px-3 py-1.5"><input className="input" aria-label="Member number" value={it.member_number}
+                                <td><input className="input" aria-label="Member number" value={it.member_number}
                                     onChange={e => setItem(idx, { member_number: e.target.value })} /></td>
-                                <td className="px-3 py-1.5"><input type="number" step="0.01" className="input text-right"
+                                <td><input type="number" step="0.01" className="input text-right"
                                     aria-label="Amount claimed"
                                     value={it.amount_claimed}
                                     onChange={e => setItem(idx, { amount_claimed: e.target.value })} /></td>
-                                <td className="px-2">
+                                <td>
                                     {items.length > 1 && (
                                         <button type="button" onClick={() => removeItem(idx)} className="text-ink-400 hover:text-rose-600">
                                             <X size={14} />
@@ -2448,7 +2441,7 @@ function ClaimModal({ providers, onClose, onSaved }) {
                                     <Plus size={12} /> Add item
                                 </button>
                             </td>
-                            <td className="px-3 py-2 text-right font-mono font-semibold">{formatAmount(total)}</td>
+                            <td className="num font-mono font-semibold">{formatAmount(total)}</td>
                             <td aria-label="Actions"></td>
                         </tr>
                     </tfoot>
@@ -2485,22 +2478,22 @@ function ClaimDetailsModal({ claim, providerName, onClose }) {
                 </div>
             )}
             <div className="border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-3 py-2 font-medium">Invoice ref</th>
-                            <th className="text-left px-3 py-2 font-medium">Patient</th>
-                            <th className="text-left px-3 py-2 font-medium">Member #</th>
-                            <th className="text-right px-3 py-2 font-medium">Amount</th>
+                            <th className="font-medium">Invoice ref</th>
+                            <th className="font-medium">Patient</th>
+                            <th className="font-medium">Member #</th>
+                            <th className="num font-medium">Amount</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {claim.items.map(it => (
                             <tr key={it.item_id}>
-                                <td className="px-3 py-1.5">{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '—')}</td>
-                                <td className="px-3 py-1.5">{it.patient_name || '—'}</td>
-                                <td className="px-3 py-1.5 font-mono text-xs">{it.member_number || '—'}</td>
-                                <td className="px-3 py-1.5 text-right font-mono">{formatAmount(it.amount_claimed)}</td>
+                                <td>{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '-')}</td>
+                                <td>{it.patient_name || '-'}</td>
+                                <td className="font-mono text-xs">{it.member_number || '-'}</td>
+                                <td className="num font-mono">{formatAmount(it.amount_claimed)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -2533,38 +2526,38 @@ function DepositsSection() {
                            onNew={() => setOpen(true)} />
 
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No deposits yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Number</th>
-                            <th className="text-left px-4 py-2 font-medium">Patient #</th>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Method</th>
-                            <th className="text-right px-4 py-2 font-medium">Amount</th>
-                            <th className="text-right px-4 py-2 font-medium">Applied</th>
-                            <th className="text-right px-4 py-2 font-medium">Available</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Number</th>
+                            <th className="font-medium">Patient #</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Method</th>
+                            <th className="num font-medium">Amount</th>
+                            <th className="num font-medium">Applied</th>
+                            <th className="num font-medium">Available</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(d => {
                             const avail = Number(d.amount) - Number(d.amount_applied || 0);
                             return (
                                 <tr key={d.deposit_id}>
-                                    <td className="px-4 py-1.5 font-mono text-xs">{d.deposit_number}</td>
-                                    <td className="px-4 py-1.5">{d.patient_id}</td>
-                                    <td className="px-4 py-1.5">{d.deposit_date}</td>
-                                    <td className="px-4 py-1.5">{d.method}</td>
-                                    <td className="px-4 py-1.5 text-right font-mono">{formatAmount(d.amount)}</td>
-                                    <td className="px-4 py-1.5 text-right font-mono">{formatAmount(d.amount_applied || 0)}</td>
-                                    <td className="px-4 py-1.5 text-right font-mono font-semibold">{formatAmount(avail)}</td>
-                                    <td className="px-4 py-1.5">
+                                    <td className="font-mono text-xs">{d.deposit_number}</td>
+                                    <td>{d.patient_id}</td>
+                                    <td>{d.deposit_date}</td>
+                                    <td>{d.method}</td>
+                                    <td className="num font-mono">{formatAmount(d.amount)}</td>
+                                    <td className="num font-mono">{formatAmount(d.amount_applied || 0)}</td>
+                                    <td className="num font-mono font-semibold">{formatAmount(avail)}</td>
+                                    <td>
                                         <span className={`text-xs px-2 py-0.5 rounded-md ${DEPOSIT_STATUS_BADGE[d.status]}`}>
                                             {d.status}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-1.5 text-right space-x-3 whitespace-nowrap">
+                                    <td className="num space-x-3 whitespace-nowrap">
                                         {avail > 0 && (
                                             <>
                                                 <button type="button" onClick={() => setApplying(d)}
@@ -2716,7 +2709,7 @@ function BankTab() {
     const [section, setSection] = useState('accounts');
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
-            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
+            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-2 h-fit">
                 <nav className="space-y-1">
                     {BANK_SECTIONS.map(({ key, label, icon: Icon }) => (
                         <button type="button" key={key}
@@ -2764,7 +2757,7 @@ function BankAccountsSection() {
 
     const accountName = (id) => {
         const a = accounts.find(x => x.account_id === id);
-        return a ? `${a.code} ${a.name}` : '—';
+        return a ? `${a.code} ${a.name}` : '-';
     };
 
     return (
@@ -2772,32 +2765,32 @@ function BankAccountsSection() {
             <SectionHeader title="Bank Accounts" subtitle="Bank accounts linked to GL asset accounts for reconciliation."
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No bank accounts yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Name</th>
-                            <th className="text-left px-4 py-2 font-medium">Bank</th>
-                            <th className="text-left px-4 py-2 font-medium">Account #</th>
-                            <th className="text-left px-4 py-2 font-medium">Currency</th>
-                            <th className="text-left px-4 py-2 font-medium">GL link</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Name</th>
+                            <th className="font-medium">Bank</th>
+                            <th className="font-medium">Account #</th>
+                            <th className="font-medium">Currency</th>
+                            <th className="font-medium">GL link</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(b => (
                             <tr key={b.bank_account_id}>
-                                <td className="px-4 py-1.5 font-medium">{b.name}</td>
-                                <td className="px-4 py-1.5">{b.bank_name}{b.branch ? ` · ${b.branch}` : ''}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{b.account_number}</td>
-                                <td className="px-4 py-1.5">{b.currency_code}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{accountName(b.gl_account_id)}</td>
-                                <td className="px-4 py-1.5">
+                                <td className="font-medium">{b.name}</td>
+                                <td>{b.bank_name}{b.branch ? ` · ${b.branch}` : ''}</td>
+                                <td className="font-mono text-xs">{b.account_number}</td>
+                                <td>{b.currency_code}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{accountName(b.gl_account_id)}</td>
+                                <td>
                                     <span className={'text-xs ' + (b.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {b.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="num">
                                     <button type="button" onClick={() => { setEditing(b); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
@@ -2857,8 +2850,8 @@ function BankAccountModal({ initial, accounts, onClose, onSaved }) {
                 <Field label="GL account">
                     <select className="input" value={form.gl_account_id || ''}
                             onChange={(e) => setForm({ ...form, gl_account_id: e.target.value })}>
-                        <option value="">— pick an Asset account —</option>
-                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code} — {a.name}</option>)}
+                        <option value="">, pick an Asset account, </option>
+                        {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.code}, {a.name}</option>)}
                     </select>
                 </Field>
                 <Field label="Opening balance"><input aria-label="Opening balance" type="number" step="0.01" className="input"
@@ -2898,7 +2891,7 @@ function BankTransactionsSection() {
     };
     useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter]);
 
-    const accountName = (id) => accounts.find(a => a.bank_account_id === id)?.name || '—';
+    const accountName = (id) => accounts.find(a => a.bank_account_id === id)?.name || '-';
 
     return (
         <div className="space-y-4">
@@ -2923,29 +2916,29 @@ function BankTransactionsSection() {
             </div>
 
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No transactions.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Account</th>
-                            <th className="text-left px-4 py-2 font-medium">Description</th>
-                            <th className="text-left px-4 py-2 font-medium">Reference</th>
-                            <th className="text-right px-4 py-2 font-medium">Amount</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Account</th>
+                            <th className="font-medium">Description</th>
+                            <th className="font-medium">Reference</th>
+                            <th className="num font-medium">Amount</th>
+                            <th className="font-medium">Status</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(t => (
                             <tr key={t.bank_transaction_id}>
-                                <td className="px-4 py-1.5">{t.transaction_date}</td>
-                                <td className="px-4 py-1.5">{accountName(t.bank_account_id)}</td>
-                                <td className="px-4 py-1.5 text-ink-700 dark:text-ink-200">{t.description}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '—'}</td>
+                                <td>{t.transaction_date}</td>
+                                <td>{accountName(t.bank_account_id)}</td>
+                                <td className="text-ink-700 dark:text-ink-200">{t.description}</td>
+                                <td className="font-mono text-xs">{t.reference || '-'}</td>
                                 <td className={'px-4 py-1.5 text-right font-mono ' +
                                     (Number(t.amount) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                                     {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
                                 </td>
-                                <td className="px-4 py-1.5">
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${RECON_BADGE[t.reconciliation_status]}`}>
                                         {t.reconciliation_status}
                                     </span>
@@ -3073,7 +3066,7 @@ function ReconciliationSection() {
                 <Field label="Account">
                     <select className="input min-w-[200px]" value={selected}
                             onChange={(e) => setSelected(e.target.value)}>
-                        <option value="">—</option>
+                        <option value="">, </option>
                         {accounts.map(a => <option key={a.bank_account_id} value={a.bank_account_id}>{a.name}</option>)}
                     </select>
                 </Field>
@@ -3081,27 +3074,27 @@ function ReconciliationSection() {
 
             <DataCard loading={loading} empty={items.length === 0}
                       emptyMsg={selected ? 'Nothing left to reconcile here.' : 'Pick an account above.'}>
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Description</th>
-                            <th className="text-left px-4 py-2 font-medium">Reference</th>
-                            <th className="text-right px-4 py-2 font-medium">Amount</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Description</th>
+                            <th className="font-medium">Reference</th>
+                            <th className="num font-medium">Amount</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(t => (
                             <tr key={t.bank_transaction_id}>
-                                <td className="px-4 py-1.5">{t.transaction_date}</td>
-                                <td className="px-4 py-1.5">{t.description}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '—'}</td>
+                                <td>{t.transaction_date}</td>
+                                <td>{t.description}</td>
+                                <td className="font-mono text-xs">{t.reference || '-'}</td>
                                 <td className={'px-4 py-1.5 text-right font-mono ' +
                                     (Number(t.amount) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                                     {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
                                 </td>
-                                <td className="px-4 py-1.5 text-right space-x-2">
+                                <td className="num space-x-2">
                                     <button type="button" onClick={() => setMatching(t)}
                                             className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline inline-flex items-center gap-1">
                                         <Check size={12} /> Match
@@ -3164,26 +3157,26 @@ function MatchModal({ tx, onClose, onSaved }) {
                 </div>
             ) : (
                 <div className="border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                    <table className="table-clean">
+                        <thead>
                             <tr>
-                                <th className="text-left px-3 py-2 font-medium">Entry</th>
-                                <th className="text-left px-3 py-2 font-medium">Date</th>
-                                <th className="text-right px-3 py-2 font-medium">Debit</th>
-                                <th className="text-right px-3 py-2 font-medium">Credit</th>
-                                <th className="text-left px-3 py-2 font-medium">Memo</th>
+                                <th className="font-medium">Entry</th>
+                                <th className="font-medium">Date</th>
+                                <th className="num font-medium">Debit</th>
+                                <th className="num font-medium">Credit</th>
+                                <th className="font-medium">Memo</th>
                                 <th aria-label="Actions"></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                        <tbody>
                             {candidates.map(c => (
                                 <tr key={c.line_id}>
-                                    <td className="px-3 py-1.5 font-mono text-xs">{c.entry_number}</td>
-                                    <td className="px-3 py-1.5">{c.entry_date}</td>
-                                    <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.debit)}</td>
-                                    <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.credit)}</td>
-                                    <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{c.memo || c.description || '—'}</td>
-                                    <td className="px-3 py-1.5 text-right">
+                                    <td className="font-mono text-xs">{c.entry_number}</td>
+                                    <td>{c.entry_date}</td>
+                                    <td className="num font-mono">{formatAmount(c.debit)}</td>
+                                    <td className="num font-mono">{formatAmount(c.credit)}</td>
+                                    <td className="text-ink-600 dark:text-ink-400">{c.memo || c.description || '-'}</td>
+                                    <td className="num">
                                         <button type="button" onClick={() => match(c.line_id)} disabled={saving}
                                                 className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline">
                                             Match
@@ -3210,7 +3203,7 @@ function MatchModal({ tx, onClose, onSaved }) {
 function ModalShell({ title, onClose, wide, children }) {
     return (
         <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
+            <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-overlay w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{title}</h3>
                     <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">

@@ -23,4 +23,4 @@ export const DEPARTMENT_LABELS = {
 };
 
 /** Friendly, app-wide display label for a canonical department name. */
-export const departmentLabel = (canonical) => DEPARTMENT_LABELS[canonical] || canonical || '—';
+export const departmentLabel = (canonical) => DEPARTMENT_LABELS[canonical] || canonical || '-';

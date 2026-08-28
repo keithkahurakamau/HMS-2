@@ -2,6 +2,7 @@ import React, { useEffect, useReducer, useState, useCallback } from 'react';
 import { Building2, Plus, Search, Trash2, Edit3, X, UserCheck, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
+import { SkeletonTable } from '../ui/Skeleton';
 
 // Departments + staff list + loading flag are loaded together by fetchAll.
 const initialDepts = { departments: [], staff: [], loading: true };
@@ -80,17 +81,16 @@ export default function DepartmentsManager() {
             <div className="flex-1 overflow-auto p-4">
                 {loading ? (
                     <div className="text-center py-12 text-slate-400 dark:text-ink-400">
-                        <Activity className="animate-spin mx-auto mb-2" /> Loading…
-                    </div>
+                        <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                 ) : filtered.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 dark:text-ink-400">
                         <Building2 size={32} className="mx-auto mb-2 opacity-40" />
-                        No departments yet. Create one — its members will share a private channel automatically.
+                        No departments yet. Create one: its members will share a private channel automatically.
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {filtered.map((d) => (
-                            <div key={d.department_id} className="bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl p-4 hover:shadow-soft transition-shadow">
+                            <div key={d.department_id} className="bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl p-4 transition-shadow">
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <span className="shrink-0 size-10 rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-300 flex items-center justify-center">

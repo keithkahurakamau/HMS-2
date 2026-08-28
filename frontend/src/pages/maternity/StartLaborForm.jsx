@@ -4,7 +4,7 @@ import { errorText } from './errors';
 
 // The wards board (GET /wards/board) attaches both admission_id and
 // patient_id to every Occupied bed, so a patient's active ward admission(s)
-// can be found by exact patient_id match — the same id carried on episode
+// can be found by exact patient_id match, the same id carried on episode
 // objects from listEpisodes (see app/routes/maternity.py _episode_dict).
 // Ward/bed/admission-date are shown alongside so multiple active admissions
 // for the same patient can still be told apart by the person starting labor.
@@ -109,7 +109,7 @@ export default function StartLaborForm({ onClose, onStarted }) {
       aria-modal="true"
       aria-label="Start labor"
     >
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-overlay">
         <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Start labor</h3>
         {(error || loadError) && (
           <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error || loadError}</p>
@@ -125,7 +125,7 @@ export default function StartLaborForm({ onClose, onStarted }) {
             <option value="">Select a patient…</option>
             {episodes.map((ep) => (
               <option key={ep.episode_id} value={ep.episode_id}>
-                {ep.patient_name} — G{ep.gravida} P{ep.para}
+                {ep.patient_name}, G{ep.gravida} P{ep.para}
               </option>
             ))}
           </select>
@@ -145,13 +145,13 @@ export default function StartLaborForm({ onClose, onStarted }) {
               </option>
               {admissions.map((a) => (
                 <option key={a.admission_id} value={a.admission_id}>
-                  {a.ward_name} · Bed {a.bed_number} · admitted {a.admission_date || '—'}
+                  {a.ward_name} · Bed {a.bed_number} · admitted {a.admission_date || '-'}
                 </option>
               ))}
             </select>
             {!admissionsLoading && admissions.length === 0 && (
               <span className="mt-1 block text-xs text-ink-500 dark:text-ink-400">
-                No active ward admission found for this patient — admit them to a ward first.
+                No active ward admission found for this patient, admit them to a ward first.
               </span>
             )}
           </label>

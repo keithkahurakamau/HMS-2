@@ -11,10 +11,10 @@ import Logo from '../../components/Logo';
 import { NAME_KEY, EXPIRES_KEY, isSuperAdminAuthenticated } from './superAdminAuth';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Superadmin login — dramatic dark hero surface.                            */
+/*  Superadmin login: dramatic dark hero surface.                            */
 /*                                                                            */
 /*  Intentionally retains the dark treatment to signal "restricted, not your  */
-/*  ordinary login" — but realigned to the brand cyan palette so the rest of  */
+/*  ordinary login": but realigned to the brand cyan palette so the rest of  */
 /*  the console (which is now light) doesn't feel like a different product.   */
 /* ────────────────────────────────────────────────────────────────────────── */
 
@@ -36,7 +36,7 @@ export default function SuperAdminLogin() {
         setIsSubmitting(true);
         try {
             // The backend now sets an HttpOnly 'superadmin_token' cookie on
-            // success — the response body only carries display data + TTL.
+            // success: the response body only carries display data + TTL.
             const res = await apiClient.post('/public/superadmin/login', { email, password });
             const { full_name, expires_in } = res.data || {};
             if (full_name) localStorage.setItem(NAME_KEY, full_name);
@@ -70,7 +70,7 @@ export default function SuperAdminLogin() {
                     </span>
                 </div>
 
-                <div className="bg-white/[0.05] backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-elevated">
+                <div className="bg-white/[0.05] backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-overlay">
                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 ring-1 ring-brand-500/20 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-300">
                         <Lock size={12} aria-hidden="true" /> Restricted access
                     </span>

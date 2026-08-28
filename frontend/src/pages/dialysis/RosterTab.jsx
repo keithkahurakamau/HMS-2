@@ -19,7 +19,7 @@ export default function RosterTab() {
   return (
     <div className="space-y-6">
       <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
-        Chair occupancy — {roster.weekday}, {roster.date}
+        Chair occupancy: {roster.weekday}, {roster.date}
       </h3>
 
       <section aria-label="Machines">
@@ -28,7 +28,7 @@ export default function RosterTab() {
           {roster.machines.map((m) => (
             <div key={m.machine_id} className="rounded-xl border border-ink-200/70 dark:border-ink-800 p-4">
               <div className="text-sm font-medium text-ink-900 dark:text-white">{m.name}</div>
-              <div className="text-xs text-ink-500 dark:text-ink-400">{m.station || '—'}</div>
+              <div className="text-xs text-ink-500 dark:text-ink-400">{m.station || '-'}</div>
               <div className="mt-2 text-sm">
                 {m.current_order ? (
                   <span className="text-brand-700 dark:text-brand-300">
@@ -48,7 +48,7 @@ export default function RosterTab() {
         <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">Scheduled today</h4>
         <ul className="mt-2 space-y-1 text-sm text-ink-700 dark:text-ink-300">
           {roster.scheduled.map((s) => (
-            <li key={s.schedule_id}>• {s.patient_name || `Patient #${s.patient_id}`} — {s.pattern}{s.shift ? ` (${s.shift})` : ''}</li>
+            <li key={s.schedule_id}>• {s.patient_name || `Patient #${s.patient_id}`}, {s.pattern}{s.shift ? ` (${s.shift})` : ''}</li>
           ))}
           {roster.scheduled.length === 0 && <li className="text-ink-400">No patients scheduled today.</li>}
         </ul>

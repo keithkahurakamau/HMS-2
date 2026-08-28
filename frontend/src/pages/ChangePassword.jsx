@@ -53,7 +53,7 @@ export default function ChangePassword({ email, currentPassword, onSuccess }) {
         <div className="min-h-screen bg-ink-50 bg-mesh flex items-center justify-center p-4 sm:p-8">
             <div className="w-full max-w-md animate-slide-up">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center size-14 rounded-2xl bg-amber-500 ring-4 ring-amber-100 shadow-soft">
+                    <div className="inline-flex items-center justify-center size-14 rounded-xl bg-amber-500 ring-4 ring-amber-100">
                         <ShieldCheck size={28} className="text-white" />
                     </div>
                     <h1 className="mt-5 text-2xl font-semibold text-ink-900 tracking-tight">Secure your account</h1>

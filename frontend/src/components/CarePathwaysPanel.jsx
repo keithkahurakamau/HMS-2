@@ -7,13 +7,13 @@ import { apiClient } from '../api/client';
 const PRIORITIES = ['Elective', 'Emergency'];
 const err = (e, fallback) => toast.error(e?.response?.data?.detail || fallback);
 
-/** Shared modal shell — portaled to <body> so it escapes the workspace card's
+/** Shared modal shell: portaled to <body> so it escapes the workspace card's
  *  stacking context and always sits above the queue bar and page chrome. */
 function Modal({ title, icon: Icon, onClose, children, footer }) {
     return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 backdrop-blur-sm p-4"
             onClick={onClose} role="presentation">
-            <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col"
+            <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-overlay w-full max-w-lg max-h-[90vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white flex items-center gap-2">
@@ -134,7 +134,7 @@ function AdmitModal({ patient, diagnosis, onClose }) {
 }
 
 /**
- * Care pathways from the Clinical Desk — request a surgical case (theatre) or
+ * Care pathways from the Clinical Desk, request a surgical case (theatre) or
  * admit the patient to a ward. Reuses the theatre and wards modules; each
  * button is gated on the viewer's permission so it only appears when actionable.
  */

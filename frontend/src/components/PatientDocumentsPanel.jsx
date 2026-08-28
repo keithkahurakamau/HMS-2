@@ -6,9 +6,10 @@ import {
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import { reprintPatientDocument } from '../utils/reprintDocument';
+import { SkeletonTable } from './ui/Skeleton';
 
 /**
- * PatientDocumentsPanel — every document previously issued to a patient, with
+ * PatientDocumentsPanel: every document previously issued to a patient, with
  * a one-click reprint.
  *
  * Reprints render from the *current* record rather than a stored file, so a
@@ -27,7 +28,7 @@ const KIND_META = {
 };
 
 const formatDate = (value) => {
-    if (!value) return '—';
+    if (!value) return '-';
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
@@ -110,7 +111,7 @@ export default function PatientDocumentsPanel({ patientId }) {
             <div className="p-5 space-y-4">
                 <p className="text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
                     Anything already issued to this patient can be printed again. Reprints are
-                    generated from the current record, so corrections are included — and each one
+                    generated from the current record, so corrections are included, and each one
                     is written to the access log.
                 </p>
 
@@ -122,8 +123,7 @@ export default function PatientDocumentsPanel({ patientId }) {
 
                 {isLoading ? (
                     <div className="flex items-center gap-2 text-sm text-ink-400 dark:text-ink-500 py-4">
-                        <Activity className="animate-spin" size={15} /> Loading documents…
-                    </div>
+                        <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                 ) : documents.length === 0 && !error ? (
                     <p className="text-sm text-ink-400 dark:text-ink-500 py-3">
                         No documents have been issued to this patient yet.

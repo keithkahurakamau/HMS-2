@@ -8,7 +8,7 @@ import { ModalShell, ModalActions, Field } from './ui';
 import { formatAmount } from './format';
 
 // The editable form is one logical unit (per-item amounts + a notes field),
-// so it lives in a single reducer rather than separate useState slices — one
+// so it lives in a single reducer rather than separate useState slices, one
 // dispatch = one render, and the transitions are testable in isolation.
 const initialForm = { amounts: {}, notes: '' }; // amounts: item_id → string
 function formReducer(state, action) {
@@ -110,24 +110,24 @@ export default function BulkAllocateModal({ deposit, onClose, onSaved }) {
                 <div className="p-6 text-sm text-ink-500 dark:text-ink-400">No claim items with an unallocated balance.</div>
             ) : (
                 <div className="border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 sticky top-0">
+                    <table className="table-clean table-sticky">
+                        <thead>
                             <tr>
-                                <th className="text-left px-3 py-2 font-medium">Claim</th>
-                                <th className="text-left px-3 py-2 font-medium">Patient</th>
-                                <th className="text-left px-3 py-2 font-medium">Invoice ref</th>
-                                <th className="text-right px-3 py-2 font-medium">Remaining</th>
-                                <th className="text-right px-3 py-2 font-medium w-36">Allocate</th>
+                                <th className="font-medium">Claim</th>
+                                <th className="font-medium">Patient</th>
+                                <th className="font-medium">Invoice ref</th>
+                                <th className="num font-medium">Remaining</th>
+                                <th className="num font-medium w-36">Allocate</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                        <tbody>
                             {items.map(it => (
                                 <tr key={it.item_id}>
-                                    <td className="px-3 py-1.5 font-mono text-xs">{it.schedule_number}</td>
-                                    <td className="px-3 py-1.5">{it.patient_name || '—'}</td>
-                                    <td className="px-3 py-1.5">{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '—')}</td>
-                                    <td className="px-3 py-1.5 text-right font-mono">{formatAmount(it.remaining)}</td>
-                                    <td className="px-2 py-1">
+                                    <td className="font-mono text-xs">{it.schedule_number}</td>
+                                    <td>{it.patient_name || '-'}</td>
+                                    <td>{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '-')}</td>
+                                    <td className="num font-mono">{formatAmount(it.remaining)}</td>
+                                    <td>
                                         <input type="number" step="0.01" min="0" max={it.remaining}
                                                aria-label={`Allocation amount for ${it.patient_name || it.schedule_number}`}
                                                className="input text-right py-1 px-2 w-32"

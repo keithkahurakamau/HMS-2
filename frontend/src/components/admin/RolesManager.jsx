@@ -2,6 +2,7 @@ import React, { useEffect, useReducer, useState, useCallback } from 'react';
 import { ShieldCheck, Plus, Trash2, X, Lock, Activity, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
+import { SkeletonTable } from '../ui/Skeleton';
 
 // Friendly section labels for permission categories. Keys match the prefix
 // before the `:` in a codename (e.g. `mpesa:read` → "M-Pesa"). Unknown
@@ -121,7 +122,7 @@ export default function RolesManager() {
     const savePerms = async () => {
         if (!activeRole) return;
         if (activeRole.name === 'Admin') {
-            toast.error('Admin permissions cannot be edited — they cover everything.');
+            toast.error('Admin permissions cannot be edited, they cover everything.');
             return;
         }
         setSavingPerms(true);
@@ -194,8 +195,7 @@ export default function RolesManager() {
 
             {loading ? (
                 <div className="flex-1 flex items-center justify-center text-slate-400 dark:text-ink-400">
-                    <Activity className="animate-spin mr-2" /> Loading…
-                </div>
+                    <SkeletonTable rows={4} cols={3} label="Loading" /></div>
             ) : (
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
                     {/* Roles list */}
@@ -205,7 +205,7 @@ export default function RolesManager() {
                                 const isActive = r.role_id === activeRoleId;
                                 return (
                                     <li key={r.role_id}>
-                                        {/* Clickable row containing a Delete button — a native <button> can't nest another, so role="button" is the correct pattern here. */}
+                                        {/* Clickable row containing a Delete button, a native <button> can't nest another, so role="button" is the correct pattern here. */}
                                         {/* react-doctor-disable-next-line react-doctor/prefer-tag-over-role */}
                                         <div role="button" tabIndex={0}
                                             onClick={() => setActiveRoleId(r.role_id)}
@@ -263,7 +263,7 @@ export default function RolesManager() {
                                     </div>
                                     {activeRole.name === 'Admin' ? (
                                         <span className="text-xs font-bold text-slate-500 dark:text-ink-400 flex items-center gap-1">
-                                            <Lock size={12} /> Locked — full access
+                                            <Lock size={12} /> Locked, full access
                                         </span>
                                     ) : (
                                         <button type="button"

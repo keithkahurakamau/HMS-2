@@ -5,15 +5,15 @@ import { apiClient } from '../api/client';
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Active patient context.                                                   */
 /*                                                                            */
-/*  When a clinician opens a patient — from the directory, the clinical       */
-/*  queue, or any other "select patient" affordance — the patient becomes     */
+/*  When a clinician opens a patient, from the directory, the clinical       */
+/*  queue, or any other "select patient" affordance, the patient becomes     */
 /*  the *active* context. The active context:                                 */
 /*                                                                            */
 /*    1. Renders as a persistent bar at the top of every workspace page,      */
 /*       so the clinician always knows which patient they're acting on.       */
 /*    2. Survives soft navigations across modules (Clinical → Pharmacy →      */
 /*       Lab → …) so the user doesn't have to re-pick the patient.            */
-/*    3. Survives reloads via sessionStorage — closing the tab still ends     */
+/*    3. Survives reloads via sessionStorage: closing the tab still ends     */
 /*       the session, which keeps the audit window tight.                     */
 /*    4. Posts an entry to /api/patients/{id}/access on every navigation,     */
 /*       feeding the KDPA S.26 audit trail with both the module visited      */
@@ -24,7 +24,7 @@ const PatientContext = createContext(null);
 
 // Only an opaque ID + the open timestamp ever cross into sessionStorage.
 // The full record (name, DOB, allergies, blood group, …) is PHI under KDPA
-// S.26 and MUST stay in volatile React state — never persisted in clear
+// S.26 and MUST stay in volatile React state, never persisted in clear
 // text. On reload we re-fetch from /api/patients/{id} which goes through
 // the authenticated tenant DB; if the cookie is gone or the tenant header
 // no longer matches, the fetch fails and the context clears itself, which
@@ -32,7 +32,7 @@ const PatientContext = createContext(null);
 const SESSION_KEY = 'hms_active_patient_ref';
 
 // Map the URL prefix to a human-readable module label for the access log.
-// Anything not in the map is dropped to a generic "Workspace" — better
+// Anything not in the map is dropped to a generic "Workspace", better
 // than logging the raw URL into a privacy table.
 const PATH_TO_MODULE = [
     ['/app/admin',              'Command Center'],
@@ -63,8 +63,7 @@ const moduleForPath = (pathname) => {
 
 // The persisted blob uses a neutral field name (`ref`) and an integer-only
 // coercion to break CodeQL's taint heuristic for js/clear-text-storage-of-
-// sensitive-data. An integer record ID is not, by itself, sensitive data —
-// it's a foreign key into a server-side table that requires the auth cookie
+// sensitive-data. An integer record ID is not, by itself, sensitive data, // it's a foreign key into a server-side table that requires the auth cookie
 // + tenant header to dereference. We still go through Number() to defend
 // against a hand-edited storage value.
 const loadRefFromSession = () => {
@@ -89,20 +88,20 @@ const persistRefToSession = (recordRef, openedAt) => {
         } else {
             sessionStorage.removeItem(SESSION_KEY);
         }
-    } catch { /* private mode, full storage — silently degrade */ }
+    } catch { /* private mode, full storage, silently degrade */ }
 };
 
 export const PatientProvider = ({ children }) => {
     const [activePatient, setActivePatientState] = useState(null);
     const location = useLocation();
     // Coalesce: don't double-log the same (patient, module) pair within a
-    // short window — React routing fires twice in StrictMode and several
+    // short window: React routing fires twice in StrictMode and several
     // pages remount on filter changes.
     const lastLog = useRef({ patientId: null, module: null, at: 0 });
 
     const setActivePatient = useCallback((patient) => {
-        // Normalize the shape so every caller — Patients page, Clinical
-        // queue, etc. — produces the same context. Required fields:
+        // Normalize the shape so every caller, Patients page, Clinical
+        // queue, etc., produces the same context. Required fields:
         //   patient_id, outpatient_no, surname, other_names.
         // Optional: sex, date_of_birth, allergies, blood_group.
         if (!patient) {
@@ -148,7 +147,7 @@ export const PatientProvider = ({ children }) => {
     // public marketing surface (`/`, `/portal`, `/login`, …), a stale ref
     // from a prior session would fire an API call without the tenant header,
     // and the response-interceptor in api/client.js would bounce the visitor
-    // to `/portal?next=/` — breaking the "first hit lands on Landing" UX.
+    // to `/portal?next=/`, breaking the "first hit lands on Landing" UX.
     useEffect(() => {
         if (!location.pathname.startsWith('/app/')) return;
         const stored = loadRefFromSession();
@@ -187,7 +186,7 @@ export const PatientProvider = ({ children }) => {
     }, []);
 
     // ── Audit trail: log every cross-module navigation while a patient
-    // is active. Fires on URL change. Fire-and-forget — a failed log
+    // is active. Fires on URL change. Fire-and-forget: a failed log
     // must not block the user's workflow.
     useEffect(() => {
         if (!activePatient || !activePatient.patient_id) return;
@@ -203,7 +202,7 @@ export const PatientProvider = ({ children }) => {
         apiClient
             .post(`/patients/${activePatient.patient_id}/access`, { module })
             .catch(() => { /* non-critical, swallow */ });
-        // location is react-router's useLocation() — reactive, so this dep is
+        // location is react-router's useLocation(): reactive, so this dep is
         // correct and the access-log effect must re-run on each route change.
         // The rule matches the name "location" and can't distinguish it from
         // window.location; documented false positive.

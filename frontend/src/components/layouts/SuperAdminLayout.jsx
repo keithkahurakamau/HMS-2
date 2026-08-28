@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, CreditCard, Settings,
-    ShieldAlert, LogOut, Search, Activity, Users, LifeBuoy,
+    ShieldAlert, LogOut, Users, LifeBuoy,
     Menu, X, Smartphone, Wallet, KeyRound,
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/superAdminAuth';
@@ -10,6 +10,7 @@ import { apiClient } from '../../api/client';
 import { useJourney } from '../../context/JourneyContext';
 import Logo from '../Logo';
 import ThemeToggle from '../ThemeToggle';
+import PlatformHealth from '../PlatformHealth';
 
 // Route → tour-journey map for the on-first-visit walkthrough, mirroring the
 // tenant MainLayout convention. Prefix match handles any nested paths. Only
@@ -28,7 +29,7 @@ const ROUTE_TO_JOURNEY = [
 /*  surface that fights the shadcn-aligned design system.                     */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-// Static nav config (literals + module-scope icon imports) — built once at
+// Static nav config (literals + module-scope icon imports), built once at
 // module load instead of every render.
 const NAV = [
     { name: 'Overview',                 path: '/superadmin/dashboard', icon: <LayoutDashboard size={18} /> },
@@ -80,7 +81,7 @@ export default function SuperAdminLayout() {
                 />
             )}
 
-            {/* Sidebar — kept dark to match MainLayout. */}
+            {/* Sidebar: kept dark to match MainLayout. */}
             <aside
                 aria-label="Console navigation"
                 className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-ink-900 via-ink-900 to-ink-950 border-r border-white/5 flex flex-col
@@ -152,7 +153,7 @@ export default function SuperAdminLayout() {
                 </div>
             </aside>
 
-            {/* Main Content Area — now light, matches MainLayout. */}
+            {/* Main Content Area: now light, matches MainLayout. */}
             <div className="flex-1 flex flex-col min-w-0 relative bg-ink-50 dark:bg-ink-950">
                 <header className="relative h-16 border-b border-ink-200/70 dark:border-white/5 flex items-center justify-between px-4 sm:px-8 shrink-0 bg-white/80 dark:bg-ink-900/30 backdrop-blur-md z-10 gap-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -164,24 +165,11 @@ export default function SuperAdminLayout() {
                         >
                             <Menu size={20} aria-hidden="true" />
                         </button>
-                        <div className="hidden sm:flex items-center gap-2 pl-2.5 pr-3 py-1.5 bg-accent-50 dark:bg-accent-500/10 ring-1 ring-accent-100 dark:ring-accent-500/20 rounded-full">
-                            <Activity size={14} className="text-accent-600 dark:text-accent-400" aria-hidden="true" />
-                            <span className="text-2xs font-semibold text-accent-700 dark:text-accent-300 uppercase tracking-wider whitespace-nowrap">All systems operational</span>
-                        </div>
+                        <PlatformHealth />
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="relative hidden md:block">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true" />
-                            <label htmlFor="console-search" className="sr-only">Quick search tenants</label>
-                            <input
-                                id="console-search"
-                                type="search"
-                                placeholder="Quick search tenants…"
-                                className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-700 rounded-full pl-9 pr-4 py-1.5 text-sm text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 w-64 transition-all"
-                            />
-                        </div>
-                        {/* Operator-scoped theme switch — independent of any tenant
+                        {/* Operator-scoped theme switch: independent of any tenant
                             client's preference (stored under hms_admin_theme). */}
                         <ThemeToggle scope="admin" compact />
                     </div>

@@ -52,7 +52,7 @@ export default function Triage() {
     const [systemicExam, setSystemicExam] = useState([]);
     const [procedures, setProcedures] = useState([]);
 
-    // Local draft safety net for the notes field — protects a nurse's typed
+    // Local draft safety net for the notes field, protects a nurse's typed
     // observations from an interruption before "Save & send" is clicked. Keyed
     // by queue_id so one patient's notes can never surface on another's form.
     const triageDraftKey = activePatient?.queue_id ? `triageNotes:${activePatient.queue_id}` : null;
@@ -214,7 +214,7 @@ export default function Triage() {
 
         try {
             const res = await apiClient.post('/triage/submit', payload);
-            toast.success(res.data?.message || 'Triage saved — patient sent to the doctor.');
+            toast.success(res.data?.message || 'Triage saved. Patient sent to the doctor.');
             clearNotesDraft();
             clearWorkspace();
             fetchQueue();
@@ -225,7 +225,7 @@ export default function Triage() {
         }
     };
 
-    // Lab Report — pull the patient's tests then print (printLabReport, T6).
+    // Lab Report: pull the patient's tests then print (printLabReport, T6).
     const handleLabReport = () => {
         if (!activePatient) return;
         apiClient.get('/laboratory/tests', { params: { patient_id: activePatient.patient_id } })
@@ -233,7 +233,7 @@ export default function Triage() {
             .catch((e) => toast.error(e.response?.data?.detail || 'Could not load lab tests.'));
     };
 
-    // Prescription — compose meds then route a Pharmacy record (same path the
+    // Prescription: compose meds then route a Pharmacy record (same path the
     // Clinical Desk uses); the backend gates it on clinical:write + consent.
     const handlePrescriptionSave = (meds) => {
         if (!activePatient || !meds.length) return;
@@ -246,7 +246,7 @@ export default function Triage() {
             .catch((e) => {
                 const detail = e.response?.data?.detail;
                 toast.error(typeof detail === 'string' && /consent/i.test(detail)
-                    ? 'No active Treatment consent on file — record consent first.' : (detail || 'Could not create prescription.'));
+                    ? 'No active Treatment consent on file. Record consent first.' : (detail || 'Could not create prescription.'));
             });
     };
 
@@ -266,7 +266,7 @@ export default function Triage() {
             medications: [],
             followUp: null } });
 
-    // Consolidated Actions ▾ — mirrors MedicentreV3's Triage menu; permission-
+    // Consolidated Actions menu, mirrors MedicentreV3's Triage menu; permission-
     // gated (empty groups disappear). Lab/Radiology orders need clinical:write.
     const actionGroups = [
         { label: 'Requests', items: [
@@ -295,7 +295,7 @@ export default function Triage() {
                 eyebrow="Nursing"
                 icon={HeartPulse}
                 title="Triage"
-                subtitle="Capture vitals and acuity before the consultation — the doctor's desk arrives pre-filled."
+                subtitle="Capture vitals and acuity before the consultation, so the doctor's desk arrives pre-filled."
             />
 
             {/* TOP PANEL: patient details + triage queue */}
@@ -336,13 +336,13 @@ export default function Triage() {
                     <>
                         {/* Tab bar + Actions ▾ */}
                         <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-3 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 z-10">
-                            <div className="flex gap-1 bg-ink-100/70 dark:bg-ink-800/70 p-1 rounded-xl">
+                            <div className="segmented w-auto">
                                 {[
                                     { id: 'triage', label: 'Triage' },
                                     { id: 'history', label: 'Patient History' },
                                 ].map((t) => (
                                     <button type="button" key={t.id} onClick={() => setActiveTab(t.id)}
-                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === t.id ? 'bg-white dark:bg-ink-900 text-brand-700 dark:text-brand-300 shadow-soft' : 'text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200'}`}>
+                                        className={`segmented-option ${activeTab === t.id ? 'segmented-option-active' : ''}`}>
                                         {t.label}
                                     </button>
                                 ))}

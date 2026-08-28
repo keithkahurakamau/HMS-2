@@ -44,7 +44,7 @@ describe('with artwork', () => {
         render(<LetterheadStudio value={withArt} onChange={onChange} />);
         // jsdom range inputs ignore arrow keys, so drive the change directly.
         fireEvent.change(screen.getByLabelText(/Top margin/i), { target: { value: '55' } });
-        // Number, not "55" — the print CSS interpolates this into mm values.
+        // Number, not "55", the print CSS interpolates this into mm values.
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ margin_top_mm: 55 }));
     });
 
@@ -80,7 +80,7 @@ describe('with artwork', () => {
 
     it('warns that tight margins will print text over the artwork', () => {
         // The artwork always prints in full now, so a small margin no longer
-        // hides the letterhead — it makes content land on top of it.
+        // hides the letterhead: it makes content land on top of it.
         render(<LetterheadStudio value={{ ...withArt, margin_top_mm: 3, margin_bottom_mm: 0 }}
             onChange={vi.fn()} />);
         expect(screen.getByText(/print over your\s+header or footer artwork/i)).toBeInTheDocument();

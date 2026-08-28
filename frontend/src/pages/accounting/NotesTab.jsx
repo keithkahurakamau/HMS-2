@@ -1,4 +1,4 @@
-/* Debit / credit notes — post-invoice receivable adjustments that post
+/* Debit / credit notes: post-invoice receivable adjustments that post
  * through the normal journal pipeline. Backed by /api/accounting/notes. */
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../../api/client';
@@ -80,39 +80,39 @@ export default function NotesTab() {
                            disabledMsg="Set up a chart of accounts first." />
 
             <DataCard loading={loading} empty={notes.length === 0} emptyMsg="No notes yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Number</th>
-                            <th className="text-left px-4 py-2 font-medium">Type</th>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Dr / Cr</th>
-                            <th className="text-right px-4 py-2 font-medium">Amount</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Number</th>
+                            <th className="font-medium">Type</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Dr / Cr</th>
+                            <th className="num font-medium">Amount</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {notes.map(n => (
                             <tr key={n.note_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
-                                <td className="px-4 py-2 font-mono text-xs">{n.note_number}</td>
-                                <td className="px-4 py-2">
+                                <td className="font-mono text-xs">{n.note_number}</td>
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${TYPE_BADGE[n.note_type]}`}>
                                         {n.note_type}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2">{n.note_date}</td>
-                                <td className="px-4 py-2 text-xs text-ink-600 dark:text-ink-400">
+                                <td>{n.note_date}</td>
+                                <td className="text-xs text-ink-600 dark:text-ink-400">
                                     <div>Dr {accLabel(n.debit_account_id)}</div>
                                     <div>Cr {accLabel(n.credit_account_id)}</div>
                                 </td>
-                                <td className="px-4 py-2 text-right font-mono">{formatAmount(n.amount)}</td>
-                                <td className="px-4 py-2">
+                                <td className="num font-mono">{formatAmount(n.amount)}</td>
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${NOTE_STATUS_BADGE[n.status]}`}>
                                         {n.status}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
+                                <td className="num space-x-2 whitespace-nowrap">
                                     {n.status === 'draft' && (
                                         <>
                                             <button type="button" onClick={() => post(n.note_id)}
@@ -152,7 +152,7 @@ export default function NotesTab() {
 function AccountSelect({ value, onChange, accounts }) {
     return (
         <select className="input" value={value} onChange={onChange}>
-            <option value="">— select account —</option>
+            <option value="">, select account, </option>
             {accounts.map((a) => (
                 <option key={a.account_id} value={a.account_id}>{a.code} {a.name}</option>
             ))}

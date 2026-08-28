@@ -14,6 +14,7 @@ import WhatsNew from '../WhatsNew';
 import NotificationBell from '../NotificationBell';
 import ThemeToggle from '../ThemeToggle';
 import ActivePatientBar from '../ActivePatientBar';
+import SystemStatus from '../SystemStatus';
 import { TenantLogo } from '../Logo';
 import { useBranding } from '../../context/BrandingContext';
 
@@ -52,7 +53,7 @@ const ROUTE_TO_JOURNEY = [
 // allocated once. Each module declares legacy `allowedRoles` + a
 // `requiredPermission`; we prefer permissions and fall back to role names.
 const NAVIGATION = [
-    // Home is the universal landing — visible to every role, no gate.
+    // Home is the universal landing, visible to every role, no gate.
     { name: 'Home',              path: '/app/home',            icon: <Home size={18} />,            allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Accountant'], moduleKey: null },
     { name: 'Command Center',    path: '/app/admin',           icon: <LayoutDashboard size={18} />, allowedRoles: ['Admin'],                                          requiredPermission: 'users:manage',     moduleKey: 'dashboard' },
     { name: 'Messages',          path: '/app/messages',        icon: <MessageSquare size={18} />,   allowedRoles: ['Admin', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Receptionist'], requiredPermission: 'messaging:read', moduleKey: 'messaging' },
@@ -71,7 +72,7 @@ const NAVIGATION = [
     { name: 'Appointments',      path: '/app/appointments',    icon: <CalendarDays size={18} />,    allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'appointments:read',moduleKey: 'appointments' },
     // Calendar carries each user's personal events (every role gets one) plus
     // the appointments overlay for roles that can see appointments. No
-    // permission gate — it's account-level — so it falls back to allowedRoles.
+    // permission gate (it is account-level), so it falls back to allowedRoles.
     { name: 'Calendar',          path: '/app/calendar',        icon: <CalendarClock size={18} />,   allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse', 'Pharmacist', 'Lab Technician', 'Radiologist', 'Accountant'], moduleKey: 'appointments' },
     { name: 'Inventory Hub',     path: '/app/inventory',       icon: <Package size={18} />,         allowedRoles: ['Admin', 'Pharmacist', 'Lab Technician'],          requiredPermission: 'inventory:read',   moduleKey: 'inventory' },
     { name: 'Billing & Finance', path: '/app/billing',         icon: <Receipt size={18} />,         allowedRoles: ['Admin', 'Receptionist'],                          requiredPermission: 'billing:read',     moduleKey: 'billing' },
@@ -117,7 +118,7 @@ export default function MainLayout() {
     const userPerms = user?.permissions || [];
     const userRole = user?.role;
     const filteredNav = NAVIGATION.filter(item => {
-        // 1) Module entitlement first — items the tenant didn't purchase are
+        // 1) Module entitlement first: items the tenant didn't purchase are
         //    hidden entirely. While modules are still loading we show
         //    permission-allowed items so the sidebar isn't empty on first
         //    paint. Always-on modules are always present per ModuleContext.
@@ -204,7 +205,7 @@ export default function MainLayout() {
                     </div>
                 </nav>
 
-                {/* User card — links to the self-service profile page */}
+                {/* User card, links to the self-service profile page */}
                 <div className="p-4 border-t border-white/5 shrink-0">
                     <NavLink
                         to="/app/profile"
@@ -252,13 +253,7 @@ export default function MainLayout() {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="hidden sm:flex items-center gap-2 pl-2.5 pr-3 py-1.5 bg-accent-50 dark:bg-accent-700/15 ring-1 ring-inset ring-accent-100 dark:ring-accent-700/30 rounded-full">
-                            <span className="relative flex size-2">
-                                <span className="animate-pulse-soft absolute inline-flex h-full w-full rounded-full bg-accent-500 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full size-2 bg-accent-600"></span>
-                            </span>
-                            <span className="text-2xs font-semibold text-accent-700 dark:text-accent-400 uppercase tracking-wider">System Online</span>
-                        </div>
+                        <SystemStatus />
                         {currentJourneyKey && (
                             <button
                                 type="button"
@@ -289,9 +284,9 @@ export default function MainLayout() {
                 <main
                     id="main-content"
                     tabIndex={-1}
-                    className="flex-1 overflow-y-auto bg-ink-50 dark:bg-ink-950 p-3 sm:p-4 lg:p-5 custom-scrollbar"
+                    className="density-compact flex-1 overflow-y-auto bg-ink-50 dark:bg-ink-950 p-3 sm:p-4 lg:p-5 custom-scrollbar"
                 >
-                    {/* Active-patient bar — pinned at the top of the main outlet so
+                    {/* Active-patient bar, pinned at the top of the main outlet so
                         every workspace page renders the patient context above its
                         own header. Bar self-hides when no patient is active. */}
                     <div data-tour="active-patient-bar"><ActivePatientBar /></div>

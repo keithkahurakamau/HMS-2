@@ -1,30 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 
 /* ──────────────────────────────────────────────────────────────────────────
- * useDraftSafetyNet — protects free-text clinical notes from being lost to
+ * useDraftSafetyNet: protects free-text clinical notes from being lost to
  * an interruption (accidental navigation, browser crash, closed tab, shift
  * change) before the host form has an explicit save.
  *
  * This is a client-side (localStorage) layer only. Where a module already
  * has a server-side draft/resume concept (e.g. Clinical Desk's "Save draft"),
- * that remains the durable, cross-device source of truth — this hook only
+ * that remains the durable, cross-device source of truth, this hook only
  * covers the gap *before* the first explicit save, on this device.
  *
  * Storage-key isolation is the caller's responsibility and matters a lot
  * here: `storageKey` MUST encode the record the draft belongs to (e.g.
  * `clinicalDesk:${queue_id}`, `medicalHistoryEntry:${patient_id}:${entry_id
  * || 'new'}`) so one patient's draft can never surface on another patient's
- * form — this is PHI, not a generic form cache.
+ * form: this is PHI, not a generic form cache.
  *
  * Entries are encrypted (AES-GCM, Web Crypto API) before they ever touch
  * localStorage, with a random key generated once per browser profile and
  * kept alongside them. This does not defend against an attacker who can
- * already run script in this origin (XSS) — no client-only scheme can, since
+ * already run script in this origin (XSS), no client-only scheme can, since
  * the decryption key has to live somewhere script can reach it too, or the
  * safety net couldn't decrypt its own drafts after a reload. It does close
  * the more realistic risk for browser-local PHI caches: a shared clinic
  * workstation, someone glancing at devtools/localStorage, or raw disk/backup
- * forensics — never storing clinical text as plain, greppable text at rest,
+ * forensics: never storing clinical text as plain, greppable text at rest,
  * consistent with this codebase's server-side PHI encryption work.
  *
  * Usage:
@@ -38,7 +38,7 @@ import { useEffect, useRef, useState } from 'react';
  *   // clearDraft()  → call after a successful submit so a stale draft can't
  *   //                 resurface on a later, unrelated encounter
  *
- * Nothing is ever applied automatically — restoring is always an explicit,
+ * Nothing is ever applied automatically, restoring is always an explicit,
  * verbatim action the caller (and therefore the clinician) can see and
  * choose, never a silent overwrite or reformat of what was typed.
  * ────────────────────────────────────────────────────────────────────────── */
@@ -51,7 +51,7 @@ function safeStringify(value) {
     try {
         return JSON.stringify(value);
     } catch {
-        return null; // circular/unserializable — autosave just no-ops for this tick
+        return null; // circular/unserializable: autosave just no-ops for this tick
     }
 }
 
@@ -113,7 +113,7 @@ async function readEntry(storageKey) {
         if (!parsed || typeof parsed !== 'object' || !('value' in parsed)) return null;
         return parsed; // { value, savedAt }
     } catch {
-        return null; // corrupt/undecryptable entry — never let a bad value break the form
+        return null; // corrupt/undecryptable entry: never let a bad value break the form
     }
 }
 
@@ -123,7 +123,7 @@ async function writeEntry(storageKey, value) {
         localStorage.setItem(PREFIX + storageKey, await encryptToBase64(plainText));
     } catch {
         // Storage full/unavailable (private browsing, quota), or Web Crypto
-        // unsupported in this context — the safety net silently no-ops
+        // unsupported in this context: the safety net silently no-ops
         // rather than breaking the form in front of the clinician. The
         // server-side save path (where one exists) is unaffected either way.
     }
@@ -137,7 +137,7 @@ function removeEntry(storageKey) {
     }
 }
 
-// `pending` has three states, not two — this distinction is what keeps
+// `pending` has three states, not two, this distinction is what keeps
 // autosave from ever racing the (necessarily async, decrypting) lookup and
 // clobbering an unacknowledged draft before it's had a chance to load:
 //   undefined → haven't checked storage for this identity yet
@@ -152,12 +152,12 @@ export default function useDraftSafetyNet({ storageKey, value, enabled = true })
     const timerRef = useRef(null);
 
     // The instant we start pointing at a different record, drop back to
-    // "haven't checked yet" synchronously — during render, not in an effect
+    // "haven't checked yet" synchronously: during render, not in an effect
     // (React's documented alternative to an effect for "adjust state when a
     // prop changes"). This guarantees the recovery banner can never show a
     // frame of the *previous* record's draft; the real answer for the new
     // record arrives a moment later via the lookup effect below. Only state
-    // is touched here (never a ref) — render must stay pure.
+    // is touched here (never a ref), render must stay pure.
     if (identity !== initializedFor) {
         setInitializedFor(identity);
         setPending(undefined);
@@ -176,13 +176,12 @@ export default function useDraftSafetyNet({ storageKey, value, enabled = true })
         return () => { cancelled = true; };
     }, [identity]);
 
-    // Debounced, encrypted autosave — inert until the lookup above has
+    // Debounced, encrypted autosave, inert until the lookup above has
     // resolved for this identity (pending !== undefined) and found nothing
     // unacknowledged (pending === null). Keyed off the serialized value so
     // an object literal recreated every render doesn't restart the debounce
     // window unless its actual content changed. The effect's own cleanup
-    // clears any in-flight timer whenever identity/value/pending change —
-    // including a record switch — so a stale write can never land under the
+    // clears any in-flight timer whenever identity/value/pending change,     // including a record switch: so a stale write can never land under the
     // wrong key.
     const serializedValue = safeStringify(value);
     useEffect(() => {

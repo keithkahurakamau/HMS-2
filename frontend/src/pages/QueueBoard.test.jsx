@@ -52,7 +52,7 @@ beforeEach(() => {
     });
 });
 
-describe('QueueBoard — live queue', () => {
+describe('QueueBoard: live queue', () => {
     it('loads the live board and shows Q.No, scheme, and from→to rooms', async () => {
         renderWithProviders(<QueueBoard />);
 
@@ -81,7 +81,7 @@ describe('QueueBoard — live queue', () => {
     });
 });
 
-describe('QueueBoard — day footprints', () => {
+describe('QueueBoard: day footprints', () => {
     it('switches to the Day tab and shows a patient footprint trail', async () => {
         const user = userEvent.setup();
         renderWithProviders(<QueueBoard />);

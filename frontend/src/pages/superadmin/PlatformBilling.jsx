@@ -12,7 +12,7 @@ const TIER_PRICING = {
     Standard: 18500,
 };
 
-// Pure currency formatter — module scope so it isn't redefined every render.
+// Pure currency formatter: module scope so it isn't redefined every render.
 const KES = (n) => `KES ${(n || 0).toLocaleString('en-KE')}`;
 
 export default function PlatformBilling() {
@@ -149,17 +149,17 @@ export default function PlatformBilling() {
 
                 {/* Desktop table */}
                 <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
+                    <table className="table-clean table-sticky">
+                        <thead>
                             <tr>
-                                <th className="px-6 py-3">Tenant</th>
-                                <th className="px-6 py-3">Tier</th>
-                                <th className="px-6 py-3">Monthly fee</th>
-                                <th className="px-6 py-3">Status</th>
-                                <th className="px-6 py-3 text-right">Action</th>
+                                <th>Tenant</th>
+                                <th>Tier</th>
+                                <th>Monthly fee</th>
+                                <th>Status</th>
+                                <th className="num">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-200">
+                        <tbody>
                             {isLoading ? (
                                 <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500 dark:text-ink-400">
                                     <Activity size={16} className="inline animate-spin mr-2 text-brand-600 dark:text-brand-400" aria-hidden="true" />Loading…
@@ -168,7 +168,7 @@ export default function PlatformBilling() {
                                 <tr><td colSpan="5" className="px-6 py-12 text-center text-ink-500 dark:text-ink-400">No tenants match your filter.</td></tr>
                             ) : filtered.map(tenant => (
                                 <tr key={tenant.id} className="hover:bg-ink-50 dark:hover:bg-ink-800/50 transition-colors">
-                                    <td className="px-6 py-3">
+                                    <td>
                                         <div className="flex items-center gap-2">
                                             <Building2 size={16} className="text-ink-400" aria-hidden="true" />
                                             <div className="min-w-0">
@@ -177,7 +177,7 @@ export default function PlatformBilling() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-3">
+                                    <td>
                                         {tenant.is_premium ? (
                                             <span className="badge-warn inline-flex items-center gap-1">
                                                 <Crown size={10} aria-hidden="true" /> Premium
@@ -186,16 +186,16 @@ export default function PlatformBilling() {
                                             <span className="badge-neutral">Standard</span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-3 font-mono text-xs text-ink-700 dark:text-ink-200">
+                                    <td className="font-mono text-xs text-ink-700 dark:text-ink-200">
                                         {KES(tenant.is_premium ? TIER_PRICING.Premium : TIER_PRICING.Standard)}
                                     </td>
-                                    <td className="px-6 py-3">
+                                    <td>
                                         <span className="inline-flex items-center gap-1.5 text-accent-700 dark:text-accent-300 text-xs font-semibold">
                                             <span className="size-1.5 rounded-full bg-accent-500 animate-pulse-soft" aria-hidden="true"></span>
                                             Active
                                         </span>
                                     </td>
-                                    <td className="px-6 py-3 text-right">
+                                    <td className="num">
                                         <button
                                             type="button"
                                             onClick={() => toggleTier(tenant)}
@@ -203,7 +203,7 @@ export default function PlatformBilling() {
                                             className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                                                 tenant.is_premium
                                                     ? 'bg-ink-100 hover:bg-ink-200 text-ink-700 border border-ink-200 dark:bg-ink-800 dark:hover:bg-ink-700 dark:text-ink-200 dark:border-ink-700'
-                                                    : 'bg-brand-600 hover:bg-brand-700 text-white shadow-soft'
+                                                    : 'bg-brand-600 hover:bg-brand-700 text-white'
                                             }`}
                                         >
                                             {tenant.is_premium ? (
@@ -252,7 +252,7 @@ export default function PlatformBilling() {
                                     className={`shrink-0 text-xs font-semibold px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] ${
                                         tenant.is_premium
                                             ? 'bg-ink-100 hover:bg-ink-200 text-ink-700 border border-ink-200 dark:bg-ink-800 dark:hover:bg-ink-700 dark:text-ink-200 dark:border-ink-700'
-                                            : 'bg-brand-600 hover:bg-brand-700 text-white shadow-soft'
+                                            : 'bg-brand-600 hover:bg-brand-700 text-white'
                                     }`}
                                 >
                                     {tenant.is_premium ? (
@@ -299,9 +299,9 @@ function KpiCard({ icon: Icon, label, value, sub, accent }) {
 
 function PricingCard({ tier, price, seats, features, highlight }) {
     return (
-        <div className={`rounded-2xl border p-5 ${
+        <div className={`rounded-xl border p-5 ${
             highlight
-                ? 'bg-gradient-to-br from-amber-50 to-amber-100/60 border-amber-200 shadow-soft dark:from-amber-500/10 dark:to-amber-500/5 dark:border-amber-500/20'
+                ? 'bg-gradient-to-br from-amber-50 to-amber-100/60 border-amber-200 dark:from-amber-500/10 dark:to-amber-500/5 dark:border-amber-500/20'
                 : 'card'
         }`}>
             <div className="flex justify-between items-start mb-3">

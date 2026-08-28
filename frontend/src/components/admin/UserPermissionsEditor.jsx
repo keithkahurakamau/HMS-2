@@ -2,20 +2,20 @@ import React, { useEffect, useReducer, useState, useMemo } from 'react';
 import { X, Activity, ShieldCheck, Plus, Minus, RotateCcw, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
+import { SkeletonTable } from '../ui/Skeleton';
 
 /**
  * Per-user permission overrides editor.
  *
- * Mental model: every permission has one of three states for this user —
- *   • inherit — uses the role's default (no override row stored)
- *   • grant   — force-on, even if the role doesn't include it
- *   • revoke  — force-off, even if the role includes it
+ * Mental model: every permission has one of three states for this user,  *   • inherit, uses the role's default (no override row stored)
+ *   • grant, force-on, even if the role doesn't include it
+ *   • revoke, force-off, even if the role includes it
  *
  * The Admin role can't be overridden (wildcard by design); we render a
  * read-only banner if the target user is an Admin.
  */
 // The initial fetch loads the catalogue + the user's saved overrides and flips
-// the loading flag — one logical unit, so it lives in a single reducer.
+// the loading flag: one logical unit, so it lives in a single reducer.
 const initialLoad = { data: null, permissions: [], loading: true };
 function loadReducer(state, action) {
     switch (action.type) {
@@ -165,8 +165,7 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
 
                 {loading ? (
                     <div className="flex-1 flex items-center justify-center py-16 text-slate-400 dark:text-ink-400">
-                        <Activity className="animate-spin mr-2" /> Loading…
-                    </div>
+                        <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                 ) : isAdmin ? (
                     <div className="p-8 text-center">
                         <ShieldCheck size={32} className="mx-auto mb-3 text-amber-500" />
@@ -217,7 +216,7 @@ export default function UserPermissionsEditor({ user, onClose, onSaved }) {
                                                             {p.codename}
                                                         </p>
                                                         <p className="text-2xs text-slate-500 dark:text-ink-400 truncate mt-0.5">
-                                                            {p.description || '—'}
+                                                            {p.description || '-'}
                                                         </p>
                                                         <div className="flex gap-1.5 mt-1 flex-wrap">
                                                             {fromRole && (

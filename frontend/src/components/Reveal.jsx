@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 /**
- * Reveal — wraps any content and fades it up when it enters the viewport.
+ * Reveal: wraps any content and fades it up when it enters the viewport.
  *
- * Why a component (and not a CSS class) — IntersectionObserver gives us
+ * Why a component (and not a CSS class), IntersectionObserver gives us
  * a precise trigger so animations only run when the user actually sees
  * the section, and we don't burn render cycles animating off-screen DOM
  * during initial page load. Once revealed, the observer disconnects so
@@ -33,7 +33,7 @@ export default function Reveal({
     const [shown, setShown] = useState(prefersReducedMotion);
 
     useEffect(() => {
-        if (prefersReducedMotion) return; // already shown — nothing to observe
+        if (prefersReducedMotion) return; // already shown: nothing to observe
         const el = ref.current;
         if (!el) return;
         const io = new IntersectionObserver((entries) => {

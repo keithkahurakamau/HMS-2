@@ -5,6 +5,41 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------
+   Density and motion tokens.
+
+   Comfortable is the default and covers marketing, auth and the patient
+   portal. Clinical, admin and superadmin surfaces opt into .density-compact
+   on their layout wrapper, which is the single switch that tightens every
+   module page at once.
+   --------------------------------------------------------------------- */
+:root {
+  --ctl-h: 2.5rem;    /* 40px control height */
+  --row-h: 3.5rem;    /* 56px table row */
+  --card-p: 1.5rem;   /* 24px card padding */
+  --sec-gap: 2rem;    /* 32px section gap */
+
+  --dur-fast: 120ms;
+  --dur: 160ms;
+  --dur-slow: 220ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.density-compact {
+  --ctl-h: 2rem;      /* 32px */
+  --row-h: 2.5rem;    /* 40px */
+  --card-p: 1rem;     /* 16px */
+  --sec-gap: 1.25rem; /* 20px */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+}
+
+/* ---------------------------------------------------------------------
    Base typography & rendering
    --------------------------------------------------------------------- */
 @layer base {
@@ -37,7 +72,7 @@
     color: #94a3b8;
   }
 
-  /* Unify focus across the app — any input/select/textarea/button gets the
+  /* Unify focus across the app, any input/select/textarea/button gets the
      same teal ring instead of the browser's default. */
   input:focus, select:focus, textarea:focus, button:focus {
     outline: none;
@@ -47,7 +82,7 @@
     box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.18);
   }
 
-  /* Tables — gentle defaults so module pages without `.table-clean` still match */
+  /* Tables: gentle defaults so module pages without `.table-clean` still match */
   table { border-collapse: separate; border-spacing: 0; }
   thead th {
     background-color: rgba(241, 245, 249, 0.6);
@@ -61,21 +96,33 @@
 }
 
 /* ---------------------------------------------------------------------
-   Component classes — reusable design primitives
+   Component classes: reusable design primitives
    --------------------------------------------------------------------- */
 @layer components {
-  /* Surfaces */
+  /* Surfaces.
+
+     Border first: a card is anchored to the page, so it earns a border, not a
+     shadow. Shadow is reserved for surfaces that genuinely float, which is
+     what .overlay-surface is for. Consumers supply their own padding
+     (`card p-5`, `card p-4`), so these rules stay padding-free. */
   .card {
-    @apply bg-white border border-ink-200/70 rounded-2xl shadow-soft;
+    @apply bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl;
   }
   .card-flush {
-    @apply bg-white border border-ink-200/70 rounded-2xl;
+    @apply bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl;
   }
+  /* Kept as an alias so the 242 existing call sites keep working. Elevation is
+     no longer what distinguishes it; use .overlay-surface if it truly floats. */
   .card-elevated {
-    @apply bg-white border border-ink-200/60 rounded-2xl shadow-elevated;
+    @apply bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl;
   }
+  /* Marketing surfaces only. Do not use inside the workspace. */
   .card-glass {
     @apply bg-white/70 backdrop-blur-xl border border-white/60 rounded-2xl shadow-soft;
+  }
+  /* Modals, popovers, dropdowns, toasts: things that float above the page. */
+  .overlay-surface {
+    @apply bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay;
   }
 
   /* Section headers used in pages */
@@ -90,148 +137,87 @@
   }
 
   /* Buttons */
-  /*
-   * ─── Liquid-glass buttons (Apple iOS 18 material) ───────────────────
-   *
-   * Every variant inherits the same glass substrate from .btn:
-   *   - backdrop-filter blur + saturate (the frosted "behind" look)
-   *   - layered inset shadows for the specular ring — a bright hairline
-   *     at the top + subtle hairline at the bottom + 1px outer ring
-   *     that catches ambient light
-   *   - soft outer drop shadow for elevation
-   *   - hover lifts +1px and brightens the rings
-   *   - active scales to 0.97 with a 90ms snap-back, so a tap feels
-   *     like pressing actual glass
-   *
-   * Colour variants (primary, danger, success) stack a soft white
-   * "top gloss" gradient over a saturated colour fill, so the glass
-   * still reads as glass even with a brand colour underneath.
-   * Secondary is the canonical clear-glass card.
-   * Ghost is transparent until hover, when it materialises into the
-   * glass family for visual continuity.
-   */
+  /* Buttons are flat and bordered. The previous treatment layered a
+     backdrop-filter, a five-stop inset shadow stack and a hover lift, which is
+     the single loudest "dated" signal in the app and the most expensive thing
+     on the compositor. What replaces it: solid fill, real height from the
+     density token, and a press that responds immediately.
+
+     Transitions stay on cheap properties only, and are CSS rather than
+     keyframes so an interrupted hover reverses from where it is. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-semibold
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold
            select-none cursor-pointer
            focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500
            disabled:opacity-50 disabled:cursor-not-allowed;
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    /* Scope the transition to cheap properties only. Using `transition-all`
-       here made the browser also animate backdrop-filter/filter on hover,
-       thrashing the compositor layer and causing flicker/stutter app-wide. */
-    transition: transform 200ms ease, box-shadow 200ms ease,
-                background 200ms ease, background-color 200ms ease,
-                color 200ms ease, border-color 200ms ease;
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.55),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.08),
-      0 1px 1px rgba(15, 23, 42, 0.04),
-      0 6px 14px -2px rgba(15, 23, 42, 0.10);
-  }
-  .btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.65),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.10),
-      0 2px 4px rgba(15, 23, 42, 0.06),
-      0 12px 28px -6px rgba(15, 23, 42, 0.20);
+    height: var(--ctl-h);
+    transition: background-color var(--dur) var(--ease-out),
+                border-color var(--dur) var(--ease-out),
+                color var(--dur) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
   }
   .btn:active:not(:disabled) {
-    transform: translateY(0) scale(0.97);
-    transition-duration: 90ms;
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    transform: none;
   }
 
+  /* Solid fills, no sheen overlay. Cyan is the primary action and nothing
+     else, so .btn-primary is the only button carrying it. */
   .btn-primary {
-    @apply btn text-white;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(8, 145, 178) 0%, rgb(13, 148, 136) 100%);
+    @apply btn bg-brand-600 text-white border border-brand-600;
   }
   .btn-primary:hover:not(:disabled) {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(6, 165, 196) 0%, rgb(15, 165, 152) 100%);
+    @apply bg-brand-700 border-brand-700;
   }
 
   .btn-secondary {
-    @apply btn text-ink-800;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
-      rgba(255, 255, 255, 0.55);
+    @apply btn bg-white dark:bg-ink-900 text-ink-800 dark:text-ink-200
+           border border-ink-300 dark:border-ink-700;
   }
   .btn-secondary:hover:not(:disabled) {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 50%),
-      rgba(255, 255, 255, 0.70);
+    @apply bg-ink-50 dark:bg-ink-800 border-ink-400 dark:border-ink-600;
   }
 
   .btn-ghost {
-    @apply btn text-ink-600;
-    background: transparent;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: none;
+    @apply btn bg-transparent text-ink-600 dark:text-ink-400 border border-transparent;
   }
   .btn-ghost:hover:not(:disabled) {
-    @apply text-ink-900;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
-      rgba(255, 255, 255, 0.55);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.65),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.10),
-      0 2px 4px rgba(15, 23, 42, 0.06),
-      0 12px 28px -6px rgba(15, 23, 42, 0.20);
+    @apply bg-ink-100 dark:bg-ink-800 text-ink-900 dark:text-ink-100;
   }
 
   .btn-danger {
-    @apply btn text-white;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(220, 38, 38) 0%, rgb(185, 28, 28) 100%);
+    @apply btn bg-status-critical text-white border border-status-critical;
   }
   .btn-danger:hover:not(:disabled) {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(239, 68, 68) 0%, rgb(220, 38, 38) 100%);
+    @apply bg-red-700 border-red-700;
   }
 
-  /* Low-emphasis destructive action — text/border only until hover. Used for
-     inline row actions (e.g. disable account) where a full red fill would be
-     too loud in a dense table. */
+  /* Low-emphasis destructive action: text and border only until hover. Used for
+     inline row actions (for example disable account) where a full red fill
+     would be too loud in a dense table. */
   .btn-danger-ghost {
-    @apply btn text-rose-600;
-    background: transparent;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: inset 0 0 0 1px rgba(225, 29, 72, 0.25);
+    @apply btn bg-transparent text-rose-600 dark:text-rose-400
+           border border-rose-200 dark:border-rose-900;
   }
   .btn-danger-ghost:hover:not(:disabled) {
-    @apply text-rose-700;
-    background: rgba(244, 63, 94, 0.08);
+    @apply text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40
+           border-rose-300 dark:border-rose-800;
   }
 
-  /* Compact button — for inline/table row actions. Pairs with any btn-* skin. */
+  /* Compact button for inline and table row actions. Pairs with any btn-* skin.
+     Overrides the density height rather than adding vertical padding to it. */
   .btn-xs {
-    @apply gap-1.5 px-2.5 py-1.5 text-xs rounded-lg;
+    @apply gap-1.5 px-2.5 text-xs rounded-md;
+    height: 1.75rem;
   }
 
   .btn-success {
-    @apply btn text-white;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(16, 185, 129) 0%, rgb(5, 150, 105) 100%);
+    @apply btn bg-status-ok text-white border border-status-ok;
   }
   .btn-success:hover:not(:disabled) {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%),
-      linear-gradient(180deg, rgb(34, 197, 144) 0%, rgb(8, 168, 119) 100%);
+    @apply bg-emerald-700 border-emerald-700;
   }
 
   /* Inputs */
@@ -278,15 +264,6 @@
     @apply text-2xl sm:text-3xl font-semibold text-ink-900 tracking-tight;
   }
 
-  /* Tab pill row (used on AdminDashboard) */
-  .tab-pill {
-    @apply inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium
-           text-ink-300 hover:text-white transition-colors;
-  }
-  .tab-pill-active {
-    @apply bg-white/10 text-white shadow-soft ring-1 ring-white/15;
-  }
-
   /* Sidebar nav links */
   .nav-link {
     @apply relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
@@ -300,26 +277,169 @@
     @apply absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-brand-400;
   }
 
-  /* Tables */
+  /* Tables.
+
+     Row height comes from the density token, so the same markup is roomy on
+     the portal and tight in a clinical worklist. Numerals are tabular
+     throughout: in a column of figures, proportional digits stop the eye
+     comparing magnitudes down the column. Headers stick so a long worklist
+     keeps its column meaning while scrolling. */
   .table-clean {
-    @apply w-full text-left text-sm text-ink-700;
+    @apply w-full text-left text-sm text-ink-700 dark:text-ink-300;
+    font-variant-numeric: tabular-nums;
   }
-  .table-clean thead {
-    @apply text-2xs uppercase tracking-wider text-ink-500 bg-ink-50/60;
+  .table-clean thead th {
+    @apply px-4 text-2xs uppercase tracking-wider font-semibold
+           text-ink-500 dark:text-ink-400
+           bg-ink-50 dark:bg-ink-900
+           border-b border-ink-200 dark:border-ink-800;
+    height: var(--row-h);
   }
-  .table-clean th {
-    @apply px-6 py-3 font-semibold;
+  /* Opt-in, and only valid when the table sits inside its own scroll container.
+     Applied by hand rather than by default, because sticky resolves against the
+     nearest scrolling ancestor: on a table that just flows down the page the
+     header detaches and floats over the page header. */
+  .table-clean.table-sticky thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
   .table-clean tbody tr {
-    @apply border-t border-ink-100/80 hover:bg-ink-50/50 transition-colors;
+    @apply border-b border-ink-100 dark:border-ink-800/60;
+    transition: background-color var(--dur-fast) var(--ease-out);
+  }
+  .table-clean tbody tr:hover {
+    @apply bg-ink-50/70 dark:bg-ink-800/40;
   }
   .table-clean td {
-    @apply px-6 py-4;
+    @apply px-4 align-middle;
+    height: var(--row-h);
+  }
+  /* Right-align numeric columns so decimal points line up. */
+  .table-clean th.num, .table-clean td.num {
+    @apply text-right;
+  }
+
+  /* The second table register: a compact list nested inside a card or panel,
+     such as the newborn list on a delivery or a vitals strip on a patient
+     header. It is not the primary content of its view, so it takes no sticky
+     header, no row hover and no horizontal padding, which would otherwise
+     misalign it with the surrounding card text. Numerals stay tabular. */
+  .table-inline {
+    @apply w-full text-left text-sm text-ink-700 dark:text-ink-300;
+    font-variant-numeric: tabular-nums;
+  }
+  .table-inline thead th {
+    @apply pr-3 pb-1.5 text-2xs uppercase tracking-wider font-medium
+           text-ink-500 dark:text-ink-400
+           border-b border-ink-100 dark:border-ink-800;
+  }
+  .table-inline td {
+    @apply pr-3 py-1.5 align-middle;
+  }
+  .table-inline th.num, .table-inline td.num {
+    @apply text-right pr-0;
+  }
+
+  /* ---------------------------------------------------------------------
+     Type scale.
+
+     Six steps: 12 / 14 / 16 / 20 / 24 / 32. Tailwind's own fontSize scale is
+     deliberately NOT overridden, because moving `text-lg` from 18px to 20px
+     would silently reflow all 198 files at once with no way to review it.
+     These named utilities let pages migrate onto the scale deliberately.
+     --------------------------------------------------------------------- */
+  .t-caption  { @apply text-xs font-medium tracking-wide text-ink-500 dark:text-ink-400; }
+  .t-body     { @apply text-sm text-ink-700 dark:text-ink-300; }
+  .t-body-lg  { @apply text-base text-ink-700 dark:text-ink-300; }
+  .t-title    { @apply text-[1.25rem] font-semibold tracking-tight text-ink-900 dark:text-ink-100; }
+  .t-heading  { @apply text-[1.5rem] font-semibold tracking-tight text-ink-900 dark:text-ink-100; }
+  .t-display  { @apply font-display text-[2rem] font-semibold tracking-tight text-ink-900 dark:text-ink-100; }
+
+  /* ---------------------------------------------------------------------
+     Required states.
+
+     Every collection surface ships four: empty, loading, error, denied.
+     --------------------------------------------------------------------- */
+  .skeleton {
+    @apply rounded bg-ink-100 dark:bg-ink-800;
+    animation: skeleton-pulse 1.4s ease-in-out infinite;
+  }
+
+  .empty {
+    @apply flex flex-col items-center justify-center gap-3 py-12 text-center;
+  }
+
+  /* Filter chips.
+
+     A row that narrows what a table shows is not a tab row: there is no panel
+     per option, so announcing it as tabs misleads a screen reader. These are
+     toggle buttons, and callers must set aria-pressed. */
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium
+           text-ink-600 dark:text-ink-400
+           hover:bg-ink-100 dark:hover:bg-ink-800
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500;
+    transition: background-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
+  }
+  .chip-active {
+    @apply bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300
+           ring-1 ring-inset ring-brand-200 dark:ring-brand-500/30;
+  }
+  .chip-count {
+    @apply tnum text-ink-400 dark:text-ink-500;
+  }
+
+  /* Segmented control: a two or three way view switch, where each option does
+     own a panel. Distinct from .chip, which filters one panel. */
+  .segmented {
+    @apply flex w-full gap-1 p-1 rounded-lg bg-ink-100 dark:bg-ink-800;
+  }
+  .segmented-option {
+    @apply flex-1 inline-flex items-center justify-center gap-2 px-4 rounded-md text-sm font-medium
+           text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500;
+    height: var(--ctl-h);
+    transition: background-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
+  }
+  .segmented-option-active {
+    @apply bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100
+           ring-1 ring-inset ring-ink-200 dark:ring-ink-700;
+  }
+
+  /* Form field wrapper: label, control, hint and error in one rhythm. */
+  .field {
+    @apply flex flex-col gap-1.5;
+  }
+  .field > label {
+    @apply text-sm font-medium text-ink-700 dark:text-ink-300;
+  }
+  .field .field-hint {
+    @apply text-xs text-ink-500 dark:text-ink-400;
+  }
+  .field .field-error {
+    @apply text-xs text-status-critical;
+  }
+}
+
+@layer utilities {
+  /* Tabular numerals. Mandatory on tables, vitals, money and counts. */
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none; }
   }
 }
 
 /* ---------------------------------------------------------------------
-   Utilities — scrollbars, focus, accessibility
+   Utilities: scrollbars, focus, accessibility
    --------------------------------------------------------------------- */
 @layer utilities {
   /* ── Liquid-glass surface treatment ──────────────────────────────────
@@ -399,7 +519,7 @@
       radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.08) 0px, transparent 60%);
   }
 
-  /* Animated gradient text — Cyan → Teal → Emerald sweep */
+  /* Animated gradient text: Cyan → Teal → Emerald sweep */
   .text-gradient-brand {
     background-image: linear-gradient(135deg, #0891b2 0%, #14b8a6 50%, #10b981 100%);
     -webkit-background-clip: text;
@@ -459,7 +579,7 @@ html.dark body {
    Most modules are built from these classes, so theming them here gives
    every module dark mode at once (matching the hand-tuned Messages module)
    without editing each page. Module-specific raw colours (bg-white,
-   text-ink-900 …) still need per-element `dark:` variants — this covers the
+   text-ink-900 …) still need per-element `dark:` variants, this covers the
    common chrome: cards, inputs, tables, badges, glass.
    ink: 900=#0f172a 850=#111827 800=#1e293b 700=#334155 300=#cbd5e1 …
    --------------------------------------------------------------------- */
@@ -471,7 +591,7 @@ html.dark .card-elevated {
 }
 html.dark .card-elevated { box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5); }
 
-/* Inputs — both the .input class and bare form controls in modules. */
+/* Inputs: both the .input class and bare form controls in modules. */
 html.dark .input,
 html.dark input[type="text"], html.dark input[type="email"],
 html.dark input[type="password"], html.dark input[type="number"],
@@ -489,7 +609,7 @@ html.dark textarea::placeholder { color: #64748b; }   /* ink-500 */
 
 html.dark .label { color: #cbd5e1; }                  /* ink-300 */
 
-/* Tables — header + row hover. */
+/* Tables: header + row hover. */
 html.dark thead th {
   background-color: rgba(30, 41, 59, 0.5);            /* ink-800/50 */
   color: #94a3b8;                                     /* ink-400 */
@@ -503,7 +623,7 @@ html.dark .badge-neutral {
   --tw-ring-color: #334155;
 }
 
-/* Frosted glass cards — flip the white substrate to a dark one. */
+/* Frosted glass cards: flip the white substrate to a dark one. */
 html.dark .glass-card {
   background-color: rgba(15, 23, 42, 0.72);           /* ink-900/72 */
   border-color: rgba(255, 255, 255, 0.08);
@@ -513,7 +633,7 @@ html.dark .card-glass {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Secondary / ghost buttons — their light skin is a white glass substrate that
+/* Secondary / ghost buttons: their light skin is a white glass substrate that
    reads as a near-white slab on dark. Flip to a translucent light-on-dark glass
    so they still read as glass but belong to the dark surface. (primary / danger
    / success are saturated colour fills and already sit fine on dark.) */
@@ -549,7 +669,7 @@ html.dark .btn-ghost:hover:not(:disabled) {
     0 6px 14px -2px rgba(0, 0, 0, 0.45);
 }
 
-/* Section / stat / helper typography — the shared text primitives. */
+/* Section / stat / helper typography, the shared text primitives. */
 html.dark .section-title { color: #f8fafc; }          /* near-white */
 html.dark .section-sub,
 html.dark .section-eyebrow { color: #94a3b8; }        /* ink-400 */
@@ -567,7 +687,7 @@ html.dark .table-clean thead {
 html.dark .table-clean tbody tr { border-top-color: #1e293b; }   /* ink-800 */
 html.dark .table-clean tbody tr:hover { background-color: rgba(30, 41, 59, 0.4); }
 
-/* Faint grid background — lighten the hairlines so they read on dark. */
+/* Faint grid background: lighten the hairlines so they read on dark. */
 html.dark .bg-grid {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
@@ -616,7 +736,7 @@ html.dark .bg-grid {
 }
 
 @layer components {
-  /* Plain white panel — hairline border, quiet shadow. (Calm redesign: the
+  /* Plain white panel: hairline border, quiet shadow. (Calm redesign: the
      old frosted glass + heavy blur is gone; class name kept so every page
      that uses it picks up the simple look.) */
   .lp-glass {
@@ -624,13 +744,13 @@ html.dark .bg-grid {
     border: 1px solid #e2e8f0;
     box-shadow: 0 1px 2px rgba(2, 53, 53, 0.04), 0 8px 24px -16px rgba(2, 53, 53, 0.12);
   }
-  /* On-dark panel — flat, hairline border, no blur. */
+  /* On-dark panel: flat, hairline border, no blur. */
   .lp-glass-dark {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(178, 240, 240, 0.16);
   }
 
-  /* Primary CTA — solid teal, quiet hover. No glow, no lift. */
+  /* Primary CTA: solid teal, quiet hover. No glow, no lift. */
   .lp-btn-glow {
     display: inline-flex;
     align-items: center;
@@ -645,7 +765,7 @@ html.dark .bg-grid {
   .lp-btn-glow:hover { background: #036666; }
   .lp-btn-glow:active { background: var(--lp-teal-deep); }
 
-  /* Ghost CTA — hairline outline, soft ice fill on hover. */
+  /* Ghost CTA: hairline outline, soft ice fill on hover. */
   .lp-btn-ghost {
     display: inline-flex;
     align-items: center;
@@ -681,7 +801,7 @@ html.dark .bg-grid {
     border-color: rgba(178, 240, 240, 0.55);
   }
 
-  /* Card — white, hairline border, whisper of shadow. Hover tints the
+  /* Card: white, hairline border, whisper of shadow. Hover tints the
      border teal; no lift, no glow. */
   .lp-card {
     background: #ffffff;
@@ -725,7 +845,7 @@ html.dark .bg-grid {
     border: 1px solid rgba(178, 240, 240, 0.28);
   }
 
-  /* Accent text — static soft-cyan tint on dark, no animation. */
+  /* Accent text: static soft-cyan tint on dark, no animation. */
   .lp-text-gradient {
     color: #7dd8d8;
   }
@@ -743,6 +863,6 @@ html.dark .bg-grid {
   }
   .lp-glow-ring { box-shadow: 0 0 0 2px rgba(0, 128, 128, 0.35); }
   .lp-divider { height: 1px; background: #e2e8f0; }
-  /* Grain retired in the calm redesign — kept as a no-op for stragglers. */
+  /* Grain retired in the calm redesign, kept as a no-op for stragglers. */
   .lp-grain::after { content: none; }
 }

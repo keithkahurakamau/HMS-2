@@ -59,7 +59,7 @@ export default function MachinesTab() {
             <span>
               <span className="block text-sm font-medium text-ink-900 dark:text-white">{m.name}</span>
               <span className="block text-xs text-ink-500 dark:text-ink-400">
-                {[m.model, m.station].filter(Boolean).join(' · ') || '—'}
+                {[m.model, m.station].filter(Boolean).join(' · ') || '-'}
               </span>
             </span>
             <button type="button" onClick={() => toggle(m)}

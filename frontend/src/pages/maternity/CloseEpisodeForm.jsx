@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { closeEpisode } from './api';
 import { errorText } from './errors';
 
-// Mirrors the backend's VALID_CLOSE_STATUS (app/routes/maternity.py) —
-// these are the only two values close_episode accepts.
+// Mirrors the backend's VALID_CLOSE_STATUS (app/routes/maternity.py): // these are the only two values close_episode accepts.
 const CLOSE_STATUSES = ['Closed', 'Transferred'];
 
 export default function CloseEpisodeForm({ episodeId, patientName, onClose, onClosed }) {
@@ -35,9 +34,9 @@ export default function CloseEpisodeForm({ episodeId, patientName, onClose, onCl
       aria-modal="true"
       aria-label="Close episode"
     >
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-overlay">
         <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
-          Close episode{patientName ? ` — ${patientName}` : ''}
+          Close episode{patientName ? `, ${patientName}` : ''}
         </h3>
         <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
           This ends the pregnancy episode. It cannot be reopened here, but the

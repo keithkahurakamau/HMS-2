@@ -7,7 +7,7 @@ import {
 import PageHeader from '../../components/PageHeader';
 
 /**
- * Platform Settings is read-only by design — the canonical source of truth is
+ * Platform Settings is read-only by design, the canonical source of truth is
  * the deployment's .env file, not a database row. Operators tweak the values
  * there and rolling-restart workers; we surface the *effective* values here so
  * a superadmin can verify the runtime state matches their expectation.
@@ -30,7 +30,7 @@ export default function PlatformSettings() {
         (async () => {
             try {
                 const [rootRes, tenantsRes] = await Promise.all([
-                    apiClient.get('/').catch(() => ({ data: null })),
+                    apiClient.get('/health').catch(() => ({ data: null })),
                     apiClient.get('/public/hospitals').catch(() => ({ data: [] })),
                 ]);
                 setHealth(rootRes.data);
@@ -49,7 +49,7 @@ export default function PlatformSettings() {
             icon: ShieldCheck,
             rows: [
                 { label: 'Platform name', value: health?.system || 'MediFleet' },
-                { label: 'Version', value: health?.version || '—', mono: true },
+                { label: 'Version', value: health?.version || '-', mono: true },
                 { label: 'Operational status', value: health?.status || 'Unknown', badge: 'success' },
             ],
         },

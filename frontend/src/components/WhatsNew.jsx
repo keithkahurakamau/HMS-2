@@ -5,7 +5,7 @@ import { useJourney } from '../context/JourneyContext';
 import { APP_VERSION, unseenReleases, writeLastSeenVersion, readLastSeenVersion } from '../releases';
 
 /**
- * WhatsNew — shows a versioned "what changed" panel when the signed-in user is
+ * WhatsNew: shows a versioned "what changed" panel when the signed-in user is
  * behind the current APP_VERSION. Dismissing records APP_VERSION as last-seen
  * (per-user, localStorage) so it won't reappear. Optional "Take the tour"
  * button replays the product tours via JourneyContext.
@@ -41,9 +41,9 @@ export default function WhatsNew() {
             <div className="card w-full max-w-md p-5">
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="font-semibold text-ink-900 dark:text-white flex items-center gap-2">
-                        <Sparkles size={18} className="text-brand-600" /> What&apos;s new
+                        <Sparkles size={18} className="text-brand-600 dark:text-brand-400" /> What&apos;s new
                     </h2>
-                    <button type="button" onClick={dismiss} aria-label="Close" className="text-ink-400 hover:text-ink-700">
+                    <button type="button" onClick={dismiss} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:text-ink-500 dark:hover:text-ink-200">
                         <X size={18} />
                     </button>
                 </div>

@@ -7,6 +7,7 @@ import {
     MessageSquare, Calendar, CheckCircle2, AlertCircle, Clock, ShieldCheck,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 const STATUS_ICONS = {
     'Open':                 AlertCircle,
@@ -25,7 +26,7 @@ const STATUS_DOT_COLOR = {
 };
 
 const formatRelative = (iso) => {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const then = new Date(iso).getTime();
     const diff = Date.now() - then;
     const m = Math.floor(diff / 60000);
@@ -92,7 +93,7 @@ export default function Support() {
     const [replyBox, dispatchReply] = useReducer(replyReducer, initialReplyBox);
     const { reply, sendingReply } = replyBox;
 
-    useEffect(() => { fetchTickets(); }, []);  // initial load — filter is client-side now
+    useEffect(() => { fetchTickets(); }, []);  // initial load: filter is client-side now
 
     // ModuleGuard hands us a prefill payload via router state when the user
     // clicks "Contact MediFleet Support to upgrade". Open the new-ticket
@@ -115,7 +116,7 @@ export default function Support() {
         // Strip the state so a back-forward navigation doesn't re-open the
         // composer with stale prefill data.
         navigate(location.pathname, { replace: true, state: null });
-        // location is react-router's useLocation() — a reactive value, so these
+        // location is react-router's useLocation(): a reactive value, so these
         // deps are correct and the effect must re-run on navigation. The
         // no-mutable-in-deps rule matches the name "location" and can't tell it
         // apart from window.location here; this is its documented false positive.
@@ -151,7 +152,7 @@ export default function Support() {
         dispatchCompose({ type: 'submitting', value: true });
         try {
             const res = await apiClient.post('/support/', draft);
-            toast.success('Ticket raised — the MediFleet team will respond shortly.');
+            toast.success('Ticket raised: the MediFleet team will respond shortly.');
             dispatchCompose({ type: 'close' });
             dispatchCompose({ type: 'reset' });
             await fetchTickets();
@@ -201,7 +202,7 @@ export default function Support() {
         return counts;
     }, [tickets]);
 
-    // History view — newest activity first. Apply the status filter here
+    // History view: newest activity first. Apply the status filter here
     // rather than on the server so the filter chips above can show counts.
     const sortedTickets = useMemo(() => {
         const filtered = statusFilter ? tickets.filter(t => t.status === statusFilter) : tickets;
@@ -227,7 +228,7 @@ export default function Support() {
                 }
             />
 
-            {/* History filter chips — show count per status across the whole inbox */}
+            {/* History filter chips: show count per status across the whole inbox */}
             <div data-tour="support-filters" className="card p-2 flex flex-wrap gap-1" role="tablist" aria-label="Filter tickets by status">
                 <button
                     type="button"
@@ -268,8 +269,7 @@ export default function Support() {
                 <div data-tour="support-list" className="col-span-12 lg:col-span-5 card overflow-hidden flex flex-col" style={{maxHeight: 'calc(100vh - 18rem)'}}>
                     {isLoading ? (
                         <div className="flex-1 flex items-center justify-center text-ink-400 p-10">
-                            <Activity className="animate-spin mr-2 text-brand-500" size={18} /> Loading…
-                        </div>
+                            <SkeletonTable rows={4} cols={3} label="Loading" /></div>
                     ) : sortedTickets.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-ink-400 p-10 text-center">
                             <LifeBuoy size={36} className="mb-3 text-ink-300" />
@@ -366,7 +366,7 @@ export default function Support() {
                                     const isPlatform = m.author_kind === 'platform';
                                     return (
                                         <div key={m.message_id} className={`flex ${isPlatform ? 'justify-start' : 'justify-end'}`}>
-                                            <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-3 border ${
+                                            <div className={`max-w-[85%] sm:max-w-[75%] rounded-xl p-3 border ${
                                                 isPlatform ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20' : 'bg-brand-50 dark:bg-brand-900/20 border-brand-200 dark:border-brand-500/20'
                                             }`}>
                                                 <div className="flex items-baseline justify-between gap-3 mb-1">
@@ -403,7 +403,7 @@ export default function Support() {
             {isNewOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => dispatchCompose({ type: 'close' })} />
-                    <div className="relative w-full max-w-xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="flex justify-between items-center p-5 border-b border-ink-100 dark:border-ink-800">
                             <h2 className="text-xl font-semibold flex items-center gap-2 dark:text-white"><LifeBuoy size={20} className="text-brand-600" /> Raise a ticket</h2>
                             <button type="button" onClick={() => dispatchCompose({ type: 'close' })} aria-label="Close" className="text-ink-400 hover:text-ink-700 p-2 hover:bg-ink-100 rounded-full">

@@ -3,8 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import useDraftSafetyNet from './useDraftSafetyNet';
 
-// A tiny host component so we exercise the hook the way real callers do —
-// through mounts/rerenders/clicks — rather than calling it in isolation.
+// A tiny host component so we exercise the hook the way real callers do, // through mounts/rerenders/clicks: rather than calling it in isolation.
 // Entries are encrypted at rest, so tests verify behavior entirely through
 // this public interface (mount a fresh Host for the same key and see what
 // it finds) rather than by inspecting raw localStorage content.
@@ -20,7 +19,7 @@ function Host({ storageKey, value, enabled = true, onApplied }) {
     );
 }
 
-// Real timers throughout — encryption is real async Web Crypto work, so
+// Real timers throughout: encryption is real async Web Crypto work, so
 // mixing it with fake timers just to speed up the ~1s debounce isn't worth
 // the added fragility. Generous waitFor timeouts absorb the real delay.
 const DEBOUNCE_WAIT = { timeout: 3000 };
@@ -51,7 +50,7 @@ describe('useDraftSafetyNet', () => {
 
         // A fresh mount with different (blank) current-form content must not
         // clobber the stored draft just because the debounce window elapses
-        // — it's still unacknowledged.
+        //, it's still unacknowledged.
         const { unmount: unmountB } = render(<Host storageKey="k2" value={{ text: '' }} />);
         await waitFor(() => expect(screen.getByTestId('has-draft').textContent).toBe('true'), DEBOUNCE_WAIT);
         await settle(1200);

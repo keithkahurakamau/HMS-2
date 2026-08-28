@@ -5,7 +5,7 @@ import Logo from './Logo';
  * Footer shared by the public pages (Landing, Demo).
  *
  * Carries the Nova-Habitat Technologies attribution, so the parent-company
- * line lives in one place rather than being copy-pasted per page — the two
+ * line lives in one place rather than being copy-pasted per page, the two
  * footers had already drifted apart in their link sets before this.
  *
  * `children` are the page's own quick links, which differ per page.

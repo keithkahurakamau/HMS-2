@@ -78,11 +78,11 @@ export default function VisitHistoryList({ visits }) {
                                                     {visit.record_status}
                                                 </span>
                                             )}
-                                            <span className="text-xs text-slate-400 dark:text-ink-400">{visit.date ? new Date(visit.date).toLocaleDateString() : '—'}</span>
+                                            <span className="text-xs text-slate-400 dark:text-ink-400">{visit.date ? new Date(visit.date).toLocaleDateString() : '-'}</span>
                                         </span>
                                     </span>
                                     <span className="block text-xs text-slate-500 dark:text-ink-400 mt-0.5">
-                                        <span className="font-medium">Complaint:</span> {visit.chief_complaint || '—'} · <span className="font-medium">Dr:</span> {visit.doctor}
+                                        <span className="font-medium">Complaint:</span> {visit.chief_complaint || '-'} · <span className="font-medium">Dr:</span> {visit.doctor}
                                     </span>
                                 </span>
                             </button>
@@ -105,7 +105,7 @@ export default function VisitHistoryList({ visits }) {
                                                     {VITAL_LABELS.map(([key, label]) => (
                                                         <div key={key} className="rounded-lg bg-slate-50 dark:bg-ink-800/40 p-2">
                                                             <p className="text-2xs text-slate-400 dark:text-ink-400">{label}</p>
-                                                            <p className="text-sm font-semibold text-slate-800 dark:text-ink-200">{detail.vitals?.[key] ?? '—'}</p>
+                                                            <p className="text-sm font-semibold text-slate-800 dark:text-ink-200">{detail.vitals?.[key] ?? '-'}</p>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -141,7 +141,7 @@ export default function VisitHistoryList({ visits }) {
                                                         ))}
                                                     </ul>
                                                 ) : null}
-                                                <p className="text-sm text-slate-700 dark:text-ink-300 mt-1">{detail.diagnosis || '—'}</p>
+                                                <p className="text-sm text-slate-700 dark:text-ink-300 mt-1">{detail.diagnosis || '-'}</p>
                                             </Section>
                                             {detail.prescriptions?.length > 0 && (
                                                 <Section title="Prescriptions">
@@ -149,7 +149,7 @@ export default function VisitHistoryList({ visits }) {
                                                         {detail.prescriptions.map((p, i) => (
                                                             <li key={i} className="text-sm text-slate-700 dark:text-ink-300 flex items-center gap-2">
                                                                 <Pill size={13} className="text-accent-600 dark:text-accent-400 shrink-0" />
-                                                                <span><span className="font-semibold">{p.drug}</span> {p.formulation} — {p.dosage}, {p.frequency}, {p.duration}</span>
+                                                                <span><span className="font-semibold">{p.drug}</span> {p.formulation}. {p.dosage}, {p.frequency}, {p.duration}</span>
                                                             </li>
                                                         ))}
                                                     </ul>
@@ -169,7 +169,7 @@ export default function VisitHistoryList({ visits }) {
                                                         {detail.lab_tests.map((t) => (
                                                             <li key={t.test_id} className="text-sm text-slate-700 dark:text-ink-300 flex items-center gap-2">
                                                                 <TestTube size={13} className="text-brand-600 dark:text-brand-400 shrink-0" />
-                                                                <span><span className="font-semibold">{t.test_name}</span> · {t.status}{t.result_summary ? ` — ${t.result_summary}` : ''}</span>
+                                                                <span><span className="font-semibold">{t.test_name}</span> · {t.status}{t.result_summary ? `, ${t.result_summary}` : ''}</span>
                                                             </li>
                                                         ))}
                                                     </ul>
@@ -181,7 +181,7 @@ export default function VisitHistoryList({ visits }) {
                                                         {detail.radiology.map((r) => (
                                                             <li key={r.request_id} className="text-sm text-slate-700 dark:text-ink-300 flex items-center gap-2">
                                                                 <ImageIcon size={13} className="text-brand-600 dark:text-brand-400 shrink-0" />
-                                                                <span><span className="font-semibold">{r.exam_type}</span> · {r.status}{r.conclusion ? ` — ${r.conclusion}` : ''}</span>
+                                                                <span><span className="font-semibold">{r.exam_type}</span> · {r.status}{r.conclusion ? `, ${r.conclusion}` : ''}</span>
                                                             </li>
                                                         ))}
                                                     </ul>
