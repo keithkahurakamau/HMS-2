@@ -52,6 +52,12 @@ describe('Tabs', () => {
         expect(screen.getByRole('tab', { name: /orders/i })).toHaveAttribute('tabindex', '-1');
     });
 
+    it('renders an icon when one is given', () => {
+        const Icon = (props) => <svg data-testid="tab-icon" {...props} />;
+        render(<Tabs items={[{ id: 'a', label: 'Alpha', icon: Icon }]} activeId="a" onChange={() => {}} />);
+        expect(screen.getByTestId('tab-icon')).toBeInTheDocument();
+    });
+
     it('renders a count when one is given', () => {
         render(<Tabs items={items} activeId="orders" onChange={() => {}} />);
         expect(screen.getByRole('tab', { name: /results/i })).toHaveTextContent('3');

@@ -11,6 +11,8 @@ import {
     Receipt, Search, Target, FileMinus, RefreshCw,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import Tabs from '../components/ui/Tabs';
+import { SkeletonTable } from '../components/ui/Skeleton';
 import BudgetingTab from './accounting/BudgetingTab';
 import NotesTab from './accounting/NotesTab';
 import BulkAllocateModal from './accounting/BulkAllocateModal';
@@ -61,21 +63,12 @@ export default function Accounting() {
                 tone="brand"
             />
 
-            <div data-tour="acc-tabs" className="flex flex-wrap gap-2 border-b border-ink-200/70 dark:border-ink-800">
-                {TABS.map(({ key, label, icon: Icon }) => (
-                    <button type="button"
-                        key={key}
-                        onClick={() => setTab(key)}
-                        className={
-                            'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ' +
-                            (tab === key
-                                ? 'border-brand-600 text-brand-700 dark:text-brand-300'
-                                : 'border-transparent text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200')
-                        }
-                    >
-                        <Icon size={16} /> {label}
-                    </button>
-                ))}
+            <div data-tour="acc-tabs">
+                <Tabs
+                    items={TABS.map(({ key, label, icon }) => ({ id: key, label, icon }))}
+                    activeId={tab}
+                    onChange={setTab}
+                />
             </div>
 
             {tab === 'coa'        && <ChartOfAccountsTab />}
@@ -328,20 +321,20 @@ function JournalEntriesTab() {
             </div>
 
             <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">#</th>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Currency</th>
-                            <th className="text-left px-4 py-2 font-medium">Reference</th>
-                            <th className="text-left px-4 py-2 font-medium">Memo</th>
-                            <th className="text-right px-4 py-2 font-medium">Total (Dr)</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
-                            <th className="px-4 py-2" aria-label="Actions"></th>
+                            <th className="font-medium">#</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Currency</th>
+                            <th className="font-medium">Reference</th>
+                            <th className="font-medium">Memo</th>
+                            <th className="num font-medium">Total (Dr)</th>
+                            <th className="font-medium">Status</th>
+                            <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {loading ? (
                             <tr><td colSpan={8} className="px-4 py-6 text-ink-500 dark:text-ink-400">Loading...</td></tr>
                         ) : entries.length === 0 ? (
@@ -350,18 +343,18 @@ function JournalEntriesTab() {
                             const totalDr = (e.lines || []).reduce((s, l) => s + Number(l.debit || 0), 0);
                             return (
                                 <tr key={e.entry_id}>
-                                    <td className="px-4 py-2 font-mono text-xs">{e.entry_number}</td>
-                                    <td className="px-4 py-2">{e.entry_date}</td>
-                                    <td className="px-4 py-2">{e.currency_code}</td>
-                                    <td className="px-4 py-2">{e.reference || '-'}</td>
-                                    <td className="px-4 py-2 text-ink-600 dark:text-ink-400">{e.memo || '-'}</td>
-                                    <td className="px-4 py-2 text-right font-mono">{formatAmount(totalDr)}</td>
-                                    <td className="px-4 py-2">
+                                    <td className="font-mono text-xs">{e.entry_number}</td>
+                                    <td>{e.entry_date}</td>
+                                    <td>{e.currency_code}</td>
+                                    <td>{e.reference || '-'}</td>
+                                    <td className="text-ink-600 dark:text-ink-400">{e.memo || '-'}</td>
+                                    <td className="num font-mono">{formatAmount(totalDr)}</td>
+                                    <td>
                                         <span className={`text-xs px-2 py-0.5 rounded-md ${STATUS_BADGE[e.status]}`}>
                                             {e.status}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-2 text-right">
+                                    <td className="num">
                                         {e.status === 'draft' && (
                                             <button type="button" onClick={() => post(e.entry_id)}
                                                     className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 hover:underline">
@@ -479,20 +472,20 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
             </Field>
 
             <div className="mt-4 border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-3 py-2 font-medium">Account</th>
-                            <th className="text-right px-3 py-2 font-medium w-32">Debit</th>
-                            <th className="text-right px-3 py-2 font-medium w-32">Credit</th>
-                            <th className="text-left px-3 py-2 font-medium">Description</th>
+                            <th className="font-medium">Account</th>
+                            <th className="num font-medium w-32">Debit</th>
+                            <th className="num font-medium w-32">Credit</th>
+                            <th className="font-medium">Description</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {lines.map((l, idx) => (
                             <tr key={l._uid}>
-                                <td className="px-3 py-1.5">
+                                <td>
                                     <select className="input" value={l.account_id}
                                             onChange={(e) => setLine(idx, { account_id: e.target.value })}>
                                         <option value="">, </option>
@@ -502,23 +495,23 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                                             </option>)}
                                     </select>
                                 </td>
-                                <td className="px-3 py-1.5">
+                                <td>
                                     <input type="number" step="0.01" className="input text-right"
                                            aria-label={`Debit, line ${idx + 1}`}
                                            value={l.debit}
                                            onChange={(e) => setLine(idx, { debit: e.target.value, credit: e.target.value ? '' : l.credit })} />
                                 </td>
-                                <td className="px-3 py-1.5">
+                                <td>
                                     <input type="number" step="0.01" className="input text-right"
                                            aria-label={`Credit, line ${idx + 1}`}
                                            value={l.credit}
                                            onChange={(e) => setLine(idx, { credit: e.target.value, debit: e.target.value ? '' : l.debit })} />
                                 </td>
-                                <td className="px-3 py-1.5">
+                                <td>
                                     <input className="input" aria-label={`Description, line ${idx + 1}`} value={l.description}
                                            onChange={(e) => setLine(idx, { description: e.target.value })} />
                                 </td>
-                                <td className="px-2">
+                                <td>
                                     {lines.length > 2 && (
                                         <button type="button" onClick={() => removeLine(idx)} className="text-ink-400 hover:text-rose-600">
                                             <X size={14} />
@@ -530,14 +523,14 @@ function NewJournalModal({ accounts, currencies, onClose, onSaved }) {
                     </tbody>
                     <tfoot className="bg-ink-50 dark:bg-ink-800/40">
                         <tr>
-                            <td className="px-3 py-2">
+                            <td>
                                 <button type="button" onClick={addLine}
                                         className="text-xs text-brand-700 dark:text-brand-300 hover:underline inline-flex items-center gap-1">
                                     <Plus size={12} /> Add line
                                 </button>
                             </td>
-                            <td className="px-3 py-2 text-right font-mono">{formatAmount(totals.dr)}</td>
-                            <td className="px-3 py-2 text-right font-mono">{formatAmount(totals.cr)}</td>
+                            <td className="num font-mono">{formatAmount(totals.dr)}</td>
+                            <td className="num font-mono">{formatAmount(totals.cr)}</td>
                             <td colSpan={2} className="px-3 py-2">
                                 {totals.balanced ? (
                                     <span className="text-xs text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-1">
@@ -884,30 +877,30 @@ function SuppliersSection() {
             <SectionHeader title="Suppliers" subtitle="Vendors you buy goods and services from."
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No suppliers yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Name</th>
-                            <th className="text-left px-4 py-2 font-medium">Contact</th>
-                            <th className="text-left px-4 py-2 font-medium">KRA PIN</th>
-                            <th className="text-right px-4 py-2 font-medium">Terms (days)</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Name</th>
+                            <th className="font-medium">Contact</th>
+                            <th className="font-medium">KRA PIN</th>
+                            <th className="num font-medium">Terms (days)</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((s) => (
                             <tr key={s.supplier_id}>
-                                <td className="px-4 py-1.5 font-medium">{s.name}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{s.contact_person || '-'}{s.email ? ` · ${s.email}` : ''}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{s.tax_pin || '-'}</td>
-                                <td className="px-4 py-1.5 text-right">{s.payment_terms_days}</td>
-                                <td className="px-4 py-1.5">
+                                <td className="font-medium">{s.name}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{s.contact_person || '-'}{s.email ? ` · ${s.email}` : ''}</td>
+                                <td className="font-mono text-xs">{s.tax_pin || '-'}</td>
+                                <td className="num">{s.payment_terms_days}</td>
+                                <td>
                                     <span className={'text-xs ' + (s.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {s.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="num">
                                     <button type="button" onClick={() => { setEditing(s); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
@@ -1022,28 +1015,28 @@ function InsuranceSection() {
             <SectionHeader title="Insurance Providers" subtitle="Insurers your hospital accepts (NHIF, AAR, Jubilee, etc.)."
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No providers yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Name</th>
-                            <th className="text-left px-4 py-2 font-medium">Contact</th>
-                            <th className="text-left px-4 py-2 font-medium">Phone</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Name</th>
+                            <th className="font-medium">Contact</th>
+                            <th className="font-medium">Phone</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((p) => (
                             <tr key={p.provider_id}>
-                                <td className="px-4 py-1.5 font-medium">{p.name}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{p.contact_person || '-'}{p.email ? ` · ${p.email}` : ''}</td>
-                                <td className="px-4 py-1.5">{p.phone || '-'}</td>
-                                <td className="px-4 py-1.5">
+                                <td className="font-medium">{p.name}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{p.contact_person || '-'}{p.email ? ` · ${p.email}` : ''}</td>
+                                <td>{p.phone || '-'}</td>
+                                <td>
                                     <span className={'text-xs ' + (p.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {p.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="num">
                                     <button type="button" onClick={() => { setEditing(p); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
@@ -1148,32 +1141,32 @@ function SchemesSection() {
                            disabled={providers.length === 0}
                            disabledMsg="Add an insurance provider first." />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No schemes yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Provider</th>
-                            <th className="text-left px-4 py-2 font-medium">Scheme</th>
-                            <th className="text-left px-4 py-2 font-medium">Code</th>
-                            <th className="text-right px-4 py-2 font-medium">Coverage limit</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Provider</th>
+                            <th className="font-medium">Scheme</th>
+                            <th className="font-medium">Code</th>
+                            <th className="num font-medium">Coverage limit</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((s) => (
                             <tr key={s.scheme_id}>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{providerName(s.provider_id)}</td>
-                                <td className="px-4 py-1.5 font-medium">{s.name}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{s.scheme_code || '-'}</td>
-                                <td className="px-4 py-1.5 text-right font-mono">
+                                <td className="text-ink-600 dark:text-ink-400">{providerName(s.provider_id)}</td>
+                                <td className="font-medium">{s.name}</td>
+                                <td className="font-mono text-xs">{s.scheme_code || '-'}</td>
+                                <td className="num font-mono">
                                     {s.coverage_limit ? formatAmount(s.coverage_limit) : '-'}
                                 </td>
-                                <td className="px-4 py-1.5">
+                                <td>
                                     <span className={'text-xs ' + (s.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {s.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="num">
                                     <button type="button" onClick={() => { setEditing(s); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
@@ -1317,34 +1310,34 @@ function PriceListSection() {
                 </button>
             </div>
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No price items yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Code</th>
-                            <th className="text-left px-4 py-2 font-medium">Service</th>
-                            <th className="text-left px-4 py-2 font-medium">Category</th>
-                            <th className="text-right px-4 py-2 font-medium">Unit price</th>
-                            <th className="text-right px-4 py-2 font-medium">Tax %</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Code</th>
+                            <th className="font-medium">Service</th>
+                            <th className="font-medium">Category</th>
+                            <th className="num font-medium">Unit price</th>
+                            <th className="num font-medium">Tax %</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((p) => (
                             <tr key={p.price_id}>
-                                <td className="px-4 py-1.5 font-mono text-xs">{p.service_code}</td>
-                                <td className="px-4 py-1.5">{p.name}</td>
-                                <td className="px-4 py-1.5">
+                                <td className="font-mono text-xs">{p.service_code}</td>
+                                <td>{p.name}</td>
+                                <td>
                                     <span className="text-xs px-2 py-0.5 rounded-md bg-ink-50 dark:bg-ink-800/40 text-ink-700 dark:text-ink-200">{p.category}</span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right font-mono">{formatAmount(p.unit_price)}</td>
-                                <td className="px-4 py-1.5 text-right">{Number(p.tax_rate_pct).toFixed(1)}%</td>
-                                <td className="px-4 py-1.5">
+                                <td className="num font-mono">{formatAmount(p.unit_price)}</td>
+                                <td className="num">{Number(p.tax_rate_pct).toFixed(1)}%</td>
+                                <td>
                                     <span className={'text-xs ' + (p.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {p.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right whitespace-nowrap">
+                                <td className="num whitespace-nowrap">
                                     <button type="button" onClick={() => { setEditing(p); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                     <button type="button" onClick={() => deleteItem(p)}
@@ -1476,24 +1469,24 @@ function MappingsSection() {
                 </p>
             </div>
             <DataCard loading={loading} empty={catalogue.length === 0} emptyMsg="No mappings.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Source key</th>
-                            <th className="text-left px-4 py-2 font-medium">Description</th>
-                            <th className="text-left px-4 py-2 font-medium">Debit (Dr)</th>
-                            <th className="text-left px-4 py-2 font-medium">Credit (Cr)</th>
+                            <th className="font-medium">Source key</th>
+                            <th className="font-medium">Description</th>
+                            <th className="font-medium">Debit (Dr)</th>
+                            <th className="font-medium">Credit (Cr)</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {catalogue.map((c) => (
                             <tr key={c.source_key}>
-                                <td className="px-4 py-1.5 font-mono text-xs">{c.source_key}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{c.description}</td>
-                                <td className="px-4 py-1.5">{codeName(c.mapping?.debit_account_id)}</td>
-                                <td className="px-4 py-1.5">{codeName(c.mapping?.credit_account_id)}</td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="font-mono text-xs">{c.source_key}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{c.description}</td>
+                                <td>{codeName(c.mapping?.debit_account_id)}</td>
+                                <td>{codeName(c.mapping?.credit_account_id)}</td>
+                                <td className="num">
                                     {c.mapping ? (
                                         <button type="button" onClick={() => setEditing(c.mapping)}
                                                 className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
@@ -1577,9 +1570,9 @@ function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg }) {
 
 function DataCard({ loading, empty, emptyMsg, children }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+        <div className="card-flush overflow-hidden">
             {loading ? (
-                <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
+                <div className="p-6"><SkeletonTable rows={4} cols={4} /></div>
             ) : empty ? (
                 <div className="p-6 text-sm text-ink-500 dark:text-ink-400">{emptyMsg}</div>
             ) : children}
@@ -1752,36 +1745,36 @@ function TransactionLogTab() {
 
             {/* Table */}
             <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Entry #</th>
-                            <th className="text-left px-4 py-2 font-medium">Source</th>
-                            <th className="text-left px-4 py-2 font-medium">Reference</th>
-                            <th className="text-left px-4 py-2 font-medium">Memo</th>
-                            <th className="text-right px-4 py-2 font-medium">Amount</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Entry #</th>
+                            <th className="font-medium">Source</th>
+                            <th className="font-medium">Reference</th>
+                            <th className="font-medium">Memo</th>
+                            <th className="num font-medium">Amount</th>
+                            <th className="font-medium">Status</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {loading ? (
                             <tr><td colSpan={7} className="px-4 py-6 text-ink-500 dark:text-ink-400">Loading…</td></tr>
                         ) : rows.length === 0 ? (
                             <tr><td colSpan={7} className="px-4 py-6 text-ink-500 dark:text-ink-400">No transactions match these filters.</td></tr>
                         ) : rows.map((r) => (
                             <tr key={r.entry_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
-                                <td className="px-4 py-2 whitespace-nowrap">{r.entry_date}</td>
-                                <td className="px-4 py-2 font-mono text-xs">{r.entry_number}</td>
-                                <td className="px-4 py-2">
+                                <td className="whitespace-nowrap">{r.entry_date}</td>
+                                <td className="font-mono text-xs">{r.entry_number}</td>
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ring-1 ${SOURCE_TONE[r.source_label] || 'bg-ink-100 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400 ring-ink-200 dark:ring-ink-800'}`}>
                                         {r.source_label}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2">{r.reference || '-'}</td>
-                                <td className="px-4 py-2 text-ink-600 dark:text-ink-400 max-w-[22rem] truncate" title={r.memo || ''}>{r.memo || '-'}</td>
-                                <td className="px-4 py-2 text-right font-mono whitespace-nowrap">{formatAmount(r.amount)}</td>
-                                <td className="px-4 py-2">
+                                <td>{r.reference || '-'}</td>
+                                <td className="text-ink-600 dark:text-ink-400 max-w-[22rem] truncate" title={r.memo || ''}>{r.memo || '-'}</td>
+                                <td className="num font-mono whitespace-nowrap">{formatAmount(r.amount)}</td>
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${STATUS_BADGE[r.status] || ''}`}>{r.status}</span>
                                 </td>
                             </tr>
@@ -1964,39 +1957,39 @@ function TrialBalanceView({ data }) {
                     Difference: {formatAmount(data.totals.difference)}
                 </span>
             </div>
-            <table className="w-full text-sm">
-                <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+            <table className="table-clean">
+                <thead>
                     <tr>
-                        <th className="text-left px-4 py-2 font-medium">Code</th>
-                        <th className="text-left px-4 py-2 font-medium">Account</th>
-                        <th className="text-left px-4 py-2 font-medium">Type</th>
-                        <th className="text-right px-4 py-2 font-medium">Debit</th>
-                        <th className="text-right px-4 py-2 font-medium">Credit</th>
-                        <th className="text-right px-4 py-2 font-medium">Balance</th>
+                        <th className="font-medium">Code</th>
+                        <th className="font-medium">Account</th>
+                        <th className="font-medium">Type</th>
+                        <th className="num font-medium">Debit</th>
+                        <th className="num font-medium">Credit</th>
+                        <th className="num font-medium">Balance</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                <tbody>
                     {data.rows.length === 0 ? (
                         <tr><td colSpan={6} className="px-4 py-6 text-ink-500 dark:text-ink-400">No posted entries up to this date.</td></tr>
                     ) : data.rows.map(r => (
                         <tr key={r.account_id}>
-                            <td className="px-4 py-1.5 font-mono text-xs">{r.code}</td>
-                            <td className="px-4 py-1.5">{r.name}</td>
-                            <td className="px-4 py-1.5">
+                            <td className="font-mono text-xs">{r.code}</td>
+                            <td>{r.name}</td>
+                            <td>
                                 <span className={`text-xs px-2 py-0.5 rounded-md ${TYPE_TONE[r.account_type] || ''}`}>{r.account_type}</span>
                             </td>
-                            <td className="px-4 py-1.5 text-right font-mono">{formatAmount(r.debit)}</td>
-                            <td className="px-4 py-1.5 text-right font-mono">{formatAmount(r.credit)}</td>
-                            <td className="px-4 py-1.5 text-right font-mono font-semibold">{formatAmount(r.balance)}</td>
+                            <td className="num font-mono">{formatAmount(r.debit)}</td>
+                            <td className="num font-mono">{formatAmount(r.credit)}</td>
+                            <td className="num font-mono font-semibold">{formatAmount(r.balance)}</td>
                         </tr>
                     ))}
                 </tbody>
                 <tfoot className="bg-ink-50 dark:bg-ink-800/40">
                     <tr>
                         <td colSpan={3} className="px-4 py-2 font-semibold">Totals</td>
-                        <td className="px-4 py-2 text-right font-mono font-semibold">{formatAmount(data.totals.debit)}</td>
-                        <td className="px-4 py-2 text-right font-mono font-semibold">{formatAmount(data.totals.credit)}</td>
-                        <td className="px-4 py-2" aria-label="Actions"></td>
+                        <td className="num font-mono font-semibold">{formatAmount(data.totals.debit)}</td>
+                        <td className="num font-mono font-semibold">{formatAmount(data.totals.credit)}</td>
+                        <td aria-label="Actions"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -2093,24 +2086,24 @@ function DailyCollectionsView({ data }) {
                 </h3>
                 <span className="text-xs text-ink-700 dark:text-ink-200">Total: <span className="font-mono font-semibold">{formatAmount(data.total)}</span></span>
             </div>
-            <table className="w-full text-sm">
-                <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+            <table className="table-clean">
+                <thead>
                     <tr>
-                        <th className="text-left px-4 py-2 font-medium">Date</th>
-                        <th className="text-left px-4 py-2 font-medium">Code</th>
-                        <th className="text-left px-4 py-2 font-medium">Account</th>
-                        <th className="text-right px-4 py-2 font-medium">Amount</th>
+                        <th className="font-medium">Date</th>
+                        <th className="font-medium">Code</th>
+                        <th className="font-medium">Account</th>
+                        <th className="num font-medium">Amount</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                <tbody>
                     {data.rows.length === 0 ? (
                         <tr><td colSpan={4} className="px-4 py-6 text-ink-500 dark:text-ink-400">No cash collections in this window.</td></tr>
                     ) : data.rows.map((r) => (
                         <tr key={r.account_code}>
-                            <td className="px-4 py-1.5">{r.date}</td>
-                            <td className="px-4 py-1.5 font-mono text-xs">{r.account_code}</td>
-                            <td className="px-4 py-1.5">{r.account_name}</td>
-                            <td className="px-4 py-1.5 text-right font-mono">{formatAmount(r.amount)}</td>
+                            <td>{r.date}</td>
+                            <td className="font-mono text-xs">{r.account_code}</td>
+                            <td>{r.account_name}</td>
+                            <td className="num font-mono">{formatAmount(r.amount)}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -2263,38 +2256,38 @@ function ClaimsSection() {
                            disabledMsg="Add an insurance provider first (Configuration tab)." />
 
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No claim schedules yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Number</th>
-                            <th className="text-left px-4 py-2 font-medium">Provider</th>
-                            <th className="text-left px-4 py-2 font-medium">Period</th>
-                            <th className="text-right px-4 py-2 font-medium">Items</th>
-                            <th className="text-right px-4 py-2 font-medium">Claimed</th>
-                            <th className="text-right px-4 py-2 font-medium">Settled</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Number</th>
+                            <th className="font-medium">Provider</th>
+                            <th className="font-medium">Period</th>
+                            <th className="num font-medium">Items</th>
+                            <th className="num font-medium">Claimed</th>
+                            <th className="num font-medium">Settled</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(c => (
                             <tr key={c.schedule_id} className="hover:bg-ink-50/40 dark:hover:bg-ink-800/50">
-                                <td className="px-4 py-2 font-mono text-xs">
+                                <td className="font-mono text-xs">
                                     <button type="button" onClick={() => setSelected(c)} className="hover:underline">
                                         {c.schedule_number}
                                     </button>
                                 </td>
-                                <td className="px-4 py-2">{providerName(c.provider_id)}</td>
-                                <td className="px-4 py-2 text-ink-600 dark:text-ink-400">{c.period_from} → {c.period_to}</td>
-                                <td className="px-4 py-2 text-right">{c.items?.length || 0}</td>
-                                <td className="px-4 py-2 text-right font-mono">{formatAmount(c.total_amount)}</td>
-                                <td className="px-4 py-2 text-right font-mono">{c.settled_amount ? formatAmount(c.settled_amount) : '-'}</td>
-                                <td className="px-4 py-2">
+                                <td>{providerName(c.provider_id)}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{c.period_from} → {c.period_to}</td>
+                                <td className="num">{c.items?.length || 0}</td>
+                                <td className="num font-mono">{formatAmount(c.total_amount)}</td>
+                                <td className="num font-mono">{c.settled_amount ? formatAmount(c.settled_amount) : '-'}</td>
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${CLAIM_STATUS_BADGE[c.status]}`}>
                                         {c.status}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2 text-right space-x-2">
+                                <td className="num space-x-2">
                                     {c.status === 'draft' && (
                                         <button type="button" onClick={() => submit(c.schedule_id)}
                                                 className="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-sky-300 hover:underline">
@@ -2407,30 +2400,30 @@ function ClaimModal({ providers, onClose, onSaved }) {
             </div>
 
             <div className="mt-4 border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-3 py-2 font-medium">Invoice ref</th>
-                            <th className="text-left px-3 py-2 font-medium">Patient</th>
-                            <th className="text-left px-3 py-2 font-medium">Member #</th>
-                            <th className="text-right px-3 py-2 font-medium w-32">Amount</th>
+                            <th className="font-medium">Invoice ref</th>
+                            <th className="font-medium">Patient</th>
+                            <th className="font-medium">Member #</th>
+                            <th className="num font-medium w-32">Amount</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map((it, idx) => (
                             <tr key={it._uid}>
-                                <td className="px-3 py-1.5"><input className="input" aria-label="Invoice reference" value={it.invoice_reference}
+                                <td><input className="input" aria-label="Invoice reference" value={it.invoice_reference}
                                     onChange={e => setItem(idx, { invoice_reference: e.target.value })} /></td>
-                                <td className="px-3 py-1.5"><input className="input" aria-label="Patient name" value={it.patient_name}
+                                <td><input className="input" aria-label="Patient name" value={it.patient_name}
                                     onChange={e => setItem(idx, { patient_name: e.target.value })} /></td>
-                                <td className="px-3 py-1.5"><input className="input" aria-label="Member number" value={it.member_number}
+                                <td><input className="input" aria-label="Member number" value={it.member_number}
                                     onChange={e => setItem(idx, { member_number: e.target.value })} /></td>
-                                <td className="px-3 py-1.5"><input type="number" step="0.01" className="input text-right"
+                                <td><input type="number" step="0.01" className="input text-right"
                                     aria-label="Amount claimed"
                                     value={it.amount_claimed}
                                     onChange={e => setItem(idx, { amount_claimed: e.target.value })} /></td>
-                                <td className="px-2">
+                                <td>
                                     {items.length > 1 && (
                                         <button type="button" onClick={() => removeItem(idx)} className="text-ink-400 hover:text-rose-600">
                                             <X size={14} />
@@ -2448,7 +2441,7 @@ function ClaimModal({ providers, onClose, onSaved }) {
                                     <Plus size={12} /> Add item
                                 </button>
                             </td>
-                            <td className="px-3 py-2 text-right font-mono font-semibold">{formatAmount(total)}</td>
+                            <td className="num font-mono font-semibold">{formatAmount(total)}</td>
                             <td aria-label="Actions"></td>
                         </tr>
                     </tfoot>
@@ -2485,22 +2478,22 @@ function ClaimDetailsModal({ claim, providerName, onClose }) {
                 </div>
             )}
             <div className="border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-3 py-2 font-medium">Invoice ref</th>
-                            <th className="text-left px-3 py-2 font-medium">Patient</th>
-                            <th className="text-left px-3 py-2 font-medium">Member #</th>
-                            <th className="text-right px-3 py-2 font-medium">Amount</th>
+                            <th className="font-medium">Invoice ref</th>
+                            <th className="font-medium">Patient</th>
+                            <th className="font-medium">Member #</th>
+                            <th className="num font-medium">Amount</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {claim.items.map(it => (
                             <tr key={it.item_id}>
-                                <td className="px-3 py-1.5">{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '-')}</td>
-                                <td className="px-3 py-1.5">{it.patient_name || '-'}</td>
-                                <td className="px-3 py-1.5 font-mono text-xs">{it.member_number || '-'}</td>
-                                <td className="px-3 py-1.5 text-right font-mono">{formatAmount(it.amount_claimed)}</td>
+                                <td>{it.invoice_reference || (it.invoice_id ? `#${it.invoice_id}` : '-')}</td>
+                                <td>{it.patient_name || '-'}</td>
+                                <td className="font-mono text-xs">{it.member_number || '-'}</td>
+                                <td className="num font-mono">{formatAmount(it.amount_claimed)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -2533,38 +2526,38 @@ function DepositsSection() {
                            onNew={() => setOpen(true)} />
 
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No deposits yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Number</th>
-                            <th className="text-left px-4 py-2 font-medium">Patient #</th>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Method</th>
-                            <th className="text-right px-4 py-2 font-medium">Amount</th>
-                            <th className="text-right px-4 py-2 font-medium">Applied</th>
-                            <th className="text-right px-4 py-2 font-medium">Available</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Number</th>
+                            <th className="font-medium">Patient #</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Method</th>
+                            <th className="num font-medium">Amount</th>
+                            <th className="num font-medium">Applied</th>
+                            <th className="num font-medium">Available</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(d => {
                             const avail = Number(d.amount) - Number(d.amount_applied || 0);
                             return (
                                 <tr key={d.deposit_id}>
-                                    <td className="px-4 py-1.5 font-mono text-xs">{d.deposit_number}</td>
-                                    <td className="px-4 py-1.5">{d.patient_id}</td>
-                                    <td className="px-4 py-1.5">{d.deposit_date}</td>
-                                    <td className="px-4 py-1.5">{d.method}</td>
-                                    <td className="px-4 py-1.5 text-right font-mono">{formatAmount(d.amount)}</td>
-                                    <td className="px-4 py-1.5 text-right font-mono">{formatAmount(d.amount_applied || 0)}</td>
-                                    <td className="px-4 py-1.5 text-right font-mono font-semibold">{formatAmount(avail)}</td>
-                                    <td className="px-4 py-1.5">
+                                    <td className="font-mono text-xs">{d.deposit_number}</td>
+                                    <td>{d.patient_id}</td>
+                                    <td>{d.deposit_date}</td>
+                                    <td>{d.method}</td>
+                                    <td className="num font-mono">{formatAmount(d.amount)}</td>
+                                    <td className="num font-mono">{formatAmount(d.amount_applied || 0)}</td>
+                                    <td className="num font-mono font-semibold">{formatAmount(avail)}</td>
+                                    <td>
                                         <span className={`text-xs px-2 py-0.5 rounded-md ${DEPOSIT_STATUS_BADGE[d.status]}`}>
                                             {d.status}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-1.5 text-right space-x-3 whitespace-nowrap">
+                                    <td className="num space-x-3 whitespace-nowrap">
                                         {avail > 0 && (
                                             <>
                                                 <button type="button" onClick={() => setApplying(d)}
@@ -2772,32 +2765,32 @@ function BankAccountsSection() {
             <SectionHeader title="Bank Accounts" subtitle="Bank accounts linked to GL asset accounts for reconciliation."
                            onNew={() => { setEditing(null); setOpen(true); }} />
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No bank accounts yet.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Name</th>
-                            <th className="text-left px-4 py-2 font-medium">Bank</th>
-                            <th className="text-left px-4 py-2 font-medium">Account #</th>
-                            <th className="text-left px-4 py-2 font-medium">Currency</th>
-                            <th className="text-left px-4 py-2 font-medium">GL link</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Name</th>
+                            <th className="font-medium">Bank</th>
+                            <th className="font-medium">Account #</th>
+                            <th className="font-medium">Currency</th>
+                            <th className="font-medium">GL link</th>
+                            <th className="font-medium">Status</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(b => (
                             <tr key={b.bank_account_id}>
-                                <td className="px-4 py-1.5 font-medium">{b.name}</td>
-                                <td className="px-4 py-1.5">{b.bank_name}{b.branch ? ` · ${b.branch}` : ''}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{b.account_number}</td>
-                                <td className="px-4 py-1.5">{b.currency_code}</td>
-                                <td className="px-4 py-1.5 text-ink-600 dark:text-ink-400">{accountName(b.gl_account_id)}</td>
-                                <td className="px-4 py-1.5">
+                                <td className="font-medium">{b.name}</td>
+                                <td>{b.bank_name}{b.branch ? ` · ${b.branch}` : ''}</td>
+                                <td className="font-mono text-xs">{b.account_number}</td>
+                                <td>{b.currency_code}</td>
+                                <td className="text-ink-600 dark:text-ink-400">{accountName(b.gl_account_id)}</td>
+                                <td>
                                     <span className={'text-xs ' + (b.is_active ? 'text-emerald-700 dark:text-emerald-300' : 'text-ink-400')}>
                                         {b.is_active ? 'active' : 'inactive'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-1.5 text-right">
+                                <td className="num">
                                     <button type="button" onClick={() => { setEditing(b); setOpen(true); }}
                                             className="text-xs text-brand-700 dark:text-brand-300 hover:underline">Edit</button>
                                 </td>
@@ -2923,29 +2916,29 @@ function BankTransactionsSection() {
             </div>
 
             <DataCard loading={loading} empty={items.length === 0} emptyMsg="No transactions.">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Account</th>
-                            <th className="text-left px-4 py-2 font-medium">Description</th>
-                            <th className="text-left px-4 py-2 font-medium">Reference</th>
-                            <th className="text-right px-4 py-2 font-medium">Amount</th>
-                            <th className="text-left px-4 py-2 font-medium">Status</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Account</th>
+                            <th className="font-medium">Description</th>
+                            <th className="font-medium">Reference</th>
+                            <th className="num font-medium">Amount</th>
+                            <th className="font-medium">Status</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(t => (
                             <tr key={t.bank_transaction_id}>
-                                <td className="px-4 py-1.5">{t.transaction_date}</td>
-                                <td className="px-4 py-1.5">{accountName(t.bank_account_id)}</td>
-                                <td className="px-4 py-1.5 text-ink-700 dark:text-ink-200">{t.description}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '-'}</td>
+                                <td>{t.transaction_date}</td>
+                                <td>{accountName(t.bank_account_id)}</td>
+                                <td className="text-ink-700 dark:text-ink-200">{t.description}</td>
+                                <td className="font-mono text-xs">{t.reference || '-'}</td>
                                 <td className={'px-4 py-1.5 text-right font-mono ' +
                                     (Number(t.amount) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                                     {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
                                 </td>
-                                <td className="px-4 py-1.5">
+                                <td>
                                     <span className={`text-xs px-2 py-0.5 rounded-md ${RECON_BADGE[t.reconciliation_status]}`}>
                                         {t.reconciliation_status}
                                     </span>
@@ -3081,27 +3074,27 @@ function ReconciliationSection() {
 
             <DataCard loading={loading} empty={items.length === 0}
                       emptyMsg={selected ? 'Nothing left to reconcile here.' : 'Pick an account above.'}>
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-4 py-2 font-medium">Date</th>
-                            <th className="text-left px-4 py-2 font-medium">Description</th>
-                            <th className="text-left px-4 py-2 font-medium">Reference</th>
-                            <th className="text-right px-4 py-2 font-medium">Amount</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Description</th>
+                            <th className="font-medium">Reference</th>
+                            <th className="num font-medium">Amount</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {items.map(t => (
                             <tr key={t.bank_transaction_id}>
-                                <td className="px-4 py-1.5">{t.transaction_date}</td>
-                                <td className="px-4 py-1.5">{t.description}</td>
-                                <td className="px-4 py-1.5 font-mono text-xs">{t.reference || '-'}</td>
+                                <td>{t.transaction_date}</td>
+                                <td>{t.description}</td>
+                                <td className="font-mono text-xs">{t.reference || '-'}</td>
                                 <td className={'px-4 py-1.5 text-right font-mono ' +
                                     (Number(t.amount) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
                                     {Number(t.amount) >= 0 ? '+' : ''}{formatAmount(t.amount)}
                                 </td>
-                                <td className="px-4 py-1.5 text-right space-x-2">
+                                <td className="num space-x-2">
                                     <button type="button" onClick={() => setMatching(t)}
                                             className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline inline-flex items-center gap-1">
                                         <Check size={12} /> Match
@@ -3164,26 +3157,26 @@ function MatchModal({ tx, onClose, onSaved }) {
                 </div>
             ) : (
                 <div className="border border-ink-200 dark:border-ink-800 rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead className="bg-ink-50 dark:bg-ink-800/40 text-ink-600 dark:text-ink-400">
+                    <table className="table-clean">
+                        <thead>
                             <tr>
-                                <th className="text-left px-3 py-2 font-medium">Entry</th>
-                                <th className="text-left px-3 py-2 font-medium">Date</th>
-                                <th className="text-right px-3 py-2 font-medium">Debit</th>
-                                <th className="text-right px-3 py-2 font-medium">Credit</th>
-                                <th className="text-left px-3 py-2 font-medium">Memo</th>
+                                <th className="font-medium">Entry</th>
+                                <th className="font-medium">Date</th>
+                                <th className="num font-medium">Debit</th>
+                                <th className="num font-medium">Credit</th>
+                                <th className="font-medium">Memo</th>
                                 <th aria-label="Actions"></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                        <tbody>
                             {candidates.map(c => (
                                 <tr key={c.line_id}>
-                                    <td className="px-3 py-1.5 font-mono text-xs">{c.entry_number}</td>
-                                    <td className="px-3 py-1.5">{c.entry_date}</td>
-                                    <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.debit)}</td>
-                                    <td className="px-3 py-1.5 text-right font-mono">{formatAmount(c.credit)}</td>
-                                    <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{c.memo || c.description || '-'}</td>
-                                    <td className="px-3 py-1.5 text-right">
+                                    <td className="font-mono text-xs">{c.entry_number}</td>
+                                    <td>{c.entry_date}</td>
+                                    <td className="num font-mono">{formatAmount(c.debit)}</td>
+                                    <td className="num font-mono">{formatAmount(c.credit)}</td>
+                                    <td className="text-ink-600 dark:text-ink-400">{c.memo || c.description || '-'}</td>
+                                    <td className="num">
                                         <button type="button" onClick={() => match(c.line_id)} disabled={saving}
                                                 className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline">
                                             Match

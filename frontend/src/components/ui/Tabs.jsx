@@ -11,13 +11,18 @@ import React, { useRef } from 'react';
  *  a keyboard user does not have to tab through eleven of them to reach the
  *  panel.
  *
+ *  The strip scrolls horizontally rather than wrapping: a wrapped tab strip
+ *  moves the content below it as the active tab changes rows, and Accounting
+ *  alone carries ten tabs.
+ *
  *  The active indicator animates scaleX from 0 to 1 rather than sliding a
  *  positioned bar, and the transition is CSS rather than a keyframe, so an
  *  interrupted change reverses from wherever it currently is instead of
  *  snapping. The button itself is never scaled, only the underline.
  *
  *  Props:
- *   - items:    [{ id, label, count? }]. `count` renders a neutral badge.
+ *   - items:    [{ id, label, count?, icon? }]. `count` renders a neutral
+ *               badge; `icon` is a component, rendered before the label.
  *   - activeId: the currently selected item id.
  *   - onChange: (id) => void, called on click and on arrow key.
  */
@@ -34,9 +39,10 @@ export default function Tabs({ items, activeId, onChange }) {
     };
 
     return (
-        <div role="tablist" className="flex items-center gap-1 border-b border-ink-200 dark:border-ink-800">
+        <div role="tablist" className="flex items-center gap-1 overflow-x-auto border-b border-ink-200 dark:border-ink-800">
             {items.map((item, index) => {
                 const active = item.id === activeId;
+                const Icon = item.icon;
                 return (
                     <button
                         key={item.id}
@@ -48,7 +54,7 @@ export default function Tabs({ items, activeId, onChange }) {
                         onClick={() => onChange(item.id)}
                         onKeyDown={(event) => handleKeyDown(event, index)}
                         className={[
-                            'relative inline-flex items-center gap-2 px-3 text-sm font-medium',
+                            'relative inline-flex shrink-0 items-center gap-2 px-3 text-sm font-medium whitespace-nowrap',
                             'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-t-md',
                             active
                                 ? 'text-brand-700 dark:text-brand-300'
@@ -56,6 +62,7 @@ export default function Tabs({ items, activeId, onChange }) {
                         ].join(' ')}
                         style={{ height: 'var(--ctl-h)', transition: 'color var(--dur-fast) var(--ease-out)' }}
                     >
+                        {Icon && <Icon size={16} aria-hidden="true" />}
                         {item.label}
                         {typeof item.count === 'number' && (
                             <span className="badge-neutral tnum">{item.count}</span>
