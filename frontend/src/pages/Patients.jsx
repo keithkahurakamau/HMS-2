@@ -632,17 +632,17 @@ export default function Patients() {
             {/* ── Desktop table (md+) ─────────────────────────────────────── */}
             <div className="hidden md:block card overflow-visible">
                 <div className="overflow-x-auto overflow-y-visible">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-ink-50 dark:bg-ink-900/40 text-ink-600 dark:text-ink-400 text-2xs uppercase font-semibold tracking-[0.14em]">
+                    <table className="table-clean">
+                        <thead>
                             <tr>
-                                <th className="px-5 py-3">Patient</th>
-                                <th className="px-5 py-3">Contact</th>
-                                <th className="px-5 py-3">Vitals</th>
-                                <th className="px-5 py-3">Route to queue</th>
-                                <th className="px-5 py-3 text-right">Manage</th>
+                                <th>Patient</th>
+                                <th>Contact</th>
+                                <th>Vitals</th>
+                                <th>Route to queue</th>
+                                <th className="num">Manage</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-ink-100 dark:divide-ink-800 text-ink-700 dark:text-ink-300">
+                        <tbody>
                             {isLoading ? (
                                 <tr>
                                     <td colSpan="5" className="px-6 py-12 text-center text-ink-500">
@@ -665,7 +665,7 @@ export default function Patients() {
                                     return (
                                         <tr key={patient.patient_id} className="hover:bg-ink-50/60 transition-colors">
                                             {/* Patient */}
-                                            <td className="px-5 py-3 align-top">
+                                            <td className="align-top">
                                                 <div className="flex items-start gap-3">
                                                     <div className={`shrink-0 size-10 rounded-full flex items-center justify-center text-sm font-semibold ${avatarColor(patient.outpatient_no)}`} aria-hidden="true">
                                                         {initialsOf(patient)}
@@ -686,7 +686,7 @@ export default function Patients() {
                                             </td>
 
                                             {/* Contact */}
-                                            <td className="px-5 py-3 align-top text-xs">
+                                            <td className="align-top text-xs">
                                                 <div className="flex items-center gap-1.5 text-ink-700 dark:text-ink-300">
                                                     <Phone size={12} className="text-ink-400 shrink-0" aria-hidden="true" />
                                                     <span className="truncate">{patient.telephone_1 || '-'}</span>
@@ -701,7 +701,7 @@ export default function Patients() {
                                             </td>
 
                                             {/* Vitals */}
-                                            <td className="px-5 py-3 align-top text-xs">
+                                            <td className="align-top text-xs">
                                                 <div className="flex items-center gap-1.5 text-ink-700 dark:text-ink-300">
                                                     <Droplet size={12} className="text-rose-500 shrink-0" aria-hidden="true" />
                                                     <span>{patient.blood_group && patient.blood_group !== 'Unknown' ? patient.blood_group : 'Unknown'}</span>
@@ -718,7 +718,7 @@ export default function Patients() {
                                             </td>
 
                                             {/* Route to queue */}
-                                            <td className="px-5 py-3 align-top">
+                                            <td className="align-top">
                                                 <div data-tour="patient-row-route-chips" className="flex flex-wrap gap-1">
                                                     {ROUTE_TARGETS.map(t => {
                                                         const Icon = t.icon;
@@ -744,7 +744,7 @@ export default function Patients() {
                                             </td>
 
                                             {/* Manage dropdown */}
-                                            <td className="px-5 py-3 text-right align-top">
+                                            <td className="num align-top">
                                                 <button
                                                     type="button"
                                                     data-tour="patient-row-more"
@@ -881,7 +881,7 @@ export default function Patients() {
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
 
-                    <div className="relative w-full max-w-4xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-4xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-6 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shrink-0">
                             <div>
                                 <span className="section-eyebrow">New registration</span>
@@ -1336,7 +1336,7 @@ function RouteToModal({ patient, target, busy, onSubmit, onClose }) {
             aria-modal="true"
             aria-labelledby="route-modal-title"
         >
-            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-lg max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay w-full max-w-lg max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
                 {/* Header */}
                 <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-900/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0 flex items-start gap-3">
@@ -1587,7 +1587,7 @@ function RowMenu({ patient, anchorEl, onClose, onViewDetails, onView, onEdit, on
                 width: MENU_WIDTH,
                 opacity: pos.ready ? 1 : 0,
             }}
-            className="bg-white dark:bg-ink-900 rounded-xl shadow-elevated border border-ink-200 dark:border-ink-800 py-2 z-[60] text-left animate-fade-in"
+            className="bg-white dark:bg-ink-900 rounded-xl shadow-overlay border border-ink-200 dark:border-ink-800 py-2 z-[60] text-left animate-fade-in"
         >
             <div className="px-3 pt-1 pb-1.5 text-2xs font-semibold text-ink-500 uppercase tracking-[0.14em]">Manage</div>
             <button type="button" role="menuitem" onClick={() => onViewDetails(patient)} className="w-full px-3.5 py-2 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-ink-800/50 flex items-center gap-2.5 cursor-pointer">
@@ -1716,7 +1716,7 @@ function PatientDetailsModal({ patient, onClose, onEdit }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm cursor-default" onClick={onClose} />
             <div role="dialog" aria-modal="true" aria-label="Patient details"
-                className="relative w-full max-w-2xl max-h-[90vh] bg-white dark:bg-ink-900 rounded-2xl shadow-elevated flex flex-col">
+                className="relative w-full max-w-2xl max-h-[90vh] bg-white dark:bg-ink-900 rounded-xl shadow-overlay flex flex-col">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3 p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="flex items-center gap-3 min-w-0">
@@ -1853,7 +1853,7 @@ function EditPatientModal({ patient, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="relative bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-3xl max-h-[90vh] flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div>
                         <h3 className="text-lg font-semibold text-ink-900 dark:text-ink-100">Edit patient</h3>

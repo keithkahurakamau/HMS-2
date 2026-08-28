@@ -435,11 +435,11 @@ export default function Laboratory() {
             <div data-tour="lab-tabs" className="card p-2 flex items-center justify-between shrink-0">
                 <div role="tablist" aria-label="Laboratory mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
                     <button type="button" role="tab" aria-selected={activeTab === 'queue'} onClick={() => setActiveTab('queue')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'queue' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <Microscope size={16} className={activeTab === 'queue' ? 'text-brand-600' : 'text-ink-400'} /> Lab Operations
                     </button>
                     <button type="button" role="tab" aria-selected={activeTab === 'catalog'} onClick={() => setActiveTab('catalog')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <FileDigit size={16} className={activeTab === 'catalog' ? 'text-accent-600' : 'text-ink-400'} /> Test Catalog
                     </button>
                 </div>
@@ -683,7 +683,7 @@ export default function Laboratory() {
                                                                         <td className="font-semibold">
                                                                             {item.is_reusable ? '1 use (no deduct)' : `${item.quantity} ${item.unit}`}
                                                                         </td>
-                                                                        <td className="text-right">
+                                                                        <td className="num">
                                                                             <button type="button" onClick={() => removeConsumedItem(item.batch_id)} aria-label="Remove"
                                                                                     className="text-ink-400 hover:text-rose-600"><Trash2 size={15} /></button>
                                                                         </td>
@@ -748,7 +748,7 @@ export default function Laboratory() {
                                     <th>Price</th>
                                     <th>Barcode</th>
                                     <th>Status</th>
-                                    <th className="text-right">Actions</th>
+                                    <th className="num">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -768,7 +768,7 @@ export default function Laboratory() {
                                         <td className="font-mono">{Number(test.base_price).toFixed(2)}</td>
                                         <td>{test.requires_barcode ? <span className="badge-warn text-2xs">Required</span> : <span className="badge-neutral text-2xs">Optional</span>}</td>
                                         <td>{test.is_active ? <span className="badge-success text-2xs">Active</span> : <span className="badge-neutral text-2xs">Inactive</span>}</td>
-                                        <td className="text-right">
+                                        <td className="num">
                                             <button type="button" onClick={() => startEdit(test)} className="text-brand-600 hover:text-brand-800 p-1.5" aria-label="Edit"><Pencil size={15} /></button>
                                             {test.is_active && (
                                                 <button type="button" onClick={() => deactivateCatalog(test)} className="text-rose-600 hover:text-rose-800 p-1.5 ml-1" aria-label="Deactivate"><Trash2 size={15} /></button>
@@ -786,7 +786,7 @@ export default function Laboratory() {
             {editorOpen && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setEditorOpen(false)} />
-                    <div className="relative w-full max-w-3xl bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-3xl bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shrink-0">
                             <div>
                                 <span className="section-eyebrow">{editing ? 'Edit test' : 'New test'}</span>

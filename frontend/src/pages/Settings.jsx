@@ -182,12 +182,12 @@ export default function Settings() {
             {/* Branding Studio promo card: distinct from the flat key/value store. */}
             <Link
                 to="/app/branding"
-                className="block group relative overflow-hidden rounded-2xl bg-brand-gradient text-white p-6 shadow-soft hover:shadow-elevated transition-all cursor-pointer"
+                className="block group relative overflow-hidden rounded-xl bg-brand-gradient text-white p-6 hover:shadow-overlay transition-all cursor-pointer"
             >
                 <div className="absolute inset-0 bg-aurora opacity-60 pointer-events-none" />
                 <div className="relative flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-4">
-                        <div className="size-12 rounded-2xl bg-white/15 backdrop-blur ring-1 ring-white/20 flex items-center justify-center">
+                        <div className="size-12 rounded-xl bg-white/15 backdrop-blur ring-1 ring-white/20 flex items-center justify-center">
                             <Palette size={20} />
                         </div>
                         <div>
@@ -267,7 +267,7 @@ export default function Settings() {
             {showCustomForm && (
                 <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                     <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => dispatchCustom({ type: 'close' })} />
-                    <div className="relative w-full max-w-lg bg-white dark:bg-ink-900 h-full shadow-elevated flex flex-col animate-slide-in-right">
+                    <div className="relative w-full max-w-lg bg-white dark:bg-ink-900 h-full shadow-overlay flex flex-col animate-slide-in-right">
                         <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                             <h2 className="text-lg font-semibold dark:text-white flex items-center gap-2"><Plus size={18} /> Add custom setting</h2>
                             <button type="button" onClick={() => dispatchCustom({ type: 'close' })} aria-label="Close" className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 p-2 hover:bg-ink-100 dark:hover:bg-ink-800/50 rounded-full cursor-pointer">

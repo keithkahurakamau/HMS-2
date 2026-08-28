@@ -676,7 +676,7 @@ export default function ClinicalDesk() {
                                     { id: 'history', label: 'Patient History' },
                                 ].map((t) => (
                                     <button type="button" key={t.id} onClick={() => setActiveTab(t.id)}
-                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === t.id ? 'bg-white dark:bg-ink-900 text-brand-700 dark:text-brand-300 shadow-soft' : 'text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200'}`}>
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === t.id ? 'bg-white dark:bg-ink-900 text-brand-700 dark:text-brand-300' : 'text-ink-500 dark:text-ink-400 hover:text-ink-800 dark:hover:text-ink-200'}`}>
                                         {t.label}
                                     </button>
                                 ))}
@@ -819,7 +819,7 @@ export default function ClinicalDesk() {
                                 <button type="button" data-tour="clinical-forward-pharmacy" onClick={() => handleClinicalSubmit('Pharmacy')} disabled={isSubmitting} className="btn-success">
                                     <Pill size={15} /> Forward to pharmacy
                                 </button>
-                                <button type="button" data-tour="clinical-finalize" onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 dark:bg-ink-700 text-white hover:bg-ink-900 dark:hover:bg-ink-600 shadow-soft">
+                                <button type="button" data-tour="clinical-finalize" onClick={() => handleClinicalSubmit('Completed')} disabled={isSubmitting} className="btn bg-ink-800 dark:bg-ink-700 text-white hover:bg-ink-900 dark:hover:bg-ink-600">
                                     <FileSignature size={15} /> Finalize &amp; sign
                                 </button>
                             </div>
@@ -959,10 +959,10 @@ function ConsultationFeeModal({ current, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-sm overflow-hidden flex flex-col">
+            <div className="relative bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-sm overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                        <div className="size-9 rounded-xl bg-brand-600 text-white flex items-center justify-center">
                             <Receipt size={17} />
                         </div>
                         <div>
@@ -1022,10 +1022,10 @@ function ConsentModal({ patient, draft, setDraft, submitting, onClose, onSubmit 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="relative bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 text-white flex items-center justify-center shadow-soft">
+                        <div className="size-9 rounded-xl bg-brand-600 text-white flex items-center justify-center">
                             <ShieldCheck size={17} />
                         </div>
                         <div>
@@ -1215,7 +1215,7 @@ function FollowUpModal({ patient, existing, onClose, onBooked }) {
             aria-modal="true"
             aria-labelledby="followup-title"
         >
-            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay w-full max-w-xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
                 <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0">
                         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">Schedule follow-up</p>

@@ -423,13 +423,13 @@ export default function Pharmacy() {
             {/* GLOBAL PHARMACY HEADER & TABS */}
             <div data-tour="pharmacy-tabs" className="card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between shrink-0 gap-2">
                 <div role="tablist" aria-label="Pharmacy mode" className="flex bg-ink-100/70 p-1 rounded-xl w-full max-w-md">
-                    <button type="button" role="tab" aria-selected={activeTab === 'rx'} onClick={() => setActiveTab('rx')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'rx' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                    <button type="button" role="tab" aria-selected={activeTab === 'rx'} onClick={() => setActiveTab('rx')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'rx' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <Pill size={16} className={activeTab === 'rx' ? 'text-brand-600' : 'text-ink-400'} /> Rx Fulfillment
                     </button>
-                    <button type="button" role="tab" aria-selected={activeTab === 'otc'} onClick={() => setActiveTab('otc')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'otc' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                    <button type="button" role="tab" aria-selected={activeTab === 'otc'} onClick={() => setActiveTab('otc')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'otc' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <Store size={16} className={activeTab === 'otc' ? 'text-accent-600' : 'text-ink-400'} /> OTC Point of Sale
                     </button>
-                    <button type="button" role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'transactions' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                    <button type="button" role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'transactions' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
                         <History size={16} className={activeTab === 'transactions' ? 'text-brand-600' : 'text-ink-400'} /> Transactions
                     </button>
                 </div>
@@ -680,7 +680,7 @@ function BillPaymentDetails({ total }) {
         { label: 'Amount Due', value: fmtKES(total), strong: true },
     ];
     return (
-        <section className="card-flush border border-ink-200 dark:border-ink-800 rounded-2xl overflow-hidden">
+        <section className="card-flush border border-ink-200 dark:border-ink-800 rounded-xl overflow-hidden">
             <header className="flex items-center gap-2 px-4 py-2.5 border-b border-ink-100 dark:border-ink-800 bg-ink-50/60 dark:bg-ink-800/40">
                 <Wallet size={15} className="text-brand-500" />
                 <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100 tracking-tight">Bill Payment Details</h3>
@@ -702,7 +702,7 @@ function BillPaymentDetails({ total }) {
 // pharmacist sets the quantity and marks each line packed before dispensing.
 function BillItemsTable({ rows, packed, onToggle, onQty }) {
     return (
-        <section className="card-flush border border-ink-200 dark:border-ink-800 rounded-2xl overflow-hidden">
+        <section className="card-flush border border-ink-200 dark:border-ink-800 rounded-xl overflow-hidden">
             <header className="flex items-center justify-between px-4 py-2.5 border-b border-ink-100 dark:border-ink-800 bg-ink-50/60 dark:bg-ink-800/40">
                 <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100 tracking-tight flex items-center gap-2">
                     <Pill size={15} className="text-brand-500" /> Bill Items
@@ -711,32 +711,32 @@ function BillItemsTable({ rows, packed, onToggle, onQty }) {
             </header>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[720px]">
-                    <thead className="bg-ink-50/60 dark:bg-ink-800/40 text-ink-500 dark:text-ink-400">
+                    <thead>
                         <tr className="text-left text-2xs uppercase tracking-wider">
-                            <th className="px-3 py-2 font-medium">#</th>
-                            <th className="px-3 py-2 font-medium">Item</th>
-                            <th className="px-3 py-2 font-medium">Dosage</th>
-                            <th className="px-3 py-2 font-medium">Freq</th>
-                            <th className="px-3 py-2 font-medium">Duration</th>
-                            <th className="px-3 py-2 font-medium">Stock / Batch</th>
-                            <th className="px-3 py-2 font-medium text-right">Rate</th>
-                            <th className="px-3 py-2 font-medium text-right">Qty</th>
-                            <th className="px-3 py-2 font-medium text-right">Amount</th>
-                            <th className="px-3 py-2 font-medium text-center">Packed</th>
+                            <th className="font-medium">#</th>
+                            <th className="font-medium">Item</th>
+                            <th className="font-medium">Dosage</th>
+                            <th className="font-medium">Freq</th>
+                            <th className="font-medium">Duration</th>
+                            <th className="font-medium">Stock / Batch</th>
+                            <th className="num font-medium">Rate</th>
+                            <th className="num font-medium">Qty</th>
+                            <th className="num font-medium">Amount</th>
+                            <th className="font-medium text-center">Packed</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {rows.map(({ line, idx, batch, qty, amount }) => (
                             <tr key={`${idx}-${line.drug}-${line.dosage}`} className={packed[idx] ? 'bg-emerald-50/40 dark:bg-emerald-500/5' : ''}>
-                                <td className="px-3 py-2 text-ink-400">{idx + 1}</td>
-                                <td className="px-3 py-2">
+                                <td className="text-ink-400">{idx + 1}</td>
+                                <td>
                                     <span className="font-medium text-ink-900 dark:text-ink-100">{line.drug}</span>
                                     {line.formulation && <span className="block text-2xs text-ink-400">{line.formulation}</span>}
                                 </td>
-                                <td className="px-3 py-2 text-ink-600 dark:text-ink-300">{line.dosage}</td>
-                                <td className="px-3 py-2 text-ink-600 dark:text-ink-300">{line.frequency}</td>
-                                <td className="px-3 py-2 text-ink-600 dark:text-ink-300">{line.duration}</td>
-                                <td className="px-3 py-2">
+                                <td className="text-ink-600 dark:text-ink-300">{line.dosage}</td>
+                                <td className="text-ink-600 dark:text-ink-300">{line.frequency}</td>
+                                <td className="text-ink-600 dark:text-ink-300">{line.duration}</td>
+                                <td>
                                     {batch ? (
                                         <span className="text-ink-600 dark:text-ink-300">
                                             <span className="font-mono text-2xs">{batch.batch_number}</span>
@@ -746,16 +746,16 @@ function BillItemsTable({ rows, packed, onToggle, onQty }) {
                                         <span className="inline-flex items-center gap-1 text-2xs text-rose-600"><AlertCircle size={12} /> No stock match</span>
                                     )}
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums text-ink-600 dark:text-ink-300">{batch ? fmtKES(batch.unit_price) : '-'}</td>
-                                <td className="px-3 py-2 text-right">
+                                <td className="num tabular-nums text-ink-600 dark:text-ink-300">{batch ? fmtKES(batch.unit_price) : '-'}</td>
+                                <td className="num">
                                     <input type="number" min="0" max={batch?.quantity ?? undefined}
                                         aria-label={`Quantity for ${line.drug}`}
                                         value={qty || ''} disabled={!batch}
                                         onChange={(e) => onQty(idx, e.target.value)}
                                         className="input py-1 w-20 text-right disabled:opacity-50" />
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums font-medium text-ink-800 dark:text-ink-200">{amount ? fmtKES(amount) : '-'}</td>
-                                <td className="px-3 py-2 text-center">
+                                <td className="num tabular-nums font-medium text-ink-800 dark:text-ink-200">{amount ? fmtKES(amount) : '-'}</td>
+                                <td className="text-center">
                                     <input type="checkbox" checked={!!packed[idx]} disabled={!batch}
                                         aria-label={`Mark ${line.drug} packed`}
                                         onChange={() => onToggle(idx)}
@@ -948,36 +948,36 @@ function TransactionsTab() {
             </div>
 
             <div className="overflow-x-auto border border-ink-200/70 rounded-lg">
-                <table className="w-full text-sm">
-                    <thead className="bg-ink-50/60 text-ink-600 dark:text-ink-400">
+                <table className="table-clean">
+                    <thead>
                         <tr>
-                            <th className="text-left px-3 py-2 font-medium">Date</th>
-                            <th className="text-left px-3 py-2 font-medium">Item</th>
-                            <th className="text-right px-3 py-2 font-medium">Qty</th>
-                            <th className="text-right px-3 py-2 font-medium">Total</th>
-                            <th className="text-left px-3 py-2 font-medium">Customer</th>
-                            <th className="text-left px-3 py-2 font-medium">Method</th>
-                            <th className="text-left px-3 py-2 font-medium">Status</th>
-                            <th className="text-left px-3 py-2 font-medium">Cashier</th>
+                            <th className="font-medium">Date</th>
+                            <th className="font-medium">Item</th>
+                            <th className="num font-medium">Qty</th>
+                            <th className="num font-medium">Total</th>
+                            <th className="font-medium">Customer</th>
+                            <th className="font-medium">Method</th>
+                            <th className="font-medium">Status</th>
+                            <th className="font-medium">Cashier</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-ink-100 dark:divide-ink-800">
+                    <tbody>
                         {loading ? (
                             <tr><td colSpan={9} className="px-3 py-6 text-ink-500">Loading...</td></tr>
                         ) : rows.length === 0 ? (
                             <tr><td colSpan={9} className="px-3 py-6 text-ink-500">No transactions in this window.</td></tr>
                         ) : rows.map((r) => (
                             <tr key={r.dispense_id}>
-                                <td className="px-3 py-1.5 whitespace-nowrap">
+                                <td className="whitespace-nowrap">
                                     {r.dispensed_at ? new Date(r.dispensed_at).toLocaleString() : '-'}
                                 </td>
-                                <td className="px-3 py-1.5">{r.item_name}</td>
-                                <td className="px-3 py-1.5 text-right">{r.quantity}</td>
-                                <td className="px-3 py-1.5 text-right font-mono">{Number(r.total_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                <td className="px-3 py-1.5">{r.patient_id ? `#${r.patient_id}` : 'Walk-in'}</td>
-                                <td className="px-3 py-1.5">{r.payment_method || '-'}</td>
-                                <td className="px-3 py-1.5">
+                                <td>{r.item_name}</td>
+                                <td className="num">{r.quantity}</td>
+                                <td className="num font-mono">{Number(r.total_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                <td>{r.patient_id ? `#${r.patient_id}` : 'Walk-in'}</td>
+                                <td>{r.payment_method || '-'}</td>
+                                <td>
                                     <span
                                         aria-label={`Invoice status: ${r.invoice_status}`}
                                         className={'text-xs px-2 py-0.5 rounded-md ' + (
@@ -987,8 +987,8 @@ function TransactionsTab() {
                                         'bg-ink-50 dark:bg-ink-900/40 text-ink-600 dark:text-ink-400'
                                     )}>{r.invoice_status}</span>
                                 </td>
-                                <td className="px-3 py-1.5 text-ink-600 dark:text-ink-400">{r.cashier || '-'}</td>
-                                <td className="px-3 py-1.5 text-right">
+                                <td className="text-ink-600 dark:text-ink-400">{r.cashier || '-'}</td>
+                                <td className="num">
                                     <button type="button" onClick={() => printReceipt(r.dispense_id)}
                                             className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
                                         <ReceiptText size={12} /> Receipt
@@ -1122,7 +1122,7 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
 
     return (
         <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-md">
+            <div className="bg-white dark:bg-ink-900 rounded-xl shadow-overlay w-full max-w-md">
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <div>
                         <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Collect payment</h3>
