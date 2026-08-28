@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import { apiClient } from '../api/client';
+import { SkeletonTable } from '../components/ui/Skeleton';
 import toast from 'react-hot-toast';
 import {
     CalendarDays, Plus, X, Filter, CheckCircle2, XCircle,
@@ -21,7 +22,7 @@ const STATUS_OPTIONS = ['Scheduled', 'Confirmed', 'Completed', 'Cancelled', 'No-
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 // Server data + its loading flag are one logical unit, owned by the fetch
-// routines below — grouped in a reducer so the directory load is a single
+// routines below, grouped in a reducer so the directory load is a single
 // dispatch instead of two separate setState calls.
 const initialData = { appointments: [], doctors: [], patients: [], isLoading: true };
 function dataReducer(state, action) {
@@ -41,7 +42,7 @@ export default function Appointments() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [form, setForm] = useState({ patient_id: '', doctor_id: '', appointment_date: '', notes: '' });
     const [submitting, setSubmitting] = useState(false);
-    // Cross-page active patient — when present, "New appointment" pre-fills.
+    // Cross-page active patient: when present, "New appointment" pre-fills.
     const { activePatient } = useActivePatient();
 
     const fetchAppointments = async () => {
@@ -76,7 +77,7 @@ export default function Appointments() {
 
     // When an active patient is open and the user clicks "New appointment",
     // pre-select them. This is what makes the Calendar feel connected to
-    // the rest of the system — open patient → book → done.
+    // the rest of the system: open patient, book, done.
     useEffect(() => {
         if (isFormOpen && activePatient?.patient_id && !form.patient_id) {
             setForm(f => ({ ...f, patient_id: String(activePatient.patient_id) }));
@@ -189,7 +190,7 @@ export default function Appointments() {
 
             {isLoading ? (
                 <div className="flex items-center justify-center h-64 text-ink-400">
-                    <Activity className="animate-spin mr-2" size={20} /> Loading…
+                    <SkeletonTable rows={4} cols={3} label="Loading appointments" />
                 </div>
             ) : grouped.length === 0 ? (
                 <div className="card p-12 text-center text-ink-400 border-dashed">
@@ -207,7 +208,7 @@ export default function Appointments() {
                             </h2>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                                 {list.map(appt => (
-                                    <article key={appt.appointment_id} className="card p-4 flex gap-4 items-start hover:shadow-elevated transition-shadow">
+                                    <article key={appt.appointment_id} className="card p-4 flex gap-4 items-start hover:bg-ink-50 dark:hover:bg-ink-800/40 transition-colors">
                                         <div className="w-16 shrink-0 text-center bg-ink-50 dark:bg-ink-800/40 ring-1 ring-ink-100 dark:ring-ink-800 rounded-xl py-2.5">
                                             <div className="text-lg font-semibold text-ink-900 dark:text-white leading-none">
                                                 {new Date(appt.appointment_date).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: false })}

@@ -65,13 +65,13 @@ export default function QueueBoard() {
             />
 
             <div className="card p-2 flex items-center shrink-0">
-                <div role="tablist" aria-label="Queue board mode" className="flex bg-ink-100/70 dark:bg-ink-800/70 p-1 rounded-xl w-full max-w-md">
+                <div role="tablist" aria-label="Queue board mode" className="segmented max-w-md">
                     <button type="button" role="tab" aria-selected={tab === 'live'} onClick={() => setTab('live')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${tab === 'live' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                        className={`segmented-option ${tab === 'live' ? 'segmented-option-active' : ''}`}>
                         <Activity size={16} className={tab === 'live' ? 'text-brand-600' : 'text-ink-400'} /> Live queue
                     </button>
                     <button type="button" role="tab" aria-selected={tab === 'day'} onClick={() => setTab('day')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${tab === 'day' ? 'bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100 shadow-soft ring-1 ring-ink-200/70' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900'}`}>
+                        className={`segmented-option ${tab === 'day' ? 'segmented-option-active' : ''}`}>
                         <MapPin size={16} className={tab === 'day' ? 'text-accent-600' : 'text-ink-400'} /> Day &middot; Footprints
                     </button>
                 </div>
@@ -122,11 +122,12 @@ function LiveQueue() {
         <div className="flex-1 min-h-0 card overflow-hidden flex flex-col">
             {/* Toolbar */}
             <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-3 border-b border-ink-100 dark:border-ink-800 bg-ink-50/40 dark:bg-ink-800/30">
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div role="group" aria-label="Filter by department" className="flex flex-wrap items-center gap-1.5">
                     {departments.map((d) => (
                         <button type="button" key={d} onClick={() => setDept(d)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dept === d ? 'bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300 ring-1 ring-brand-200 dark:ring-brand-500/30' : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800'}`}>
-                            {d === 'All' ? 'All' : departmentLabel(d)}{d !== 'All' && <span className="ml-1 text-ink-400">{rows.filter((r) => r.to_department === d).length}</span>}
+                            aria-pressed={dept === d}
+                            className={`chip ${dept === d ? 'chip-active' : ''}`}>
+                            {d === 'All' ? 'All' : departmentLabel(d)}{d !== 'All' && <span className="chip-count">{rows.filter((r) => r.to_department === d).length}</span>}
                         </button>
                     ))}
                 </div>

@@ -384,6 +384,45 @@
     @apply flex flex-col items-center justify-center gap-3 py-12 text-center;
   }
 
+  /* Filter chips.
+
+     A row that narrows what a table shows is not a tab row: there is no panel
+     per option, so announcing it as tabs misleads a screen reader. These are
+     toggle buttons, and callers must set aria-pressed. */
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium
+           text-ink-600 dark:text-ink-400
+           hover:bg-ink-100 dark:hover:bg-ink-800
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500;
+    transition: background-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
+  }
+  .chip-active {
+    @apply bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300
+           ring-1 ring-inset ring-brand-200 dark:ring-brand-500/30;
+  }
+  .chip-count {
+    @apply tnum text-ink-400 dark:text-ink-500;
+  }
+
+  /* Segmented control: a two or three way view switch, where each option does
+     own a panel. Distinct from .chip, which filters one panel. */
+  .segmented {
+    @apply flex w-full gap-1 p-1 rounded-lg bg-ink-100 dark:bg-ink-800;
+  }
+  .segmented-option {
+    @apply flex-1 inline-flex items-center justify-center gap-2 px-4 rounded-md text-sm font-medium
+           text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500;
+    height: var(--ctl-h);
+    transition: background-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
+  }
+  .segmented-option-active {
+    @apply bg-white dark:bg-ink-900 text-ink-900 dark:text-ink-100
+           ring-1 ring-inset ring-ink-200 dark:ring-ink-700;
+  }
+
   /* Form field wrapper: label, control, hint and error in one rhythm. */
   .field {
     @apply flex flex-col gap-1.5;
