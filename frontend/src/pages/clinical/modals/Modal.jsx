@@ -16,7 +16,7 @@ export default function Modal({ title, icon: Icon, onClose, children, footer, si
     return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 backdrop-blur-sm p-4"
             onClick={onClose} role="presentation">
-            <div className={`bg-white dark:bg-ink-900 rounded-2xl shadow-xl w-full ${WIDTHS[size] || WIDTHS.md} max-h-[90vh] flex flex-col`}
+            <div className={`bg-white dark:bg-ink-900 rounded-2xl shadow-overlay w-full ${WIDTHS[size] || WIDTHS.md} max-h-[90vh] flex flex-col`}
                 onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white flex items-center gap-2">

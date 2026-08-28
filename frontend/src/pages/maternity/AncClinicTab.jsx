@@ -77,7 +77,7 @@ export default function AncClinicTab() {
 
       <section
         aria-label="Active pregnancies"
-        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4"
+        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4"
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Active pregnancies</h2>
@@ -114,7 +114,7 @@ export default function AncClinicTab() {
 
       <section
         aria-label="Episode detail"
-        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4"
+        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4"
       >
         {!selected ? (
           <p className="text-sm text-ink-500 dark:text-ink-400">Select an episode to view visits.</p>

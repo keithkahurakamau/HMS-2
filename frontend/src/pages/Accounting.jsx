@@ -119,7 +119,7 @@ function ChartOfAccountsTab() {
                 </button>
             </div>
 
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-2">
                 {loading ? (
                     <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
                 ) : tree.length === 0 ? (
@@ -320,7 +320,7 @@ function JournalEntriesTab() {
                 </button>
             </div>
 
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
                 <table className="table-clean">
                     <thead>
                         <tr>
@@ -580,7 +580,7 @@ function CurrenciesTab() {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Currencies */}
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl">
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Currencies</h3>
                     <button type="button" onClick={() => setOpenCur(true)}
@@ -606,7 +606,7 @@ function CurrenciesTab() {
             </div>
 
             {/* FX Rates */}
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl">
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Exchange rates</h3>
                     <button type="button" onClick={() => setOpenFx(true)}
@@ -775,7 +775,7 @@ function SettingsTab() {
     if (!settings) return <div className="text-sm text-ink-500 dark:text-ink-400 p-6">Loading...</div>;
 
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5 max-w-2xl">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-6 space-y-5 max-w-2xl">
             <Field label="Base currency">
                 <input aria-label="Base currency" className="input bg-ink-50 dark:bg-ink-800/40" value={settings.base_currency_code} readOnly disabled />
                 <p className="text-xs text-ink-500 dark:text-ink-400 mt-1">
@@ -828,7 +828,7 @@ function ConfigurationTab() {
     const [section, setSection] = useState('suppliers');
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
-            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
+            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-2 h-fit">
                 <nav className="space-y-1">
                     {CONFIG_SECTIONS.map(({ key, label, icon: Icon }) => (
                         <button type="button" key={key}
@@ -1695,7 +1695,7 @@ function TransactionLogTab() {
     return (
         <div className="space-y-4">
             {/* Filter bar */}
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-3 flex flex-wrap items-end gap-3">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-3 flex flex-wrap items-end gap-3">
                 <div className="relative flex-1 min-w-[180px]">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                     <input aria-label="Search entry no., reference, memo…"
@@ -1744,7 +1744,7 @@ function TransactionLogTab() {
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
                 <table className="table-clean">
                     <thead>
                         <tr>
@@ -1863,7 +1863,7 @@ function ReportsTab() {
 
     return (
         <div className="space-y-4">
-            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-4 flex flex-wrap items-end gap-3">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-4 flex flex-wrap items-end gap-3">
                 <Field label="Report">
                     <select className="input" value={report} onChange={(e) => setReport(e.target.value)}>
                         {REPORT_TYPES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
@@ -1950,7 +1950,7 @@ function exportReport(report, data) {
 
 function TrialBalanceView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Trial Balance, as of {data.as_of}</h3>
                 <span className={'text-xs ' + (Number(data.totals.difference) === 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
@@ -1999,7 +1999,7 @@ function TrialBalanceView({ data }) {
 
 function IncomeStatementView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-6 space-y-5">
             <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
                 Income Statement: {data.from_date} to {data.to_date}
             </h3>
@@ -2022,7 +2022,7 @@ function IncomeStatementView({ data }) {
 
 function BalanceSheetView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-5">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-6 space-y-5">
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Balance Sheet, as of {data.as_of}</h3>
                 <span className={'text-xs ' + (data.balanced ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
@@ -2054,7 +2054,7 @@ function BalanceSheetView({ data }) {
 
 function CashFlowView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 space-y-4">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-6 space-y-4">
             <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
                 Cash Flow: {data.from_date} to {data.to_date}
             </h3>
@@ -2079,7 +2079,7 @@ function CashFlowView({ data }) {
 
 function DailyCollectionsView({ data }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between">
                 <h3 className="text-sm font-semibold">
                     Daily Collections: {data.from_date} to {data.to_date}
@@ -2169,7 +2169,7 @@ function DebtorsTab() {
     const [section, setSection] = useState('claims');
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
-            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
+            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-2 h-fit">
                 <nav className="space-y-1">
                     {DEBTORS_SECTIONS.map(({ key, label, icon: Icon }) => (
                         <button type="button" key={key}
@@ -2709,7 +2709,7 @@ function BankTab() {
     const [section, setSection] = useState('accounts');
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
-            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-2 h-fit">
+            <aside className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-2 h-fit">
                 <nav className="space-y-1">
                     {BANK_SECTIONS.map(({ key, label, icon: Icon }) => (
                         <button type="button" key={key}
@@ -3203,7 +3203,7 @@ function MatchModal({ tx, onClose, onSaved }) {
 function ModalShell({ title, onClose, wide, children }) {
     return (
         <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
+            <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-overlay w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{title}</h3>
                     <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">

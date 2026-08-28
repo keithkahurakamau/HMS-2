@@ -143,7 +143,7 @@ export default function NotificationBell() {
                     className="absolute right-0 mt-2 w-96 max-w-[calc(100vw-2rem)]
                                bg-white dark:bg-ink-900
                                border border-ink-200/70 dark:border-ink-700
-                               rounded-2xl shadow-elevated overflow-hidden
+                               rounded-2xl shadow-overlay overflow-hidden
                                z-[70] animate-slide-in-right"
                 >
                     <div className="px-4 py-3 border-b border-ink-100 dark:border-ink-800 flex items-center justify-between bg-ink-50/60 dark:bg-ink-950/40">

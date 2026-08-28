@@ -88,7 +88,7 @@ export default function ActionsMenu({ groups, has, disabled = false }) {
             {open && pos && createPortal(
                 <div ref={menuRef} role="menu"
                     style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, right: pos.right, width: PANEL_W }}
-                    className={`z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-xl py-2 custom-scrollbar
+                    className={`z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-overlay py-2 custom-scrollbar
                         transition duration-100 ease-out ${pos.flip ? 'origin-bottom-right' : 'origin-top-right'}
                         ${shown ? 'opacity-100 scale-100 translate-y-0' : `opacity-0 scale-95 ${pos.flip ? 'translate-y-1' : '-translate-y-1'}`}`}>
                     {/* Caret pointing back at the trigger (up when below it, down when flipped above) */}

@@ -66,7 +66,7 @@ export default function PartographEntryForm({ laborId, correctingEntry = null, o
       aria-modal="true"
       aria-label={correctingEntry ? 'Correct partograph entry' : 'New partograph entry'}
     >
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated max-h-[90vh] overflow-y-auto">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-overlay max-h-[90vh] overflow-y-auto">
         <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{heading}</h3>
         {correctingEntry && (
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">

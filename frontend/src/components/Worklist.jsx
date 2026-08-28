@@ -90,7 +90,7 @@ export default function Worklist({
         onClick={() => setActive(value)}
         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
           on
-            ? 'bg-brand-600 text-white shadow-soft'
+            ? 'bg-brand-600 text-white'
             : 'bg-ink-100 text-ink-600 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700'
         }`}
       >

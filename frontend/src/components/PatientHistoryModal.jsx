@@ -78,7 +78,7 @@ export default function PatientHistoryModal({ patientId, initialSection = null, 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-label="Patient medical history">
             <button type="button" aria-label="Close" className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="relative bg-white dark:bg-ink-900 rounded-2xl shadow-overlay w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-ink-100 dark:border-ink-800 shrink-0">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">

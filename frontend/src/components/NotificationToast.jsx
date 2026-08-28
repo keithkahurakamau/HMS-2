@@ -18,7 +18,7 @@ export default function NotificationToast({ notification, visible, onClick, onDi
     return (
         <div
             role="status"
-            className={`relative w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-700 rounded-2xl shadow-elevated overflow-hidden ${visible ? 'animate-slide-in-right' : 'opacity-0'}`}
+            className={`relative w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-700 rounded-2xl shadow-overlay overflow-hidden ${visible ? 'animate-slide-in-right' : 'opacity-0'}`}
         >
             <button type="button" onClick={onClick} className="w-full text-left pl-4 pr-8 py-3 hover:bg-ink-50/60 dark:hover:bg-ink-800/50 transition-colors flex gap-3 cursor-pointer">
                 <span className={`shrink-0 size-9 rounded-xl flex items-center justify-center ring-1 ring-inset ${style.ring}`} aria-hidden="true">

@@ -83,7 +83,7 @@ export default function PatientSearch({
 
       {open && (
         <ul id="patient-search-results" role="listbox"
-            className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-elevated">
+            className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-overlay">
           {loading && <li className="px-3 py-2 text-sm text-ink-400">Searching…</li>}
           {!loading && results.length === 0 && (
             <li className="px-3 py-2 text-sm text-ink-400">No matches.</li>

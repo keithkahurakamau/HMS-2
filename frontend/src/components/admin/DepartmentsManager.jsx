@@ -90,7 +90,7 @@ export default function DepartmentsManager() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {filtered.map((d) => (
-                            <div key={d.department_id} className="bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl p-4 hover:shadow-soft transition-shadow">
+                            <div key={d.department_id} className="bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl p-4 transition-shadow">
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <span className="shrink-0 size-10 rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-300 flex items-center justify-center">

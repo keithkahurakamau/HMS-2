@@ -201,7 +201,7 @@ function BudgetDetail({ budgetId, onBack }) {
             {loading ? (
                 <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
             ) : periods.length === 0 ? (
-                <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft p-6 text-sm text-ink-600 dark:text-ink-400">
+                <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl p-6 text-sm text-ink-600 dark:text-ink-400">
                     No fiscal periods exist for {budget.fiscal_year} yet.
                     <button type="button" onClick={seedYear} className="ml-2 text-brand-700 hover:underline font-medium">
                         Create the 12 monthly periods
@@ -269,7 +269,7 @@ function BudgetGrid({ budget, accounts, periods }) {
     const grandTotal = accounts.reduce((s, a) => s + rowTotal(a.account_id), 0);
 
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2 border-b border-ink-100 dark:border-ink-800 text-xs text-ink-500 dark:text-ink-400">
                 <span>Edit any cell, changes save automatically.</span>
                 {savedAt && <span className="text-emerald-600">Saved {savedAt.toLocaleTimeString()}</span>}

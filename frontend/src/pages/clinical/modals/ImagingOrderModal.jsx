@@ -71,7 +71,7 @@ export default function ImagingOrderModal({ patient, onClose }) {
             aria-modal="true"
             aria-labelledby="imaging-order-title"
         >
-            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-elevated w-full max-w-2xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
+            <div className="bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-2xl shadow-overlay w-full max-w-2xl max-h-[calc(100vh-1.5rem)] flex flex-col overflow-hidden animate-slide-up">
                 <div className="px-4 sm:px-6 py-4 border-b border-ink-200 dark:border-ink-800 bg-ink-50 dark:bg-ink-800/40 flex justify-between items-start gap-3 shrink-0">
                     <div className="min-w-0">
                         <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">New imaging order</p>

@@ -82,7 +82,7 @@ export default function DeliveryForm({ episodeId, onClose, onSaved }) {
       aria-modal="true"
       aria-label="Record delivery"
     >
-      <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated max-h-[90vh] overflow-y-auto">
+      <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-overlay max-h-[90vh] overflow-y-auto">
         <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Record delivery</h3>
         {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         <label className="mt-3 block text-sm text-ink-700 dark:text-ink-300">

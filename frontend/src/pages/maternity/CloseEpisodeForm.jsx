@@ -34,7 +34,7 @@ export default function CloseEpisodeForm({ episodeId, patientName, onClose, onCl
       aria-modal="true"
       aria-label="Close episode"
     >
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-elevated">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white dark:bg-ink-900 p-5 shadow-overlay">
         <h3 className="text-sm font-semibold text-ink-900 dark:text-white">
           Close episode{patientName ? `, ${patientName}` : ''}
         </h3>

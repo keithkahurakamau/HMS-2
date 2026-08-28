@@ -155,7 +155,7 @@ export default function IcdDiagnosisPicker({ codes, onChange }) {
                     id={listboxId}
                     role="listbox"
                     aria-label="Diagnosis suggestions"
-                    className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-elevated max-h-48 overflow-y-auto custom-scrollbar"
+                    className="absolute z-30 w-full mt-1 bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 rounded-xl shadow-overlay max-h-48 overflow-y-auto custom-scrollbar"
                 >
                     {results.map((r, idx) => (
                         <button

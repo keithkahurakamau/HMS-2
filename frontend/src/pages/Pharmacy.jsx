@@ -549,7 +549,7 @@ export default function Pharmacy() {
                             ) : (
                                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                                     {filteredInventory.map(item => (
-                                        <div key={item.batch_id} className="border border-ink-200 dark:border-ink-800 rounded-xl p-3 hover:border-accent-300 hover:shadow-soft transition-all bg-white dark:bg-ink-900 flex flex-col justify-between">
+                                        <div key={item.batch_id} className="border border-ink-200 dark:border-ink-800 rounded-xl p-3 hover:border-accent-300 transition-all bg-white dark:bg-ink-900 flex flex-col justify-between">
                                             <div>
                                                 <div className="flex justify-between items-start mb-1 gap-2">
                                                     <h4 className="font-semibold text-sm text-ink-900 dark:text-ink-100">{item.name}</h4>

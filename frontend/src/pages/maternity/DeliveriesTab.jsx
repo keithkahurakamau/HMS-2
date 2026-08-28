@@ -80,7 +80,7 @@ export default function DeliveriesTab() {
     <div className="grid gap-4 md:grid-cols-2">
       <section
         aria-label="Active pregnancies"
-        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4"
+        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4"
       >
         <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Active pregnancies</h2>
         {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
@@ -106,7 +106,7 @@ export default function DeliveriesTab() {
 
       <section
         aria-label="Delivered episodes"
-        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4"
+        className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4"
       >
         <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Delivered</h2>
         <ul className="mt-3 divide-y divide-ink-100 dark:divide-ink-800">
@@ -130,7 +130,7 @@ export default function DeliveriesTab() {
       {selected && (
         <section
           aria-label="Delivery detail"
-          className="md:col-span-2 rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4"
+          className="md:col-span-2 rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4"
         >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-900 dark:text-white">{selected.patient_name}</h2>

@@ -25,7 +25,7 @@ export function SectionHeader({ title, subtitle, onNew, disabled, disabledMsg, n
 
 export function DataCard({ loading, empty, emptyMsg, children }) {
     return (
-        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl shadow-soft overflow-hidden">
+        <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-2xl overflow-hidden">
             {loading ? (
                 <div className="p-6 text-sm text-ink-500 dark:text-ink-400">Loading...</div>
             ) : empty ? (
@@ -38,7 +38,7 @@ export function DataCard({ loading, empty, emptyMsg, children }) {
 export function ModalShell({ title, onClose, wide, children }) {
     return (
         <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
+            <div className={'bg-white dark:bg-ink-900 rounded-2xl shadow-overlay w-full ' + (wide ? 'max-w-3xl' : 'max-w-md')}>
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 className="text-sm font-semibold text-ink-900 dark:text-white">{title}</h3>
                     <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-700 dark:hover:text-ink-200">

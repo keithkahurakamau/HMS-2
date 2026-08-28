@@ -84,7 +84,7 @@ export default function LaborBoardTab() {
     <div className="space-y-4">
       {error && <p className="print:hidden text-sm text-rose-600 dark:text-rose-400">{error}</p>}
       <section aria-label="Labor board"
-               className="print:hidden rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4">
+               className="print:hidden rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink-900 dark:text-white">In labor</h2>
           <button
@@ -121,7 +121,7 @@ export default function LaborBoardTab() {
 
       {selected && (
         <section aria-label="Partograph" data-tour="mat-partograph" ref={partographRef}
-                 className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-soft p-4">
+                 className="rounded-2xl border border-ink-200/70 dark:border-ink-800 bg-white dark:bg-ink-900 p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-900 dark:text-white">
               Partograph: {selected.patient_name}

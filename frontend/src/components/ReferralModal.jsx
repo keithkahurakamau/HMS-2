@@ -84,7 +84,7 @@ export default function ReferralModal({ patient, recordId = null, initialSummary
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="referral-modal-title">
-            <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-elevated w-full max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="bg-white dark:bg-ink-900 rounded-2xl shadow-overlay w-full max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <div className="flex items-center justify-between p-4 border-b border-ink-100 dark:border-ink-800">
                     <h3 id="referral-modal-title" className="font-bold text-ink-800 dark:text-ink-200 flex items-center gap-2">
                         <FileText size={16} /> Refer {patient.patient_name}
