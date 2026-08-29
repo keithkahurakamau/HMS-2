@@ -17,18 +17,17 @@ const PLAN_OPTIONS = ['standard', 'premium'];
 const STATUS_OPTIONS = ['active', 'paused', 'cancelled'];
 const METHOD_OPTIONS = ['mpesa', 'bank', 'cash', 'waiver'];
 
-const INVOICE_STATUS_TONE = {
-    open: 'badge-info',
-    paid: 'badge-success',
-    void: 'badge-neutral',
-};
-
 /**
  * TenantDrawer: the drill-down view for one tenant's receivables. Shows the
  * subscription terms (editable), every invoice with its running balance,
  * and every payment recorded against them. Every write action here calls
  * `onChanged()` afterwards so the ageing table and summary tiles behind it
  * stay in sync without the operator having to close and reopen the drawer.
+ *
+ * The body is split into three sections (SubscriptionSection, InvoicesSection,
+ * PaymentsSection) further down this file so this component stays a thin
+ * orchestrator: it owns the data fetch and the write handlers, the sections
+ * own their own markup.
  */
 export default function TenantDrawer({ tenantId, onClose, onChanged }) {
     const [detail, setDetail] = useState(null);
@@ -67,6 +66,13 @@ export default function TenantDrawer({ tenantId, onClose, onChanged }) {
     }, [tenantId]);
 
     useEffect(() => { load(); }, [load]);
+
+    // Escape closes the drawer, matching what a native <dialog> gives for free.
+    useEffect(() => {
+        const onKeyDown = (event) => { if (event.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [onClose]);
 
     const notifyChanged = () => { if (onChanged) onChanged(); };
 
@@ -183,7 +189,6 @@ export default function TenantDrawer({ tenantId, onClose, onChanged }) {
 
                     {!loading && !error && detail && (
                         <>
-                            {/* Balances */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="card p-4">
                                     <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-ink-500 dark:text-ink-400">Outstanding</p>
@@ -197,208 +202,262 @@ export default function TenantDrawer({ tenantId, onClose, onChanged }) {
                                 </div>
                             </div>
 
-                            {/* Subscription terms */}
-                            <section className="card p-4 space-y-3">
-                                <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Subscription terms</h3>
-                                {!detail.subscription && (
-                                    <p className="text-sm text-ink-500 dark:text-ink-400">No subscription configured for this tenant.</p>
-                                )}
-                                {detail.subscription && (
-                                    <>
-                                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                                            <div className="text-xs text-ink-500 dark:text-ink-400 space-y-0.5">
-                                                <p>Cycle: <span className="font-medium text-ink-700 dark:text-ink-200">{detail.subscription.cycle}</span></p>
-                                                <p>Started: <span className="tnum">{detail.subscription.started_on}</span></p>
-                                                <p>Next invoice: <span className="tnum">{detail.subscription.next_invoice_on}</span></p>
-                                            </div>
-                                            {detail.subscription.reminders_paused && (
-                                                <span className="badge-warn inline-flex items-center gap-1">
-                                                    <PauseCircle size={10} aria-hidden="true" /> Reminders paused
-                                                </span>
-                                            )}
-                                            <button
-                                                type="button"
-                                                onClick={togglePause}
-                                                disabled={pauseSaving}
-                                                className="btn btn-secondary btn-xs"
-                                            >
-                                                {detail.subscription.reminders_paused
-                                                    ? <><PlayCircle size={12} aria-hidden="true" /> Resume reminders</>
-                                                    : <><PauseCircle size={12} aria-hidden="true" /> Pause reminders</>}
-                                            </button>
-                                        </div>
+                            <SubscriptionSection
+                                subscription={detail.subscription}
+                                subForm={subForm}
+                                setSubForm={setSubForm}
+                                subSaving={subSaving}
+                                pauseSaving={pauseSaving}
+                                onTogglePause={togglePause}
+                                onSaveSubscription={saveSubscription}
+                            />
 
-                                        <form onSubmit={saveSubscription} className="grid grid-cols-3 gap-3 pt-2 border-t border-ink-100 dark:border-ink-800">
-                                            <Field label="Plan">
-                                                <select
-                                                    className="input"
-                                                    value={subForm.plan}
-                                                    onChange={(e) => setSubForm((f) => ({ ...f, plan: e.target.value }))}
-                                                >
-                                                    {PLAN_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
-                                                </select>
-                                            </Field>
-                                            <Field label="Price (KES)">
-                                                <input
-                                                    aria-label="Price (KES)"
-                                                    className="input tnum"
-                                                    inputMode="decimal"
-                                                    value={subForm.price_kes}
-                                                    onChange={(e) => setSubForm((f) => ({ ...f, price_kes: e.target.value }))}
-                                                />
-                                            </Field>
-                                            <Field label="Status">
-                                                <select
-                                                    className="input"
-                                                    value={subForm.status}
-                                                    onChange={(e) => setSubForm((f) => ({ ...f, status: e.target.value }))}
-                                                >
-                                                    {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-                                                </select>
-                                            </Field>
-                                            <div className="col-span-3 flex justify-end">
-                                                <button type="submit" disabled={subSaving} className="btn btn-primary btn-xs">
-                                                    {subSaving ? 'Saving…' : 'Save subscription'}
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </>
-                                )}
-                            </section>
+                            <InvoicesSection
+                                invoices={detail.invoices}
+                                openAction={openAction}
+                                paymentForm={paymentForm}
+                                setPaymentForm={setPaymentForm}
+                                voidReason={voidReason}
+                                setVoidReason={setVoidReason}
+                                actionSaving={actionSaving}
+                                onOpenPayment={openPaymentForm}
+                                onOpenVoid={openVoidForm}
+                                onCloseAction={closeAction}
+                                onSubmitPayment={submitPayment}
+                                onSubmitVoid={submitVoid}
+                            />
 
-                            {/* Invoices */}
-                            <section className="space-y-2">
-                                <h3 className="text-sm font-semibold text-ink-900 dark:text-white flex items-center gap-2">
-                                    <Receipt size={14} className="text-ink-400" aria-hidden="true" /> Invoices
-                                </h3>
-                                {detail.invoices.length === 0 ? (
-                                    <p className="text-sm text-ink-500 dark:text-ink-400">No invoices raised yet.</p>
-                                ) : (
-                                    <div className="card overflow-x-auto">
-                                        <table className="table-clean">
-                                            <thead>
-                                                <tr>
-                                                    <th>Number</th><th>Period</th><th className="num">Amount</th>
-                                                    <th className="num">Balance</th><th>Status</th><th>Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {detail.invoices.map((inv) => (
-                                                    <React.Fragment key={inv.id}>
-                                                        <tr>
-                                                            <td className="font-mono text-xs">{inv.number}</td>
-                                                            <td className="text-xs">{inv.period_start} – {inv.period_end}</td>
-                                                            <td className="num tnum">{formatKes(inv.amount_kes)}</td>
-                                                            <td className="num tnum">{formatKes(inv.balance)}</td>
-                                                            <td>
-                                                                <span className={INVOICE_STATUS_TONE[inv.status] || 'badge-neutral'}>{inv.status}</span>
-                                                            </td>
-                                                            <td>
-                                                                {inv.status === 'open' && (
-                                                                    <div className="flex gap-1.5">
-                                                                        <button type="button" className="btn btn-secondary btn-xs" onClick={() => openPaymentForm(inv)}>
-                                                                            <Banknote size={12} aria-hidden="true" /> Payment
-                                                                        </button>
-                                                                        <button type="button" className="btn btn-danger-ghost btn-xs" onClick={() => openVoidForm(inv)}>
-                                                                            <Ban size={12} aria-hidden="true" /> Void
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                        {openAction?.invoiceId === inv.id && openAction.kind === 'payment' && (
-                                                            <tr>
-                                                                <td colSpan={6} className="bg-ink-50 dark:bg-ink-800/40">
-                                                                    <form onSubmit={(e) => submitPayment(e, inv.id)} className="flex flex-wrap items-end gap-2 py-2">
-                                                                        <Field label="Amount (KES)">
-                                                                            <input aria-label="Payment amount" className="input tnum" inputMode="decimal"
-                                                                                value={paymentForm.amount_kes}
-                                                                                onChange={(e) => setPaymentForm((f) => ({ ...f, amount_kes: e.target.value }))} />
-                                                                        </Field>
-                                                                        <Field label="Paid on">
-                                                                            <input aria-label="Paid on" type="date" className="input"
-                                                                                value={paymentForm.paid_on}
-                                                                                onChange={(e) => setPaymentForm((f) => ({ ...f, paid_on: e.target.value }))} />
-                                                                        </Field>
-                                                                        <Field label="Method">
-                                                                            <select aria-label="Payment method" className="input"
-                                                                                value={paymentForm.method}
-                                                                                onChange={(e) => setPaymentForm((f) => ({ ...f, method: e.target.value }))}>
-                                                                                {METHOD_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                                                                            </select>
-                                                                        </Field>
-                                                                        <Field label="Note" className="flex-1 min-w-[10rem]">
-                                                                            <input aria-label="Payment note" className="input"
-                                                                                value={paymentForm.note}
-                                                                                onChange={(e) => setPaymentForm((f) => ({ ...f, note: e.target.value }))} />
-                                                                        </Field>
-                                                                        <button type="submit" disabled={actionSaving} className="btn btn-primary btn-xs">
-                                                                            {actionSaving ? 'Saving…' : 'Record payment'}
-                                                                        </button>
-                                                                        <button type="button" className="btn btn-ghost btn-xs" onClick={closeAction}>Cancel</button>
-                                                                    </form>
-                                                                </td>
-                                                            </tr>
-                                                        )}
-                                                        {openAction?.invoiceId === inv.id && openAction.kind === 'void' && (
-                                                            <tr>
-                                                                <td colSpan={6} className="bg-ink-50 dark:bg-ink-800/40">
-                                                                    <form onSubmit={(e) => submitVoid(e, inv.id)} className="flex flex-wrap items-end gap-2 py-2">
-                                                                        <Field label="Reason for voiding this invoice" className="flex-1 min-w-[14rem]">
-                                                                            <input aria-label="Void reason" className="input"
-                                                                                value={voidReason}
-                                                                                onChange={(e) => setVoidReason(e.target.value)} />
-                                                                        </Field>
-                                                                        <button type="submit" disabled={actionSaving} className="btn btn-danger btn-xs">
-                                                                            {actionSaving ? 'Voiding…' : 'Void invoice'}
-                                                                        </button>
-                                                                        <button type="button" className="btn btn-ghost btn-xs" onClick={closeAction}>Cancel</button>
-                                                                    </form>
-                                                                </td>
-                                                            </tr>
-                                                        )}
-                                                    </React.Fragment>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </section>
-
-                            {/* Payments */}
-                            <section className="space-y-2">
-                                <h3 className="text-sm font-semibold text-ink-900 dark:text-white flex items-center gap-2">
-                                    <Banknote size={14} className="text-ink-400" aria-hidden="true" /> Payments
-                                </h3>
-                                {detail.payments.length === 0 ? (
-                                    <p className="text-sm text-ink-500 dark:text-ink-400">No payments recorded yet.</p>
-                                ) : (
-                                    <div className="card overflow-x-auto">
-                                        <table className="table-clean">
-                                            <thead>
-                                                <tr><th>Invoice</th><th className="num">Amount</th><th>Paid on</th><th>Method</th><th>Note</th></tr>
-                                            </thead>
-                                            <tbody>
-                                                {detail.payments.map((p) => (
-                                                    <tr key={p.id}>
-                                                        <td className="text-xs">#{p.invoice_id}</td>
-                                                        <td className="num tnum">{formatKes(p.amount_kes)}</td>
-                                                        <td className="text-xs tnum">{p.paid_on}</td>
-                                                        <td className="text-xs">{p.method}</td>
-                                                        <td className="text-xs text-ink-500 dark:text-ink-400">{p.note || '-'}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </section>
+                            <PaymentsSection payments={detail.payments} />
                         </>
                     )}
                 </div>
             </div>
         </div>,
         document.body,
+    );
+}
+
+function SubscriptionSection({
+    subscription, subForm, setSubForm, subSaving, pauseSaving, onTogglePause, onSaveSubscription,
+}) {
+    return (
+        <section className="card p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-ink-900 dark:text-white">Subscription terms</h3>
+            {!subscription && (
+                <p className="text-sm text-ink-500 dark:text-ink-400">No subscription configured for this tenant.</p>
+            )}
+            {subscription && (
+                <>
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="text-xs text-ink-500 dark:text-ink-400 space-y-0.5">
+                            <p>Cycle: <span className="font-medium text-ink-700 dark:text-ink-200">{subscription.cycle}</span></p>
+                            <p>Started: <span className="tnum">{subscription.started_on}</span></p>
+                            <p>Next invoice: <span className="tnum">{subscription.next_invoice_on}</span></p>
+                        </div>
+                        {subscription.reminders_paused && (
+                            <span className="badge-warn inline-flex items-center gap-1">
+                                <PauseCircle size={10} aria-hidden="true" /> Reminders paused
+                            </span>
+                        )}
+                        <button type="button" onClick={onTogglePause} disabled={pauseSaving} className="btn btn-secondary btn-xs">
+                            {subscription.reminders_paused
+                                ? <><PlayCircle size={12} aria-hidden="true" /> Resume reminders</>
+                                : <><PauseCircle size={12} aria-hidden="true" /> Pause reminders</>}
+                        </button>
+                    </div>
+
+                    <form onSubmit={onSaveSubscription} className="grid grid-cols-3 gap-3 pt-2 border-t border-ink-100 dark:border-ink-800">
+                        <Field label="Plan">
+                            <select className="input" value={subForm.plan} onChange={(e) => setSubForm((f) => ({ ...f, plan: e.target.value }))}>
+                                {PLAN_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Price (KES)">
+                            <input
+                                aria-label="Price (KES)"
+                                className="input tnum"
+                                inputMode="decimal"
+                                value={subForm.price_kes}
+                                onChange={(e) => setSubForm((f) => ({ ...f, price_kes: e.target.value }))}
+                            />
+                        </Field>
+                        <Field label="Status">
+                            <select className="input" value={subForm.status} onChange={(e) => setSubForm((f) => ({ ...f, status: e.target.value }))}>
+                                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </Field>
+                        <div className="col-span-3 flex justify-end">
+                            <button type="submit" disabled={subSaving} className="btn btn-primary btn-xs">
+                                {subSaving ? 'Saving…' : 'Save subscription'}
+                            </button>
+                        </div>
+                    </form>
+                </>
+            )}
+        </section>
+    );
+}
+
+const INVOICE_STATUS_TONE = {
+    open: 'badge-info',
+    paid: 'badge-success',
+    void: 'badge-neutral',
+};
+
+function InvoicesSection({
+    invoices, openAction, paymentForm, setPaymentForm, voidReason, setVoidReason,
+    actionSaving, onOpenPayment, onOpenVoid, onCloseAction, onSubmitPayment, onSubmitVoid,
+}) {
+    return (
+        <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-ink-900 dark:text-white flex items-center gap-2">
+                <Receipt size={14} className="text-ink-400" aria-hidden="true" /> Invoices
+            </h3>
+            {invoices.length === 0 ? (
+                <p className="text-sm text-ink-500 dark:text-ink-400">No invoices raised yet.</p>
+            ) : (
+                <div className="card overflow-x-auto">
+                    <table className="table-clean">
+                        <thead>
+                            <tr>
+                                <th>Number</th><th>Period</th><th className="num">Amount</th>
+                                <th className="num">Balance</th><th>Status</th><th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {invoices.map((inv) => (
+                                <React.Fragment key={inv.id}>
+                                    <tr>
+                                        <td className="font-mono text-xs">{inv.number}</td>
+                                        <td className="text-xs">{inv.period_start} – {inv.period_end}</td>
+                                        <td className="num tnum">{formatKes(inv.amount_kes)}</td>
+                                        <td className="num tnum">{formatKes(inv.balance)}</td>
+                                        <td><span className={INVOICE_STATUS_TONE[inv.status] || 'badge-neutral'}>{inv.status}</span></td>
+                                        <td>
+                                            {inv.status === 'open' && (
+                                                <div className="flex gap-1.5">
+                                                    <button type="button" className="btn btn-secondary btn-xs" onClick={() => onOpenPayment(inv)}>
+                                                        <Banknote size={12} aria-hidden="true" /> Payment
+                                                    </button>
+                                                    <button type="button" className="btn btn-danger-ghost btn-xs" onClick={() => onOpenVoid(inv)}>
+                                                        <Ban size={12} aria-hidden="true" /> Void
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                    {openAction?.invoiceId === inv.id && openAction.kind === 'payment' && (
+                                        <PaymentFormRow
+                                            paymentForm={paymentForm}
+                                            setPaymentForm={setPaymentForm}
+                                            actionSaving={actionSaving}
+                                            onSubmit={(e) => onSubmitPayment(e, inv.id)}
+                                            onCancel={onCloseAction}
+                                        />
+                                    )}
+                                    {openAction?.invoiceId === inv.id && openAction.kind === 'void' && (
+                                        <VoidFormRow
+                                            voidReason={voidReason}
+                                            setVoidReason={setVoidReason}
+                                            actionSaving={actionSaving}
+                                            onSubmit={(e) => onSubmitVoid(e, inv.id)}
+                                            onCancel={onCloseAction}
+                                        />
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </section>
+    );
+}
+
+function PaymentFormRow({ paymentForm, setPaymentForm, actionSaving, onSubmit, onCancel }) {
+    return (
+        <tr>
+            <td colSpan={6} className="bg-ink-50 dark:bg-ink-800/40">
+                <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2 py-2">
+                    <Field label="Amount (KES)">
+                        <input aria-label="Payment amount" className="input tnum" inputMode="decimal"
+                            value={paymentForm.amount_kes}
+                            onChange={(e) => setPaymentForm((f) => ({ ...f, amount_kes: e.target.value }))} />
+                    </Field>
+                    <Field label="Paid on">
+                        <input aria-label="Paid on" type="date" className="input"
+                            value={paymentForm.paid_on}
+                            onChange={(e) => setPaymentForm((f) => ({ ...f, paid_on: e.target.value }))} />
+                    </Field>
+                    <Field label="Method">
+                        <select aria-label="Payment method" className="input"
+                            value={paymentForm.method}
+                            onChange={(e) => setPaymentForm((f) => ({ ...f, method: e.target.value }))}>
+                            {METHOD_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                    </Field>
+                    <Field label="Note" className="flex-1 min-w-[10rem]">
+                        <input aria-label="Payment note" className="input"
+                            value={paymentForm.note}
+                            onChange={(e) => setPaymentForm((f) => ({ ...f, note: e.target.value }))} />
+                    </Field>
+                    <button type="submit" disabled={actionSaving} className="btn btn-primary btn-xs">
+                        {actionSaving ? 'Saving…' : 'Record payment'}
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-xs" onClick={onCancel}>Cancel</button>
+                </form>
+            </td>
+        </tr>
+    );
+}
+
+function VoidFormRow({ voidReason, setVoidReason, actionSaving, onSubmit, onCancel }) {
+    return (
+        <tr>
+            <td colSpan={6} className="bg-ink-50 dark:bg-ink-800/40">
+                <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2 py-2">
+                    <Field label="Reason for voiding this invoice" className="flex-1 min-w-[14rem]">
+                        <input aria-label="Void reason" className="input" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} />
+                    </Field>
+                    <button type="submit" disabled={actionSaving} className="btn btn-danger btn-xs">
+                        {actionSaving ? 'Voiding…' : 'Void invoice'}
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-xs" onClick={onCancel}>Cancel</button>
+                </form>
+            </td>
+        </tr>
+    );
+}
+
+function PaymentsSection({ payments }) {
+    return (
+        <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-ink-900 dark:text-white flex items-center gap-2">
+                <Banknote size={14} className="text-ink-400" aria-hidden="true" /> Payments
+            </h3>
+            {payments.length === 0 ? (
+                <p className="text-sm text-ink-500 dark:text-ink-400">No payments recorded yet.</p>
+            ) : (
+                <div className="card overflow-x-auto">
+                    <table className="table-clean">
+                        <thead>
+                            <tr><th>Invoice</th><th className="num">Amount</th><th>Paid on</th><th>Method</th><th>Note</th></tr>
+                        </thead>
+                        <tbody>
+                            {payments.map((p) => (
+                                <tr key={p.id}>
+                                    <td className="text-xs">#{p.invoice_id}</td>
+                                    <td className="num tnum">{formatKes(p.amount_kes)}</td>
+                                    <td className="text-xs tnum">{p.paid_on}</td>
+                                    <td className="text-xs">{p.method}</td>
+                                    <td className="text-xs text-ink-500 dark:text-ink-400">{p.note || '-'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </section>
     );
 }
 
