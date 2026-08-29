@@ -35,6 +35,7 @@ import logging
 import os
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Iterable
 
@@ -256,6 +257,76 @@ MASTER_DB_PATCHES: list[str] = [
     "CREATE INDEX IF NOT EXISTS ix_plat_payhero_txn_receipt  ON platform_payhero_transactions (receipt_number);",
     "CREATE INDEX IF NOT EXISTS ix_plat_payhero_txn_status   ON platform_payhero_transactions (status);",
     "CREATE INDEX IF NOT EXISTS ix_plat_payhero_txn_initiated ON platform_payhero_transactions (initiated_at);",
+    # c3d4e5f6a7b8: subscription receivables and dunning (operator-side
+    # ledger of what each hospital owes MediFleet). These four tables live
+    # in the MASTER DB only; the alembic revision that defines them is
+    # guarded to run only when connected to a database literally named
+    # "hms_master" (see that revision for why `_has_table` alone isn't a
+    # safe guard). Every statement here is idempotent.
+    """
+    CREATE TABLE IF NOT EXISTS subscriptions (
+        id                SERIAL PRIMARY KEY,
+        tenant_id         INTEGER NOT NULL UNIQUE REFERENCES tenants(tenant_id),
+        plan              VARCHAR(20)  NOT NULL DEFAULT 'standard',
+        price_kes         NUMERIC(12, 2) NOT NULL DEFAULT 0,
+        cycle             VARCHAR(10)  NOT NULL DEFAULT 'monthly',
+        status            VARCHAR(20)  NOT NULL DEFAULT 'active',
+        started_on        DATE NOT NULL,
+        next_invoice_on   DATE NOT NULL,
+        reminders_paused  BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at        TIMESTAMPTZ DEFAULT now(),
+        updated_at        TIMESTAMPTZ
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_subscriptions_tenant ON subscriptions (tenant_id);",
+    """
+    CREATE TABLE IF NOT EXISTS subscription_invoices (
+        id               SERIAL PRIMARY KEY,
+        tenant_id        INTEGER NOT NULL REFERENCES tenants(tenant_id),
+        subscription_id  INTEGER NOT NULL REFERENCES subscriptions(id),
+        number           VARCHAR(20) NOT NULL UNIQUE,
+        period_start     DATE NOT NULL,
+        period_end       DATE NOT NULL,
+        amount_kes       NUMERIC(12, 2) NOT NULL,
+        issued_on        DATE NOT NULL,
+        due_on           DATE NOT NULL,
+        status           VARCHAR(20) NOT NULL DEFAULT 'open',
+        void_reason      TEXT,
+        created_at       TIMESTAMPTZ DEFAULT now(),
+        CONSTRAINT uq_invoice_period UNIQUE (subscription_id, period_start)
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_sub_invoice_tenant ON subscription_invoices (tenant_id);",
+    "CREATE INDEX IF NOT EXISTS ix_sub_invoice_sub    ON subscription_invoices (subscription_id);",
+    "CREATE INDEX IF NOT EXISTS ix_sub_invoice_due    ON subscription_invoices (due_on);",
+    "CREATE INDEX IF NOT EXISTS ix_sub_invoice_status ON subscription_invoices (status);",
+    """
+    CREATE TABLE IF NOT EXISTS invoice_payments (
+        id                        SERIAL PRIMARY KEY,
+        invoice_id                INTEGER NOT NULL REFERENCES subscription_invoices(id),
+        platform_transaction_id   INTEGER,
+        amount_kes                NUMERIC(12, 2) NOT NULL,
+        paid_on                   DATE NOT NULL,
+        method                    VARCHAR(20) NOT NULL DEFAULT 'mpesa',
+        recorded_by               INTEGER REFERENCES superadmins(admin_id),
+        note                      TEXT,
+        created_at                TIMESTAMPTZ DEFAULT now()
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_invoice_payment_inv ON invoice_payments (invoice_id);",
+    """
+    CREATE TABLE IF NOT EXISTS dunning_events (
+        id          SERIAL PRIMARY KEY,
+        invoice_id  INTEGER NOT NULL REFERENCES subscription_invoices(id),
+        tenant_id   INTEGER NOT NULL REFERENCES tenants(tenant_id),
+        day_offset  INTEGER NOT NULL,
+        sent_at     TIMESTAMPTZ DEFAULT now(),
+        recipients  INTEGER NOT NULL DEFAULT 0,
+        CONSTRAINT uq_dunning_milestone UNIQUE (invoice_id, day_offset)
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_dunning_invoice ON dunning_events (invoice_id);",
+    "CREATE INDEX IF NOT EXISTS ix_dunning_tenant   ON dunning_events (tenant_id);",
 ]
 
 
@@ -346,6 +417,97 @@ def _apply_master_patches(master_url: str) -> None:
         LOG.info("master DB patched (%d statement%s applied).",
                  len(MASTER_DB_PATCHES),
                  "" if len(MASTER_DB_PATCHES) == 1 else "s")
+    finally:
+        engine.dispose()
+
+
+# Mirrors app/routes/public.py and frontend/src/pages/superadmin/PlatformBilling.jsx.
+_SUBSCRIPTION_TIER_PRICING = {"premium": 49500, "standard": 18500}
+
+
+def _next_subscription_billing_date(today: date, day: int) -> date:
+    """The next occurrence of ``day`` (a day-of-month) on or after ``today``,
+    clamped to short months. Duplicated from the c3d4e5f6a7b8 alembic
+    revision rather than imported: migrations are meant to run once per
+    revision and to stay frozen, so their logic is copied here (same
+    convention as LEGACY_BOOTSTRAP_SEEDS above) instead of imported sideways.
+
+    Imports ``monthrange`` locally rather than a module-level
+    ``import calendar``: the model import block below binds the name
+    ``calendar`` to ``app.models.calendar`` in this module's namespace,
+    which would silently shadow the stdlib module of the same name.
+    """
+    from calendar import monthrange
+
+    def _clamp(year: int, month: int) -> date:
+        last = monthrange(year, month)[1]
+        return date(year, month, min(day, last))
+
+    candidate = _clamp(today.year, today.month)
+    if candidate < today:
+        if today.month == 12:
+            candidate = _clamp(today.year + 1, 1)
+        else:
+            candidate = _clamp(today.year, today.month + 1)
+    return candidate
+
+
+def _backfill_subscriptions(master_url: str) -> None:
+    """Create a Subscription row for every tenant that doesn't have one.
+
+    Why this lives here and not only in the alembic revision: master never
+    actually receives a real ``alembic upgrade head`` in CI or production
+    (see migration-check.yml and render-start.sh, both only ever call
+    ``_apply_master_patches`` for the master DB; real ``alembic upgrade``
+    only ever targets tenant databases). A backfill written solely inside
+    the c3d4e5f6a7b8 revision's ``upgrade()`` would therefore never run
+    outside a developer's own machine, and hospitals that predate this
+    feature would never be invoiced. Idempotent: skips any tenant that
+    already has a subscription.
+    """
+    engine = create_engine(master_url)
+    try:
+        with engine.begin() as conn:
+            if not inspect(conn).has_table("subscriptions"):
+                return
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT t.tenant_id, t.is_premium, t.is_active, t.created_at
+                    FROM tenants t
+                    WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.tenant_id = t.tenant_id)
+                    """
+                )
+            ).fetchall()
+            if not rows:
+                return
+            today = date.today()
+            insert_stmt = text(
+                """
+                INSERT INTO subscriptions
+                    (tenant_id, plan, price_kes, cycle, status, started_on, next_invoice_on, reminders_paused)
+                VALUES
+                    (:tenant_id, :plan, :price_kes, 'monthly', :status, :started_on, :next_invoice_on, FALSE)
+                """
+            )
+            for row in rows:
+                started_on = row.created_at.date() if row.created_at is not None else today
+                is_premium = bool(row.is_premium)
+                plan = "premium" if is_premium else "standard"
+                price = _SUBSCRIPTION_TIER_PRICING["premium" if is_premium else "standard"]
+                status = "active" if row.is_active else "paused"
+                conn.execute(
+                    insert_stmt,
+                    {
+                        "tenant_id": row.tenant_id,
+                        "plan": plan,
+                        "price_kes": price,
+                        "status": status,
+                        "started_on": started_on,
+                        "next_invoice_on": _next_subscription_billing_date(today, started_on.day),
+                    },
+                )
+        LOG.info("subscriptions backfilled for %d tenant(s) without one.", len(rows))
     finally:
         engine.dispose()
 
@@ -871,6 +1033,10 @@ def main() -> int:
     #    yet been extended — the SELECT only touches columns that always exist.
     try:
         _apply_master_patches(master_url)
+        # Every tenant needs a Subscription row once the tables above exist,
+        # or it is silently never invoiced. See _backfill_subscriptions for
+        # why this cannot be left to the alembic revision alone.
+        _backfill_subscriptions(master_url)
     except Exception as exc:
         LOG.error("Master DB patching failed: %s", exc)
         return 4

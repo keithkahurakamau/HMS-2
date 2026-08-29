@@ -38,6 +38,7 @@ const NAV = [
     { name: 'Users & Access',           path: '/superadmin/users',     icon: <KeyRound size={18} /> },
     { name: 'Support Inbox',            path: '/superadmin/support',   icon: <LifeBuoy size={18} /> },
     { name: 'Revenue & Tiers',          path: '/superadmin/billing',   icon: <CreditCard size={18} /> },
+    { name: 'Receivables',              path: '/superadmin/receivables', icon: <Wallet size={18} /> },
     { name: 'Subscription Billing',     path: '/superadmin/subscriptions', icon: <Wallet size={18} /> },
     { name: 'M-Pesa Provisioning',      path: '/superadmin/payments',  icon: <Smartphone size={18} /> },
     { name: 'Platform Settings',        path: '/superadmin/settings',  icon: <Settings size={18} /> },

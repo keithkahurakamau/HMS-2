@@ -20,6 +20,8 @@ import logging
 import re
 import secrets
 import string
+from datetime import date
+from decimal import Decimal
 from typing import Optional, Tuple
 
 from sqlalchemy import create_engine, text
@@ -30,6 +32,7 @@ from app.config.database import DATABASE_URL, Base, get_tenant_engine
 from app.config.settings import settings  # noqa: F401 — kept for forward-compat
 from app.core.security import get_password_hash
 from app.models.master import Tenant
+from app.models.subscription_billing import Subscription
 from app.models.user import User, Role, Permission
 from app.models.inventory import Location
 from app.models.settings import HospitalSetting
@@ -61,6 +64,71 @@ from app.models import accounting as _accounting  # noqa: F401
 from app.models import calendar as _calendar  # noqa: F401
 
 logger = logging.getLogger(__name__)
+
+
+# Mirrors app/routes/public.py's TIER_PRICING, scripts/migrate_all_tenants.py's
+# _SUBSCRIPTION_TIER_PRICING, and frontend/src/pages/superadmin/PlatformBilling.jsx.
+# Duplicated rather than imported, same convention as the other tier-price
+# copies in this codebase: each lives next to the one thing it prices.
+_SUBSCRIPTION_TIER_PRICING = {"premium": Decimal("49500"), "standard": Decimal("18500")}
+
+
+def _next_subscription_billing_date(today: date, day: int) -> date:
+    """The next occurrence of ``day`` (a day-of-month) on or after ``today``,
+    clamped to short months. Duplicated from the same-named helper in
+    scripts/migrate_all_tenants.py rather than imported: that module keeps
+    its date math frozen and copied deliberately (see its own docstring),
+    and this module has no other reason to depend on the scripts package.
+    """
+    from calendar import monthrange
+
+    def _clamp(year: int, month: int) -> date:
+        last = monthrange(year, month)[1]
+        return date(year, month, min(day, last))
+
+    candidate = _clamp(today.year, today.month)
+    if candidate < today:
+        if today.month == 12:
+            candidate = _clamp(today.year + 1, 1)
+        else:
+            candidate = _clamp(today.year, today.month + 1)
+    return candidate
+
+
+def _create_subscription(master_db, tenant: Tenant) -> Subscription:
+    """Create the billing Subscription for a freshly-provisioned tenant, in
+    the same master-DB transaction as the Tenant row.
+
+    Without this, a hospital onboarded today has no Subscription: it is
+    silently skipped by ensure_invoices (which filters on active
+    subscriptions) and does not even appear on the ageing page (which joins
+    Subscription to Tenant), so it stays unbilled and invisible until a
+    deploy happens to run the backfill in scripts/migrate_all_tenants.py.
+
+    Plan and price come from the tenant's tier exactly the way the backfill
+    and the platform overview derive them: ``tenant.is_premium`` is the one
+    source of truth for tier, not a new flag on this call.
+    """
+    plan = "premium" if tenant.is_premium else "standard"
+    price = _SUBSCRIPTION_TIER_PRICING[plan]
+    # tenant.created_at is populated by the INSERT's RETURNING clause once
+    # the row has been flushed; the fallback mirrors the same defensive
+    # pattern the backfill in scripts/migrate_all_tenants.py uses for the
+    # rare case a server-side default hasn't come back yet.
+    started_on = tenant.created_at.date() if tenant.created_at is not None else date.today()
+    subscription = Subscription(
+        tenant_id=tenant.tenant_id,
+        plan=plan,
+        price_kes=price,
+        cycle="monthly",
+        status="active",
+        started_on=started_on,
+        next_invoice_on=_next_subscription_billing_date(started_on, started_on.day),
+        reminders_paused=False,
+    )
+    master_db.add(subscription)
+    master_db.flush()
+    return subscription
 
 
 # RBAC seed used for every new tenant. Mirrors what seed.py installs.
@@ -569,8 +637,14 @@ def provision_tenant(
 
     temp_password = _generate_temp_password()
 
-    # 3. Database + schema + seed. If any step fails, undo cleanly.
+    # 3. Subscription + database + schema + seed. If any step fails, undo
+    # cleanly. The subscription is created here, inside the same
+    # try/except as the rest of provisioning, so a failure rolls back the
+    # tenant row too and reaches the caller as the same RuntimeError the
+    # database/schema steps already raise, rather than an unhandled
+    # SQLAlchemy error the route below has no handler for.
     try:
+        _create_subscription(master_db, tenant)
         _create_database_if_missing(db_name)
         _build_schema(db_name)
         _seed_baseline(
