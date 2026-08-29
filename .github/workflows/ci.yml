@@ -87,6 +87,10 @@ jobs:
         working-directory: backend
         run: pytest tests/support/ -q
 
+      - name: Backend receivables tests
+        working-directory: backend
+        run: pytest tests/receivables/ -q
+
   frontend:
     name: frontend (lint + build)
     runs-on: ubuntu-latest

@@ -120,7 +120,9 @@ def get_platform_overview(master_db: Session = Depends(get_master_db)):
     Returns:
       * tenant counts (total, active, suspended, premium, standard)
       * platform MRR + ARR (computed off the same tier prices the billing UI
-        applies — see TIER_PRICING below)
+        applies, see TIER_PRICING below), plus collected_this_month, the
+        actual sum of InvoicePayment rows for the current calendar month, so
+        the projection and the real cash received are never confused
       * 30-day growth (tenants provisioned in the trailing window)
       * total active users across every active tenant DB (best-effort —
         failures per tenant are surfaced under ``user_count_errors`` so the
@@ -133,8 +135,10 @@ def get_platform_overview(master_db: Session = Depends(get_master_db)):
     aggregate query and disposes it.
     """
     from datetime import datetime, timezone, timedelta
-    from sqlalchemy import text
+    from decimal import Decimal
+    from sqlalchemy import func, text
     from app.models.support import SupportTicket
+    from app.models.subscription_billing import InvoicePayment
     from app.config.database import get_tenant_engine
 
     # Tier pricing mirrors the frontend PlatformBilling client constants.
@@ -149,6 +153,32 @@ def get_platform_overview(master_db: Session = Depends(get_master_db)):
     standard_count = len(active) - premium_count
 
     mrr = premium_count * TIER_PRICING["premium"] + standard_count * TIER_PRICING["standard"]
+
+    # Actual cash received this calendar month, as opposed to mrr above
+    # which is a price-list projection that never moves whether or not a
+    # single hospital has paid. Summed straight off InvoicePayment (the
+    # master-DB receivables ledger) rather than derived from mrr, so the two
+    # figures can genuinely disagree instead of one being computed from
+    # the other.
+    today = datetime.now(timezone.utc).date()
+    month_start = today.replace(day=1)
+    next_month_start = (
+        month_start.replace(year=month_start.year + 1, month=1)
+        if month_start.month == 12
+        else month_start.replace(month=month_start.month + 1)
+    )
+    # A waiver is money written off, not money received, so it is excluded
+    # here the same way it is excluded from the receivables "received"
+    # figure: this number sits right next to mrr specifically to show real
+    # cash collected, and a waiver would overstate that.
+    collected_raw = master_db.query(
+        func.coalesce(func.sum(InvoicePayment.amount_kes), 0)
+    ).filter(
+        InvoicePayment.paid_on >= month_start,
+        InvoicePayment.paid_on < next_month_start,
+        InvoicePayment.method != "waiver",
+    ).scalar()
+    collected_this_month = str(Decimal(collected_raw).quantize(Decimal("0.01")))
 
     # 30-day growth — tenants whose created_at falls inside the trailing window.
     # We compare in UTC; the column has timezone=True so the math is honest.
@@ -206,6 +236,7 @@ def get_platform_overview(master_db: Session = Depends(get_master_db)):
         "revenue": {
             "mrr": mrr,
             "arr": mrr * 12,
+            "collected_this_month": collected_this_month,
             "currency": "KES",
         },
         "growth": {
