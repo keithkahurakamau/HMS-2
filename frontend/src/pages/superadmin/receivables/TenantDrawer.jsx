@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import {
@@ -6,12 +6,20 @@ import {
 } from 'lucide-react';
 import {
     getTenantDetail, recordPayment, voidInvoice, setReminders, updateSubscription,
-    formatKes,
+    formatKes, isZeroMoney,
 } from '../../../api/receivables';
 import { SkeletonTable } from '../../../components/ui/Skeleton';
 import ErrorState from '../../../components/ui/ErrorState';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
+
+// Everything a focus trap needs to cycle through. Deliberately excludes
+// tabindex="-1" targets: those are programmatic focus destinations, not
+// stops in the tab order.
+const FOCUSABLE_SELECTOR = [
+    'a[href]', 'button:not([disabled])', 'textarea:not([disabled])',
+    'input:not([disabled])', 'select:not([disabled])', '[tabindex]:not([tabindex="-1"])',
+].join(', ');
 
 const PLAN_OPTIONS = ['standard', 'premium'];
 const STATUS_OPTIONS = ['active', 'paused', 'cancelled'];
@@ -45,6 +53,15 @@ export default function TenantDrawer({ tenantId, onClose, onChanged }) {
     const [voidReason, setVoidReason] = useState('');
     const [actionSaving, setActionSaving] = useState(false);
 
+    // Focus management for this portal-based dialog (native <dialog> is
+    // deferred project-wide, so none of this comes for free): dialogRef
+    // scopes the Tab trap, closeButtonRef is where focus lands on open, and
+    // previouslyFocusedRef is what focus returns to on close (whatever
+    // triggered the drawer, normally the ageing table row).
+    const dialogRef = useRef(null);
+    const closeButtonRef = useRef(null);
+    const previouslyFocusedRef = useRef(null);
+
     const load = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -73,6 +90,46 @@ export default function TenantDrawer({ tenantId, onClose, onChanged }) {
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
     }, [onClose]);
+
+    // On open, move focus into the dialog rather than leaving it wherever it
+    // was (or nowhere, if the trigger was a mouse click on a non-focusable
+    // element). On close, give it back to whatever had focus before the
+    // drawer opened, so a keyboard user lands back on the table row instead
+    // of the top of the document. Runs once per mount: this component is
+    // mounted/unmounted by the parent each time the drawer opens/closes, so
+    // there is no separate "isOpen" prop to key off.
+    useEffect(() => {
+        previouslyFocusedRef.current = document.activeElement;
+        closeButtonRef.current?.focus();
+        return () => {
+            const toRestore = previouslyFocusedRef.current;
+            if (toRestore && typeof toRestore.focus === 'function' && document.contains(toRestore)) {
+                toRestore.focus();
+            }
+        };
+    }, []);
+
+    // Keep Tab from escaping to the page behind the backdrop while the
+    // drawer is open. Cycles within whatever is actually focusable right
+    // now (a loading skeleton has nothing; a loaded drawer has several
+    // buttons/inputs), so it stays correct as sections load in or fold away.
+    const handleTrapKeyDown = (event) => {
+        if (event.key !== 'Tab' || !dialogRef.current) return;
+        const focusables = Array.from(dialogRef.current.querySelectorAll(FOCUSABLE_SELECTOR));
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const isInside = dialogRef.current.contains(document.activeElement);
+        if (event.shiftKey) {
+            if (!isInside || document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            }
+        } else if (!isInside || document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    };
 
     const notifyChanged = () => { if (onChanged) onChanged(); };
 
@@ -162,8 +219,10 @@ export default function TenantDrawer({ tenantId, onClose, onChanged }) {
     return createPortal(
         <div className="fixed inset-0 z-50 flex justify-end bg-ink-900/50 backdrop-blur-sm" onClick={onClose} role="presentation">
             <div
+                ref={dialogRef}
                 className="overlay-surface h-full w-full max-w-2xl flex flex-col rounded-none border-l"
                 onClick={(event) => event.stopPropagation()}
+                onKeyDown={handleTrapKeyDown}
                 role="dialog"
                 aria-modal="true"
                 aria-label={detail ? `Receivables for ${detail.tenant_name}` : 'Tenant receivables'}
@@ -174,6 +233,7 @@ export default function TenantDrawer({ tenantId, onClose, onChanged }) {
                         <span className="truncate">{detail ? detail.tenant_name : 'Loading tenant…'}</span>
                     </h2>
                     <button
+                        ref={closeButtonRef}
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
@@ -196,7 +256,7 @@ export default function TenantDrawer({ tenantId, onClose, onChanged }) {
                                 </div>
                                 <div className="card p-4">
                                     <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-ink-500 dark:text-ink-400">Overdue</p>
-                                    <p className={`tnum text-xl font-semibold mt-1 ${detail.balances.overdue === '0.00' ? 'text-ink-900 dark:text-white' : 'text-rose-700 dark:text-rose-400'}`}>
+                                    <p className={`tnum text-xl font-semibold mt-1 ${isZeroMoney(detail.balances.overdue) ? 'text-ink-900 dark:text-white' : 'text-rose-700 dark:text-rose-400'}`}>
                                         {formatKes(detail.balances.overdue)}
                                     </p>
                                 </div>
