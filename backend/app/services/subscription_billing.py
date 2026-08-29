@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Iterator
@@ -27,6 +28,27 @@ MILESTONES = (1, 7, 14, 30)
 # shared across the whole database, so this value must stay unique to the
 # billing run and never be reused for another lock.
 BILLING_LOCK_KEY = 7825001
+
+
+@dataclass
+class BillingRunResult:
+    """What a billing run actually did, so a caller (the cron, or the
+    console's 'Run billing now' button) can tell "nothing was due" apart
+    from "every subscription failed". Both used to look identical: zero
+    counts and a clean exit. failures carries one human-readable line per
+    failed subscription or tenant, so the caller's log names what broke
+    instead of hiding it behind a plausible-looking zero."""
+    invoices_created: int
+    reminders_sent: int
+    failures: list[str] = field(default_factory=list)
+    # True only when the run did not execute at all because another run
+    # already held billing_lock. A skipped run is the correct outcome, not
+    # a failure, so callers must be able to tell the two apart.
+    skipped: bool = False
+
+    @property
+    def ok(self) -> bool:
+        return not self.failures
 
 
 def outstanding_balance(db: Session, invoice: SubscriptionInvoice) -> Decimal:
@@ -109,10 +131,16 @@ def billing_lock(db: Session) -> Iterator[bool]:
             db.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": BILLING_LOCK_KEY})
 
 
-def ensure_invoices(db: Session, as_of: date) -> list[SubscriptionInvoice]:
+def ensure_invoices(
+    db: Session, as_of: date, failures: list[str] | None = None,
+) -> list[SubscriptionInvoice]:
     """Raise every invoice now due. Safe to run repeatedly: the unique
     constraint on (subscription_id, period_start) is the guard, and
-    next_invoice_on advances in the same transaction."""
+    next_invoice_on advances in the same transaction.
+
+    failures, when given a list, gets one human-readable line appended per
+    subscription that raised. Optional and additive, so existing callers
+    that only care about the return value are unaffected."""
     created: list[SubscriptionInvoice] = []
     subs = db.query(Subscription).filter(
         Subscription.status == "active",
@@ -151,10 +179,12 @@ def ensure_invoices(db: Session, as_of: date) -> list[SubscriptionInvoice]:
                     created.append(inv)
                 sub.next_invoice_on = next_billing
             db.commit()
-        except Exception:
+        except Exception as exc:
             # One bad subscription must not stop the rest.
             db.rollback()
             logger.exception("Invoice generation failed for subscription %s", sub.id)
+            if failures is not None:
+                failures.append(f"subscription {sub.id} (tenant {sub.tenant_id}): {exc}")
     return created
 
 
@@ -188,11 +218,17 @@ def notify_tenant_admins(tenant_db_name: str, title: str, body: str) -> int:
         session.close()
 
 
-def run_dunning(db: Session, as_of: date, notifier=None) -> list[DunningEvent]:
+def run_dunning(
+    db: Session, as_of: date, notifier=None, failures: list[str] | None = None,
+) -> list[DunningEvent]:
     """Remind the admins of every hospital with an overdue balance.
 
     Only the highest milestone reached is sent, so a month of downtime does
     not deliver four notifications about one invoice at once.
+
+    failures, when given a list, gets one human-readable line appended per
+    tenant that could not be notified. Optional and additive, same as
+    ensure_invoices's failures parameter.
     """
     from app.models.master import Tenant
 
@@ -235,9 +271,11 @@ def run_dunning(db: Session, as_of: date, notifier=None) -> list[DunningEvent]:
         )
         try:
             recipients = send(tenant.db_name, title, body)
-        except Exception:
+        except Exception as exc:
             # Log and skip. No DunningEvent is written, so the next run retries.
             logger.exception("Could not notify tenant %s", tenant.tenant_id)
+            if failures is not None:
+                failures.append(f"tenant {tenant.tenant_id} ({tenant.db_name}): {exc}")
             continue
 
         event = DunningEvent(invoice_id=invoice.id, tenant_id=tenant.tenant_id,
@@ -247,3 +285,25 @@ def run_dunning(db: Session, as_of: date, notifier=None) -> list[DunningEvent]:
         events.append(event)
 
     return events
+
+
+def run_billing_cycle(db: Session, as_of: date) -> BillingRunResult:
+    """The one billing entry point both the cron and the console's 'Run
+    billing now' button should call. Serialises on billing_lock, then runs
+    ensure_invoices and run_dunning against a single shared failures list,
+    so the caller gets one result that distinguishes a genuinely quiet run
+    from one where every subscription failed.
+    """
+    with billing_lock(db) as acquired:
+        if not acquired:
+            return BillingRunResult(
+                invoices_created=0, reminders_sent=0,
+                failures=["billing run already in progress, skipped"],
+                skipped=True,
+            )
+        failures: list[str] = []
+        invoices = ensure_invoices(db, as_of, failures=failures)
+        events = run_dunning(db, as_of, failures=failures)
+        return BillingRunResult(
+            invoices_created=len(invoices), reminders_sent=len(events), failures=failures,
+        )
