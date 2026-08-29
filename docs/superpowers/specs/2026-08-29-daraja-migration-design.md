@@ -294,11 +294,27 @@ is mocked at one seam.
 | A hospital left on sandbox in production | Per-tenant environment plus an explicit health-panel warning |
 | Big-bang cutover | No live Pay Hero data and no live hospital, so there is nothing to cut over from |
 
-## Open question for the operator
+## Credentials: answered
 
-**Does MediFleet already hold its own Daraja production credentials for the
-subscription rail?** The hospital rail can be built and tested against sandbox
-using each hospital's own credentials as they onboard, but the subscription rail
-is MediFleet's own shortcode and needs the operator's own Go-Live. If those
-credentials do not exist yet, the work still completes: the subscription rail
-ships pointed at sandbox and flips with a configuration change, no redeploy.
+**MediFleet holds no Daraja credentials of its own** (confirmed by the operator,
+2026-08-29). No Safaricom Go-Live has been done for the MediFleet shortcode.
+
+Consequences, all of which the design already accommodates:
+
+- **The subscription rail ships pointed at sandbox.** It is built, tested and
+  merged in full, and becomes live through a configuration change once the
+  operator completes Go-Live. No redeploy, no code change, no migration.
+- **Collecting subscriptions by M-Pesa is not available until then.** This is not
+  a blocker: the receivables ledger shipped on 2026-08-29 already records payments
+  received by any means, so the operator continues to record bank transfers and
+  manual M-Pesa receipts against invoices exactly as now. The Daraja rail replaces
+  the typing, not the ledger.
+- **The hospital rail is unaffected.** Each hospital brings its own credentials
+  when it onboards, and none is live today, so every hospital starts in sandbox
+  and flips per tenant when its own Go-Live completes. The per-tenant
+  `environment` field exists precisely for this.
+- **Nothing in this work can be verified against production M-Pesa before merge.**
+  Every flow is proven against Daraja sandbox and against mocked responses at the
+  client seam. The first production transaction on either rail will be a live
+  smoke test performed by a human with a real handset, not something CI can
+  assert. The plan ends with a written smoke-test procedure for that reason.
