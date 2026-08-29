@@ -1,5 +1,7 @@
 import base64
+import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -50,6 +52,38 @@ def test_normalize_msisdn_rejects_garbage(bad):
 def test_daraja_timestamp_shape():
     ts = daraja_timestamp(datetime(2026, 8, 29, 14, 5, 3))
     assert ts == "20260829140503"
+
+
+def _nairobi_now_str() -> str:
+    return datetime.now(ZoneInfo("Africa/Nairobi")).strftime("%Y%m%d%H%M%S")
+
+
+def test_daraja_timestamp_default_path_is_nairobi_not_host_tz(monkeypatch):
+    """Regression test for a bug where the default path used a bare
+    ``datetime.now(timezone.utc).astimezone()``, which follows whatever
+    timezone the HOST process is configured with rather than Nairobi.
+    Render containers default the host to UTC, so every STK push built on
+    the default path carried a timestamp hours off Nairobi time, and
+    Safaricom's tight Timestamp tolerance would reject it.
+
+    Forcing the host to a timezone far from Nairobi (Los Angeles, ~10-11h
+    offset) makes the two diverge unmistakably, so this test fails against
+    the old ``.astimezone()`` implementation and passes against the fixed
+    ``datetime.now(ZoneInfo("Africa/Nairobi"))`` one.
+    """
+    monkeypatch.setenv("TZ", "America/Los_Angeles")
+    time.tzset()
+    try:
+        before = _nairobi_now_str()
+        result = daraja_timestamp()
+        after = _nairobi_now_str()
+    finally:
+        monkeypatch.delenv("TZ", raising=False)
+        time.tzset()
+
+    # Tolerate the test running across a second boundary rather than pin to
+    # one instant.
+    assert result in {before, after}
 
 
 def test_stk_password_is_base64_of_concatenation():

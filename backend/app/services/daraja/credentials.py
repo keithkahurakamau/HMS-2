@@ -7,15 +7,17 @@ from __future__ import annotations
 
 import base64
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.x509 import load_pem_x509_certificate
 
 _CERT_DIR = Path(__file__).resolve().parent.parent.parent / "vendor" / "safaricom"
 _ENVIRONMENTS = {"sandbox", "production"}
+_NAIROBI = ZoneInfo("Africa/Nairobi")
 
 _DIGITS = re.compile(r"\D")
 
@@ -39,8 +41,15 @@ def normalize_msisdn(phone: str) -> str:
 
 
 def daraja_timestamp(now: datetime | None = None) -> str:
-    """Daraja wants local Kenyan wall-clock time as YYYYMMDDHHMMSS."""
-    moment = now or datetime.now(timezone.utc).astimezone()
+    """Daraja wants local Kenyan wall-clock time as YYYYMMDDHHMMSS.
+
+    The default path is pinned to Africa/Nairobi explicitly: a bare
+    ``.astimezone()`` would instead follow the host's configured timezone,
+    which on Render is UTC, three hours off Nairobi and outside Safaricom's
+    Timestamp tolerance. Callers that pass their own ``now`` keep full
+    control, unaffected by this pin.
+    """
+    moment = now or datetime.now(_NAIROBI)
     return moment.strftime("%Y%m%d%H%M%S")
 
 

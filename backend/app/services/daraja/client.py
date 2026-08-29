@@ -104,7 +104,7 @@ class DarajaClient:
                 or "Daraja rejected the request"
             )
             logger.warning("Daraja %s -> %s %s", path, response.status_code, safe_repr(data))
-            raise DarajaError(message, status_code=response.status_code, body=data)
+            raise DarajaError(message, status_code=response.status_code, body=safe_repr(data))
         return data
 
     def _execute(self, fn, url: str, **kwargs):
