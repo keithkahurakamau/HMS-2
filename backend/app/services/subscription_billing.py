@@ -138,8 +138,8 @@ def billing_lock(db: Session) -> Iterator[bool]:
     instead of blocking.
     """
     conn = db.get_bind().connect()
-    conn.begin()
     try:
+        conn.begin()
         acquired = bool(
             conn.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": BILLING_LOCK_KEY}).scalar()
         )
