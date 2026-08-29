@@ -7,10 +7,12 @@ the same state. The tests exist mainly to prove that property.
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Iterator
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.models.subscription_billing import (
@@ -20,6 +22,11 @@ from app.models.subscription_billing import (
 logger = logging.getLogger("subscription_billing")
 
 MILESTONES = (1, 7, 14, 30)
+
+# Arbitrary but fixed: pg_advisory_lock keys are a single 64-bit namespace
+# shared across the whole database, so this value must stay unique to the
+# billing run and never be reused for another lock.
+BILLING_LOCK_KEY = 7825001
 
 
 def outstanding_balance(db: Session, invoice: SubscriptionInvoice) -> Decimal:
@@ -73,6 +80,33 @@ def next_number(db: Session, on: date) -> str:
     )
     seq = int(latest[0].split("-")[-1]) + 1 if latest else 1
     return f"{prefix}{seq:04d}"
+
+
+@contextmanager
+def billing_lock(db: Session) -> Iterator[bool]:
+    """Serialise billing runs with a Postgres advisory lock.
+
+    Two callers converge here: the daily cron and the operator console's
+    "Run billing now" button. next_number picks the next invoice number by
+    reading the highest existing one, so two runs at once can race and
+    collide, in which case the unique constraint on `number` skips the
+    losing subscription for the day rather than corrupting anything, but a
+    skipped invoice is still a hospital not billed that day.
+
+    Session-level (pg_advisory_lock/pg_advisory_unlock), not transaction-level,
+    because a billing run spans multiple commits and a transaction-level
+    lock would release at the first one. Acquisition is non-blocking
+    (pg_try_advisory_lock): a caller that finds the lock held should skip
+    its run rather than wait, so yields False instead of blocking.
+    """
+    acquired = bool(
+        db.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": BILLING_LOCK_KEY}).scalar()
+    )
+    try:
+        yield acquired
+    finally:
+        if acquired:
+            db.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": BILLING_LOCK_KEY})
 
 
 def ensure_invoices(db: Session, as_of: date) -> list[SubscriptionInvoice]:
