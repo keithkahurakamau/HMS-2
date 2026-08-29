@@ -10,24 +10,25 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+# Constrained to the values the rest of the system actually understands.
+# A free-form string here can silently drop a tenant out of billing: setting
+# status to "Active" (capital A) would pass validation but never match
+# ensure_invoices's `Subscription.status == "active"` filter, with no error
+# raised anywhere.
+SubscriptionStatus = Literal["active", "paused", "cancelled"]
+SubscriptionPlan = Literal["standard", "premium"]
+PaymentMethod = Literal["mpesa", "bank", "cash", "cheque", "waiver"]
+
 
 class PaymentIn(BaseModel):
-    amount_kes: Decimal = Field(gt=0)
+    amount_kes: Decimal = Field(gt=0, decimal_places=2)
     paid_on: date
-    method: str = Field(default="mpesa", max_length=20)
+    method: PaymentMethod = "mpesa"
     note: Optional[str] = Field(default=None, max_length=500)
-
-    @field_validator("method")
-    @classmethod
-    def _method_not_blank(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("method must not be blank")
-        return v
 
 
 class VoidIn(BaseModel):
@@ -47,9 +48,9 @@ class RemindersIn(BaseModel):
 
 
 class SubscriptionUpdateIn(BaseModel):
-    plan: Optional[str] = Field(default=None, max_length=20)
-    price_kes: Optional[Decimal] = Field(default=None, gt=0)
-    status: Optional[str] = Field(default=None, max_length=20)
+    plan: Optional[SubscriptionPlan] = None
+    price_kes: Optional[Decimal] = Field(default=None, gt=0, decimal_places=2)
+    status: Optional[SubscriptionStatus] = None
 
 
 class AgeingRow(BaseModel):

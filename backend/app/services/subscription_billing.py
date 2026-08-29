@@ -115,20 +115,47 @@ def billing_lock(db: Session) -> Iterator[bool]:
     losing subscription for the day rather than corrupting anything, but a
     skipped invoice is still a hospital not billed that day.
 
-    Session-level (pg_advisory_lock/pg_advisory_unlock), not transaction-level,
-    because a billing run spans multiple commits and a transaction-level
-    lock would release at the first one. Acquisition is non-blocking
-    (pg_try_advisory_lock): a caller that finds the lock held should skip
-    its run rather than wait, so yields False instead of blocking.
+    Opens and holds its OWN dedicated connection for the whole run, rather
+    than locking on *db*. ensure_invoices commits once per subscription, and
+    a commit on *db* returns its connection to the pool: with QueuePool the
+    lock would strand on that now-idle pooled connection (a later
+    pg_advisory_unlock on a different connection is a no-op, so the lock
+    would never clear and every future run would report skipped forever);
+    with DB_POOLER_ENABLED (NullPool + PgBouncer transaction pooling, see
+    app/config/database.py) the underlying server connection is only ever
+    pinned to a client for the life of one open transaction, so a
+    session-level lock only means anything here if it is acquired and held
+    inside a single transaction that never commits until the run is done.
+    That is exactly what this does: the dedicated connection's transaction
+    stays open (uncommitted) for the whole `with` block, and closing the
+    connection in `finally` releases the lock even if the explicit unlock
+    below fails to run, because Postgres always drops a session's advisory
+    locks when its backend disconnects. That removes the stranding failure
+    mode entirely instead of just narrowing it.
+
+    Acquisition is non-blocking (pg_try_advisory_lock): a caller that finds
+    the lock held should skip its run rather than wait, so yields False
+    instead of blocking.
     """
-    acquired = bool(
-        db.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": BILLING_LOCK_KEY}).scalar()
-    )
+    conn = db.get_bind().connect()
+    conn.begin()
     try:
-        yield acquired
+        acquired = bool(
+            conn.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": BILLING_LOCK_KEY}).scalar()
+        )
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                try:
+                    conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": BILLING_LOCK_KEY})
+                except Exception:
+                    logger.exception(
+                        "Explicit pg_advisory_unlock failed; closing the dedicated "
+                        "billing_lock connection below still releases it."
+                    )
     finally:
-        if acquired:
-            db.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": BILLING_LOCK_KEY})
+        conn.close()
 
 
 def ensure_invoices(
@@ -267,7 +294,7 @@ def run_dunning(
         title = "Subscription payment overdue"
         body = (
             f"Invoice {invoice.number} for {invoice.period_start:%B %Y} is "
-            f"{age} days overdue. Balance KES {balance:,.0f}."
+            f"{age} days overdue. Balance KES {balance:,.2f}."
         )
         try:
             recipients = send(tenant.db_name, title, body)
@@ -278,10 +305,36 @@ def run_dunning(
                 failures.append(f"tenant {tenant.tenant_id} ({tenant.db_name}): {exc}")
             continue
 
+        if not recipients:
+            # Zero recipients (no active Admin in the tenant) is a failure,
+            # not a success: writing the DunningEvent anyway would burn this
+            # milestone permanently with nobody ever having been told.
+            # Leaving no event written means the next run retries it, same
+            # as the notifier-raised case above.
+            logger.warning(
+                "No recipients for tenant %s (%s); milestone %d not recorded, will retry",
+                tenant.tenant_id, tenant.db_name, milestone,
+            )
+            if failures is not None:
+                failures.append(
+                    f"tenant {tenant.tenant_id} ({tenant.db_name}): no active admin to notify"
+                )
+            continue
+
         event = DunningEvent(invoice_id=invoice.id, tenant_id=tenant.tenant_id,
-                             day_offset=milestone, recipients=recipients or 0)
-        db.add(event)
-        db.commit()
+                             day_offset=milestone, recipients=recipients)
+        try:
+            db.add(event)
+            db.commit()
+        except Exception as exc:
+            # The tenant was already notified above; a failure to record
+            # that must not abort dunning for every remaining tenant, and
+            # must not leave a half-written event dangling in the session.
+            db.rollback()
+            logger.exception("Could not record dunning event for tenant %s", tenant.tenant_id)
+            if failures is not None:
+                failures.append(f"tenant {tenant.tenant_id} ({tenant.db_name}): {exc}")
+            continue
         events.append(event)
 
     return events

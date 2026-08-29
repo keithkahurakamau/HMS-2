@@ -84,3 +84,25 @@ def test_collected_this_month_is_zero_string_with_no_payments(
     res = client_superadmin.get(OVERVIEW)
     assert res.status_code == 200
     assert res.json()["revenue"]["collected_this_month"] == "0.00"
+
+
+def test_collected_this_month_excludes_a_waiver(
+    client_superadmin, master_db, make_tenant,
+):
+    """A waiver is money written off, not cash collected. collected_this_month
+    exists specifically so real cash can be compared against projected MRR;
+    a waiver counting toward it would misrepresent that reality."""
+    tenant, sub = make_tenant()
+    today = date.today()
+    invoice = _make_invoice(
+        master_db, tenant, sub, number="INV-WAIVED", period_start=today.replace(day=1),
+    )
+    master_db.add(InvoicePayment(
+        invoice_id=invoice.id, amount_kes=Decimal("18500.00"),
+        paid_on=today, method="waiver",
+    ))
+    master_db.commit()
+
+    res = client_superadmin.get(OVERVIEW)
+    assert res.status_code == 200
+    assert res.json()["revenue"]["collected_this_month"] == "0.00"

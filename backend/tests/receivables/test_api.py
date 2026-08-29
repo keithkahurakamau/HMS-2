@@ -145,6 +145,22 @@ def test_voiding_an_unpaid_invoice_succeeds_and_stores_the_reason(client_superad
     assert inv.void_reason == "raised by mistake"
 
 
+def test_a_void_invoice_shows_a_zero_balance_in_the_tenant_drawer(client_superadmin, master_db, make_tenant):
+    """A voided invoice was cancelled, not collected: the console drawer
+    must never show it carrying a live-looking balance."""
+    tenant, sub = make_tenant(price=Decimal("15000.00"), next_on=date(2026, 8, 1))
+    ensure_invoices(master_db, date(2026, 8, 1))
+    inv = master_db.query(SubscriptionInvoice).first()
+    res = client_superadmin.post(f"{BASE}/invoice/{inv.id}/void", json={"reason": "raised by mistake"})
+    assert res.status_code == 200
+
+    res = client_superadmin.get(f"{BASE}/tenant/{tenant.tenant_id}")
+    assert res.status_code == 200
+    row = next(r for r in res.json()["invoices"] if r["id"] == inv.id)
+    assert row["status"] == "void"
+    assert row["balance"] == "0.00"
+
+
 # ─── Reminders and subscription edits ────────────────────────────────────────
 
 
@@ -167,6 +183,25 @@ def test_updating_subscription_terms(client_superadmin, make_tenant):
     assert body["price_kes"] == "25000.00"
 
 
+def test_an_invalid_status_is_rejected(client_superadmin, make_tenant):
+    """status is a Literal now, not a free-form string: "Active" (capital A)
+    would otherwise pass validation and silently drop the tenant out of
+    ensure_invoices's `status == "active"` filter, with no error anywhere."""
+    tenant, sub = make_tenant(next_on=date(2026, 8, 1))
+    res = client_superadmin.put(f"{BASE}/subscription/{tenant.tenant_id}",
+                                 json={"status": "Active"})
+    assert res.status_code == 422
+
+
+def test_an_invalid_payment_method_is_rejected(client_superadmin, master_db, make_tenant):
+    make_tenant(next_on=date(2026, 8, 1))
+    ensure_invoices(master_db, date(2026, 8, 1))
+    inv = master_db.query(SubscriptionInvoice).first()
+    res = client_superadmin.post(f"{BASE}/invoice/{inv.id}/payment",
+                                  json={"amount_kes": "100.00", "paid_on": "2026-08-02", "method": "paypal"})
+    assert res.status_code == 422
+
+
 # ─── Reads: summary, ageing, tenant detail ──────────────────────────────────
 
 
@@ -184,6 +219,26 @@ def test_summary_totals(client_superadmin, master_db, make_tenant):
     assert body["billed"] == "15000.00"
     assert body["received"] == "5000.00"
     assert body["outstanding"] == "10000.00"
+
+
+def test_a_waiver_does_not_count_as_received(client_superadmin, master_db, make_tenant):
+    """A waiver is money written off, not money collected. The dashboard
+    presents received as the real-cash counterpart to projected MRR, so a
+    waiver inflating it would misrepresent what actually came in."""
+    make_tenant(price=Decimal("15000.00"), next_on=date(2026, 8, 1))
+    ensure_invoices(master_db, date(2026, 8, 1))
+    inv = master_db.query(SubscriptionInvoice).first()
+    master_db.add(InvoicePayment(invoice_id=inv.id, amount_kes=Decimal("15000.00"),
+                                  paid_on=date(2026, 8, 2), method="waiver"))
+    master_db.commit()
+
+    res = client_superadmin.get(f"{BASE}/summary")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["received"] == "0.00"
+    # The invoice is fully closed by the waiver, so nothing is outstanding
+    # either; this is not a case of "the waiver was simply not recorded".
+    assert body["outstanding"] == "0.00"
 
 
 def test_ageing_response_shape_matches_the_frontend_contract(client_superadmin, master_db, make_tenant):

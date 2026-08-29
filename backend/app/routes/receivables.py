@@ -78,7 +78,10 @@ def _subscription_view(sub: Subscription) -> dict:
 def summary(master_db: Session = Depends(get_master_db)):
     """Platform-wide totals as of today. A voided invoice never counts
     toward billed, received, outstanding, or overdue: it was cancelled,
-    not collected."""
+    not collected. A waiver (InvoicePayment.method == "waiver") never
+    counts toward received either: it is money written off, not money
+    that came in, and this figure sits next to projected MRR precisely so
+    the operator can see the real cash position."""
     as_of = date.today()
     invoices = (
         master_db.query(SubscriptionInvoice)
@@ -102,7 +105,10 @@ def summary(master_db: Session = Depends(get_master_db)):
         func.coalesce(func.sum(InvoicePayment.amount_kes), 0)
     ).join(
         SubscriptionInvoice, InvoicePayment.invoice_id == SubscriptionInvoice.id
-    ).filter(SubscriptionInvoice.status != "void").scalar()
+    ).filter(
+        SubscriptionInvoice.status != "void",
+        InvoicePayment.method != "waiver",
+    ).scalar()
 
     return {
         "billed": _money(billed),
@@ -184,6 +190,11 @@ def tenant_detail(tenant_id: int, master_db: Session = Depends(get_master_db)):
             if inv.due_on < as_of:
                 overdue_total += balance
 
+        # A void invoice was cancelled, not collected: it must never show a
+        # live-looking balance in the drawer, even though outstanding_balance
+        # would still compute one off amount_kes minus payments.
+        displayed_balance = Decimal("0.00") if inv.status == "void" else balance
+
         invoice_rows.append({
             "id": inv.id,
             "number": inv.number,
@@ -194,7 +205,7 @@ def tenant_detail(tenant_id: int, master_db: Session = Depends(get_master_db)):
             "due_on": inv.due_on.isoformat(),
             "status": inv.status,
             "void_reason": inv.void_reason,
-            "balance": _money(balance),
+            "balance": _money(displayed_balance),
             "days_overdue": days_overdue(inv, as_of),
             "ageing_bucket": ageing_bucket(days_overdue(inv, as_of)) if inv.status == "open" else None,
         })

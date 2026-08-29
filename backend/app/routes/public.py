@@ -120,7 +120,7 @@ def get_platform_overview(master_db: Session = Depends(get_master_db)):
     Returns:
       * tenant counts (total, active, suspended, premium, standard)
       * platform MRR + ARR (computed off the same tier prices the billing UI
-        applies — see TIER_PRICING below), plus collected_this_month, the
+        applies, see TIER_PRICING below), plus collected_this_month, the
         actual sum of InvoicePayment rows for the current calendar month, so
         the projection and the real cash received are never confused
       * 30-day growth (tenants provisioned in the trailing window)
@@ -167,11 +167,16 @@ def get_platform_overview(master_db: Session = Depends(get_master_db)):
         if month_start.month == 12
         else month_start.replace(month=month_start.month + 1)
     )
+    # A waiver is money written off, not money received, so it is excluded
+    # here the same way it is excluded from the receivables "received"
+    # figure: this number sits right next to mrr specifically to show real
+    # cash collected, and a waiver would overstate that.
     collected_raw = master_db.query(
         func.coalesce(func.sum(InvoicePayment.amount_kes), 0)
     ).filter(
         InvoicePayment.paid_on >= month_start,
         InvoicePayment.paid_on < next_month_start,
+        InvoicePayment.method != "waiver",
     ).scalar()
     collected_this_month = str(Decimal(collected_raw).quantize(Decimal("0.01")))
 
