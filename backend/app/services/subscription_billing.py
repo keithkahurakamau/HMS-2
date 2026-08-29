@@ -122,3 +122,94 @@ def ensure_invoices(db: Session, as_of: date) -> list[SubscriptionInvoice]:
             db.rollback()
             logger.exception("Invoice generation failed for subscription %s", sub.id)
     return created
+
+
+def notify_tenant_admins(tenant_db_name: str, title: str, body: str) -> int:
+    """Write one notification per Admin user in a tenant's own database.
+
+    Notifications live in the tenant DB, keyed to a tenant user_id, so the
+    reminder has to cross databases. Caller wraps this: a tenant we cannot
+    reach must not abort the run for everyone else.
+    """
+    from sqlalchemy.orm import sessionmaker
+
+    from app.config.database import get_tenant_engine
+    from app.models.notification import Notification
+    from app.models.user import Role, User
+
+    session = sessionmaker(bind=get_tenant_engine(tenant_db_name))()
+    try:
+        admins = (
+            session.query(User)
+            .join(Role, User.role_id == Role.role_id)
+            .filter(Role.name == "Admin", User.is_active == True)  # noqa: E712
+            .all()
+        )
+        for admin in admins:
+            session.add(Notification(user_id=admin.user_id, category="warning",
+                                     title=title, body=body))
+        session.commit()
+        return len(admins)
+    finally:
+        session.close()
+
+
+def run_dunning(db: Session, as_of: date, notifier=None) -> list[DunningEvent]:
+    """Remind the admins of every hospital with an overdue balance.
+
+    Only the highest milestone reached is sent, so a month of downtime does
+    not deliver four notifications about one invoice at once.
+    """
+    from app.models.master import Tenant
+
+    send = notifier or notify_tenant_admins
+    events: list[DunningEvent] = []
+
+    rows = (
+        db.query(SubscriptionInvoice, Subscription, Tenant)
+        .join(Subscription, SubscriptionInvoice.subscription_id == Subscription.id)
+        .join(Tenant, SubscriptionInvoice.tenant_id == Tenant.tenant_id)
+        .filter(SubscriptionInvoice.status == "open",
+                SubscriptionInvoice.due_on < as_of)
+        .all()
+    )
+
+    for invoice, sub, tenant in rows:
+        if sub.reminders_paused:
+            continue
+        if outstanding_balance(db, invoice) <= 0:
+            continue
+
+        age = days_overdue(invoice, as_of)
+        reached = [m for m in MILESTONES if age >= m]
+        if not reached:
+            continue
+        milestone = max(reached)
+
+        already = db.query(DunningEvent).filter(
+            DunningEvent.invoice_id == invoice.id,
+            DunningEvent.day_offset == milestone,
+        ).first()
+        if already:
+            continue
+
+        balance = outstanding_balance(db, invoice)
+        title = "Subscription payment overdue"
+        body = (
+            f"Invoice {invoice.number} for {invoice.period_start:%B %Y} is "
+            f"{age} days overdue. Balance KES {balance:,.0f}."
+        )
+        try:
+            recipients = send(tenant.db_name, title, body)
+        except Exception:
+            # Log and skip. No DunningEvent is written, so the next run retries.
+            logger.exception("Could not notify tenant %s", tenant.tenant_id)
+            continue
+
+        event = DunningEvent(invoice_id=invoice.id, tenant_id=tenant.tenant_id,
+                             day_offset=milestone, recipients=recipients or 0)
+        db.add(event)
+        db.commit()
+        events.append(event)
+
+    return events
