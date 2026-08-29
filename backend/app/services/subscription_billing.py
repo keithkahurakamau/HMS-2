@@ -83,7 +83,7 @@ def ensure_invoices(db: Session, as_of: date) -> list[SubscriptionInvoice]:
     subs = db.query(Subscription).filter(
         Subscription.status == "active",
         Subscription.next_invoice_on <= as_of,
-    ).all()
+    ).order_by(Subscription.id).all()
 
     for sub in subs:
         try:
@@ -94,13 +94,19 @@ def ensure_invoices(db: Session, as_of: date) -> list[SubscriptionInvoice]:
                     SubscriptionInvoice.subscription_id == sub.id,
                     SubscriptionInvoice.period_start == period_start,
                 ).first()
+                next_billing = _advance_one_month(period_start, billing_day)
                 if not exists:
                     inv = SubscriptionInvoice(
                         tenant_id=sub.tenant_id,
                         subscription_id=sub.id,
                         number=next_number(db, period_start),
                         period_start=period_start,
-                        period_end=_month_end(period_start),
+                        # The day before the next billing date, not the calendar
+                        # month end: an anchor other than the 1st (the common
+                        # case, since started_on comes from tenant.created_at)
+                        # must produce a period that is exactly one billing
+                        # cycle long, with no gap or overlap between periods.
+                        period_end=next_billing - timedelta(days=1),
                         amount_kes=sub.price_kes,
                         issued_on=period_start,
                         due_on=period_start,      # monthly in advance, due on issue
@@ -109,7 +115,7 @@ def ensure_invoices(db: Session, as_of: date) -> list[SubscriptionInvoice]:
                     db.add(inv)
                     db.flush()
                     created.append(inv)
-                sub.next_invoice_on = _advance_one_month(period_start, billing_day)
+                sub.next_invoice_on = next_billing
             db.commit()
         except Exception:
             # One bad subscription must not stop the rest.

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from app.models.subscription_billing import SubscriptionInvoice
@@ -51,3 +51,33 @@ def test_numbers_are_unique_and_sequential(master_db, make_tenant):
     created = ensure_invoices(master_db, date(2026, 8, 1))
     numbers = sorted(i.number for i in created)
     assert numbers == ["MF-2026-0001", "MF-2026-0002"]
+
+
+def test_period_end_follows_the_billing_anchor_not_the_calendar_month(master_db, make_tenant):
+    # Anchored to the 15th: a period must be exactly one billing cycle long
+    # (the day before the next billing date), not the calendar month end.
+    # Task 2's backfill sets started_on from tenant.created_at, so a non-1st
+    # anchor like this is the common case, not a corner case.
+    make_tenant(started=date(2026, 1, 15), next_on=date(2026, 6, 15))
+    created = ensure_invoices(master_db, date(2026, 7, 15))
+    assert len(created) == 2
+    first, second = created
+    assert first.period_start == date(2026, 6, 15)
+    assert first.period_end == date(2026, 7, 14)
+    assert second.period_start == date(2026, 7, 15)
+    assert second.period_end == date(2026, 8, 14)
+    # Contiguity is the property that matters: no gap, no overlap.
+    assert second.period_start == first.period_end + timedelta(days=1)
+
+
+def test_day_31_anchor_clamps_and_stays_contiguous_across_february(master_db, make_tenant):
+    tenant, sub = make_tenant(started=date(2026, 1, 31), next_on=date(2026, 1, 31))
+    created = ensure_invoices(master_db, date(2026, 4, 29))
+    periods = [(inv.period_start, inv.period_end) for inv in created]
+    assert periods == [
+        (date(2026, 1, 31), date(2026, 2, 27)),
+        (date(2026, 2, 28), date(2026, 3, 30)),
+        (date(2026, 3, 31), date(2026, 4, 29)),
+    ]
+    for (_, end), (next_start, _) in zip(periods, periods[1:]):
+        assert next_start == end + timedelta(days=1)
