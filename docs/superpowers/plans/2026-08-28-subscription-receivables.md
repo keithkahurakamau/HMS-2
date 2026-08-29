@@ -72,7 +72,7 @@ npm run build
 
 **Files:**
 - Create: `backend/app/models/subscription_billing.py`
-- Modify: `backend/scripts/migrate_all_tenants.py` (import block at line 59)
+- Do not modify: `backend/scripts/migrate_all_tenants.py` (see Step 2)
 
 **Interfaces:**
 - Produces: `Subscription`, `SubscriptionInvoice`, `InvoicePayment`, `DunningEvent` importable from `app.models.subscription_billing`.
@@ -173,9 +173,15 @@ class DunningEvent(Base):
     recipients = Column(Integer, nullable=False, default=0)
 ```
 
-- [ ] **Step 2: Register the module in the migrate script's import block**
+- [ ] **Step 2: Do NOT add the module to the migrate script's import block**
 
-In `backend/scripts/migrate_all_tenants.py`, line 59, add `subscription_billing` to the `from app.models import (...)` list, keeping alphabetical order (after `settings as _settings`, before `support`). Without this, `Base.metadata` is missing the tables and legacy bootstrap silently skips them.
+This is the opposite of the rule for tenant models, and getting it backwards is
+load-bearing. That import list feeds `Base.metadata`, and the script runs an
+unfiltered `Base.metadata.create_all()` against every tenant engine, so anything
+in the list is physically created in every hospital database. `platform_payhero`,
+the existing master-only precedent, is deliberately absent from the list for
+exactly this reason. Master-only tables are bootstrapped by `MASTER_DB_PATCHES`
+in Task 2 instead. Leave `scripts/migrate_all_tenants.py` untouched in this task.
 
 - [ ] **Step 3: Verify the models import and the metadata is complete**
 
@@ -194,7 +200,7 @@ Expected: `all four tables registered in metadata`
 - [ ] **Step 4: Commit**
 
 ```bash
-git add backend/app/models/subscription_billing.py backend/scripts/migrate_all_tenants.py
+git add backend/app/models/subscription_billing.py
 git commit -m "feat(billing): subscription, invoice, payment and dunning tables"
 ```
 
