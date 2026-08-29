@@ -33,7 +33,7 @@ import app.models.user as _user                           # noqa: F401,E402
 import app.models.notification as _notification           # noqa: F401,E402
 import app.models.subscription_billing as _sub            # noqa: F401,E402
 from app.config.database import Base                      # noqa: E402
-from app.models.master import Tenant                       # noqa: E402
+from app.models.master import SuperAdmin, Tenant            # noqa: E402
 from app.models.subscription_billing import Subscription   # noqa: E402
 
 TEST_DB = os.getenv("RECEIVABLES_TEST_DB", "hms_receivables_test")
@@ -60,10 +60,78 @@ def master_db(engine) -> Iterator[Session]:
     session.rollback()
     # Order matters: children before parents.
     for table in ("dunning_events", "invoice_payments", "subscription_invoices",
-                  "subscriptions", "tenants"):
+                  "subscriptions", "tenants", "superadmins"):
         session.execute(text(f"DELETE FROM {table}"))
     session.commit()
     session.close()
+
+
+@pytest.fixture()
+def client_superadmin(master_db) -> Iterator["TestClient"]:
+    """A TestClient authenticated as a superadmin.
+
+    require_superadmin is overridden directly rather than logging in through
+    a real cookie, so the test never depends on JWT secrets or the superadmin
+    login flow. get_master_db is overridden to hand back this test's own
+    master_db session (bound to the receivables test database) instead of
+    the app's real hms_master engine.
+
+    A real SuperAdmin row is still created, because InvoicePayment.recorded_by
+    is a foreign key into superadmins: recording a payment as an admin_id
+    that doesn't exist would fail with a FK violation, not prove anything
+    about the route.
+
+    The app's CSRF middleware rejects unsafe methods (POST/PUT) without a
+    matching csrf_token cookie and X-CSRF-Token header, so both are seeded
+    with the same value up front, the same "double submit cookie" contract
+    the middleware checks.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.config.database import get_master_db
+    from app.core.dependencies import require_superadmin
+    from app.main import app
+
+    admin = SuperAdmin(email="test-superadmin@example.test", full_name="Test Superadmin",
+                       hashed_password="not-a-real-hash", is_active=True)
+    master_db.add(admin)
+    master_db.commit()
+
+    def _get_master_db():
+        yield master_db
+
+    def _require_superadmin():
+        return {"admin_id": admin.admin_id, "email": admin.email, "full_name": admin.full_name}
+
+    app.dependency_overrides[get_master_db] = _get_master_db
+    app.dependency_overrides[require_superadmin] = _require_superadmin
+    try:
+        client = TestClient(app)
+        client.cookies.set("csrf_token", "test-csrf-token")
+        client.headers.update({"x-csrf-token": "test-csrf-token"})
+        # Tests that need to assert attribution (e.g. a payment's
+        # recorded_by) read the real id off the client rather than
+        # assuming 1: DELETE-based cleanup between tests never resets the
+        # superadmins sequence, so it climbs across the run.
+        client.admin_id = admin.admin_id
+        yield client
+    finally:
+        app.dependency_overrides.pop(get_master_db, None)
+        app.dependency_overrides.pop(require_superadmin, None)
+
+
+@pytest.fixture()
+def client_anonymous() -> Iterator["TestClient"]:
+    """A TestClient with no auth at all: require_superadmin is not
+    overridden, so every receivables endpoint must reject it."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+    client.cookies.set("csrf_token", "test-csrf-token")
+    client.headers.update({"x-csrf-token": "test-csrf-token"})
+    yield client
 
 
 @pytest.fixture()
