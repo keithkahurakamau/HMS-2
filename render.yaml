@@ -112,3 +112,41 @@ services:
         sync: false
       - key: SEED_SUPERADMIN_PASSWORD
         sync: false
+
+  # Daily billing run: raises subscription invoices that have come due and
+  # sends overdue reminders. Same idempotent code path as the operator
+  # console's "Run billing now" button (app/services/subscription_billing.py),
+  # serialised against it with a Postgres advisory lock so the two can never
+  # collide.
+  #
+  # 03:00 UTC = 06:00 EAT, before the Kenyan working day starts.
+  #
+  # This blueprint has no envVarGroups; the web service above declares its
+  # environment inline, so this cron service mirrors that pattern rather
+  # than referencing a group that does not exist. Settings() (app/config/
+  # settings.py) fails fast if SECRET_KEY, ENCRYPTION_KEY, or (in production)
+  # CORS_ORIGINS/PASSWORD_PEPPER are missing, so this needs the same
+  # variables as hms-backend, not just DATABASE_URL.
+  - type: cron
+    name: medifleet-billing
+    runtime: python
+    rootDir: backend
+    plan: starter
+    schedule: "0 3 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.cli.run_billing
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: PASSWORD_PEPPER
+        sync: false
+      - key: CORS_ORIGINS
+        value: "https://www.medifleet.app,https://medifleet.app,https://hms-2-psi.vercel.app"

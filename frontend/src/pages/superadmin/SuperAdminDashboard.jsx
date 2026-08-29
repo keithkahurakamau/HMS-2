@@ -6,6 +6,7 @@ import {
     AlertTriangle, ArrowUpRight, ArrowDownRight, Crown, LifeBuoy, RefreshCw,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
+import { formatKes } from '../../api/receivables';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Superadmin Global Overview.                                               */
@@ -83,9 +84,14 @@ export default function SuperAdminDashboard() {
             },
             {
                 icon: CreditCard,
-                label: 'Monthly recurring revenue',
+                label: 'Monthly recurring revenue (projected)',
                 value: KES(overview.revenue?.mrr),
                 sub: `${KES(overview.revenue?.arr)} ARR projected`,
+                // mrr/arr are a price-list projection, the same number
+                // whether every hospital has paid or none of them have.
+                // This second line is the actual cash in, so the two can
+                // never be mistaken for one another.
+                sub2: `${formatKes(overview.revenue?.collected_this_month)} collected this month`,
                 accent: 'accent',
                 onClick: () => navigate('/superadmin/billing'),
             },
@@ -151,7 +157,7 @@ export default function SuperAdminDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {isLoading && !overview
                     ? [0, 1, 2, 3].map((i) => <StatSkeleton key={i} />)
-                    : tiles.map(({ icon: Icon, label, value, sub, accent, onClick, growth }) => {
+                    : tiles.map(({ icon: Icon, label, value, sub, sub2, accent, onClick, growth }) => {
                         const TileEl = onClick ? 'button' : 'div';
                         return (
                             <TileEl
@@ -165,7 +171,7 @@ export default function SuperAdminDashboard() {
                                 </div>
                                 <div className="min-w-0">
                                     <p className="stat-label">{label}</p>
-                                    <p className="stat-value truncate">{value}</p>
+                                    <p className="stat-value tnum truncate">{value}</p>
                                     {sub && (
                                         <p className="text-xs text-ink-500 dark:text-ink-400 mt-1 flex items-center gap-1">
                                             {growth !== undefined && (
@@ -175,6 +181,9 @@ export default function SuperAdminDashboard() {
                                             )}
                                             <span className="truncate">{sub}</span>
                                         </p>
+                                    )}
+                                    {sub2 && (
+                                        <p className="tnum text-xs text-ink-500 dark:text-ink-400 mt-0.5 truncate">{sub2}</p>
                                     )}
                                 </div>
                             </TileEl>
