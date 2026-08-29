@@ -244,7 +244,7 @@ def record_payment(
     visible and attributable to whoever recorded it."""
     invoice = master_db.query(SubscriptionInvoice).filter(
         SubscriptionInvoice.id == invoice_id
-    ).first()
+    ).with_for_update().first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found.")
     if invoice.status == "void":
@@ -296,7 +296,7 @@ def void_invoice(
     voiding is not a way to hide a paid invoice."""
     invoice = master_db.query(SubscriptionInvoice).filter(
         SubscriptionInvoice.id == invoice_id
-    ).first()
+    ).with_for_update().first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found.")
     if invoice.status == "void":

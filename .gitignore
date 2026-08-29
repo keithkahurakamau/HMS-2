@@ -108,3 +108,6 @@ ruvector.db
 backend/fix_permissions.py
 backend/check_users.py
 backend/reset_admin.py
+
+# Local venv for standalone agent experiments (deepagents/langchain)
+agents-venv/

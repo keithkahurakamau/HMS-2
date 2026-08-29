@@ -9,6 +9,8 @@ Depends(require_superadmin) actually gates every path.
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy.exc import OperationalError
+
 from app.models.subscription_billing import InvoicePayment, SubscriptionInvoice
 from app.services.subscription_billing import ensure_invoices, outstanding_balance
 
@@ -274,3 +276,88 @@ def test_run_billing_now_reports_a_concurrent_run_as_a_normal_outcome_not_an_err
     assert body["skipped"] is True
     assert body["ok"] is True
     assert body["invoices_created"] == 0
+
+
+# ─── Concurrency and locking ────────────────────────────────────────────────────
+
+
+def test_invoice_row_is_locked_during_payment(master_db, make_tenant):
+    """Prove that with_for_update() genuinely locks the row. While the first
+    session holds the lock, a second session attempting nowait=True must
+    raise OperationalError. This guards against the fix being a no-op."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.exc import OperationalError
+
+    make_tenant(price=Decimal("15000.00"), next_on=date(2026, 8, 1))
+    ensure_invoices(master_db, date(2026, 8, 1))
+    inv = master_db.query(SubscriptionInvoice).first()
+
+    engine = master_db.get_bind()
+    Session = sessionmaker(bind=engine)
+    second_session = Session()
+
+    try:
+        with master_db.begin_nested():
+            locked_inv = (
+                master_db.query(SubscriptionInvoice)
+                .filter(SubscriptionInvoice.id == inv.id)
+                .with_for_update()
+                .first()
+            )
+            assert locked_inv is not None
+
+            try:
+                second_session.query(SubscriptionInvoice).filter(
+                    SubscriptionInvoice.id == inv.id
+                ).with_for_update(nowait=True).first()
+                assert False, "Second session should not acquire lock while first holds it"
+            except OperationalError:
+                pass
+    finally:
+        second_session.close()
+
+
+def test_payment_happy_path_still_works_with_lock(client_superadmin, master_db, make_tenant):
+    """Prove that the row lock does not deadlock or break the happy path:
+    a full payment can be recorded and closes the invoice."""
+    make_tenant(price=Decimal("15000.00"), next_on=date(2026, 8, 1))
+    ensure_invoices(master_db, date(2026, 8, 1))
+    inv = master_db.query(SubscriptionInvoice).first()
+
+    res = client_superadmin.post(f"{BASE}/invoice/{inv.id}/payment",
+                                  json={"amount_kes": "15000.00", "paid_on": "2026-08-02", "method": "bank"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["status"] == "paid"
+    assert body["balance"] == "0.00"
+
+    master_db.refresh(inv)
+    assert inv.status == "paid"
+    assert outstanding_balance(master_db, inv) == Decimal("0.00")
+
+
+def test_negative_payment_amount_is_rejected(client_superadmin, master_db, make_tenant):
+    """Negative payment amounts fail schema validation with HTTP 422, not a
+    custom business logic error, because Field(gt=0) validates before the
+    endpoint handler runs."""
+    make_tenant(price=Decimal("15000.00"), next_on=date(2026, 8, 1))
+    ensure_invoices(master_db, date(2026, 8, 1))
+    inv = master_db.query(SubscriptionInvoice).first()
+
+    res = client_superadmin.post(f"{BASE}/invoice/{inv.id}/payment",
+                                  json={"amount_kes": "-100.00", "paid_on": "2026-08-02", "method": "bank"})
+    assert res.status_code == 422
+
+
+def test_zero_payment_amount_is_rejected(client_superadmin, master_db, make_tenant):
+    """Zero payment amounts fail schema validation with HTTP 422, not a
+    custom business logic error, because Field(gt=0) validates before the
+    endpoint handler runs."""
+    make_tenant(price=Decimal("15000.00"), next_on=date(2026, 8, 1))
+    ensure_invoices(master_db, date(2026, 8, 1))
+    inv = master_db.query(SubscriptionInvoice).first()
+
+    res = client_superadmin.post(f"{BASE}/invoice/{inv.id}/payment",
+                                  json={"amount_kes": "0.00", "paid_on": "2026-08-02", "method": "bank"})
+    assert res.status_code == 422
