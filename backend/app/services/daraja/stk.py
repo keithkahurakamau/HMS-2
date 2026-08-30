@@ -5,14 +5,20 @@ Everything here goes through DarajaClient, the single seam that speaks HTTP
 to Safaricom. This module never calls requests directly.
 
 Money is Decimal end to end. Daraja's wire format only accepts whole
-shillings, so the int() cast on Amount happens at the request boundary and
-nowhere else.
+shillings, so any fractional amount is rounded UP to the shilling once,
+here, at the request boundary, and the SAME rounded figure is what gets
+persisted as MpesaTransaction.amount. Rounding up (not down, not truncating)
+means the two figures can never diverge: a shortfall would leave every
+fractional invoice permanently part-paid, and a mismatch between what we
+quote in the payload and what we store would make the settlement
+cross-check quarantine a legitimate, matching callback on every invoice
+with cents.
 """
 from __future__ import annotations
 
 import logging
 import secrets
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 from types import SimpleNamespace
 from typing import Optional
 from urllib.parse import quote
@@ -139,11 +145,19 @@ def initiate_stk_push(
     see that function's docstring.
     """
     config = config_for(db, department_id=department_id)
-    msisdn = normalize_msisdn(phone_number)
+    try:
+        msisdn = normalize_msisdn(phone_number)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     amount_decimal = Decimal(str(amount))
     if amount_decimal <= 0:
         raise HTTPException(status_code=400, detail="Amount must be greater than zero.")
+
+    # Round UP to the whole shilling once, here. This is the ONLY figure
+    # that ever gets quoted to Daraja or persisted: see the module
+    # docstring for why rounding up, and why the two must never diverge.
+    charged_amount = amount_decimal.quantize(Decimal("1"), rounding=ROUND_CEILING)
 
     passkey = _decrypted(config.passkey_encrypted, field="passkey")
     timestamp = daraja_timestamp()
@@ -163,7 +177,7 @@ def initiate_stk_push(
             "CustomerBuyGoodsOnline" if config.shortcode_type == "till"
             else "CustomerPayBillOnline"
         ),
-        "Amount": int(amount_decimal),  # Daraja takes whole shillings only
+        "Amount": int(charged_amount),  # already whole shillings, rounded up above
         "PartyA": msisdn,
         "PartyB": config.shortcode,
         "PhoneNumber": msisdn,
@@ -199,7 +213,7 @@ def initiate_stk_push(
         invoice_id=invoice_id,
         dispense_id=dispense_id,
         phone_number=msisdn,
-        amount=amount_decimal,
+        amount=charged_amount,
         checkout_request_id=checkout_request_id,
         merchant_request_id=merchant_request_id,
         external_reference=external_reference,
@@ -215,6 +229,10 @@ def initiate_stk_push(
         "merchant_request_id": merchant_request_id,
         "external_reference": external_reference,
         "transaction_id": txn.id,
+        # The actually-charged, rounded-up figure, so a caller (the cashier's
+        # UI) can show the patient what will really be prompted rather than
+        # the pre-rounding amount it asked for.
+        "amount_charged": charged_amount,
     }
 
 

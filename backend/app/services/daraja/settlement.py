@@ -15,28 +15,53 @@ Order of operations in apply_stk_callback, which IS the safety property:
   2. Find the Pending transaction by that id. No row: log and return None.
      Never create one here; a callback is never itself proof we initiated
      anything.
-  3. ResultCode != 0: mark Failed with ResultDesc, return.
+  3. ResultCode (normalised to a string, Daraja sends it as either an int
+     or a string depending on the endpoint) != "0": mark Failed with
+     ResultDesc, return.
   4. Read Amount and MpesaReceiptNumber from CallbackMetadata.Item.
   5. Compare the callback's amount against the amount WE requested
      (txn.amount). Mismatch: status Quarantined, record the claim, notify
      billing:manage, return WITHOUT settling.
-  6. Receipt already recorded on a settled transaction: return, it is a
-     replay. Safaricom retries, and a retry must never double-credit.
-  7. Only now set receipt_number, verified_at, verification_source, status
-     Success, and settle via settle_invoice_match.
+  6. No MpesaReceiptNumber despite ResultCode 0: status Quarantined, notify,
+     return WITHOUT settling. The receipt is the one artifact tying an
+     unsigned, attacker-reachable callback to a real Safaricom transaction;
+     a Payment with no receipt would also carry a NULL
+     transaction_reference, and Postgres allows unlimited NULLs in a unique
+     index, so the usual replay backstop would not even apply.
+  7. Serialise on the receipt with a Postgres advisory transaction lock,
+     THEN check whether it is already recorded on a settled transaction:
+     return that transaction, it is a replay. Safaricom retries, and two
+     concurrent deliveries of the same callback are also possible; either
+     way a retry or a race must never double-credit. The lock is what makes
+     this check-then-act safe against the race, not just the sequential
+     retry: the unique index on receipt_number is a backstop that turns a
+     lock failure into a 500, not a second Payment, but it is not a
+     substitute for the lock.
+  8. Only now set receipt_number, verified_at, verification_source, status
+     Success, and settle via settle_invoice_match, ALL under one commit
+     (the invoice, locked FOR UPDATE, if there is one). A single commit is
+     load-bearing: if settlement raises, nothing here has been persisted,
+     so the transaction is still Pending on disk and Safaricom's retry is
+     free to try again cleanly. Committing the Success status separately,
+     before settlement, would strand the transaction as a permanent,
+     un-retryable "Success but never settled" row the moment settlement
+     failed for any reason.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.billing import Invoice, Payment
 from app.models.mpesa import MpesaTransaction
+from app.utils.log_redact import safe_repr
 
 logger = logging.getLogger(__name__)
 
@@ -114,15 +139,21 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
         # No row means we never initiated this, or it was already resolved
         # by an earlier delivery of the same callback. Either way there is
         # nothing to create: a callback is never itself proof we pushed
-        # anything.
+        # anything. Logged with the (redacted) CheckoutRequestID so a
+        # pattern of forged or replayed ids is at least correlatable.
         logger.warning(
-            "Daraja STK callback for a CheckoutRequestID with no matching "
-            "Pending transaction; ignored"
+            "Daraja STK callback for an unrecognised or already-resolved "
+            "CheckoutRequestID (%s); ignored",
+            safe_repr(checkout_request_id),
         )
         return None
 
+    # Daraja sends ResultCode as an int from the STK callback but as a
+    # string from STK Query; normalise once so a string "0" (a genuinely
+    # successful payment) is never mistaken for a truthy != 0 and marked
+    # Failed.
     result_code = stk_callback.get("ResultCode")
-    if result_code != 0:
+    if str(result_code) != "0":
         txn.status = "Failed"
         txn.result_desc = str(stk_callback.get("ResultDesc") or "")[:255]
         db.commit()
@@ -153,32 +184,65 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
         _notify_quarantine(db, txn, reason=txn.result_desc)
         return txn
 
-    if receipt_number:
-        replay = (
-            db.query(MpesaTransaction)
-            .filter(
-                MpesaTransaction.receipt_number == receipt_number,
-                MpesaTransaction.status == "Success",
-            )
-            .first()
+    if not receipt_number:
+        # A "successful" callback with no receipt number is not settleable:
+        # the receipt is the one artifact tying this unsigned claim to a
+        # real Safaricom transaction, and a Payment with no
+        # transaction_reference would also slip past the unique-index
+        # replay backstop (Postgres allows unlimited NULLs in a unique
+        # index).
+        txn.status = "Quarantined"
+        txn.result_desc = "Callback reported success with no MpesaReceiptNumber"[:255]
+        db.commit()
+        _notify_quarantine(db, txn, reason=txn.result_desc)
+        return txn
+
+    # Serialise concurrent deliveries of this exact receipt before the
+    # check-then-act replay lookup below. Without this, two callbacks
+    # racing each other (a genuine Safaricom retry, or a forged duplicate)
+    # can both observe "not yet settled" and both proceed; the unique index
+    # on receipt_number then turns the loser into an IntegrityError and a
+    # poisoned session instead of a clean no-op. Transaction-scoped, so it
+    # releases automatically on this function's own commit below.
+    lock_id = int(hashlib.sha1(receipt_number.encode("utf-8")).hexdigest()[:15], 16)
+    db.execute(text("SELECT pg_advisory_xact_lock(:lid)"), {"lid": lock_id})
+
+    replay = (
+        db.query(MpesaTransaction)
+        .filter(
+            MpesaTransaction.receipt_number == receipt_number,
+            MpesaTransaction.status == "Success",
         )
-        if replay is not None:
-            # Safaricom retries; a retry must never double-credit.
-            logger.info("Daraja STK callback replay for an already-settled receipt; no-op")
-            return replay
+        .first()
+    )
+    if replay is not None:
+        # Safaricom retries; a retry must never double-credit.
+        logger.info("Daraja STK callback replay for an already-settled receipt; no-op")
+        db.commit()  # releases the advisory lock cleanly
+        return replay
 
     txn.receipt_number = receipt_number
     txn.verified_at = datetime.now(timezone.utc)
     txn.verification_source = "stk_callback"
     txn.status = "Success"
-    db.commit()
 
     if txn.invoice_id:
-        invoice = db.query(Invoice).filter(Invoice.invoice_id == txn.invoice_id).first()
+        invoice = (
+            db.query(Invoice)
+            .filter(Invoice.invoice_id == txn.invoice_id)
+            .with_for_update()
+            .first()
+        )
         if invoice is not None:
             settle_invoice_match(db, invoice=invoice, txn=txn, match_basis="stk_callback")
-            db.commit()
 
+    # ONE commit for the whole unit (status, receipt, and settlement
+    # together). If settle_invoice_match raises, nothing above is
+    # persisted: the transaction is still Pending on disk, so Safaricom's
+    # retry finds a live row and can settle cleanly, instead of finding a
+    # transaction already stuck at Success with no Payment and no invoice
+    # update to show for it.
+    db.commit()
     return txn
 
 
@@ -201,10 +265,10 @@ def settle_invoice_match(
     than creating a second one.
 
     Ported from services/payhero_service.py's settle_invoice_match, largely
-    unchanged: the logic was already correct. What changed is the
-    post_from_event source key (billing.payment.mpesa, provider-neutral
-    since this ledger entry no longer says which aggregator moved the
-    money) and the notification body, which no longer uses an em dash.
+    unchanged: the logic was already correct, and it already posted through
+    the provider-neutral billing.payment.mpesa source key (that key did not
+    change here). What changed is the notification body's fallback for a
+    missing receipt, which no longer uses an em dash.
     """
     from app.services.accounting_posting import post_from_event
 
@@ -262,7 +326,7 @@ def settle_invoice_match(
             title="M-Pesa payment received",
             body=(
                 f"KES {amount} on Invoice #{invoice.invoice_id} "
-                f"({'paid in full' if fully_paid else 'partial'}) . "
+                f"({'paid in full' if fully_paid else 'partial'}), "
                 f"receipt {txn.receipt_number or 'not recorded'}"
             ),
             link="/app/billing",

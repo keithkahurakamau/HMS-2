@@ -137,6 +137,36 @@ def test_amount_is_sent_as_whole_shillings(db, monkeypatch):
     assert isinstance(captured["payload"]["Amount"], int)
 
 
+def test_fractional_amount_is_rounded_up_and_persisted_consistently(db, monkeypatch):
+    """A fractional invoice (KES 1250.50) must round UP to what Daraja is
+    quoted, and the SAME rounded figure must be what MpesaTransaction.amount
+    stores. If the two ever diverged, a legitimate callback reporting the
+    quoted 1251 would be quarantined against a stored 1250.50, on every
+    single invoice with cents."""
+    _fake_oauth(monkeypatch)
+    captured = {}
+    _fake_stk_success(monkeypatch, checkout_request_id="ws_CO_fraction", capture=captured)
+    make_mpesa_config(db)
+
+    result = initiate_stk_push(
+        db,
+        phone_number="0712345678",
+        amount=Decimal("1250.50"),
+        callback_tenant="mayoclinic_db",
+    )
+
+    assert captured["payload"]["Amount"] == 1251
+    assert isinstance(captured["payload"]["Amount"], int)
+    assert result["amount_charged"] == Decimal("1251")
+
+    txn = (
+        db.query(MpesaTransaction)
+        .filter(MpesaTransaction.checkout_request_id == "ws_CO_fraction")
+        .first()
+    )
+    assert txn.amount == Decimal("1251")
+
+
 def test_callback_url_carries_the_tenant_hint_and_the_decrypted_token(db, monkeypatch):
     from app.utils.encryption import decrypt_data
 
@@ -176,15 +206,18 @@ def test_initiate_stk_push_without_a_tenant_hint_raises(db, monkeypatch):
 
 
 def test_initiate_stk_push_rejects_a_bad_phone_number(db, monkeypatch):
+    """normalize_msisdn raises ValueError; the boundary must translate that
+    into a 400, not let it escape as an unhandled 500."""
     _fake_oauth(monkeypatch)
     _fake_stk_success(monkeypatch)
     make_mpesa_config(db)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(HTTPException) as exc_info:
         initiate_stk_push(
             db, phone_number="not-a-phone", amount=Decimal("100.00"),
             callback_tenant="mayoclinic_db",
         )
+    assert exc_info.value.status_code == 400
 
 
 def test_initiate_stk_push_without_a_configured_tenant_raises(db, monkeypatch):

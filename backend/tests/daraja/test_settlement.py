@@ -6,6 +6,8 @@ operations this file is checking.
 """
 from decimal import Decimal
 
+import pytest
+
 from app.models.billing import Payment
 from app.models.mpesa import MpesaTransaction
 from app.services.daraja.settlement import apply_stk_callback, settle_invoice_match
@@ -83,7 +85,16 @@ def test_replayed_callback_is_a_no_op(db):
     assert db.query(Payment).count() == first
 
 
-def test_matching_amount_settles_and_posts_to_the_ledger(db, monkeypatch):
+def test_matching_amount_settles_and_calls_post_from_event_with_the_mpesa_source_key(db, monkeypatch):
+    """Settles the Payment/Invoice side end to end, and confirms
+    settle_invoice_match calls post_from_event with the mpesa source key.
+
+    This does NOT prove a JournalEntry lands: no LedgerMapping is seeded by
+    this test (see the db fixture's docstring for why), so the real
+    post_from_event the spy delegates to hits its own "no mapping
+    configured" branch and returns None. The real-ledger-write assertion
+    lives in test_settle_invoice_match_posts_a_real_ledger_entry_with_a_user.
+    """
     invoice = make_invoice(db, total_amount=Decimal("500.00"))
     txn = make_pending_transaction(
         db, amount=Decimal("500.00"), invoice_id=invoice.invoice_id,
@@ -127,6 +138,134 @@ def test_matching_amount_settles_and_posts_to_the_ledger(db, monkeypatch):
     assert posted["source_id"] == txn.id
     assert posted["amount"] == Decimal("500.00")
     assert "\u2014" not in posted["memo"]
+
+
+def test_string_result_code_zero_is_treated_as_success(db):
+    """Daraja sends ResultCode as an int from the STK callback but as a
+    string from STK Query. A bare `!= 0` comparison would mark a genuinely
+    successful "0" (string) payment Failed, self-contradicting the row
+    (status Failed, ResultDesc "processed successfully", invoice never
+    settled). This matters beyond the callback itself: a reconciliation job
+    routing STK Query results through apply_stk_callback would produce this
+    on every successful payment, since that endpoint always returns
+    ResultCode as a string."""
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+    txn = make_pending_transaction(
+        db, amount=Decimal("500.00"), invoice_id=invoice.invoice_id,
+        checkout_request_id="ws_CO_string_code",
+    )
+    payload = stk_callback_payload(
+        checkout_request_id=txn.checkout_request_id,
+        result_code="0",
+        amount=Decimal("500.00"),
+        receipt="STRCODE001",
+    )
+
+    result = apply_stk_callback(db, payload)
+
+    assert result.status == "Success"
+    assert result.receipt_number == "STRCODE001"
+    payment = db.query(Payment).filter(Payment.transaction_reference == "STRCODE001").first()
+    assert payment is not None
+    db.refresh(invoice)
+    assert invoice.status == "Paid"
+
+
+def test_success_with_no_receipt_number_is_quarantined_not_settled(db):
+    """A "successful" ResultCode 0 callback with no MpesaReceiptNumber must
+    not settle. The receipt is the one artifact tying an unsigned,
+    attacker-reachable claim to a real Safaricom transaction; a Payment
+    with a NULL transaction_reference would also slip past the unique-index
+    replay backstop, since Postgres allows unlimited NULLs in a unique
+    index."""
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+    txn = make_pending_transaction(
+        db, amount=Decimal("500.00"), invoice_id=invoice.invoice_id,
+        checkout_request_id="ws_CO_noreceipt",
+    )
+    payload = stk_callback_payload(
+        checkout_request_id=txn.checkout_request_id,
+        amount=Decimal("500.00"),
+        receipt=None,
+    )
+
+    result = apply_stk_callback(db, payload)
+
+    assert result.status == "Quarantined"
+    assert result.receipt_number is None
+    assert "MpesaReceiptNumber" in result.result_desc
+    assert db.query(Payment).count() == 0
+    db.refresh(invoice)
+    assert invoice.status == "Pending"
+    assert invoice.amount_paid == 0
+
+
+def test_a_raising_settlement_leaves_the_transaction_pending_and_retryable(db, monkeypatch):
+    """C1: apply_stk_callback commits the whole unit (status, receipt, and
+    settlement) exactly once. If something inside settlement raises, the
+    single commit means NOTHING from this delivery is persisted: the
+    transaction stays Pending on disk, so Safaricom's retry finds a live
+    row and settles cleanly on the next delivery, rather than finding a
+    transaction permanently stuck at Success with a receipt, an unpaid
+    invoice, and nobody alerted.
+
+    Simulated by making the ledger post itself raise, the same shape as the
+    real (separately tracked) accounting_posting.py bug: with a split
+    commit that bug is terminal; with a single commit it is a failed
+    delivery that gets retried."""
+    import app.services.accounting_posting as accounting_posting
+
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+    txn = make_pending_transaction(
+        db, amount=Decimal("500.00"), invoice_id=invoice.invoice_id,
+        checkout_request_id="ws_CO_raises",
+    )
+    # Commit the setup first: in production this row was already committed
+    # by a prior, separate request (initiate_stk_push's own commit). The
+    # rollback below must only undo what THIS callback delivery did, not
+    # the fact that we ever pushed the STK prompt at all.
+    db.commit()
+    payload = stk_callback_payload(
+        checkout_request_id=txn.checkout_request_id,
+        amount=Decimal("500.00"),
+        receipt="RAISES001",
+    )
+
+    def boom(db_, **kwargs):
+        raise RuntimeError("simulated ledger failure")
+
+    monkeypatch.setattr(accounting_posting, "post_from_event", boom)
+
+    with pytest.raises(RuntimeError):
+        apply_stk_callback(db, payload)
+
+    db.rollback()
+
+    reloaded = (
+        db.query(MpesaTransaction)
+        .filter(MpesaTransaction.checkout_request_id == "ws_CO_raises")
+        .first()
+    )
+    assert reloaded.status == "Pending"
+    assert reloaded.receipt_number is None
+    assert reloaded.verified_at is None
+    assert db.query(Payment).count() == 0
+    db.refresh(invoice)
+    assert invoice.status == "Pending"
+    assert invoice.amount_paid == 0
+
+    # Safaricom's retry: the exact same payload, delivered again, now
+    # against the real post_from_event. Because nothing committed above,
+    # step 2's Pending filter still finds this row and the retry settles.
+    monkeypatch.undo()
+    retried = apply_stk_callback(db, payload)
+
+    assert retried.status == "Success"
+    assert retried.receipt_number == "RAISES001"
+    payment = db.query(Payment).filter(Payment.transaction_reference == "RAISES001").first()
+    assert payment is not None
+    db.refresh(invoice)
+    assert invoice.status == "Paid"
 
 
 def test_failed_result_code_marks_failed_without_a_payment(db):

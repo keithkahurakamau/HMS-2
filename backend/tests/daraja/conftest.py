@@ -286,7 +286,10 @@ def stk_callback_payload(
         "ResultCode": result_code,
         "ResultDesc": result_desc,
     }
-    if result_code == 0:
+    # Daraja sends ResultCode as an int from the STK callback but as a
+    # string from STK Query; normalise the same way settlement.py does so
+    # result_code="0" (string) still builds a CallbackMetadata block.
+    if str(result_code) == "0":
         items = []
         if amount is not None:
             items.append({"Name": "Amount", "Value": float(amount)})
