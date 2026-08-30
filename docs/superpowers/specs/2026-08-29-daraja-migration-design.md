@@ -119,6 +119,11 @@ Daraja needs materially more per-shortcode configuration than Pay Hero did.
 Everything except `shortcode`, `shortcode_type` and `environment` is encrypted at
 rest with the existing Fernet key from `app/utils/encryption.py`.
 
+`callback_token` is the one exception to a single encrypted column: it is held
+as a Fernet-encrypted value plus a separate deterministic HMAC lookup hash,
+because the encrypted form is needed to build outbound CallBackURLs and the
+hash is needed since Fernet ciphertext cannot be looked up by equality.
+
 **On `SecurityCredential`.** B2C does not take the initiator password directly; it
 takes that password RSA-encrypted with Safaricom's public certificate, and the
 sandbox and production certificates differ. Two options were considered:

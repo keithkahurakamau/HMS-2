@@ -43,7 +43,21 @@ class MpesaConfig(Base):
     # path is one of the three things standing between us and a forged payment.
     # Rotatable, because a token in a URL leaks through logs and proxies in a
     # way a header secret does not.
-    callback_token = Column(String(64), unique=True, index=True, nullable=True)
+    #
+    # Stored as two columns because neither a plaintext column nor a single
+    # encrypted column can serve both directions this token is used in:
+    #   - callback_token_encrypted: Fernet ciphertext of the token. Reversible,
+    #     so an outbound STK push can decrypt it back to build its CallBackURL.
+    #   - callback_token_lookup: a deterministic HMAC-SHA256 hex digest of the
+    #     token. Fernet is non-deterministic (the same token encrypts to
+    #     different ciphertext each time), so the encrypted column cannot be
+    #     looked up by equality; this column is what an inbound callback is
+    #     resolved to a tenant by.
+    # See app/services/daraja/tokens.py, which is the only place that should
+    # write these two columns: it keeps them in sync so neither is ever set
+    # without the other.
+    callback_token_encrypted = Column(String(255), nullable=True)
+    callback_token_lookup = Column(String(64), unique=True, index=True, nullable=True)
     callback_token_rotated_at = Column(DateTime(timezone=True), nullable=True)
 
     # Refund controls. Caps are enforced server-side, never in the UI alone.
