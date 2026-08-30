@@ -50,6 +50,20 @@ class Settings(BaseSettings):
     PAYHERO_TRUSTED_PROXIES: str = ""
     PUBLIC_BASE_URL: str = ""                  # https://… used for callback URLs
 
+    # -- Daraja callback authentication (direct Safaricom integration) --
+    # Daraja does not sign callbacks, so the IP allow-list is one of three
+    # layers standing between us and a forged payment (see
+    # app.core.daraja_callback). Comma-separated CIDR list. Empty disables the
+    # IP check, only acceptable in development; verify_daraja_source raises in
+    # production.
+    DARAJA_WEBHOOK_CIDRS: str = ""
+    # Same H-4 reasoning as PAYHERO_TRUSTED_PROXIES: CIDRs of the proxies/load
+    # balancers we sit behind. X-Forwarded-For is only trusted when the
+    # immediate peer is one of these, otherwise a direct caller could spoof
+    # an allow-listed source. Empty falls back to trusting XFF only when the
+    # peer is a private/loopback address.
+    DARAJA_TRUSTED_PROXIES: str = ""
+
     # ── Email / SMTP (EMAIL-001) ───────────────────────────────────────
     # Provider-agnostic: any SMTP relay works (Gmail, Mailgun, Resend,
     # AWS SES — they all expose an SMTP endpoint). Swap providers by

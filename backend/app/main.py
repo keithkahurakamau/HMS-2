@@ -260,10 +260,20 @@ async def security_headers_middleware(request: Request, call_next):
 #     requiring a token here would brick first-load auth). The other
 #     defences on these routes — bcrypt + rate limiting + per-route locks —
 #     hold the line on credential stuffing while CSRF stays excluded.
-#   - External webhooks (M-Pesa C2B callbacks) that can't possibly carry a
-#     CSRF header because they're called by Pay Hero's servers, not browsers.
-#     Authentication on those paths is HMAC signature based, not session based
-#     (see core/payhero_webhook.verify_payhero).
+#   - External webhooks (M-Pesa callbacks) that can't possibly carry a CSRF
+#     header because they're called by a payment provider's servers, not a
+#     browser.
+#       * /api/payments/payhero/callback: Pay Hero signs every callback with
+#         an HMAC we verify (see core/payhero_webhook.verify_payhero); the
+#         signature is the real gate here, session/CSRF adds nothing.
+#       * /api/payments/mpesa/: direct Safaricom Daraja integration. Daraja
+#         does NOT sign its callbacks, so there is no signature to check and
+#         a comment claiming otherwise would be actively misleading. The
+#         model here is three-layered instead: an unguessable, rotatable
+#         callback token in the path (never the tenant database name),
+#         a Safaricom source-IP allow-list that fails closed in production
+#         when unconfigured, and a settlement cross-check that never trusts
+#         a callback's claimed amount (see core/daraja_callback.py).
 # Everything else — including the superadmin /hospitals admin surface, which
 # uses Bearer auth but still benefits from CSRF as defence-in-depth — must
 # present a matching token.
@@ -271,6 +281,7 @@ _CSRF_EXEMPT_PATHS = (
     "/api/auth/login",
     "/api/public/superadmin/login",
     "/api/payments/payhero/callback",
+    "/api/payments/mpesa/",
     # Inbound support email — called by the mail provider, not a browser.
     # Gated by HMAC signature instead of CSRF (EMAIL-003).
     "/api/public/support/inbound",
