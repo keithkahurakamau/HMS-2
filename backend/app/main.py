@@ -266,14 +266,28 @@ async def security_headers_middleware(request: Request, call_next):
 #       * /api/payments/payhero/callback: Pay Hero signs every callback with
 #         an HMAC we verify (see core/payhero_webhook.verify_payhero); the
 #         signature is the real gate here, session/CSRF adds nothing.
-#       * /api/payments/mpesa/: direct Safaricom Daraja integration. Daraja
-#         does NOT sign its callbacks, so there is no signature to check and
-#         a comment claiming otherwise would be actively misleading. The
-#         model here is three-layered instead: an unguessable, rotatable
-#         callback token in the path (never the tenant database name),
-#         a Safaricom source-IP allow-list that fails closed in production
-#         when unconfigured, and a settlement cross-check that never trusts
-#         a callback's claimed amount (see core/daraja_callback.py).
+#         TODO(daraja migration, pay hero removal task): delete this entry
+#         and this bullet once the Pay Hero routes themselves are removed.
+#         A CSRF exemption for a route that no longer exists is a silent
+#         hole waiting for the path to be reused by something else.
+#       * The six Daraja callback paths below: direct Safaricom integration.
+#         Daraja does NOT sign its callbacks, so there is no signature to
+#         check and a comment claiming otherwise would be actively
+#         misleading. The model here is three-layered instead: an
+#         unguessable, rotatable callback token in the path (never the
+#         tenant database name), a Safaricom source-IP allow-list that fails
+#         closed in production when unconfigured, and a settlement
+#         cross-check that never trusts a callback's claimed amount (see
+#         core/daraja_callback.py). Each path is listed individually and
+#         precisely, the same way the payhero entry above is: the Pay Hero
+#         precedent is deliberately NOT "/api/payments/payhero" (which would
+#         also cover /api/payments/payhero/stk-push, a browser-initiated,
+#         permission-gated POST that needs its session's CSRF token). A
+#         broad "/api/payments/mpesa/" prefix would make the same mistake
+#         for stk-push and any future config/admin route under this prefix,
+#         and auth on those routes is HttpOnly cookies with SameSite=None,
+#         so cross-site requests DO carry credentials and CSRF is
+#         load-bearing there.
 # Everything else — including the superadmin /hospitals admin surface, which
 # uses Bearer auth but still benefits from CSRF as defence-in-depth — must
 # present a matching token.
@@ -281,7 +295,16 @@ _CSRF_EXEMPT_PATHS = (
     "/api/auth/login",
     "/api/public/superadmin/login",
     "/api/payments/payhero/callback",
-    "/api/payments/mpesa/",
+    # Daraja callback paths only, never the bare "/api/payments/mpesa/"
+    # prefix (see the comment above). Trailing slash on each so a route
+    # under a similar-looking but different name, e.g. a future
+    # "/api/payments/mpesa/stk/callback-status", cannot match by accident.
+    "/api/payments/mpesa/stk/callback/",
+    "/api/payments/mpesa/c2b/validation/",
+    "/api/payments/mpesa/c2b/confirmation/",
+    "/api/payments/mpesa/b2c/result/",
+    "/api/payments/mpesa/b2c/timeout/",
+    "/api/payments/mpesa/platform/stk/callback/",
     # Inbound support email — called by the mail provider, not a browser.
     # Gated by HMAC signature instead of CSRF (EMAIL-003).
     "/api/public/support/inbound",

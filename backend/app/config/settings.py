@@ -61,7 +61,14 @@ class Settings(BaseSettings):
     # balancers we sit behind. X-Forwarded-For is only trusted when the
     # immediate peer is one of these, otherwise a direct caller could spoof
     # an allow-listed source. Empty falls back to trusting XFF only when the
-    # peer is a private/loopback address.
+    # peer is a private/loopback address, which behind a platform load
+    # balancer is normally true of every caller, proxied or not: leaving this
+    # empty makes DARAJA_WEBHOOK_CIDRS advisory rather than enforced, since a
+    # direct public caller reaching the app through that same load balancer
+    # can then set X-Forwarded-For to an allow-listed address and pass
+    # unchecked. verify_daraja_source therefore fails closed in production
+    # when this is empty, exactly as it does for an empty
+    # DARAJA_WEBHOOK_CIDRS. Only acceptable empty in development.
     DARAJA_TRUSTED_PROXIES: str = ""
 
     # ── Email / SMTP (EMAIL-001) ───────────────────────────────────────

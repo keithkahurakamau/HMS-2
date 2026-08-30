@@ -1,11 +1,15 @@
 """Daraja callback authentication.
 
-Safaricom does not sign callbacks, so these tests exercise the three things
-that stand in for a signature: the unguessable per-tenant token (never the
-tenant database name), the Safaricom source-IP allow-list (including the
-X-Forwarded-For handling ported from Pay Hero's audited, correct version),
-and the acknowledgement contract that always looks like acceptance to
-Safaricom even when we have rejected a callback on our own side.
+Safaricom does not sign callbacks, so these tests exercise the things that
+stand in for a signature: the unguessable per-tenant token plus its tenant
+routing hint (never the tenant database name, and never checked in place of
+the token), the Safaricom source-IP allow-list (including the
+X-Forwarded-For handling ported from Pay Hero's audited, correct version,
+and the production requirement that DARAJA_TRUSTED_PROXIES actually be set),
+the TenantLookupUnavailable distinction between "rejected" and "could not be
+evaluated", and the acknowledgement contract that always looks like
+acceptance to Safaricom when, and only when, we evaluated a callback and
+rejected it on our own side.
 """
 from __future__ import annotations
 
@@ -43,7 +47,13 @@ def _run(coro):
 
 
 class _FakeClock:
-    """A monotonic clock the test controls, for deterministic TTL tests."""
+    """A monotonic clock the test controls, for deterministic TTL tests.
+
+    Patched onto dc._monotonic (an indirection point the module exposes for
+    exactly this purpose), never onto stdlib time.monotonic: patching the
+    real stdlib function would also affect unrelated code sharing the
+    process during the test, e.g. SQLAlchemy pool recycling.
+    """
 
     def __init__(self, start: float = 0.0):
         self._t = start
@@ -63,6 +73,12 @@ def _isolated_negative_cache():
     dc.clear_negative_cache()
 
 
+def _new_config(is_active: bool = True) -> MpesaConfig:
+    config = MpesaConfig(shortcode="174379", shortcode_type="paybill")
+    config.is_active = is_active
+    return config
+
+
 @pytest.fixture
 def tenant_registry(monkeypatch):
     """A fake master registry + per-tenant MpesaConfig store, real instances.
@@ -79,7 +95,7 @@ def tenant_registry(monkeypatch):
     def _active_tenant_db_names():
         return list(tenants.keys())
 
-    def _lookup_token_in_tenant(tenant_db: str, lookup_hash: str) -> bool:
+    def _lookup_token_in_tenant(tenant_db: str, lookup_hash: str, *, raise_on_error: bool = False) -> bool:
         config = tenants.get(tenant_db)
         if config is None:
             return False
@@ -90,13 +106,39 @@ def tenant_registry(monkeypatch):
     return tenants
 
 
-def _new_config(is_active: bool = True) -> MpesaConfig:
-    config = MpesaConfig(shortcode="174379", shortcode_type="paybill")
-    config.is_active = is_active
-    return config
+@pytest.fixture
+def hint_registry(monkeypatch):
+    """Backs resolve_tenant_by_hint's seams: _tenant_hint_is_active,
+    _lookup_token_in_tenant (called there with raise_on_error=True), and
+    _resolve_platform_token. Returns (tenants, platform): tenants is a
+    tenant_hint -> MpesaConfig dict, platform is a one-key dict holding the
+    platform's own config (or None) under "config".
+    """
+    tenants: dict[str, MpesaConfig] = {}
+    platform: dict[str, MpesaConfig | None] = {"config": None}
+
+    def _tenant_hint_is_active(tenant_hint: str) -> bool:
+        return tenant_hint in tenants
+
+    def _lookup_token_in_tenant(tenant_db: str, lookup_hash: str, *, raise_on_error: bool = False) -> bool:
+        config = tenants.get(tenant_db)
+        if config is None:
+            return False
+        return bool(config.is_active) and config.callback_token_lookup == lookup_hash
+
+    def _resolve_platform_token(lookup_hash: str):
+        config = platform["config"]
+        if config is not None and bool(config.is_active) and config.callback_token_lookup == lookup_hash:
+            return dc._PLATFORM_HINT
+        return None
+
+    monkeypatch.setattr(dc, "_tenant_hint_is_active", _tenant_hint_is_active)
+    monkeypatch.setattr(dc, "_lookup_token_in_tenant", _lookup_token_in_tenant)
+    monkeypatch.setattr(dc, "_resolve_platform_token", _resolve_platform_token)
+    return tenants, platform
 
 
-# --- token resolution -------------------------------------------------
+# --- token resolution: legacy scanning path -------------------------------
 
 def test_unknown_callback_token_is_rejected(tenant_registry):
     """A forged callback with a guessed URL must not reach settlement."""
@@ -161,7 +203,7 @@ def test_negative_cache_does_not_hide_a_rotated_in_token_past_its_ttl(
     miss. If that same value is later legitimately rotated in, the cache
     must not keep it invisible for longer than its short TTL."""
     clock = _FakeClock()
-    monkeypatch.setattr(dc.time, "monotonic", clock)
+    monkeypatch.setattr(dc, "_monotonic", clock)
     monkeypatch.setattr(dc, "_NEGATIVE_CACHE_TTL_SECONDS", 5.0)
 
     guessed_token = mint_callback_token()
@@ -179,6 +221,156 @@ def test_negative_cache_does_not_hide_a_rotated_in_token_past_its_ttl(
     # Past the TTL: the entry has expired, so a live scan runs and finds it.
     clock.advance(10.0)
     assert dc.resolve_tenant_by_token(guessed_token) == "new_hospital_db"
+
+
+def test_master_registry_failure_raises_lookup_unavailable_not_none(monkeypatch):
+    """A master-DB blip must not look the same as 'no tenant matched':
+    resolve_tenant_by_token must not swallow it into a None."""
+    def _boom():
+        raise dc.TenantLookupUnavailable("master db unreachable")
+
+    monkeypatch.setattr(dc, "_active_tenant_db_names", _boom)
+
+    with pytest.raises(dc.TenantLookupUnavailable):
+        dc.resolve_tenant_by_token(mint_callback_token())
+
+
+def test_master_registry_failure_does_not_poison_the_negative_cache(tenant_registry, monkeypatch):
+    """A failed lookup for a VALID token must not get cached as a miss: that
+    would keep rejecting it for the rest of the TTL even after the master DB
+    has recovered."""
+    token = mint_callback_token()
+    config = _new_config()
+    store_callback_token(config, token)
+    tenant_registry["mayoclinic_db"] = config
+
+    real_scan = dc._active_tenant_db_names
+
+    def _boom():
+        raise dc.TenantLookupUnavailable("master db unreachable")
+
+    monkeypatch.setattr(dc, "_active_tenant_db_names", _boom)
+    with pytest.raises(dc.TenantLookupUnavailable):
+        dc.resolve_tenant_by_token(token)
+
+    monkeypatch.setattr(dc, "_active_tenant_db_names", real_scan)
+    assert dc.resolve_tenant_by_token(token) == "mayoclinic_db"
+
+
+# --- token resolution: hinted path (the structural change) ---------------
+
+def test_hinted_resolution_finds_the_right_tenant(hint_registry):
+    tenants, _platform = hint_registry
+    token = mint_callback_token()
+    config = _new_config()
+    store_callback_token(config, token)
+    tenants["mayoclinic_db"] = config
+
+    assert dc.resolve_tenant_by_hint("mayoclinic_db", token) == "mayoclinic_db"
+
+
+def test_valid_token_under_the_wrong_tenant_hint_is_rejected(hint_registry):
+    """The property that makes the routing hint safe to disclose: it is
+    never checked in place of the token, only alongside it. A real token
+    presented under a hint naming a DIFFERENT tenant must not resolve."""
+    tenants, _platform = hint_registry
+    token = mint_callback_token()
+    config = _new_config()
+    store_callback_token(config, token)
+    tenants["mayoclinic_db"] = config
+    tenants["mpshah_db"] = _new_config()  # a second, unrelated real tenant
+
+    assert dc.resolve_tenant_by_hint("mpshah_db", token) is None
+    # The correct hint still resolves: the token itself was never touched.
+    assert dc.resolve_tenant_by_hint("mayoclinic_db", token) == "mayoclinic_db"
+
+
+def test_hint_naming_no_tenant_at_all_is_rejected(hint_registry):
+    tenants, _platform = hint_registry
+    token = mint_callback_token()
+    config = _new_config()
+    store_callback_token(config, token)
+    tenants["mayoclinic_db"] = config
+
+    assert dc.resolve_tenant_by_hint("no_such_hospital_db", token) is None
+
+
+def test_malformed_hint_is_rejected_without_touching_any_database(hint_registry, monkeypatch):
+    tenants, _platform = hint_registry
+    token = mint_callback_token()
+    config = _new_config()
+    store_callback_token(config, token)
+    tenants["mayoclinic_db"] = config
+
+    touched = []
+    monkeypatch.setattr(dc, "_tenant_hint_is_active", lambda h: (touched.append(h) or True))
+
+    assert dc.resolve_tenant_by_hint("../etc/passwd", token) is None
+    assert dc.resolve_tenant_by_hint("MAYOCLINIC_DB", token) is None  # wrong charset
+    assert dc.resolve_tenant_by_hint("mayoclinic-db", token) is None  # hyphen not allowed
+    assert touched == []
+
+
+def test_platform_hint_resolves_against_the_platform_config(hint_registry):
+    _tenants, platform = hint_registry
+    token = mint_callback_token()
+    config = _new_config()
+    store_callback_token(config, token)
+    platform["config"] = config
+
+    assert dc.resolve_tenant_by_hint(dc._PLATFORM_HINT, token) == dc._PLATFORM_HINT
+
+
+def test_reserved_platform_hint_cannot_collide_with_a_tenant_db_name():
+    """What makes the reserved hint safe: it contains a character (a hyphen)
+    outside the charset every real tenant db_name is provisioned with, so no
+    legitimately-provisioned tenant can ever be named the same thing."""
+    assert dc._VALID_TENANT_DB_NAME.match(dc._PLATFORM_HINT) is None
+
+
+def test_tenant_hint_registry_failure_raises_not_none(monkeypatch):
+    def _boom(tenant_hint):
+        raise dc.TenantLookupUnavailable("master db unreachable")
+
+    monkeypatch.setattr(dc, "_tenant_hint_is_active", _boom)
+
+    with pytest.raises(dc.TenantLookupUnavailable):
+        dc.resolve_tenant_by_hint("mayoclinic_db", mint_callback_token())
+
+
+def test_tenant_db_failure_for_hinted_path_raises_not_none(hint_registry, monkeypatch):
+    """The tenant named by the hint exists, but its own database cannot be
+    reached: this must surface, not silently resolve to None."""
+    tenants, _platform = hint_registry
+    tenants["mayoclinic_db"] = _new_config()
+
+    def _boom(tenant_db, lookup_hash, *, raise_on_error=False):
+        raise dc.TenantLookupUnavailable("tenant db unreachable")
+
+    monkeypatch.setattr(dc, "_lookup_token_in_tenant", _boom)
+
+    with pytest.raises(dc.TenantLookupUnavailable):
+        dc.resolve_tenant_by_hint("mayoclinic_db", mint_callback_token())
+
+
+def test_hinted_lookup_failure_does_not_poison_the_negative_cache(hint_registry, monkeypatch):
+    tenants, _platform = hint_registry
+    token = mint_callback_token()
+    config = _new_config()
+    store_callback_token(config, token)
+    tenants["mayoclinic_db"] = config
+
+    real_lookup = dc._lookup_token_in_tenant
+
+    def _boom(tenant_db, lookup_hash, *, raise_on_error=False):
+        raise dc.TenantLookupUnavailable("tenant db unreachable")
+
+    monkeypatch.setattr(dc, "_lookup_token_in_tenant", _boom)
+    with pytest.raises(dc.TenantLookupUnavailable):
+        dc.resolve_tenant_by_hint("mayoclinic_db", token)
+
+    monkeypatch.setattr(dc, "_lookup_token_in_tenant", real_lookup)
+    assert dc.resolve_tenant_by_hint("mayoclinic_db", token) == "mayoclinic_db"
 
 
 # --- source IP allow-list -----------------------------------------------
@@ -251,6 +443,31 @@ def test_production_with_empty_allowlist_fails_closed(monkeypatch):
     assert exc.value.status_code == 500
 
 
+def test_production_ip_allowlist_without_trusted_proxies_fails_closed(monkeypatch):
+    """Finding 2 (review round 1): behind a load balancer the immediate peer
+    is private, so the empty-trusted-proxy fallback in _peer_is_trusted_proxy
+    would trust a spoofed X-Forwarded-For from that peer. An allow-list
+    configured without an explicit trusted-proxy list is bypassable in
+    production, so it must fail closed exactly like an empty allow-list."""
+    monkeypatch.setattr(dc, "_ALLOWED_NETS", dc._parse_cidrs("196.201.214.0/24"))
+    monkeypatch.setattr(dc, "_TRUSTED_PROXY_NETS", [])
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+
+    request = _FakeRequest(peer="196.201.214.10")
+    with pytest.raises(HTTPException) as exc:
+        _run(dc.verify_daraja_source(request))
+    assert exc.value.status_code == 500
+
+
+def test_production_with_trusted_proxies_configured_still_works(monkeypatch):
+    monkeypatch.setattr(dc, "_ALLOWED_NETS", dc._parse_cidrs("196.201.214.0/24"))
+    monkeypatch.setattr(dc, "_TRUSTED_PROXY_NETS", dc._parse_cidrs("10.0.0.0/8"))
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+
+    request = _FakeRequest(peer="10.0.0.5", xff="196.201.214.10", body=b'{"ok": 1}')
+    assert _run(dc.verify_daraja_source(request)) == b'{"ok": 1}'
+
+
 def test_development_with_empty_allowlist_is_permissive(monkeypatch):
     """Mirrors verify_payhero's posture: an empty allow-list is only
     tolerated outside production, so local fixture tests can post."""
@@ -258,6 +475,27 @@ def test_development_with_empty_allowlist_is_permissive(monkeypatch):
     monkeypatch.setattr(settings, "APP_ENV", "development")
     request = _FakeRequest(peer="8.8.8.8", body=b'{"ok": 1}')
     assert _run(dc.verify_daraja_source(request)) == b'{"ok": 1}'
+
+
+def test_body_is_not_read_before_the_ip_check_rejects(monkeypatch):
+    """The body used to be read first (Pay Hero needed the bytes for its
+    HMAC check). Daraja has no signature, so reading first only lets a
+    disallowed source make the server buffer an arbitrary body before the
+    cheapest possible rejection."""
+    monkeypatch.setattr(dc, "_ALLOWED_NETS", dc._parse_cidrs("196.201.214.0/24"))
+    monkeypatch.setattr(dc, "_TRUSTED_PROXY_NETS", [])
+
+    calls = []
+
+    class _CountingRequest(_FakeRequest):
+        async def body(self):
+            calls.append(1)
+            return await super().body()
+
+    request = _CountingRequest(peer="8.8.8.8")
+    with pytest.raises(HTTPException):
+        _run(dc.verify_daraja_source(request))
+    assert calls == []
 
 
 # --- acknowledgement contract --------------------------------------------
@@ -279,6 +517,20 @@ def test_rejected_callback_still_returns_200(tenant_registry):
     assert dc.ACK_OK == {"ResultCode": 0, "ResultDesc": "Accepted"}
 
 
+def test_lookup_failure_is_not_the_same_contract_as_a_rejection(monkeypatch):
+    """The distinction Finding 3 is about, stated as a test: a rejection
+    (None) is fine to acknowledge as 200. A failure to evaluate must raise
+    instead, so a route never accidentally answers 200 for a callback nobody
+    actually checked."""
+    def _boom():
+        raise dc.TenantLookupUnavailable("master db unreachable")
+
+    monkeypatch.setattr(dc, "_active_tenant_db_names", _boom)
+
+    with pytest.raises(dc.TenantLookupUnavailable):
+        dc.resolve_tenant_by_token(mint_callback_token())
+
+
 def test_c2b_decline_is_the_one_genuine_rejection(monkeypatch):
     """C2B validation is the one place a rejection is actually expressed to
     Safaricom, because there it means 'do not accept this payment at the
@@ -286,3 +538,14 @@ def test_c2b_decline_is_the_one_genuine_rejection(monkeypatch):
     assert dc.ACK_C2B_DECLINE["ResultCode"] != 0
     assert dc.ACK_C2B_DECLINE != dc.ACK_OK
     assert dc.ACK_C2B_DECLINE != dc.ACK_REJECT
+
+
+def test_ack_bodies_are_immutable():
+    """A route mutating one of these in place would poison it for every
+    later callback: they are shared, reused objects, not per-call templates."""
+    with pytest.raises(TypeError):
+        dc.ACK_OK["ResultCode"] = 1
+    with pytest.raises(TypeError):
+        dc.ACK_REJECT["ResultCode"] = 1
+    with pytest.raises(TypeError):
+        dc.ACK_C2B_DECLINE["ResultCode"] = 1
