@@ -16,10 +16,11 @@ from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from app.services.daraja.client import _TOKEN_CACHE
-from app.services.daraja.stk import _STALE_PENDING_TIMEOUT, initiate_stk_push
+from app.services.daraja.stk import initiate_stk_push
 from app.models.mpesa import MpesaTransaction
 from app.config.settings import settings
 from tests.daraja.conftest import make_invoice, make_mpesa_config
@@ -192,7 +193,49 @@ def test_the_second_terminal_receives_the_existing_transaction_not_an_error(
     assert sorted(already_pending_flags) == [False, True]
 
 
+def test_an_unrelated_integrity_error_is_not_mistaken_for_a_pending_conflict(db, monkeypatch):
+    """_reserve_pending must treat ONLY the two partial unique indexes as
+    "someone else already has this slot". An invoice_id that does not
+    exist violates the invoices FK instead, and swallowing that behind
+    the generic 409 "try again shortly" would tell the caller to retry a
+    request that can never succeed, hiding a real bug (a stale or
+    fabricated invoice id) behind a message that looks like ordinary
+    contention."""
+    _fake_oauth(monkeypatch)
+    call_count = {"n": 0}
+    lock = threading.Lock()
+    _fake_stk_success(monkeypatch, call_count, lock)
+    make_mpesa_config(db)
+
+    with pytest.raises(IntegrityError):
+        initiate_stk_push(
+            db,
+            phone_number="0712345678",
+            amount=Decimal("100.00"),
+            invoice_id=999999999,  # does not exist: violates the FK, not the pending guard
+            callback_tenant="mayoclinic_db",
+        )
+    assert call_count["n"] == 0
+
+
 def test_a_stale_pending_transaction_does_not_block_a_genuine_retry(db, monkeypatch):
+    """Name kept from the original spec list; the CONTRACT changed after a
+    reviewed regression. An earlier version aged a stale Pending row out to
+    a local "Expired" status so a retry was never blocked. That is a guess
+    about the original push's outcome, and apply_stk_callback only ever
+    matches status == "Pending": a late genuine success callback for the
+    "Expired" row fell into the unrecognised branch and settled nothing,
+    reproduced end to end as PAYMENT ROWS: 0, invoice still Pending, while
+    money had actually reached the till.
+
+    The correct contract, per the design doc: a stale Pending BLOCKS a
+    retry (the second cashier is told a prompt is already on its way,
+    which is true) until Task 8's reconciliation job resolves it by asking
+    Safaricom via STK Query, never by guessing locally. This test asserts
+    that: the retry does NOT push a second prompt, is NOT treated as an
+    error, and the stale row is left exactly as it was, still Pending,
+    for reconciliation to resolve later.
+    """
     _fake_oauth(monkeypatch)
     call_count = {"n": 0}
     lock = threading.Lock()
@@ -213,13 +256,9 @@ def test_a_stale_pending_transaction_does_not_block_a_genuine_retry(db, monkeypa
     )
     db.add(stale)
     db.flush()
-    stale.transaction_date = (
-        datetime.now(timezone.utc) - _STALE_PENDING_TIMEOUT - timedelta(minutes=5)
-    )
+    stale.transaction_date = datetime.now(timezone.utc) - timedelta(hours=6)
     db.commit()
 
-    # A genuine retry for the same invoice must succeed, not be told a
-    # prompt is already on its way, and must not raise.
     result = initiate_stk_push(
         db,
         phone_number="0712345678",
@@ -228,17 +267,17 @@ def test_a_stale_pending_transaction_does_not_block_a_genuine_retry(db, monkeypa
         callback_tenant="mayoclinic_db",
     )
 
-    assert result.get("already_pending", False) is False
-    assert call_count["n"] == 1
+    # Blocked, correctly: no second prompt was sent, and the caller is told
+    # a prompt is already on its way (true) rather than handed an error or
+    # a silent duplicate push.
+    assert result["already_pending"] is True
+    assert result["transaction_id"] == stale.id
+    assert call_count["n"] == 0
 
     db.refresh(stale)
-    assert stale.status == "Expired"
-    # The stale row is never guessed into Success or Failed: its real
-    # outcome, if any, is for reconciliation (Task 8) to resolve against
-    # Safaricom directly.
-    assert stale.status not in ("Success", "Failed")
+    assert stale.status == "Pending"
 
-    new_pending = (
+    pending = (
         db.query(MpesaTransaction)
         .filter(
             MpesaTransaction.invoice_id == invoice.invoice_id,
@@ -246,9 +285,8 @@ def test_a_stale_pending_transaction_does_not_block_a_genuine_retry(db, monkeypa
         )
         .all()
     )
-    assert len(new_pending) == 1
-    assert new_pending[0].id == result["transaction_id"]
-    assert new_pending[0].id != stale.id
+    assert len(pending) == 1
+    assert pending[0].id == stale.id
 
 
 # ─── Problem A: idempotency, the EXISTING mechanism ────────────────────────
@@ -334,3 +372,70 @@ def test_two_different_cashiers_are_separate_idempotency_scopes(db, monkeypatch)
     # neither is treated as a replay of the other.
     assert call_count["n"] == 2
     assert first["transaction_id"] != second["transaction_id"]
+
+
+def test_two_terminals_with_the_same_idempotency_key_and_no_invoice_push_once(
+    db, _engine, monkeypatch
+):
+    """The one case with no partial-unique-index backstop: a push with
+    neither invoice_id nor dispense_id reserves a slot that never
+    conflicts with anything, so _reserve_pending's own commit ends the
+    idempotency lock's transaction on BOTH threads before either has
+    written the idempotency cache row. Both can genuinely reach Daraja: the
+    reservation guard cannot save this case, and does not claim to.
+
+    What must still hold: neither terminal 500s (the INSERT race on
+    pk_idempotency_keys must not surface as an uncaught IntegrityError),
+    and both terminals are handed back the SAME final answer, because the
+    loser replays idempotent_guard after its own insert collides rather
+    than returning its own, different, wasted push's result.
+    """
+    _fake_oauth(monkeypatch)
+    call_count = {"n": 0}
+    lock = threading.Lock()
+    _fake_stk_success(monkeypatch, call_count, lock)
+    make_mpesa_config(db)
+    db.commit()  # visible to the two independent connections below
+
+    SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+    barrier = threading.Barrier(2)
+    results: list = []
+    errors: list = []
+    results_lock = threading.Lock()
+
+    def worker():
+        session = SessionLocal()
+        try:
+            barrier.wait(timeout=5)
+            r = initiate_stk_push(
+                session,
+                phone_number="0712345678",
+                amount=Decimal("250.00"),
+                callback_tenant="mayoclinic_db",
+                user_id=1,
+                idempotency_key="no-invoice-race-key",
+            )
+            with results_lock:
+                results.append(r)
+        except Exception as exc:  # noqa: BLE001, captured for the assertion below
+            with results_lock:
+                errors.append(exc)
+        finally:
+            session.close()
+
+    t1 = threading.Thread(target=worker)
+    t2 = threading.Thread(target=worker)
+    t1.start()
+    t2.start()
+    t1.join(timeout=15)
+    t2.join(timeout=15)
+
+    assert not errors, f"unexpected errors from concurrent pushes: {errors}"
+    assert len(results) == 2
+    # No database backstop means Daraja may genuinely be asked twice here;
+    # that is the accepted, called-out limitation of the no-invoice case.
+    # What matters is that both terminals are handed back the SAME answer,
+    # not two different half-completed ones and not a crash.
+    assert call_count["n"] in (1, 2)
+    assert results[0]["checkout_request_id"] == results[1]["checkout_request_id"]
+    assert results[0]["transaction_id"] == results[1]["transaction_id"]

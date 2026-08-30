@@ -18,13 +18,13 @@ from __future__ import annotations
 
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
 from decimal import ROUND_CEILING, Decimal
 from types import SimpleNamespace
 from typing import Optional
 from urllib.parse import quote
 
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -43,18 +43,19 @@ logger = logging.getLogger(__name__)
 _ACCOUNT_REFERENCE_MAX = 12
 _TRANSACTION_DESC_MAX = 13
 
-# An STK prompt expires on the handset in about a minute. A Pending
-# reservation older than this is treated as dead for the purpose of freeing
-# an invoice/dispense slot for a genuine retry (see _reserve_pending). This
-# is deliberately longer than the handset expiry so a merely-slow-but-live
-# push is never pre-empted, and it never marks the old push Success or
-# Failed: that would be settling from a guess. The real outcome, if any, is
-# reconciled independently (Task 8) by asking Safaricom, not by asserting one.
-_STALE_PENDING_TIMEOUT = timedelta(minutes=2)
-
 # The endpoint name idempotent_guard scopes the (user, key) cache to. A
 # constant, not a parameter, because there is exactly one call site.
 _IDEMPOTENCY_ENDPOINT = "daraja.stk-push"
+
+# The two partial unique indexes _reserve_pending is reacting to. Any OTHER
+# IntegrityError (an unknown invoice_id violating the FK, a NOT NULL slip,
+# a totally unrelated constraint) must never be silently treated as "someone
+# else already has this slot": that swallows a real bug behind a 409 that
+# can never succeed on retry. See _reserve_pending.
+_PENDING_GUARD_CONSTRAINTS = frozenset({
+    "uq_mpesa_txn_one_pending_per_invoice",
+    "uq_mpesa_txn_one_pending_per_dispense",
+})
 
 
 def config_for(db: Session, *, department_id: Optional[int] = None) -> MpesaConfig:
@@ -69,6 +70,17 @@ def config_for(db: Session, *, department_id: Optional[int] = None) -> MpesaConf
     An INACTIVE department row falls back to the default rather than
     raising: a department that switches its till off should keep
     collecting through the hospital till, not stop collecting.
+
+    Caveat this does NOT cover: deactivating a department's config does
+    not retroactively help a push already sent from it. Each config's
+    callback is authenticated by that config's OWN token, and
+    app/core/daraja_callback.py's _lookup_token_in_tenant requires
+    is_active=True on the matching row; it never falls back to the
+    hospital default the way config_for does. So a prompt already on a
+    patient's handset, sent from a till that is deactivated before the
+    callback arrives, has its callback rejected as unauthenticated, not
+    routed to the default. This function's fallback only ever applies to a
+    NEW push, never to settling one already in flight.
     """
     if department_id is not None:
         dept_config = (
@@ -104,24 +116,26 @@ def _find_pending(
 ) -> Optional[MpesaTransaction]:
     """The live Pending row (if any) blocking a reservation for this
     invoice/dispense. At most one can exist by construction of the partial
-    unique index this function's caller is reacting to."""
-    query = db.query(MpesaTransaction).filter(MpesaTransaction.status == "Pending")
+    unique index this function's caller is reacting to.
+
+    Matches on invoice_id OR dispense_id, not just whichever is checked
+    first: a row carrying both is blocked by either partial index, and a
+    conflict on one must still be found by a caller that only supplied
+    the other.
+    """
+    conditions = []
     if invoice_id is not None:
-        query = query.filter(MpesaTransaction.invoice_id == invoice_id)
-    elif dispense_id is not None:
-        query = query.filter(MpesaTransaction.dispense_id == dispense_id)
-    else:
+        conditions.append(MpesaTransaction.invoice_id == invoice_id)
+    if dispense_id is not None:
+        conditions.append(MpesaTransaction.dispense_id == dispense_id)
+    if not conditions:
         return None
-    return query.first()
-
-
-def _is_stale(txn: MpesaTransaction) -> bool:
-    started = txn.transaction_date
-    if started is None:
-        return False
-    if started.tzinfo is None:
-        started = started.replace(tzinfo=timezone.utc)
-    return (datetime.now(timezone.utc) - started) > _STALE_PENDING_TIMEOUT
+    return (
+        db.query(MpesaTransaction)
+        .filter(MpesaTransaction.status == "Pending")
+        .filter(or_(*conditions))
+        .first()
+    )
 
 
 def _reserve_pending(
@@ -134,7 +148,7 @@ def _reserve_pending(
     external_reference: str,
     bill_ref_number: str,
     config: MpesaConfig,
-) -> tuple[MpesaTransaction, bool]:
+) -> tuple[Optional[MpesaTransaction], bool]:
     """Reserve the one Pending slot for this invoice/dispense.
 
     Insert-and-catch, never check-then-insert: a check-then-insert has a gap
@@ -149,53 +163,61 @@ def _reserve_pending(
     invoice/dispense: txn is that transaction, and the caller must not push
     a second prompt to the patient's handset.
 
-    A stale existing Pending row (older than _STALE_PENDING_TIMEOUT) is
-    marked Expired, in the same transaction as the new reservation, so a
-    genuine retry of a dead prompt is not blocked forever. Expired is not
-    Success or Failed: this function never guesses at the old push's real
-    outcome, it only frees the slot. Both changes commit together, or not
-    at all.
-    """
-    for _ in range(2):
-        txn = MpesaTransaction(
-            invoice_id=invoice_id,
-            dispense_id=dispense_id,
-            phone_number=phone_number,
-            amount=charged_amount,
-            external_reference=external_reference,
-            status="Pending",
-            transaction_type="STK",
-            bill_ref_number=bill_ref_number,
-            mpesa_config_id=config.id,
-        )
-        try:
-            with db.begin_nested():
-                db.add(txn)
-                db.flush()
-        except IntegrityError:
-            existing = _find_pending(db, invoice_id=invoice_id, dispense_id=dispense_id)
-            if existing is not None and _is_stale(existing):
-                existing.status = "Expired"
-                existing.result_desc = (
-                    "Superseded by a retry after the on-handset window elapsed. "
-                    "The original push's outcome, if any, is reconciled "
-                    "independently against Safaricom, not assumed here."
-                )
-                db.flush()
-                continue
-            return existing, False
-        else:
-            # Commit NOW, before the slow Daraja network call, so a second
-            # terminal hitting the same invoice/dispense gets an immediate
-            # constraint violation instead of blocking on our uncommitted
-            # row for however long Safaricom takes to answer.
-            db.commit()
-            return txn, True
+    There is deliberately NO local staleness timer here any more. An
+    earlier version aged a Pending row out to a manufactured "Expired"
+    status so a retry was never blocked; that is a guess about the
+    original push's outcome, and apply_stk_callback only ever matches
+    status == "Pending", so a late genuine success callback for an
+    "Expired" row fell into the unrecognised branch and settled nothing:
+    money reached the till and the invoice was never credited. A stale
+    Pending now correctly BLOCKS a retry (the caller is told a prompt is
+    already on its way, which is true) until Task 8's reconciliation job
+    resolves it by asking Safaricom via STK Query, never by guessing here.
 
-    # Pathological: contention outlasted the retry budget. Surface whatever
-    # is there rather than raising a bare 500.
-    existing = _find_pending(db, invoice_id=invoice_id, dispense_id=dispense_id)
-    return existing, False
+    CONTRACT the caller must know: when this returns reserved=True, it has
+    ALREADY COMMITTED `db` (see the comment at that call site for why:
+    responsiveness against a second terminal, not correctness of the guard
+    itself), ending whatever transaction was open when this was called,
+    including releasing any Postgres advisory lock taken inside it. The
+    caller resumes in a new transaction. When it returns reserved=False,
+    no commit happens: the only DB effect was an insert attempt rolled
+    back to a SAVEPOINT, so the caller's transaction (and any lock it
+    holds) is untouched.
+
+    Only the two partial unique indexes this guard owns are treated as
+    "someone else already has this slot". Any other IntegrityError (an
+    unknown invoice_id violating its FK, for example) is re-raised: a 409
+    "try again" for a request that can never succeed is worse than the raw
+    error.
+    """
+    txn = MpesaTransaction(
+        invoice_id=invoice_id,
+        dispense_id=dispense_id,
+        phone_number=phone_number,
+        amount=charged_amount,
+        external_reference=external_reference,
+        status="Pending",
+        transaction_type="STK",
+        bill_ref_number=bill_ref_number,
+        mpesa_config_id=config.id,
+    )
+    try:
+        with db.begin_nested():
+            db.add(txn)
+            db.flush()
+    except IntegrityError as exc:
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        if constraint not in _PENDING_GUARD_CONSTRAINTS:
+            raise
+        existing = _find_pending(db, invoice_id=invoice_id, dispense_id=dispense_id)
+        return existing, False
+    else:
+        # Commit NOW, before the slow Daraja network call, so a second
+        # terminal hitting the same invoice/dispense gets an immediate
+        # constraint violation instead of blocking on our uncommitted
+        # row for however long Safaricom takes to answer.
+        db.commit()
+        return txn, True
 
 
 def _decrypted(value: Optional[str], *, field: str) -> str:
@@ -269,6 +291,50 @@ def _pending_conflict_response(txn: MpesaTransaction) -> dict:
     }
 
 
+def _finalize(
+    db: Session,
+    result: dict,
+    *,
+    persist,
+    user_id: Optional[int],
+    idempotency_key: Optional[str],
+    idempotency_body: Optional[dict],
+) -> dict:
+    """Persist `result` into the idempotency cache (if `persist` is set)
+    and commit.
+
+    _reserve_pending's own commit (see its docstring) ends the transaction
+    idempotent_guard took its Postgres advisory lock in, on purpose, so a
+    second terminal is not blocked for the whole Daraja round trip. That
+    means the lock no longer serialises two terminals racing on the SAME
+    (user_id, endpoint, key): both can reach here, and the loser's INSERT
+    into idempotency_keys collides with the winner's on
+    pk_idempotency_keys. Rather than let that surface as an uncaught
+    IntegrityError, a 500 on the exact double-click path idempotency exists
+    to protect, the loser rolls back its own attempt and replays
+    idempotent_guard to read back the winner's now-committed response, so
+    both terminals see the SAME answer.
+    """
+    if persist:
+        persist(result, status=200)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if idempotency_key is not None:
+            cached, _ = idempotent_guard(
+                db,
+                user_id=user_id,
+                endpoint=_IDEMPOTENCY_ENDPOINT,
+                key=idempotency_key,
+                body=idempotency_body,
+            )
+            if cached is not None:
+                return cached
+        raise
+    return result
+
+
 def initiate_stk_push(
     db: Session,
     *,
@@ -307,19 +373,26 @@ def initiate_stk_push(
     made (see _reserve_pending), so a callback arriving before this
     function returns still finds a row, and so a concurrent second terminal
     gets an immediate constraint violation instead of blocking on our
-    uncommitted row for however long Safaricom takes to answer.
+    uncommitted row for however long Safaricom takes to answer. That early
+    commit also means a stale Pending row (its handset prompt long dead) is
+    NOT expired or superseded here: doing that locally would be a guess
+    about the original push's outcome, and this module never guesses about
+    money. A stale row correctly blocks a retry, and the retrying cashier
+    is told a prompt is already on its way, which is true, until Task 8's
+    reconciliation job resolves it by asking Safaricom directly.
 
     `department_id` is forwarded to config_for; see that function's
     docstring for the resolution order.
     """
     persist = None
+    idempotency_body = None
     if idempotency_key:
         if user_id is None:
             raise HTTPException(
                 status_code=400,
                 detail="user_id is required when using an idempotency key.",
             )
-        body = {
+        idempotency_body = {
             "phone_number": phone_number,
             "amount": str(amount),
             "invoice_id": invoice_id,
@@ -329,7 +402,8 @@ def initiate_stk_push(
             "transaction_desc": transaction_desc,
         }
         cached, persist = idempotent_guard(
-            db, user_id=user_id, endpoint=_IDEMPOTENCY_ENDPOINT, key=idempotency_key, body=body,
+            db, user_id=user_id, endpoint=_IDEMPOTENCY_ENDPOINT, key=idempotency_key,
+            body=idempotency_body,
         )
         if cached is not None:
             return cached
@@ -378,10 +452,10 @@ def initiate_stk_push(
                 detail="Could not reserve a payment slot for this invoice. Try again shortly.",
             )
         result = _pending_conflict_response(txn)
-        if persist:
-            persist(result, status=200)
-        db.commit()
-        return result
+        return _finalize(
+            db, result, persist=persist, user_id=user_id,
+            idempotency_key=idempotency_key, idempotency_body=idempotency_body,
+        )
 
     # From here on this call owns the reserved Pending row. Any failure
     # below marks it Failed (a real, known outcome) rather than leaving it
@@ -446,10 +520,36 @@ def initiate_stk_push(
         # the pre-rounding amount it asked for.
         "amount_charged": charged_amount,
     }
-    if persist:
-        persist(result, status=200)
-    db.commit()
-    return result
+    return _finalize(
+        db, result, persist=persist, user_id=user_id,
+        idempotency_key=idempotency_key, idempotency_body=idempotency_body,
+    )
+
+
+def _config_for_query(db: Session, *, checkout_request_id: str) -> MpesaConfig:
+    """The exact till a given CheckoutRequestID was pushed from.
+
+    Daraja signs STK Query with the SAME shortcode/passkey the original
+    push used. Falling back to config_for's hospital default here (as an
+    earlier version did unconditionally) is wrong whenever the push came
+    from a department till: the signature Daraja expects is the
+    department's, not the default's, and the query fails. The
+    transaction's own mpesa_config_id (set at push time) is the source of
+    truth for which till that was; config_for's fallback is used only when
+    there is no transaction row to ask (or it predates mpesa_config_id
+    being recorded), matching this function's pre-existing behaviour for
+    that case.
+    """
+    txn = (
+        db.query(MpesaTransaction)
+        .filter(MpesaTransaction.checkout_request_id == checkout_request_id)
+        .first()
+    )
+    if txn is not None and txn.mpesa_config_id is not None:
+        config = db.query(MpesaConfig).filter(MpesaConfig.id == txn.mpesa_config_id).first()
+        if config is not None:
+            return config
+    return config_for(db)
 
 
 def query_stk(db: Session, *, checkout_request_id: str) -> dict:
@@ -463,7 +563,7 @@ def query_stk(db: Session, *, checkout_request_id: str) -> dict:
     if not checkout_request_id:
         raise HTTPException(status_code=400, detail="checkout_request_id is required")
 
-    config = config_for(db)
+    config = _config_for_query(db, checkout_request_id=checkout_request_id)
     passkey = _decrypted(config.passkey_encrypted, field="passkey")
     timestamp = daraja_timestamp()
     password = stk_password(config.shortcode, passkey, timestamp)

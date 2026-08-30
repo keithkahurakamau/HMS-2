@@ -13,6 +13,7 @@ from app.services.daraja.stk import initiate_stk_push, query_stk
 from app.models.mpesa import MpesaTransaction
 from app.config.settings import settings
 from tests.daraja.conftest import make_invoice, make_mpesa_config
+from tests.daraja.test_department_tills import make_department
 
 
 class FakeResponse:
@@ -257,3 +258,46 @@ def test_query_stk_sends_the_checkout_request_id_and_returns_darajas_response(db
 def test_query_stk_requires_a_checkout_request_id(db):
     with pytest.raises(HTTPException):
         query_stk(db, checkout_request_id="")
+
+
+def test_query_stk_uses_the_transaction_specific_till_not_the_default(db, monkeypatch):
+    """query_stk must sign with the SAME till the original push used.
+    Falling back unconditionally to config_for's hospital default (as an
+    earlier version did) makes Daraja reject the signature for any push
+    that was made on a department till, since the password is derived
+    from the shortcode and passkey: reconciliation could never resolve a
+    department-till transaction. The transaction's own mpesa_config_id,
+    set at push time, is what query_stk must resolve the config from."""
+    _fake_oauth(monkeypatch)
+    dept = make_department(db, name="Pharmacy-query-till")
+    make_mpesa_config(db, shortcode="100001")  # hospital default, must NOT be used
+    dept_config = make_mpesa_config(
+        db, shortcode="200002", department_id=dept.department_id,
+    )
+    txn = MpesaTransaction(
+        phone_number="254712345678",
+        amount=Decimal("100.00"),
+        checkout_request_id="ws_CO_dept_query",
+        merchant_request_id="mr_dept_query",
+        status="Pending",
+        transaction_type="STK",
+        mpesa_config_id=dept_config.id,
+    )
+    db.add(txn)
+    db.flush()
+
+    captured = {}
+
+    def fake_post(url, **kw):
+        captured["payload"] = kw.get("json")
+        return FakeResponse(200, {
+            "ResponseCode": "0",
+            "ResultCode": "0",
+            "ResultDesc": "The service request is processed successfully.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+    query_stk(db, checkout_request_id="ws_CO_dept_query")
+
+    assert captured["payload"]["BusinessShortCode"] == "200002"
