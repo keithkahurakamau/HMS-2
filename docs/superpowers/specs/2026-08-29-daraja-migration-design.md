@@ -186,6 +186,92 @@ import block in `scripts/migrate_all_tenants.py` (that list feeds an unfiltered
 database name, never on `_has_table("tenants")`, because tenant databases also
 contain a `tenants` table.
 
+### Per-department tills
+
+A hospital is not always one till. Departments run their own books: the pharmacy
+settles separately from the laboratory, an outpatient desk from a maternity wing.
+The operator requires that each department be able to collect on its own M-Pesa
+shortcode.
+
+**Shape.** `mpesa_configs` becomes a multi-row table with a nullable
+`department_id` referencing `departments.department_id`. The row with a NULL
+department is the hospital-wide default. A department with its own row overrides
+the default; a department without one falls back to it. This matters because no
+hospital onboards with twenty configured tills: they start with one and split it
+out as they need to, and the fallback is what makes that possible without a
+migration per department.
+
+Two partial unique indexes hold the shape: at most one row per department, and at
+most one default row. Postgres treats NULLs as distinct in a plain unique index,
+so the default needs its own partial index rather than relying on the first.
+
+**Resolution.** One function, `config_for(db, department_id=None)`: the
+department's active config when present, otherwise the hospital default,
+otherwise the same "not configured" error as today. Every caller goes through it.
+That single seam is the whole reason the change is small.
+
+**Routing back.** Each config already carries its own callback token pair, so each
+till gets its own callback URL and an inbound callback identifies the exact till
+that received the money, not merely the hospital. `mpesa_transactions` therefore
+gains an `mpesa_config_id` FK. Without it a refund could not know which till to
+pay back from, and reconciliation could not tell two tills apart.
+
+**What this does not do.** Invoices carry no department today, so nothing infers a
+department automatically. The caller passes one when it knows: the pharmacy screen
+knows it is the pharmacy. Everything else uses the hospital default and behaves
+exactly as it does now. Inferring a department from `InvoiceItem.item_type` was
+considered and rejected: an invoice can carry items from several service lines,
+so there is no single correct answer, and guessing would route real money to the
+wrong department's till.
+
+### Many terminals, one till
+
+A department is not one computer. A pharmacy can have several machines taking
+payments against the same shortcode at the same moment, and those machines are
+served by different gunicorn workers, so nothing in a single process can
+coordinate them. Two failures follow from that, and they are different problems
+with different fixes.
+
+**The same action submitted twice.** One cashier double-clicks, or the network
+drops the response and the browser retries. This is idempotency, and the codebase
+already has the mechanism: `IdempotencyKey` in `app/models/idempotency.py`, scoped
+to (user_id, endpoint, key) with a SHA-256 fingerprint of the request body, and
+the helper in `app/core/idempotency.py`. Reusing a key with a DIFFERENT body
+returns 409 rather than the wrong cached answer, which is the property that makes
+it safe. STK initiation is wrapped in it, so a repeated submit returns the first
+response and pushes no second prompt.
+
+Note the scope is per user, and that is correct: two different cashiers pressing
+their own buttons are two genuine actions, not one action retried.
+
+**Two terminals pushing the same invoice.** This is not idempotency. Two different
+users, each acting deliberately, both send an STK prompt for one invoice, and the
+patient receives two prompts and can pay twice. No per-user key catches this.
+
+The guard is a partial unique index: at most one `Pending` transaction per invoice,
+and likewise per dispense. Postgres enforces it across every worker and every
+machine, which is exactly the scope the problem lives at. A second concurrent push
+loses the race and is handed the existing pending transaction instead of creating
+its own.
+
+That must not become a permanent lock when a prompt goes unanswered. An STK prompt
+expires on the handset in about a minute, so a `Pending` transaction older than a
+short timeout is resolved by the reconciliation job (via STK Query, so the outcome
+comes from Safaricom rather than from a guess) and the slot frees. A cashier
+retrying a genuinely dead prompt is a normal path, not an error.
+
+**Settlement is already safe under concurrency** and stays that way: `receipt_number`
+carries a unique constraint, so two callbacks delivering the same receipt cannot
+both create a payment, and `settle_invoice_match` is idempotent on
+`Payment.transaction_reference`. Concurrent settlement of the SAME invoice from two
+different receipts is legitimate (a split payment) and must keep working.
+
+**The OAuth token cache** is keyed by consumer key and shared by every request in a
+worker, so terminals in one department share one token. A concurrent miss can cause
+two workers to fetch a token at once. That is harmless: Daraja issues a valid token
+per request and both are usable. It is called out here only so nobody later adds a
+lock and serialises the payment path to fix a non-problem.
+
 ### Refunds (B2C)
 
 This is the only part of the system that moves money *out*, and it is designed
