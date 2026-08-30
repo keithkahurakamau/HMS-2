@@ -241,16 +241,41 @@ Routes move from `/api/payments/payhero/*` to `/api/payments/mpesa/*` and from
 `payhero:manage` and legacy `mpesa:manage` grants continue to authorise during
 the transition without a data migration racing the deploy.
 
-Callback endpoints, all token-addressed:
+Callback endpoints carry a tenant routing hint alongside the token:
 
 ```
-POST /api/payments/mpesa/stk/callback/{callback_token}
-POST /api/payments/mpesa/c2b/validation/{callback_token}
-POST /api/payments/mpesa/c2b/confirmation/{callback_token}
-POST /api/payments/mpesa/b2c/result/{callback_token}
-POST /api/payments/mpesa/b2c/timeout/{callback_token}
-POST /api/payments/mpesa/platform/stk/callback/{callback_token}
+POST /api/payments/mpesa/stk/callback/{tenant_hint}/{token}
+POST /api/payments/mpesa/c2b/validation/{tenant_hint}/{token}
+POST /api/payments/mpesa/c2b/confirmation/{tenant_hint}/{token}
+POST /api/payments/mpesa/b2c/result/{tenant_hint}/{token}
+POST /api/payments/mpesa/b2c/timeout/{tenant_hint}/{token}
+POST /api/payments/mpesa/platform/stk/callback/{tenant_hint}/{token}
 ```
+
+**Why the hint exists, and why it does not reopen the hole this design closes.**
+Resolving a callback from the token alone means searching for it, and with one
+database per tenant that is a scan across every hospital. On an endpoint that is
+public and unauthenticated by design, that turns one cheap forged request into a
+database round trip per tenant, evicting connection-pool entries that other
+hospitals are actively using. The hint removes the search: open the one named
+database, do one indexed equality lookup on the token hash, done.
+
+The token remains the sole gate. A wrong or spoofed hint grants nothing: it is
+looked up like any other, and simply fails to find a token that lives elsewhere.
+This is exactly what the retired Pay Hero design got wrong. There the guessable
+tenant database name in the path WAS the gate once the HMAC was removed from the
+picture; here the hint is never checked in place of a token, only alongside one.
+Tenant database names are already publicly enumerable through
+`GET /api/public/hospitals`, so the hint discloses nothing new.
+
+The alternative considered and rejected was a lookup index in the master database
+mapping token hash to tenant. It works, but it needs a dual write across two
+databases with no shared transaction, so the two can drift, and a stale master row
+becomes a cross-tenant routing bug: a callback settled against the wrong hospital.
+That is a worse failure than the one it fixes.
+
+The platform rail uses a reserved hint value that cannot collide with a tenant
+database name, and resolves against master instead of opening a tenant engine.
 
 Callbacks always return HTTP 200 with Safaricom's expected acknowledgement body,
 including when we reject the content. Returning a 4xx makes Safaricom retry a
