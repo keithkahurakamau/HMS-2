@@ -31,6 +31,7 @@ import app.routes.clinical_extras as clinical_extras_module
 import app.routes.clinical_files as clinical_files_module
 import app.routes.laboratory as laboratory_module
 import app.routes.pharmacy as pharmacy_module
+import app.routes.pharmacy_starter_catalogue as pharmacy_starter_catalogue_module
 import app.routes.inventory as inventory_module
 import app.routes.wards as wards_module
 import app.routes.billing as billing_module
@@ -338,6 +339,7 @@ app.include_router(clinical_extras_module.router)
 app.include_router(clinical_files_module.router)
 app.include_router(laboratory_module.router)
 app.include_router(pharmacy_module.router)
+app.include_router(pharmacy_starter_catalogue_module.router)
 app.include_router(inventory_module.router)
 app.include_router(wards_module.router)
 app.include_router(billing_module.router)

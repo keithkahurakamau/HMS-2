@@ -187,6 +187,20 @@ def is_module_enabled(flags_raw: Optional[str], module_key: str) -> bool:
     return module_key in set(resolve_enabled_modules(flags_raw))
 
 
+def is_feature_flag_enabled(flags_raw: Optional[str], key: str) -> bool:
+    """Check an arbitrary boolean flag on ``Tenant.feature_flags`` that
+    isn't a full module (no URL-prefix gating, no default-enabled state,
+    no entry in MODULES). Absent means off: unlike a module, there's no
+    "default_enabled" fallback here, since these flags gate a sub-feature
+    of a module the tenant already has, not a whole module the middleware
+    already blocks by default.
+
+    Used for operator-controlled per-hospital toggles that don't warrant a
+    full module (e.g. ``pharmacy_starter_catalogue``).
+    """
+    return bool(_parse_flags(flags_raw).get(key, False))
+
+
 # Tenant entitlement lookup, cached briefly so the gate middleware doesn't
 # hammer the master DB on every request. Cache by tenant db_name; values are
 # the raw feature_flags JSON string (or empty string for "no flags row").
