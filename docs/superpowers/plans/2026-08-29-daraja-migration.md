@@ -1307,3 +1307,109 @@ grep -rn "—" backend/app/services/daraja backend/app/routes/mpesa* frontend/sr
 ```
 
 This branch touches `backend/app/models/**` and `backend/alembic/**`, so `migrate-all-tenants` runs and is a required check. Open the PR against `development`.
+
+---
+
+## Task 14: Per-department tills, and safe concurrency on one till
+
+**Runs immediately after Task 5, BEFORE Task 6.** Tasks 6, 7, 9 and 11 all consume the config-resolution seam and the transaction-to-till link this task establishes. Doing it later means reworking each of them.
+
+**Spec:** the sections "Per-department tills" and "Many terminals, one till" in `docs/superpowers/specs/2026-08-29-daraja-migration-design.md`. Read both before starting.
+
+**Files:**
+- Create: `backend/alembic/versions/f2a3b4c5d6e7_department_tills.py` (a NEW revision on top of `e1f2a3b4c5d6`, NOT an amendment: `e1f2a3b4c5d6` has been reviewed twice against three tenant-database shapes and reopening it risks verified work)
+- Modify: `backend/app/models/mpesa.py`, `backend/app/services/daraja/stk.py`, `backend/app/routes/mpesa_payment.py` (if it exists yet)
+- Test: `backend/tests/daraja/test_department_tills.py`, `backend/tests/daraja/test_concurrency.py`
+
+**Interfaces:**
+- Consumes: `config_for(db, *, department_id=None)` from Task 5, `MpesaConfig`, `MpesaTransaction`.
+- Produces: `config_for` with real department resolution; `MpesaTransaction.mpesa_config_id`.
+
+- [ ] **Step 1: Schema**
+
+On `MpesaConfig`:
+```python
+department_id = Column(
+    Integer,
+    ForeignKey("departments.department_id", ondelete="SET NULL"),
+    nullable=True, index=True,
+)
+```
+NULL means the hospital-wide default.
+
+Two partial unique indexes, because Postgres treats NULLs as distinct so a plain unique index will NOT stop two default rows:
+```sql
+CREATE UNIQUE INDEX uq_mpesa_configs_department ON mpesa_configs (department_id)
+    WHERE department_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_mpesa_configs_default ON mpesa_configs ((department_id IS NULL))
+    WHERE department_id IS NULL;
+```
+
+On `MpesaTransaction`:
+```python
+mpesa_config_id = Column(Integer, ForeignKey("mpesa_configs.id"), index=True, nullable=True)
+```
+Which till took the money. Without it a refund cannot know which till to pay back from, and reconciliation cannot tell two tills apart.
+
+The migration must backfill: every existing `mpesa_configs` row becomes the default (`department_id` stays NULL), and existing transactions point at it. Any tenant with more than one existing config row is a state that cannot occur today (the table was singleton by construction), so assert it rather than guessing: fail the migration loudly with the tenant name if found.
+
+- [ ] **Step 2: Real resolution in `config_for`**
+
+```python
+def config_for(db: Session, *, department_id: int | None = None) -> MpesaConfig:
+    """The till that should take this payment.
+
+    A department's own till when it has one and it is active, otherwise the
+    hospital-wide default. The fallback is what lets a hospital start with one
+    till and split departments out later without a migration per department.
+    """
+```
+Resolution order: the department's active row, then the default row, then raise the existing "not configured" HTTPException. An INACTIVE department row falls back to the default rather than failing: a department that switches its till off should keep collecting, not stop collecting.
+
+- [ ] **Step 3: Concurrency guard, the partial unique index**
+
+```sql
+CREATE UNIQUE INDEX uq_mpesa_txn_one_pending_per_invoice ON mpesa_transactions (invoice_id)
+    WHERE status = 'Pending' AND invoice_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_mpesa_txn_one_pending_per_dispense ON mpesa_transactions (dispense_id)
+    WHERE status = 'Pending' AND dispense_id IS NOT NULL;
+```
+
+In `initiate_stk_push`, catch the `IntegrityError` from that index and return the EXISTING pending transaction rather than raising. A second terminal pushing the same invoice must be told "a prompt is already on its way", not handed an error, and must not cause a second prompt on the patient's handset.
+
+Do the insert-and-catch rather than a check-then-insert: a check-then-insert has a race between the check and the insert, which is the precise failure this task exists to close.
+
+- [ ] **Step 4: Wrap STK initiation in the EXISTING idempotency mechanism**
+
+Use `app/core/idempotency.py` and `IdempotencyKey`. Do NOT build a second mechanism, and do NOT add an `idempotency_key` column to `mpesa_transactions`.
+
+Read `app/core/idempotency.py` first and follow how existing endpoints use it. The scope is (user_id, endpoint, key) with a SHA-256 fingerprint of the body, and reusing a key with a different body returns 409 rather than a wrong cached answer. That per-user scope is correct: two different cashiers pressing their own buttons are two genuine actions, not one retried.
+
+- [ ] **Step 5: Tests, and prove the concurrency ones**
+
+```
+test_department_with_its_own_till_uses_it
+test_department_without_a_till_falls_back_to_the_hospital_default
+test_inactive_department_till_falls_back_rather_than_failing
+test_no_config_at_all_raises_not_configured
+test_two_default_rows_are_rejected_by_the_database
+test_two_configs_for_one_department_are_rejected_by_the_database
+test_transaction_records_which_till_took_the_money
+
+test_two_terminals_pushing_the_same_invoice_produce_one_pending_transaction
+test_the_second_terminal_receives_the_existing_transaction_not_an_error
+test_a_stale_pending_transaction_does_not_block_a_genuine_retry
+test_repeated_submit_with_the_same_idempotency_key_pushes_once
+test_same_idempotency_key_with_a_different_body_returns_409
+test_two_different_cashiers_are_separate_idempotency_scopes
+```
+
+The two-terminal test must be GENUINELY concurrent: two threads, two separate database sessions and connections, and a `threading.Barrier` so both reach the insert together. Then prove it: drop the partial unique index, confirm the test fails with two pending rows, restore it, confirm it passes. Report that evidence verbatim.
+
+A sequential test here proves nothing, because the bug only exists when two inserts overlap. This project has already shipped one concurrency test that passed against its own bug, and caught it only because a reviewer reverted the implementation.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git commit -m "feat(daraja): per-department tills with a hospital default, and one pending push per invoice"
+```
