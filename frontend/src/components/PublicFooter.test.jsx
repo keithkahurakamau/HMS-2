@@ -5,10 +5,13 @@ import { renderWithProviders } from '../test/renderWithProviders';
 import PublicFooter, { PARENT_COMPANY } from './PublicFooter';
 
 describe('PublicFooter', () => {
-    it('attributes MediFleet to its parent company', () => {
+    it('attributes MediFleet to its parent company, and links to it', () => {
         renderWithProviders(<PublicFooter />);
         expect(screen.getByText(/A product of/i)).toBeInTheDocument();
-        expect(screen.getByText(PARENT_COMPANY)).toBeInTheDocument();
+        const link = screen.getByRole('link', { name: PARENT_COMPANY });
+        expect(link).toHaveAttribute('href', 'https://www.novahabitat.tech');
+        // External target needs noopener, or the new tab can reach window.opener.
+        expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
     });
 
     it('still carries the MediFleet copyright line', () => {
