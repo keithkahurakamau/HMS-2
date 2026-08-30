@@ -27,8 +27,11 @@ import logging
 import os
 import threading
 import uuid
-from typing import Dict, List, Optional
+from contextlib import contextmanager
+from typing import Dict, Iterator, List, Optional
 
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.inventory import InventoryItem
@@ -48,6 +51,76 @@ _ADOPTED_CATEGORY = "Drug"
 
 _lock = threading.Lock()
 _cache: Optional[List[str]] = None
+
+# Arbitrary but fixed: pg_advisory_lock keys share a 64-bit namespace that is
+# scoped to the current Postgres database (this codebase is database-per-
+# tenant, so this key only ever contends with itself within one hospital's
+# own database). Kept distinct from BILLING_LOCK_KEY in
+# app.services.subscription_billing so the two features never contend with
+# each other by accident. Must stay unique to this lock and never be reused.
+_ADOPT_LOCK_KEY = 7825101
+
+# Random component of a generated item_code: 12 hex characters is 2**48
+# possibilities, wide enough that a collision inside one adopt batch is
+# effectively impossible while still handled gracefully below if it ever
+# happens (see _MAX_ITEM_CODE_ATTEMPTS).
+_ITEM_CODE_RANDOM_HEX_CHARS = 12
+_MAX_ITEM_CODE_ATTEMPTS = 5
+
+
+@contextmanager
+def _adopt_lock(db: Session) -> Iterator[None]:
+    """Serialise adopt_into_inventory calls within one tenant database with
+    a Postgres advisory lock.
+
+    InventoryItem.name has no unique constraint (only item_code, a
+    generated code unrelated to the product name, is unique), and adding
+    one is out of scope: this feature is deliberately schema-free (see the
+    module docstring). Without a lock, two overlapping adopt calls for the
+    same product, for example two staff clicking "Adopt all" moments apart,
+    can both read the "does not already exist" snapshot before either
+    commits, and both insert a row, breaking the documented never-duplicate
+    guarantee. A lock held for the whole call closes that window.
+
+    Mirrors billing_lock in app.services.subscription_billing: opens and
+    holds its OWN dedicated connection for the whole call rather than
+    locking on *db*. Locking on the request's pooled ORM session risks the
+    lock stranding on a connection returned to the pool the moment any
+    commit happens before the lock is released, silently disabling the
+    guarantee forever with no visible error. Here the dedicated
+    connection's transaction stays open (uncommitted) for the whole `with`
+    block, and closing the connection in `finally` releases the lock even
+    if the explicit unlock below never runs, because Postgres always drops
+    a session's advisory locks when its backend disconnects.
+
+    Unlike billing_lock's non-blocking pg_try_advisory_lock (where a busy
+    lock means "skip this run, the next cron tick will do it"), acquisition
+    here is the blocking pg_advisory_lock: a caller that finds the lock
+    held is a user waiting on a request, not a cron job, so it must wait
+    its turn and then still adopt correctly, seeing the first call's
+    now-committed rows, rather than silently doing nothing.
+    """
+    conn = db.get_bind().connect()
+    try:
+        conn.begin()
+        conn.execute(text("SELECT pg_advisory_lock(:key)"), {"key": _ADOPT_LOCK_KEY})
+        try:
+            yield
+        finally:
+            try:
+                conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": _ADOPT_LOCK_KEY})
+            except Exception:
+                logger.exception(
+                    "Explicit pg_advisory_unlock failed for the starter-catalogue "
+                    "adopt lock; closing the dedicated connection below still "
+                    "releases it."
+                )
+    finally:
+        conn.close()
+
+
+def _generate_item_code() -> str:
+    return f"STC-{uuid.uuid4().hex[:_ITEM_CODE_RANDOM_HEX_CHARS].upper()}"
 
 
 def normalize_name(name: str) -> str:
@@ -141,30 +214,63 @@ def adopt_into_inventory(db: Session, requested_names: Optional[List[str]] = Non
     if not ordered_keys:
         return {"created": 0, "skipped": 0, "created_items": [], "skipped_items": []}
 
-    existing_keys = {normalize_name(name) for (name,) in db.query(InventoryItem.name).all()}
-
     created_items: List[str] = []
     skipped_items: List[str] = []
-    for key in ordered_keys:
-        display_name = catalogue_by_key[key]
-        if key in existing_keys:
-            skipped_items.append(display_name)
-            continue
-        db.add(InventoryItem(
-            item_code=f"STC-{uuid.uuid4().hex[:6].upper()}",
-            name=display_name,
-            category=_ADOPTED_CATEGORY,
-            unit_cost=0,
-            unit_price=0,
-            reorder_threshold=10,
-            is_active=True,
-        ))
-        # Guard against duplicate names within the same adopt request (e.g.
-        # a caller passing the same name twice under different casing).
-        existing_keys.add(key)
-        created_items.append(display_name)
 
-    db.commit()
+    with _adopt_lock(db):
+        existing_keys = {normalize_name(name) for (name,) in db.query(InventoryItem.name).all()}
+
+        for key in ordered_keys:
+            display_name = catalogue_by_key[key]
+            if key in existing_keys:
+                skipped_items.append(display_name)
+                continue
+
+            # item_code is UNIQUE (see backend/app/models/inventory.py) but
+            # generated at random, so a collision is possible in principle.
+            # Insert inside a SAVEPOINT per attempt so a collision only
+            # discards this one insert, retrying with a fresh code, rather
+            # than raising IntegrityError up through db.commit() and
+            # aborting every other item already staged in this batch.
+            for attempt in range(1, _MAX_ITEM_CODE_ATTEMPTS + 1):
+                savepoint = db.begin_nested()
+                try:
+                    db.add(InventoryItem(
+                        item_code=_generate_item_code(),
+                        name=display_name,
+                        category=_ADOPTED_CATEGORY,
+                        unit_cost=0,
+                        unit_price=0,
+                        reorder_threshold=10,
+                        is_active=True,
+                    ))
+                    db.flush()
+                except IntegrityError:
+                    savepoint.rollback()
+                    logger.warning(
+                        "pharmacy_starter_catalogue: item_code collision adopting %r "
+                        "(attempt %d/%d), retrying with a new code.",
+                        display_name, attempt, _MAX_ITEM_CODE_ATTEMPTS,
+                    )
+                    continue
+                else:
+                    savepoint.commit()
+                    # Guard against duplicate names within the same adopt
+                    # request (e.g. a caller passing the same name twice
+                    # under different casing).
+                    existing_keys.add(key)
+                    created_items.append(display_name)
+                    break
+            else:
+                logger.error(
+                    "pharmacy_starter_catalogue: could not generate a unique item_code "
+                    "for %r after %d attempts; skipping it, rest of the batch continues.",
+                    display_name, _MAX_ITEM_CODE_ATTEMPTS,
+                )
+                skipped_items.append(display_name)
+
+        db.commit()
+
     return {
         "created": len(created_items),
         "skipped": len(skipped_items),

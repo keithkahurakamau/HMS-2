@@ -1,6 +1,11 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# Comfortably above any realistic catalogue size (the starter catalogue is a
+# short, curated list) while still bounding a malformed or hostile payload
+# from forcing an unbounded loop in adopt_into_inventory.
+MAX_ADOPT_NAMES = 1000
 
 
 class StarterCatalogueStatus(BaseModel):
@@ -21,7 +26,11 @@ class StarterCatalogueResponse(BaseModel):
 class StarterCatalogueAdoptRequest(BaseModel):
     # Product names to adopt, matched against the catalogue by normalised
     # name. Omit or send an empty list to adopt the entire catalogue.
-    names: Optional[List[str]] = None
+    names: Optional[List[str]] = Field(
+        default=None,
+        max_length=MAX_ADOPT_NAMES,
+        description=f"At most {MAX_ADOPT_NAMES} names per request.",
+    )
 
 
 class StarterCatalogueAdoptResponse(BaseModel):

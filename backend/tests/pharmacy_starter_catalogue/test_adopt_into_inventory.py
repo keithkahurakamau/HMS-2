@@ -7,9 +7,12 @@ tests don't depend on the contents of docs/seed/pharmacy-catalogue.csv.
 """
 from __future__ import annotations
 
+import threading
+import time
 from decimal import Decimal
 
 import pytest
+from sqlalchemy.orm import sessionmaker
 
 from app.models.inventory import InventoryItem
 from app.services import pharmacy_starter_catalogue as svc
@@ -89,6 +92,71 @@ class TestNeverOverwrites:
         assert reloaded.unit_price == Decimal("99.00")
         # No second row was created for the same product.
         assert db.query(InventoryItem).filter(InventoryItem.name == "Paracetamol 500mg").count() == 1
+
+
+class TestConcurrentIdempotency:
+    def test_two_overlapping_adopts_of_the_same_product_produce_exactly_one_row(self, db, engine, monkeypatch):
+        """Reproduces the time-of-check-to-time-of-use race directly: two
+        callers, each with their own DB session (an ORM Session isn't
+        thread-safe, so a real overlap needs two connections, not one
+        session shared across threads), call adopt_into_inventory for the
+        same single-item catalogue at effectively the same instant.
+
+        InventoryItem.name has no unique constraint, so without a lock
+        serialising the two calls, both can read the "does not exist yet"
+        snapshot before either has committed, and both insert a row.
+        _generate_item_code is monkeypatched to sleep well past the
+        barrier-synchronised start skew (microseconds vs 300ms) so this is
+        deterministic rather than a coin flip: with the fix, the second
+        caller's advisory lock acquisition blocks until the first caller's
+        entire read-check-insert-commit finishes, so it always observes the
+        first caller's committed row and always skips it.
+        """
+        monkeypatch.setattr(svc, "_cache", ["Vitamin C"])
+
+        original_generate = svc._generate_item_code
+
+        def slow_generate_item_code():
+            time.sleep(0.3)
+            return original_generate()
+
+        monkeypatch.setattr(svc, "_generate_item_code", slow_generate_item_code)
+
+        session_factory = sessionmaker(bind=engine)
+        barrier = threading.Barrier(2)
+        results: dict[str, dict] = {}
+        errors: list[BaseException] = []
+
+        def worker(name: str) -> None:
+            session = session_factory()
+            try:
+                barrier.wait(timeout=10)
+                results[name] = svc.adopt_into_inventory(session)
+            except BaseException as exc:  # noqa: BLE001 - surfaced via `errors` below
+                errors.append(exc)
+            finally:
+                session.close()
+
+        t1 = threading.Thread(target=worker, args=("first",))
+        t2 = threading.Thread(target=worker, args=("second",))
+        t1.start()
+        t2.start()
+        t1.join(timeout=15)
+        t2.join(timeout=15)
+
+        assert not t1.is_alive() and not t2.is_alive(), "worker thread did not finish in time"
+        assert not errors, errors
+
+        created_counts = sorted(r["created"] for r in results.values())
+        skipped_counts = sorted(r["skipped"] for r in results.values())
+        # One caller created it, the other found it already there. Which
+        # one wins the lock is unspecified and doesn't matter; that exactly
+        # one of each outcome happened is the guarantee under test.
+        assert created_counts == [0, 1]
+        assert skipped_counts == [0, 1]
+
+        rows = db.query(InventoryItem).filter(InventoryItem.name == "Vitamin C").all()
+        assert len(rows) == 1
 
 
 class TestSubsetSelection:

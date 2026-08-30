@@ -86,6 +86,19 @@ class TestFlagGating:
         assert r.json() == {"enabled": True}
 
     def test_status_disabled_without_a_tenant_header(self, client, monkeypatch):
+        """Proves only _flag_enabled's own defensive branch: with no
+        X-Tenant-ID it treats the tenant as unknown and reports
+        enabled=False, without calling get_tenant_flags_cached at all.
+
+        This does NOT prove the production behaviour for a request missing
+        the header end to end. The `client` fixture overrides
+        get_current_user, so the real auth dependency never runs here; in
+        production a request with no X-Tenant-ID is already rejected with
+        403 by get_current_user's tenant/token match (request_tenant_id !=
+        token_tenant_id) before this route body is ever reached. This test
+        only exercises the defensive branch in isolation, in case something
+        upstream ever changes and lets a headerless request through to it.
+        """
         _set_flag(monkeypatch, True)
         r = client.get("/api/pharmacy/starter-catalogue/status")
         assert r.status_code == 200, r.text
