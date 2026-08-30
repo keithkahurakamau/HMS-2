@@ -303,6 +303,60 @@ accordingly.
 It is the correct code for a refund and produces the right message on the
 recipient's handset.
 
+### The event log, and pages to verify against
+
+Every Daraja interaction is recorded, whatever its outcome: a successful STK push,
+a customer who cancelled, a callback rejected for a mismatched amount, a refund
+that timed out, a request Safaricom refused. Success, failure and error all land in
+the same place, because the question a human actually asks is "what happened to
+this payment", and that question cannot be answered by a log that only kept the
+failures.
+
+**Why this is not just logging.** Application logs are ephemeral, unstructured, and
+invisible to the hospital staff who need them. When a patient says they paid and
+the invoice says otherwise, a cashier needs to see the receipt number, the
+timestamp, the amount Safaricom reported, and the reason it was not settled,
+without an engineer reading a log aggregator. That is a product surface, not an
+operational one.
+
+**Shape.** An `mpesa_events` row per interaction, in the tenant database, carrying:
+the flow (STK push, STK query, C2B validation, C2B confirmation, B2C request, B2C
+result, B2C timeout, transaction status, balance, URL registration), the direction
+(did we call Safaricom, or did Safaricom call us), the outcome, Safaricom's own
+`ResultCode` and `ResultDesc` verbatim, the HTTP status, how long it took, and the
+correlation handles that let a human join it up: the transaction or refund it
+belongs to, the `CheckoutRequestID`, the `ConversationID`, the receipt number, and
+which till took the money.
+
+Both payloads are stored, redacted. Storing the actual request and response is what
+makes the page worth having: "Safaricom rejected it" is not diagnosable, and
+"Safaricom returned `Bad Request - Invalid Amount` for `Amount: 0`" is.
+
+**Redaction is not optional and not best-effort.** The STK `Password`, the B2C
+`SecurityCredential`, the consumer secret, the passkey, and the callback token must
+never reach this table. It is read by hospital staff and rendered in a browser, so
+a secret stored here is a secret disclosed. The redaction runs on the way IN, so a
+secret is never written even if the page is later changed. A denylist of key names
+is the wrong shape here: use an allowlist of fields known to be safe, because the
+failure mode of a forgotten denylist entry is a leaked credential.
+
+Phone numbers are personal data and belong to a patient, so the list view masks
+them and the full value appears only in the detail view, behind the same permission
+that already governs billing.
+
+**Pages.** A hospital-facing view under the M-Pesa area: filter by outcome, flow,
+till, date, and search by receipt or phone; a detail view showing everything above.
+An operator-facing view in the superadmin console spanning tenants, for answering
+"is this one hospital or all of them". The failure states get first-class treatment
+rather than a generic error string: a quarantined callback shows the amount claimed
+against the amount requested side by side, because that is the exact comparison a
+human needs to make.
+
+**Growth.** This table grows with transaction volume and is append-only. It carries
+an index on time and on the correlation handles, the list view is paginated, and
+old rows are prunable on a retention window the operator sets. An unbounded log
+that nobody can query is a liability rather than a feature.
+
 ### Reconciliation
 
 A scheduled job, reusing the advisory-lock pattern from the billing cron:

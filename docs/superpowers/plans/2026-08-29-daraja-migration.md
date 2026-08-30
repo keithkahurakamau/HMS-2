@@ -1413,3 +1413,76 @@ A sequential test here proves nothing, because the bug only exists when two inse
 ```bash
 git commit -m "feat(daraja): per-department tills with a hospital default, and one pending push per invoice"
 ```
+
+---
+
+## Task 15: The M-Pesa event log and its verification pages
+
+**Runs after Task 8 (reconciliation) and before Task 11 (frontend).** Every earlier flow must be emitting events before the pages that read them are built, otherwise the pages are written against a table nobody populates.
+
+**Spec:** the section "The event log, and pages to verify against" in `docs/superpowers/specs/2026-08-29-daraja-migration-design.md`.
+
+**Files:**
+- Create: `backend/app/models/mpesa_events.py` (or extend `models/mpesa.py` if it stays under ~500 lines), `backend/app/services/daraja/events.py`, `backend/app/routes/mpesa_events.py`, `frontend/src/pages/mpesa/EventLog.jsx`, `frontend/src/pages/superadmin/PlatformMpesaEvents.jsx`
+- Create: a new alembic revision on top of `f2a3b4c5d6e7`
+- Modify: every `backend/app/services/daraja/*.py` flow module, to emit
+- Test: `backend/tests/daraja/test_events.py`, `frontend/src/pages/mpesa/EventLog.test.jsx`
+
+- [ ] **Step 1: The table**
+
+`mpesa_events`, tenant database, so `mpesa_events` goes in the migrate script import block (these are TENANT tables, the same rule as `mpesa`, the opposite of `platform_mpesa`).
+
+Columns: `id`, `created_at` (indexed), `flow`, `direction` (`outbound` or `inbound`), `outcome` (`success`, `failure`, `error`, `quarantined`, `rejected`), `http_status`, `daraja_result_code`, `daraja_result_desc`, `duration_ms`, `error_detail`, and the correlation handles `mpesa_transaction_id`, `mpesa_refund_id`, `mpesa_config_id`, `checkout_request_id`, `conversation_id`, `receipt_number`, each indexed. Plus `request_payload` and `response_payload` as redacted JSON text.
+
+- [ ] **Step 2: Redaction, written and tested BEFORE anything emits**
+
+```python
+def redact_payload(payload: dict) -> dict:
+    """Keep only fields known to be safe, drop everything else.
+
+    An allowlist, not a denylist. A forgotten denylist entry leaks a
+    credential into a table that hospital staff read in a browser; a
+    forgotten allowlist entry merely omits a field from a diagnostic page.
+    """
+```
+
+The values that must NEVER be stored: the STK `Password`, the B2C `SecurityCredential`, `ConsumerKey`, `ConsumerSecret`, the passkey, and the callback token in any form.
+
+Write the redaction test first, and include a test that feeds a payload containing every one of those keys and asserts none of their VALUES appears anywhere in the serialised output, including nested inside another structure. Assert on the values, not on the key names: a key renamed by Safaricom would slip a value-blind test.
+
+- [ ] **Step 3: One emit helper, called from every flow**
+
+```python
+def record_event(db, *, flow, direction, outcome, ...) -> MpesaEvent:
+```
+
+**Emitting must never break a payment.** Wrap the call so a failure to write an event is logged and swallowed, exactly as `settle_invoice_match` already does for its notification. A diagnostic table that can abort a settlement is worse than no diagnostic table.
+
+Call it from every flow: STK push and its callback, STK query, C2B validation and confirmation, B2C request, result and timeout, transaction status, balance, URL registration, and the reconciliation job.
+
+- [ ] **Step 4: The read API**
+
+`GET /api/mpesa/events` with filters (outcome, flow, till, date range) and search (receipt, phone), paginated, and `GET /api/mpesa/events/{id}` for the detail. Both behind the existing billing permission.
+
+**The list view masks phone numbers; the detail view shows them in full.** They are patient personal data.
+
+A superadmin equivalent spanning tenants, behind `require_superadmin`.
+
+- [ ] **Step 5: The pages**
+
+A hospital-facing event log under the M-Pesa area, and an operator-facing one in the superadmin console. Filters, pagination, a detail drawer showing every stored field including both payloads.
+
+Give the failure states first-class treatment rather than a generic error string. In particular, a `quarantined` event shows **the amount claimed against the amount requested, side by side**: that is the exact comparison a human needs, and burying it in a JSON blob wastes the page.
+
+Follow the existing design system: `.table-clean`, `.chip` for outcomes, `.tnum` for money and codes, and the existing drawer focus-management pattern from `frontend/src/pages/superadmin/receivables/TenantDrawer.jsx` (focus in on open, a live-queried Tab trap, restore to trigger on close).
+
+- [ ] **Step 6: Retention**
+
+A prune command removing events older than a configurable window, and a note in the runbook. Append-only tables that nobody prunes become the largest table in the database.
+
+- [ ] **Step 7: Verify and commit**
+
+```bash
+cd backend && REDIS_URL="" ./venv/bin/python -m pytest tests/daraja -q
+cd ../frontend && npm run build && npx vitest run --no-file-parallelism && npm run lint
+```
