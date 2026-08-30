@@ -37,6 +37,18 @@ const showApiError = (err, fallback) => {
 // Pure helper hoisted to module scope (no component state).
 const tenantNumericId = (t) => String(t.id || t.tenant_id || '').replace(/^tenant_/, '');
 
+// Feature flags that get their own dedicated toggle below (rather than
+// falling into the free-text "Custom flags" escape hatch) but aren't full
+// modules: they don't gate a URL prefix, so they have no entry in the
+// module catalogue the backend serves.
+const DEDICATED_FEATURE_FLAGS = [
+    {
+        key: 'pharmacy_starter_catalogue',
+        label: 'Pharmacy starter catalogue',
+        description: 'Lets the hospital browse and adopt a ready-made pharmacy product list into its own inventory.',
+    },
+];
+
 export default function TenantsManager() {
     const [tenants, setTenants] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -543,6 +555,55 @@ export default function TenantsManager() {
                                             })()}
                                         </>
                                     )}
+
+                                    {/* Feature toggles: per-hospital switches for sub-features of a
+                                        module the tenant already has, rather than a purchasable module
+                                        in their own right. Shown even when the module catalogue failed
+                                        to load, since these don't depend on it. */}
+                                    <div className="pt-1">
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-ink-400 mb-1.5">Feature toggles</p>
+                                        <div className="space-y-1.5">
+                                            {DEDICATED_FEATURE_FLAGS.map((f) => {
+                                                const flags = editForm.feature_flags || {};
+                                                const enabled = !!flags[f.key];
+                                                return (
+                                                    <label
+                                                        key={f.key}
+                                                        htmlFor={`flag-${f.key}`}
+                                                        className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer transition-colors border ${
+                                                            enabled
+                                                                ? 'bg-brand-50/60 dark:bg-brand-500/10 border-brand-200 dark:border-brand-500/20 hover:bg-brand-50 dark:hover:bg-brand-500/20'
+                                                                : 'bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-800 hover:bg-ink-50 dark:hover:bg-ink-800/50'
+                                                        }`}
+                                                    >
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-sm font-medium text-ink-900 dark:text-white truncate">{f.label}</p>
+                                                                {enabled && (
+                                                                    <span className="text-[10px] font-semibold text-accent-700 dark:text-accent-300 uppercase tracking-wider shrink-0">On</span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs text-ink-500 dark:text-ink-400 truncate mt-0.5">{f.description}</p>
+                                                        </div>
+                                                        <span className="relative shrink-0 inline-flex items-center">
+                                                            <input
+                                                                id={`flag-${f.key}`}
+                                                                type="checkbox"
+                                                                aria-label={`Enable ${f.label}`}
+                                                                checked={enabled}
+                                                                onChange={(e) => setEditForm({
+                                                                    ...editForm,
+                                                                    feature_flags: { ...flags, [f.key]: e.target.checked },
+                                                                })}
+                                                                className="sr-only peer"
+                                                            />
+                                                            <span className="w-9 h-5 bg-ink-300 rounded-full peer peer-checked:bg-accent-500 transition relative after:absolute after:left-0.5 after:top-0.5 after:bg-white after:rounded-full after:w-4 after:h-4 after:transition peer-checked:after:translate-x-4" />
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -558,7 +619,10 @@ export default function TenantsManager() {
                                 <summary className="cursor-pointer text-2xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-[0.14em]">Custom flags (advanced)</summary>
                                 <div className="mt-3 space-y-2">
                                     {(() => {
-                                        const known = new Set(moduleCatalogue.map((m) => m.key));
+                                        const known = new Set([
+                                            ...moduleCatalogue.map((m) => m.key),
+                                            ...DEDICATED_FEATURE_FLAGS.map((f) => f.key),
+                                        ]);
                                         const customs = Object.entries(editForm.feature_flags || {}).filter(([k]) => !known.has(k));
                                         if (customs.length === 0) {
                                             return <p className="text-xs text-ink-500 dark:text-ink-400 italic">No custom flags. Use the field below to add one.</p>;
