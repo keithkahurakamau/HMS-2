@@ -6,7 +6,7 @@ provider change should not rename tables a third time.
 """
 from sqlalchemy import (
     Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer,
-    Numeric, String, Text,
+    Numeric, String, Text, text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -74,6 +74,17 @@ class MpesaConfig(Base):
     transaction_desc = Column(String(100), default="Hospital Bill Payment")
     is_active = Column(Boolean, default=True)
 
+    # NULL means the hospital-wide default. A department with its own row
+    # overrides the default; a department without one falls back to it.
+    # See config_for() in app/services/daraja/stk.py for the resolution
+    # order and why an inactive department row also falls back rather
+    # than failing.
+    department_id = Column(
+        Integer,
+        ForeignKey("departments.department_id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+
     c2b_urls_registered_at = Column(DateTime(timezone=True), nullable=True)
     last_test_at = Column(DateTime(timezone=True), nullable=True)
     last_test_status = Column(String(40), nullable=True)
@@ -94,6 +105,20 @@ class MpesaConfig(Base):
             "(callback_token_encrypted IS NULL) = (callback_token_lookup IS NULL)",
             name="ck_mpesa_configs_callback_token_pair",
         ),
+        # Two partial unique indexes, not one: Postgres treats NULL as
+        # distinct in a plain unique index, so a single index on
+        # department_id would happily allow two default (NULL) rows.
+        # Enforced in Postgres via the alembic revision that introduced
+        # this column; declared here for create_all parity on fresh
+        # bootstraps.
+        Index(
+            "uq_mpesa_configs_department", "department_id",
+            unique=True, postgresql_where=text("department_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_mpesa_configs_default", text("(department_id IS NULL)"),
+            unique=True, postgresql_where=text("department_id IS NULL"),
+        ),
     )
 
 
@@ -104,6 +129,10 @@ class MpesaTransaction(Base):
     id = Column(Integer, primary_key=True)
     invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), index=True, nullable=True)
     dispense_id = Column(Integer, ForeignKey("dispense_logs.dispense_id"), index=True, nullable=True)
+
+    # Which till took the money. Without this a refund cannot know which
+    # till to pay back from, and reconciliation cannot tell two tills apart.
+    mpesa_config_id = Column(Integer, ForeignKey("mpesa_configs.id"), index=True, nullable=True)
 
     phone_number = Column(String(20), index=True, nullable=False)
     # The amount WE requested. The settlement cross-check compares the
@@ -133,6 +162,23 @@ class MpesaTransaction(Base):
 
     __table_args__ = (
         Index("ix_mpesa_txn_status_date", "status", "transaction_date"),
+        # At most one Pending push per invoice, and per dispense, across
+        # every gunicorn worker and every terminal. This is the guard that
+        # stops two cashiers on two machines both sending an STK prompt for
+        # the same invoice: app/services/daraja/stk.py inserts and catches
+        # the conflict rather than checking then inserting. Enforced in
+        # Postgres via the alembic revision that introduced this; declared
+        # here for create_all parity on fresh bootstraps.
+        Index(
+            "uq_mpesa_txn_one_pending_per_invoice", "invoice_id",
+            unique=True,
+            postgresql_where=text("status = 'Pending' AND invoice_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_mpesa_txn_one_pending_per_dispense", "dispense_id",
+            unique=True,
+            postgresql_where=text("status = 'Pending' AND dispense_id IS NOT NULL"),
+        ),
     )
 
 
