@@ -209,11 +209,24 @@ def test_a_raising_settlement_leaves_the_transaction_pending_and_retryable(db, m
     transaction permanently stuck at Success with a receipt, an unpaid
     invoice, and nobody alerted.
 
+    Deliberately does NOT call db.rollback() itself after the raise: that
+    would only prove the data is fine once someone else cleans up, not that
+    apply_stk_callback guarantees the cleanup. It must roll back on its own,
+    both to make the single-commit promise true and to release the
+    pg_advisory_xact_lock taken on the receipt (that lock is
+    transaction-scoped, so only ending the transaction, whether by commit
+    or rollback, frees it; a lock left on an open, never-rolled-back
+    transaction sitting on a pooled connection is exactly the shape of bug
+    that has silently disabled a billing feature on another branch of this
+    project before). This test checks pg_locks directly for that, not just
+    the row data.
+
     Simulated by making the ledger post itself raise, the same shape as the
     real (separately tracked) accounting_posting.py bug: with a split
     commit that bug is terminal; with a single commit it is a failed
     delivery that gets retried."""
     import app.services.accounting_posting as accounting_posting
+    from sqlalchemy import text
 
     invoice = make_invoice(db, total_amount=Decimal("500.00"))
     txn = make_pending_transaction(
@@ -221,9 +234,9 @@ def test_a_raising_settlement_leaves_the_transaction_pending_and_retryable(db, m
         checkout_request_id="ws_CO_raises",
     )
     # Commit the setup first: in production this row was already committed
-    # by a prior, separate request (initiate_stk_push's own commit). The
-    # rollback below must only undo what THIS callback delivery did, not
-    # the fact that we ever pushed the STK prompt at all.
+    # by a prior, separate request (initiate_stk_push's own commit). Only
+    # what happens after this point belongs to the callback delivery under
+    # test.
     db.commit()
     payload = stk_callback_payload(
         checkout_request_id=txn.checkout_request_id,
@@ -239,7 +252,20 @@ def test_a_raising_settlement_leaves_the_transaction_pending_and_retryable(db, m
     with pytest.raises(RuntimeError):
         apply_stk_callback(db, payload)
 
-    db.rollback()
+    # No db.rollback() here. If apply_stk_callback did not roll back on its
+    # own, either of the two checks below would show it: the row would
+    # still read whatever this session's uncommitted, un-rolled-back
+    # transaction left it as (Success, in the broken version of this fix),
+    # and/or the advisory lock would still be held.
+    # Scoped to the current database (advisory locks are per-database, and
+    # pg_locks.database records which one), so this is not a false positive
+    # from some unrelated connection elsewhere on the same Postgres
+    # instance holding an advisory lock of its own.
+    held_locks = db.execute(text(
+        "SELECT count(*) FROM pg_locks l JOIN pg_database d ON l.database = d.oid "
+        "WHERE l.locktype = 'advisory' AND d.datname = current_database()"
+    )).scalar()
+    assert held_locks == 0, "advisory lock was not released after the exception"
 
     reloaded = (
         db.query(MpesaTransaction)

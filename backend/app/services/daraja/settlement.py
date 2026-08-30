@@ -46,6 +46,16 @@ Order of operations in apply_stk_callback, which IS the safety property:
      before settlement, would strand the transaction as a permanent,
      un-retryable "Success but never settled" row the moment settlement
      failed for any reason.
+
+If anything from step 7 onward raises, apply_stk_callback rolls back and
+re-raises before the exception leaves the function. This is not optional
+tidiness: the advisory lock from step 7 is transaction-scoped, so only
+ending the transaction (commit or rollback) releases it, and the
+single-commit guarantee in step 8 is only true if a failed attempt is
+actually rolled back rather than left open on whatever connection the
+caller's session happens to be holding. apply_stk_callback does not own
+that session, so it never closes it, only ends its own transaction and
+lets the exception propagate.
 """
 from __future__ import annotations
 
@@ -207,43 +217,68 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
     lock_id = int(hashlib.sha1(receipt_number.encode("utf-8")).hexdigest()[:15], 16)
     db.execute(text("SELECT pg_advisory_xact_lock(:lid)"), {"lid": lock_id})
 
-    replay = (
-        db.query(MpesaTransaction)
-        .filter(
-            MpesaTransaction.receipt_number == receipt_number,
-            MpesaTransaction.status == "Success",
-        )
-        .first()
-    )
-    if replay is not None:
-        # Safaricom retries; a retry must never double-credit.
-        logger.info("Daraja STK callback replay for an already-settled receipt; no-op")
-        db.commit()  # releases the advisory lock cleanly
-        return replay
-
-    txn.receipt_number = receipt_number
-    txn.verified_at = datetime.now(timezone.utc)
-    txn.verification_source = "stk_callback"
-    txn.status = "Success"
-
-    if txn.invoice_id:
-        invoice = (
-            db.query(Invoice)
-            .filter(Invoice.invoice_id == txn.invoice_id)
-            .with_for_update()
+    # Everything from here on holds that advisory lock. pg_advisory_xact_lock
+    # is transaction-scoped: only a commit or a rollback ends the current
+    # transaction and frees it. A bare try/finally would not be enough,
+    # because the exception still needs to reach the caller (see below), so
+    # this is try/except-rollback-reraise rather than try/finally.
+    try:
+        replay = (
+            db.query(MpesaTransaction)
+            .filter(
+                MpesaTransaction.receipt_number == receipt_number,
+                MpesaTransaction.status == "Success",
+            )
             .first()
         )
-        if invoice is not None:
-            settle_invoice_match(db, invoice=invoice, txn=txn, match_basis="stk_callback")
+        if replay is not None:
+            # Safaricom retries; a retry must never double-credit.
+            logger.info("Daraja STK callback replay for an already-settled receipt; no-op")
+            db.commit()  # releases the advisory lock cleanly
+            return replay
 
-    # ONE commit for the whole unit (status, receipt, and settlement
-    # together). If settle_invoice_match raises, nothing above is
-    # persisted: the transaction is still Pending on disk, so Safaricom's
-    # retry finds a live row and can settle cleanly, instead of finding a
-    # transaction already stuck at Success with no Payment and no invoice
-    # update to show for it.
-    db.commit()
-    return txn
+        txn.receipt_number = receipt_number
+        txn.verified_at = datetime.now(timezone.utc)
+        txn.verification_source = "stk_callback"
+        txn.status = "Success"
+
+        if txn.invoice_id:
+            invoice = (
+                db.query(Invoice)
+                .filter(Invoice.invoice_id == txn.invoice_id)
+                .with_for_update()
+                .first()
+            )
+            if invoice is not None:
+                settle_invoice_match(db, invoice=invoice, txn=txn, match_basis="stk_callback")
+
+        # ONE commit for the whole unit (status, receipt, and settlement
+        # together). If settle_invoice_match raises, nothing above is
+        # persisted: the transaction is still Pending on disk, so Safaricom's
+        # retry finds a live row and can settle cleanly, instead of finding a
+        # transaction already stuck at Success with no Payment and no invoice
+        # update to show for it.
+        db.commit()
+        return txn
+    except Exception:
+        # A mid-settlement exception (settle_invoice_match, or
+        # post_from_event inside it) must not leave the transaction open
+        # with the advisory lock still held. db.rollback() does two things
+        # at once here: it undoes any uncommitted writes above, which is
+        # what makes the single-commit guarantee above actually true (the
+        # transaction stays Pending on disk, not just "would have, if
+        # someone eventually rolled back"), and it ends the transaction,
+        # which is the only thing that frees a transaction-scoped advisory
+        # lock. Re-raise: the caller must still learn the settlement
+        # failed, never swallow this.
+        #
+        # Deliberately NOT db.close() here. apply_stk_callback is handed a
+        # session, it does not own one: closing it would be a second,
+        # different bug (a caller that still holds a reference to this
+        # session, or a route middleware that closes it again). Session
+        # lifecycle stays with whoever opened it.
+        db.rollback()
+        raise
 
 
 # ─── Invoice settlement ─────────────────────────────────────────────────────
