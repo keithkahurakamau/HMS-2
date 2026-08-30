@@ -327,6 +327,68 @@ MASTER_DB_PATCHES: list[str] = [
     """,
     "CREATE INDEX IF NOT EXISTS ix_dunning_invoice ON dunning_events (invoice_id);",
     "CREATE INDEX IF NOT EXISTS ix_dunning_tenant   ON dunning_events (tenant_id);",
+    # Daraja migration, task 3 — platform-level M-Pesa (subscription rail).
+    # These two tables live in the MASTER DB only, the same way
+    # platform_payhero_configs/platform_payhero_transactions above do: the
+    # model file (app/models/platform_mpesa.py) is deliberately absent from
+    # the `from app.models import (...)` block up top, because that block
+    # feeds an unfiltered Base.metadata.create_all() run against every
+    # tenant engine. Listing it there would create the operator's own
+    # billing tables inside every hospital database. Every statement below
+    # is idempotent, because MASTER_DB_PATCHES runs on every deploy.
+    """
+    CREATE TABLE IF NOT EXISTS platform_mpesa_configs (
+        id                           SERIAL PRIMARY KEY,
+        shortcode                    VARCHAR(20)  NOT NULL DEFAULT '',
+        shortcode_type               VARCHAR(20)  NOT NULL DEFAULT 'paybill',
+        environment                  VARCHAR(20)  NOT NULL DEFAULT 'sandbox',
+        consumer_key_encrypted       VARCHAR(255),
+        consumer_secret_encrypted    VARCHAR(255),
+        passkey_encrypted            VARCHAR(255),
+        initiator_name               VARCHAR(80),
+        initiator_password_encrypted VARCHAR(255),
+        callback_token_encrypted     VARCHAR(255),
+        callback_token_lookup        VARCHAR(64) UNIQUE,
+        callback_token_rotated_at    TIMESTAMPTZ,
+        account_reference            VARCHAR(50)  DEFAULT 'MEDIFLEET',
+        transaction_desc             VARCHAR(100) DEFAULT 'MediFleet Subscription',
+        is_active                    BOOLEAN      DEFAULT TRUE,
+        last_test_at                 TIMESTAMPTZ,
+        last_test_status             VARCHAR(40),
+        last_test_message            TEXT,
+        created_at                   TIMESTAMPTZ  DEFAULT now(),
+        updated_at                   TIMESTAMPTZ,
+        updated_by                   INTEGER REFERENCES superadmins(admin_id),
+        CONSTRAINT ck_platform_mpesa_configs_callback_token_pair
+            CHECK ((callback_token_encrypted IS NULL) = (callback_token_lookup IS NULL))
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS platform_mpesa_transactions (
+        id                       SERIAL PRIMARY KEY,
+        tenant_id                INTEGER NOT NULL REFERENCES tenants(tenant_id),
+        subscription_invoice_id  INTEGER REFERENCES subscription_invoices(id),
+        phone_number             VARCHAR(20)  NOT NULL,
+        amount                   NUMERIC(12, 2) NOT NULL,
+        checkout_request_id      VARCHAR(100),
+        merchant_request_id      VARCHAR(100),
+        external_reference       VARCHAR(100) NOT NULL UNIQUE,
+        receipt_number           VARCHAR(50)  UNIQUE,
+        status                   VARCHAR(50)  DEFAULT 'Pending',
+        result_desc              VARCHAR(255),
+        period_label             VARCHAR(120),
+        initiated_by             INTEGER REFERENCES superadmins(admin_id),
+        initiated_at             TIMESTAMPTZ DEFAULT now(),
+        settled_at               TIMESTAMPTZ
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_tenant   ON platform_mpesa_transactions (tenant_id);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_invoice  ON platform_mpesa_transactions (subscription_invoice_id);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_checkout ON platform_mpesa_transactions (checkout_request_id);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_extref   ON platform_mpesa_transactions (external_reference);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_receipt  ON platform_mpesa_transactions (receipt_number);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_status   ON platform_mpesa_transactions (status);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_initiated ON platform_mpesa_transactions (initiated_at);",
 ]
 
 
