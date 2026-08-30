@@ -5,7 +5,8 @@ mpesa_* because M-Pesa is the rail no matter who fronts it, and the next
 provider change should not rename tables a third time.
 """
 from sqlalchemy import (
-    Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, Text,
+    Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer,
+    Numeric, String, Text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -53,9 +54,12 @@ class MpesaConfig(Base):
     #     different ciphertext each time), so the encrypted column cannot be
     #     looked up by equality; this column is what an inbound callback is
     #     resolved to a tenant by.
-    # See app/services/daraja/tokens.py, which is the only place that should
-    # write these two columns: it keeps them in sync so neither is ever set
-    # without the other.
+    # app/services/daraja/tokens.py is the intended writer for these two
+    # columns: it keeps them in sync so neither is ever set without the
+    # other. That is a convention, not an enforcement mechanism, so a
+    # database CHECK backs it (see __table_args__ below): a direct attribute
+    # write, a raw SQL UPDATE, or a hand-applied data fix cannot leave the
+    # pair half-set, even if it skips this module entirely.
     callback_token_encrypted = Column(String(255), nullable=True)
     callback_token_lookup = Column(String(64), unique=True, index=True, nullable=True)
     callback_token_rotated_at = Column(DateTime(timezone=True), nullable=True)
@@ -77,6 +81,20 @@ class MpesaConfig(Base):
 
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     updated_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+
+    __table_args__ = (
+        # Both columns NULL (no token minted yet) or both NOT NULL (a
+        # complete pair) are the only valid states. Enforced in the
+        # database, not just in app/services/daraja/tokens.py, because a
+        # half-written pair fails silently either way it happens: a
+        # lookup with no recoverable token cannot build an outbound
+        # CallBackURL, and a token with no lookup hash cannot resolve its
+        # own inbound callbacks.
+        CheckConstraint(
+            "(callback_token_encrypted IS NULL) = (callback_token_lookup IS NULL)",
+            name="ck_mpesa_configs_callback_token_pair",
+        ),
+    )
 
 
 class MpesaTransaction(Base):

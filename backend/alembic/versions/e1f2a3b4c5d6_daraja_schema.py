@@ -25,6 +25,17 @@ Drops the Pay Hero-specific columns (aggregator channel id, aggregator
 credentials, settlement bank details) when present: under Daraja there is
 no aggregator settlement bank to nominate, Safaricom pays the hospital's
 own shortcode directly.
+
+Also enforces, with a database CHECK constraint, that callback_token_encrypted
+and callback_token_lookup are always both NULL or both NOT NULL. This is a
+database-level backstop for app/services/daraja/tokens.py, which is the
+intended writer of both columns: a CHECK constraint holds against every
+write path, not only the ones that go through that helper. On the
+add-missing-columns paths (Shape A after rename, Shape B), any pre-existing
+row with exactly one of the two columns set is normalised to both NULL
+before the constraint is applied, since a half-configured token cannot be
+used for either the outbound or the inbound direction and the operator
+simply rotates a fresh one.
 """
 from typing import Sequence, Union
 
@@ -52,6 +63,14 @@ PAYHERO_ONLY_CONFIG_COLUMNS = (
     "settlement_account_name",
 )
 
+# Name is explicit (not left to SQLAlchemy's naming convention) so the
+# add-missing-columns path can check for it by name, and so any future
+# migration or downgrade can refer to it unambiguously.
+CALLBACK_TOKEN_PAIR_CHECK_NAME = "ck_mpesa_configs_callback_token_pair"
+CALLBACK_TOKEN_PAIR_CHECK_SQL = (
+    "(callback_token_encrypted IS NULL) = (callback_token_lookup IS NULL)"
+)
+
 
 def _table_exists(conn, name: str) -> bool:
     return sa.inspect(conn).has_table(name)
@@ -63,6 +82,10 @@ def _column_names(conn, table: str) -> set:
 
 def _index_names(conn, table: str) -> set:
     return {ix["name"] for ix in sa.inspect(conn).get_indexes(table)}
+
+
+def _check_constraint_names(conn, table: str) -> set:
+    return {ck["name"] for ck in sa.inspect(conn).get_check_constraints(table)}
 
 
 def _mpesa_config_columns():
@@ -214,6 +237,39 @@ def _widen_numeric_column(conn, table_name, column_name, precision, scale) -> No
         return
 
 
+def _normalize_half_written_callback_tokens(conn, table_name) -> None:
+    """Clear both callback token columns on any row that has exactly one set.
+
+    Runs before the CHECK constraint below is added, on a table that may
+    already hold data (Shape A after rename, or Shape B). A half-written
+    pair is not usable in either direction (the encrypted side alone cannot
+    be resolved by an inbound callback, the lookup side alone cannot rebuild
+    an outbound CallBackURL), so there is no data worth preserving here: the
+    operator rotates a fresh token afterwards. A fresh Shape C table has no
+    rows yet, so this is a no-op there.
+    """
+    op.execute(
+        sa.text(
+            f"UPDATE {table_name} "
+            "SET callback_token_encrypted = NULL, callback_token_lookup = NULL "
+            "WHERE (callback_token_encrypted IS NULL) != (callback_token_lookup IS NULL)"
+        )
+    )
+
+
+def _ensure_callback_token_pair_check(conn, table_name) -> None:
+    """Add the callback-token-pair CHECK constraint if it is not already there.
+
+    Idempotent so a second application of this revision (or a Shape A/B
+    table that already carries the constraint from an earlier partial run)
+    does not raise DuplicateObject.
+    """
+    if CALLBACK_TOKEN_PAIR_CHECK_NAME not in _check_constraint_names(conn, table_name):
+        op.create_check_constraint(
+            CALLBACK_TOKEN_PAIR_CHECK_NAME, table_name, CALLBACK_TOKEN_PAIR_CHECK_SQL
+        )
+
+
 def upgrade() -> None:
     conn = op.get_bind()
 
@@ -231,7 +287,13 @@ def upgrade() -> None:
 
     # ── mpesa_configs ────────────────────────────────────────────────────
     if not _table_exists(conn, "mpesa_configs"):
-        op.create_table("mpesa_configs", *_mpesa_config_columns())
+        op.create_table(
+            "mpesa_configs",
+            *_mpesa_config_columns(),
+            sa.CheckConstraint(
+                CALLBACK_TOKEN_PAIR_CHECK_SQL, name=CALLBACK_TOKEN_PAIR_CHECK_NAME
+            ),
+        )
     else:
         # A Shape B legacy mpesa_configs (never renamed to payhero_configs)
         # still carries the pre-rename column name; a Shape A table
@@ -241,6 +303,8 @@ def upgrade() -> None:
             op.alter_column("mpesa_configs", "paybill_number", new_column_name="shortcode")
         _add_columns_if_missing(conn, "mpesa_configs", _mpesa_config_columns())
         _drop_columns_if_present(conn, "mpesa_configs", PAYHERO_ONLY_CONFIG_COLUMNS)
+        _normalize_half_written_callback_tokens(conn, "mpesa_configs")
+        _ensure_callback_token_pair_check(conn, "mpesa_configs")
 
     # ── mpesa_transactions ───────────────────────────────────────────────
     if not _table_exists(conn, "mpesa_transactions"):
