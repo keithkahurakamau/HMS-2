@@ -11,6 +11,7 @@ hospital database. This project has hit that exact failure twice already
 so the regression guard below reads the script's source rather than its
 runtime metadata.
 """
+import re
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,16 @@ from app.config.database import Base
 from app.config.settings import settings
 from app.models.platform_mpesa import PlatformMpesaConfig, PlatformMpesaTransaction
 from app.services.daraja.tokens import mint_callback_token, token_lookup_hash
+
+# Matches every `from app.models import ...` statement in the file, whichever
+# shape it takes: the single parenthesised block at the top (spanning
+# multiple lines, so `[^)]` has to allow embedded newlines), or a plain
+# single-line statement placed anywhere else in the file. A second, separate
+# `from app.models import platform_mpesa` dropped in far from the main block
+# would pull the master models into Base.metadata just as effectively as an
+# in-block edit, so every occurrence of the import verb has to be checked,
+# not only the one block a human reviewer would think to look at first.
+_FROM_APP_MODELS_IMPORT_RE = re.compile(r"from app\.models import (?:\([^)]*\)|[^\n]*)")
 
 
 def _migrate_script_source() -> str:
@@ -41,6 +52,27 @@ def test_platform_tables_are_not_created_in_tenant_databases():
     assert "platform_mpesa" not in import_block
     assert "platform_mpesa_configs" in src  # but it IS in MASTER_DB_PATCHES
     assert "platform_mpesa_transactions" in src
+
+
+def test_platform_mpesa_is_not_imported_by_any_from_app_models_statement():
+    """Same guard as above, but shape-independent.
+
+    The in-block assertion above only catches sabotage inside the one
+    parenthesised `from app.models import (...)` block. It would not catch
+    a second, separate statement such as
+    `from app.models import platform_mpesa` placed anywhere else in the
+    file: that import reaches Base.metadata exactly the same way, and the
+    substring-of-one-block check above would still pass. This test instead
+    finds every `from app.models import ...` statement in the file, of
+    either shape, and asserts none of them names platform_mpesa.
+    """
+    src = _migrate_script_source()
+    import_statements = _FROM_APP_MODELS_IMPORT_RE.findall(src)
+    assert import_statements, "expected at least the main from app.models import block"
+    for statement in import_statements:
+        assert "platform_mpesa" not in statement, (
+            f"platform_mpesa must never be imported by migrate_all_tenants.py: {statement!r}"
+        )
 
 
 def test_master_patches_create_both_tables_idempotently():

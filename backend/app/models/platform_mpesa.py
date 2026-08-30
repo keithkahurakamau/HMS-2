@@ -1,4 +1,4 @@
-"""Platform-level Daraja — the operator's OWN subscription billing rail.
+"""Platform-level Daraja: the operator's OWN subscription billing rail.
 
 Lives in the MASTER database only, never a tenant database. The superadmin
 pushes a subscription STK charge to a tenant's billing contact MSISDN
@@ -13,8 +13,8 @@ operator's own billing tables inside every hospital database. This schema
 instead arrives through ``MASTER_DB_PATCHES`` in that script.
 
 Separation of concerns:
-  * ``mpesa_configs``          (tenant DB) — hospital shortcode + credentials
-  * ``platform_mpesa_configs`` (master DB) — MediFleet's own shortcode + credentials
+  * ``mpesa_configs``          (tenant DB): hospital shortcode + credentials
+  * ``platform_mpesa_configs`` (master DB): MediFleet's own shortcode + credentials
 
 MediFleet holds no Daraja credentials of its own yet: Safaricom Go-Live for
 the MediFleet shortcode has not been completed. An unconfigured platform

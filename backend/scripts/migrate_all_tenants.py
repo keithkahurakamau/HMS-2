@@ -327,7 +327,7 @@ MASTER_DB_PATCHES: list[str] = [
     """,
     "CREATE INDEX IF NOT EXISTS ix_dunning_invoice ON dunning_events (invoice_id);",
     "CREATE INDEX IF NOT EXISTS ix_dunning_tenant   ON dunning_events (tenant_id);",
-    # Daraja migration, task 3 — platform-level M-Pesa (subscription rail).
+    # Daraja migration, task 3: platform-level M-Pesa (subscription rail).
     # These two tables live in the MASTER DB only, the same way
     # platform_payhero_configs/platform_payhero_transactions above do: the
     # model file (app/models/platform_mpesa.py) is deliberately absent from
