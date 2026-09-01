@@ -33,7 +33,6 @@ account_balance's own docstring for what that means for its return value.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Optional
 from types import SimpleNamespace
 from urllib.parse import quote
@@ -210,45 +209,23 @@ def account_balance(
     to show an operator before they promise a refund. Never called on the
     refund hot path.
 
-    NOT USABLE for its stated purpose yet. This submits the request and
-    returns Safaricom's acknowledgment, but the actual balances arrive
-    later on an Account Balance result callback, and no handler for that
-    callback exists in this codebase (unlike Transaction Status, which
-    c2b.handle_transaction_status_result now handles). Until that handler
-    is built, utility_balance and working_balance are always None here,
-    deliberately never a stale or zero figure standing in for an answer
-    that has not arrived: showing an operator "no float" when the truth is
-    "Safaricom has not replied" would be the exact wrong-fact failure this
-    guards against. Treat this function today as "ask Safaricom to answer",
-    not "get the answer"."""
-    config = config_for(db, department_id=department_id)
-    initiator, credential = _initiator_credentials(config)
-    result_url, timeout_url = _flow_urls(config, callback_tenant, flow="balance")
-
-    payload = {
-        "Initiator": initiator,
-        "SecurityCredential": credential,
-        "CommandID": "AccountBalance",
-        "PartyA": config.shortcode,
-        "IdentifierType": _IDENTIFIER_TYPE_SHORTCODE,
-        "Remarks": "Balance check",
-        "QueueTimeOutURL": timeout_url,
-        "ResultURL": result_url,
-    }
-
-    client = _daraja_client(config)
-    try:
-        data = client.post("/mpesa/accountbalance/v1/query", payload)
-    except DarajaError as exc:
-        logger.warning("Daraja Account Balance query failed: %s", safe_repr(str(exc)))
-        raise
-
-    return {
-        "shortcode": config.shortcode,
-        "requested_at": datetime.now(timezone.utc).isoformat(),
-        "conversation_id": data.get("ConversationID"),
-        "response_description": data.get("ResponseDescription"),
-        # None, not 0: the figure has not arrived yet (see module docstring).
-        "utility_balance": None,
-        "working_balance": None,
-    }
+    NOT WIRED UP YET. This used to build a ResultURL/QueueTimeOutURL pair
+    under /api/payments/mpesa/balance/... and submit the AccountBalance
+    request to Safaricom, but no route exists to receive that result and
+    those paths carry no CSRF exemption (unlike the Transaction Status pair,
+    which c2b.handle_transaction_status_result now genuinely handles). A
+    live request built around URLs nothing can ever answer, and that would
+    404 or be blocked outright if Safaricom tried to reach them, is worse
+    than not sending it: it looks like progress while accomplishing
+    nothing. So this now refuses outright, loudly, rather than making the
+    call: build the balance/result and balance/timeout endpoints and their
+    CSRF exemptions first (mirroring the status/result and status/timeout
+    pair), then restore the request body this docstring used to describe.
+    """
+    raise HTTPException(
+        status_code=501,
+        detail=(
+            "Account Balance is not available yet: no result callback handler "
+            "exists to receive Safaricom's answer."
+        ),
+    )

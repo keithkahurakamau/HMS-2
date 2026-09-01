@@ -167,47 +167,26 @@ def test_query_transaction_status_uses_the_transaction_specific_till(db, monkeyp
 # ─── account_balance ─────────────────────────────────────────────────────────
 
 
-def test_account_balance_submits_a_request_and_never_guesses_the_figures(db, monkeypatch):
-    """The real Account Balance answer arrives asynchronously on a result
-    callback (see the module docstring), so this call cannot know the
-    figures yet. It must return None, never 0, for both balances: telling an
-    operator there is no float when the truth is simply "not answered yet"
-    is the exact wrong-fact failure this guards against."""
-    _fake_oauth(monkeypatch)
+def test_account_balance_refuses_outright_with_no_result_handler(db, monkeypatch):
+    """Account Balance is asynchronous the same way Transaction Status is,
+    but this codebase has no result-callback route or CSRF exemption for
+    it (unlike Transaction Status, which handle_transaction_status_result
+    genuinely handles). Building and sending a request whose ResultURL and
+    QueueTimeOutURL point at endpoints nothing can ever answer would look
+    like progress while accomplishing nothing, so this refuses outright
+    rather than calling Safaricom at all."""
     from app.utils.encryption import encrypt_data
 
     config = make_mpesa_config(db, shortcode="174379", initiator_name="testapi")
     config.initiator_password_encrypted = encrypt_data("initiator-pass")
     db.commit()
 
-    captured = {}
+    def _fail_if_called(*args, **kwargs):
+        raise AssertionError("account_balance must not call Safaricom yet")
 
-    def fake_post(url, **kw):
-        captured["url"] = url
-        captured["payload"] = kw.get("json")
-        return FakeResponse(200, {
-            "ConversationID": "AG_bal_1",
-            "ResponseDescription": "Accept the service request successfully.",
-        })
+    monkeypatch.setattr("app.services.daraja.client.requests.post", _fail_if_called)
+    monkeypatch.setattr("app.services.daraja.client.requests.get", _fail_if_called)
 
-    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
-
-    result = account_balance(db, callback_tenant="mayoclinic_db")
-
-    assert captured["url"].endswith("/mpesa/accountbalance/v1/query")
-    assert captured["payload"]["CommandID"] == "AccountBalance"
-    assert captured["payload"]["PartyA"] == "174379"
-    assert "/balance/result/mayoclinic_db/" in captured["payload"]["ResultURL"]
-    assert "/balance/timeout/mayoclinic_db/" in captured["payload"]["QueueTimeOutURL"]
-
-    assert result["utility_balance"] is None
-    assert result["working_balance"] is None
-    assert result["shortcode"] == "174379"
-    assert result["conversation_id"] == "AG_bal_1"
-
-
-def test_account_balance_requires_an_initiator_name(db):
-    make_mpesa_config(db, shortcode="174379")  # no initiator_name set
-
-    with pytest.raises(HTTPException):
+    with pytest.raises(HTTPException) as exc_info:
         account_balance(db, callback_tenant="mayoclinic_db")
+    assert exc_info.value.status_code == 501
