@@ -283,51 +283,44 @@ def handle_transaction_status_result(db: Session, payload: dict) -> Optional[Mpe
 
         params = _result_parameters(result)
 
-        # I3: ResultCode 0 only means the QUERY succeeded, not that the
-        # transaction itself did. The transaction's own outcome lives in
-        # TransactionStatus. A receipt Safaricom knows about but marks
-        # Failed or Reversed must never settle just because the query
-        # worked; anything other than Completed is quarantined, the same
-        # as a disagreeing amount, because a "successful-looking" query
-        # result for a transaction Safaricom itself did not complete is
-        # exactly the kind of thing a human needs to see, not silently
-        # leave Unverified.
-        transaction_status = params.get("TransactionStatus")
-        if transaction_status != "Completed":
-            txn.status = "Quarantined"
-            txn.result_desc = (
-                f"Transaction Status reported status {transaction_status!r}, not Completed"
-            )[:255]
-            db.commit()
-            _notify_quarantine(db, txn, reason=txn.result_desc)
-            return txn
-
-        # C1: Safaricom's key names for the amount and the receipt are not
-        # settled between documentation sources (Amount vs TransactionAmount,
-        # ReceiptNo vs TransactionReceipt); public sources disagree and the
-        # authoritative docs need a login this task cannot obtain. Reading
-        # only one spelling risks EVERY genuine result missing the field,
-        # quarantining every real payment and training staff to distrust
-        # (and bypass) this queue. Read whichever spelling is present.
+        # C1 (and I3's TransactionStatus, same reasoning): Safaricom's key
+        # names for these fields are not settled between documentation
+        # sources (Amount vs TransactionAmount, ReceiptNo vs
+        # TransactionReceipt); public sources disagree and the authoritative
+        # docs need a login this task cannot obtain. Reading only one
+        # spelling risks EVERY genuine result missing the field, quarantining
+        # every real payment. Read whichever spelling is present for each.
+        # No source contradicts "TransactionStatus" the way sources
+        # contradict Amount/Receipt, so this is a consistency measure rather
+        # than a known defect: a bare "Status" is tolerated as a plausible
+        # alternate, not assumed impossible.
         reported_receipt = params.get("TransactionReceipt")
         if reported_receipt is None:
             reported_receipt = params.get("ReceiptNo")
         raw_amount = params.get("TransactionAmount")
         if raw_amount is None:
             raw_amount = params.get("Amount")
+        transaction_status = params.get("TransactionStatus")
+        if transaction_status is None:
+            transaction_status = params.get("Status")
 
-        if reported_receipt is None or raw_amount is None:
-            # Neither spelling was found for one of the fields. This is not
-            # "the values disagree", it is "we could not find the value at
-            # all": reporting a mismatch against a fabricated None would
-            # read as a wrong-amount claim Safaricom never made. Naming the
-            # keys that actually arrived is what turns the first real
-            # sandbox delivery into a one-line answer instead of a mystery.
+        if reported_receipt is None or raw_amount is None or transaction_status is None:
+            # At least one field was not found under any spelling checked.
+            # This is not "the value is wrong", it is "we could not find it
+            # at all": treating an ABSENT TransactionStatus the same as a
+            # genuinely-not-Completed one would produce the identical
+            # quarantine message for two different facts (a missing key
+            # versus a real Reversed/Failed transaction), which is exactly
+            # the kind of thing that misdiagnoses the first real sandbox
+            # delivery. Naming the keys that actually arrived turns that
+            # into a one-line answer instead of a mystery.
             missing = []
             if reported_receipt is None:
                 missing.append("receipt (checked TransactionReceipt, ReceiptNo)")
             if raw_amount is None:
                 missing.append("amount (checked TransactionAmount, Amount)")
+            if transaction_status is None:
+                missing.append("status (checked TransactionStatus, Status)")
             keys_present = sorted(params.keys())
             txn.status = "Quarantined"
             txn.result_desc = (
@@ -355,6 +348,28 @@ def handle_transaction_status_result(db: Session, payload: dict) -> Optional[Mpe
             txn.result_desc = (
                 f"Transaction Status reported receipt {reported_receipt}, "
                 f"this row recorded {txn.receipt_number}"
+            )[:255]
+            db.commit()
+            _notify_quarantine(db, txn, reason=txn.result_desc)
+            return txn
+
+        # I3: ResultCode 0 only means the QUERY succeeded, not that the
+        # transaction itself did. The transaction's own outcome lives in
+        # TransactionStatus. A receipt Safaricom knows about but marks
+        # Failed or Reversed must never settle just because the query
+        # worked; anything other than Completed is quarantined, the same
+        # as a disagreeing amount, because a "successful-looking" query
+        # result for a transaction Safaricom itself did not complete is
+        # exactly the kind of thing a human needs to see, not silently
+        # leave Unverified. This only runs once the field is known to be
+        # PRESENT (see the missing-field check above): an absent
+        # TransactionStatus is a different fact from a present one that
+        # says something other than Completed, and must never produce this
+        # same message.
+        if transaction_status != "Completed":
+            txn.status = "Quarantined"
+            txn.result_desc = (
+                f"Transaction Status reported status {transaction_status!r}, not Completed"
             )[:255]
             db.commit()
             _notify_quarantine(db, txn, reason=txn.result_desc)

@@ -597,6 +597,58 @@ def test_transaction_status_result_not_completed_quarantines_not_settles(db, mon
     assert invoice.status == "Pending"
 
 
+def test_transaction_status_result_settles_using_the_alternate_status_spelling(db, monkeypatch):
+    """No source contradicts "TransactionStatus" the way sources contradict
+    Amount/Receipt, so this is a consistency measure rather than a known
+    defect, applied for the same reason: a bare "Status" is tolerated as a
+    plausible alternate spelling."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    invoice = make_invoice(db, total_amount=Decimal("333.00"))
+    payload = _c2b_confirmation(
+        receipt="ALTSTATUS001", amount="333", shortcode=config.shortcode,
+        bill_ref=f"INV-{invoice.invoice_id}",
+    )
+    _fake_status_ack(monkeypatch, conversation_id="AG-ALTSTATUS")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    result_payload = _status_result(
+        conversation_id="AG-ALTSTATUS", result_code=0,
+        amount="333", receipt="ALTSTATUS001",
+        transaction_status=None,  # do not write "TransactionStatus" at all
+        extra_params=[{"Key": "Status", "Value": "Completed"}],
+    )
+    resolved = handle_transaction_status_result(db, result_payload)
+
+    assert resolved.status == "Success"
+    assert db.query(Payment).count() == 1
+
+
+def test_transaction_status_result_missing_status_is_a_diagnostic_quarantine_not_a_false_reversed(db, monkeypatch):
+    """A missing TransactionStatus key and a genuinely-not-Completed
+    transaction are different facts. Treating an ABSENT status field the
+    same as a present-but-not-Completed one would produce the identical
+    quarantine message for both, misdiagnosing the first real sandbox
+    delivery that happens to omit the field under a name this code does
+    not check."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    payload = _c2b_confirmation(receipt="NOSTATUS001", amount="222", shortcode=config.shortcode)
+    _fake_status_ack(monkeypatch, conversation_id="AG-NOSTATUS")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    result_payload = _status_result(
+        conversation_id="AG-NOSTATUS", result_code=0,
+        amount="222", receipt="NOSTATUS001",
+        transaction_status=None,  # neither TransactionStatus nor Status present
+    )
+    resolved = handle_transaction_status_result(db, result_payload)
+
+    assert resolved.status == "Quarantined"
+    assert "not Completed" not in resolved.result_desc
+    assert "status" in resolved.result_desc.lower()
+    assert "keys present" in resolved.result_desc
+    assert db.query(Payment).count() == 0
+
+
 # ─── The match-order test ────────────────────────────────────────────────────
 
 
