@@ -274,21 +274,21 @@ lock and serialises the payment path to fix a non-problem.
 
 ### Passing the Safaricom charge to the patient
 
-**RESEARCHED 2026-09-01, and the findings contradict the original request. This
-section is on hold pending an operator decision. Do not implement Task 16 until
-it is resolved.**
+**DECIDED 2026-09-01, after researching the actual Safaricom tariffs.** The
+original request was to add a flat 0.55 percent surcharge to what the patient is
+prompted for. That is not built, and this section records why, because the
+reasoning is worth more than the decision.
 
-What the Safaricom tariffs actually say:
+#### What the tariffs actually say
 
-**Paybill charges are banded flat fees, not a percentage.** The bands run
-KES 1 to 100 free, 101 to 500 costs KES 7, 501 to 1,000 costs KES 13, 1,001 to
-1,500 costs KES 23, rising to a hard cap of KES 108 for large amounts. A flat
-0.55 percent is not how Safaricom bills paybill at all. The 0.55 figure appears
-in secondary sources as an effective blended merchant rate over a mid band, not
-as a charging mechanism.
+**Paybill charges are banded flat fees, not a percentage.** KES 1 to 100 is
+free, 101 to 500 costs KES 7, 501 to 1,000 costs KES 13, 1,001 to 1,500 costs
+KES 23, rising to a hard cap of KES 108. A flat 0.55 percent is not how
+Safaricom bills paybill at all; that figure appears in secondary sources as an
+effective blended merchant rate over a mid band.
 
 **There are three tariffs and their names are inverted from intuition**, which is
-the single easiest thing to get backwards here:
+the easiest thing here to get backwards:
 
 | Tariff | Who actually pays |
 |---|---|
@@ -296,82 +296,59 @@ the single easiest thing to get backwards here:
 | Customer Bouquet | The BUSINESS pays the whole fee. The customer pays nothing. |
 | Mgao | Split between them, and not evenly. |
 
-**Under Business Bouquet the fee is already deducted from the customer's own
-M-Pesa balance during the transaction, and the business receives the full amount
-entered.** Utilities, schools and hospitals are the usual Business Bouquet
-holders. So for a hospital on that tariff the patient is ALREADY paying the
-charge, and adding a surcharge to the prompt would charge them twice for the
-same thing.
+**Under Business Bouquet the fee is already deducted from the patient's own
+M-Pesa balance, and the hospital receives the full amount entered.** Utilities,
+schools and hospitals are the usual Business Bouquet holders.
 
-**Buy Goods tills are free for the customer, always.** The merchant pays roughly
-0.5 percent, capped at KES 200, dropping to 0.25 percent under KES 200. Our
-system supports both paybill and till shortcodes, so any charge logic has to
-branch on `shortcode_type` or it is wrong for half the configurations.
+**Buy Goods tills are free for the customer, always.** The merchant pays about
+0.5 percent capped at KES 200. This system supports both paybill and till
+shortcodes, so any charge logic must branch on `shortcode_type` or it is wrong
+for half the configurations.
 
-**What a flat 0.55 percent surcharge would therefore do wrong**, in four separate
-ways: double-charge every patient of a Business Bouquet hospital; use the wrong
-figure even where the hospital genuinely bears the cost, since the real charge is
-banded; ignore the KES 108 cap, so a KES 100,000 payment would be surcharged
-KES 550 against a real charge of KES 108; and apply a paybill-shaped charge to
-till shortcodes where the customer owes nothing by design.
+#### Why no surcharge is added
 
-**What a correct implementation needs**, if the operator still wants pass-through
-after seeing the above: the hospital's tariff type as a setting (Business
-Bouquet, Customer Bouquet, or Mgao), a band table rather than a percentage,
-respect for the cap, a branch on paybill versus till, and the whole thing off
-unless the hospital is on a tariff where it actually bears a cost. Sources are
-listed in the ledger.
+A flat 0.55 percent surcharge would be wrong in four independent ways: it would
+double-charge every patient of a Business Bouquet hospital, who is already
+paying; it would use the wrong figure even where the hospital does bear the cost,
+since the real charge is banded; it would ignore the KES 108 cap, surcharging a
+KES 100,000 payment by KES 550 against a real charge of KES 108; and it would
+apply a paybill-shaped charge to till shortcodes where the patient owes nothing
+by design.
 
----
+Adding money to what a patient is asked to pay, on the strength of a rate that
+does not match the biller's own tariff, is not a rounding question. It is
+overcharging people at a hospital counter.
 
-#### Original design, retained for reference. Do not build this as written.
+#### What is built instead: show the charge, never add it
 
+The amount prompted is always the invoice amount. What changes is that the
+patient and the cashier can SEE what Safaricom will take, so the figure on the
+handset is not a surprise.
 
-Safaricom takes a percentage of every M-Pesa collection. On a business-pays
-tariff that comes out of the hospital's side, so a hospital collecting KES 1,000
-nets less than KES 1,000. The operator requires that a hospital be able to pass
-that cost on to the patient instead, and that doing so be an explicit,
-per-hospital authorisation rather than a platform default.
+`MpesaConfig` gains `tariff_type`, one of `business_bouquet`, `customer_bouquet`,
+`mgao`, or `unknown`, defaulting to **unknown**. A band table module implements
+the real Safaricom bands, including the cap, and the till case where the patient
+pays nothing.
 
-**It is opt-in, off by default, and authorised in the admin portal.** A checkbox
-on the M-Pesa settings page, per till, so a pharmacy can pass charges on while an
-outpatient desk absorbs them. Off means nothing changes and the patient is
-prompted for the invoice amount, exactly as today.
+- On `business_bouquet`, the payment screen shows the band fee Safaricom will
+  deduct from the payer's balance, and the receipt repeats it.
+- On `customer_bouquet` or a till, it says plainly that there is no M-Pesa charge
+  to the payer.
+- On `unknown`, it shows nothing at all. Guessing a tariff to display a number is
+  the same error as guessing one to charge a number, only quieter.
 
-**The rate is a setting, not a constant.** It defaults to 0.55 percent, and it
-lives on the config row because Safaricom changes its tariffs and that must be a
-form edit rather than a deploy.
+This is correct under every tariff, which is precisely why it was chosen over
+pass-through: it cannot be wrong, and it does not depend on knowing something we
+do not know.
 
-**How the arithmetic must work, and the part that silently breaks invoices.**
-Three amounts exist and they are not interchangeable:
+#### If pass-through is wanted later
 
-- **net**: the invoice amount, what the hospital is owed
-- **charge**: the surcharge added when the hospital has authorised it
-- **gross**: net plus charge, what the patient is actually prompted for
-
-The patient is prompted for gross. The cross-check compares the callback's
-claimed amount against gross, because gross is what we asked Safaricom for.
-**But the invoice is credited net, never gross.** Credit the invoice with gross
-and every single invoice ends up overpaid by the surcharge, showing a phantom
-credit balance that a cashier then has to explain to a patient. The surcharge is
-not hospital revenue: it is money passing through to Safaricom.
-
-`mpesa_transactions` therefore records all three: `amount` stays the gross figure
-that anchors the cross-check, alongside `net_amount` and `charge_amount`. Storing
-only two and deriving the third invites the derivation being done differently in
-two places.
-
-**Rounding interacts with the existing rule.** M-Pesa takes whole shillings, so
-gross is already rounded up to the next shilling. That rounding happens once, on
-gross, after the charge is applied. `charge_amount` is then recorded as gross
-minus net, which is the surcharge actually collected rather than the theoretical
-percentage. Those differ by up to a shilling and the recorded figure must be the
-one that really moved, because that is what a receipt and a reconciliation have
-to agree on.
-
-**The patient sees the breakdown before they pay**, and the receipt shows it
-after. A patient prompted for KES 1,005 against a KES 1,000 invoice, with no
-explanation, reasonably believes they have been overcharged.
+The band table built here is the foundation. Pass-through then needs the tariff
+known and not `unknown`, must be off for any hospital already on Business
+Bouquet, must use bands rather than a percentage, must respect the cap, and must
+branch on paybill versus till. The one rule that would silently break invoices:
+the patient is prompted for gross and the cross-check compares gross, but the
+invoice is credited NET, because the surcharge is not hospital revenue.
 
 ### Refunds (B2C)
 

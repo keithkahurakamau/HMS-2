@@ -1489,84 +1489,71 @@ cd ../frontend && npm run build && npx vitest run --no-file-parallelism && npm r
 
 ---
 
-## Task 16: Passing the Safaricom charge to the patient
+## Task 16: Show the Safaricom charge, never add it
 
-**Runs after Task 14 and before Task 11 (frontend).** It changes what a patient is prompted for, so it must land before the pages that display amounts.
+**Runs after Task 14 and before Task 11 (frontend).**
 
-**Spec:** the section "Passing the Safaricom charge to the patient" in `docs/superpowers/specs/2026-08-29-daraja-migration-design.md`. Read it first: it contains the one rule that silently breaks invoices if got wrong.
+**Spec:** the section "Passing the Safaricom charge to the patient" in `docs/superpowers/specs/2026-08-29-daraja-migration-design.md`. **Read it in full before writing anything.** It explains why a flat 0.55 percent surcharge was researched, found to be wrong in four independent ways, and deliberately not built. An implementer who skips it will reintroduce the surcharge thinking it was an oversight.
+
+**No surcharge is ever added to the amount a patient is prompted for.** The prompt is the invoice amount. This task makes the Safaricom charge VISIBLE, not larger.
 
 **Files:**
-- Create: a new alembic revision on top of `f2a3b4c5d6e7`
-- Modify: `backend/app/models/mpesa.py`, `backend/app/services/daraja/stk.py`, `backend/app/services/daraja/settlement.py`
-- Test: `backend/tests/daraja/test_customer_charge.py`
+- Create: `backend/app/services/daraja/tariffs.py`, a new alembic revision on top of `f2a3b4c5d6e7`
+- Modify: `backend/app/models/mpesa.py`, `backend/app/services/daraja/stk.py`
+- Test: `backend/tests/daraja/test_tariffs.py`
 
-- [ ] **Step 1: Schema**
-
-On `MpesaConfig`:
-```python
-# Off by default. A hospital passing Safaricom's collection charge to the
-# patient is a commercial decision the hospital authorises for itself, not
-# a platform default applied to everyone.
-pass_charges_to_customer = Column(Boolean, nullable=False, server_default="false")
-# A setting rather than a constant: Safaricom changes tariffs, and that
-# must be a form edit rather than a deploy.
-customer_charge_percent = Column(Numeric(6, 4), nullable=False, server_default="0.0055")
-```
-
-On `MpesaTransaction`, alongside the existing `amount`:
-```python
-net_amount = Column(Numeric(12, 2), nullable=True)     # what the hospital is owed
-charge_amount = Column(Numeric(12, 2), nullable=True)  # the surcharge actually collected
-```
-
-`amount` keeps its current meaning: the GROSS figure we asked Safaricom for, which is what the settlement cross-check compares against. Do not repurpose it.
-
-Backfill existing rows: `net_amount = amount`, `charge_amount = 0`. Every existing transaction predates this feature, so its gross and net are the same figure.
-
-- [ ] **Step 2: The arithmetic, in one place**
+- [ ] **Step 1: The band table**
 
 ```python
-def apply_customer_charge(net: Decimal, config: MpesaConfig) -> tuple[Decimal, Decimal, Decimal]:
-    """Return (net, charge, gross) for a payment of `net` on this till.
+def customer_charge(amount: Decimal, *, shortcode_type: str, tariff_type: str) -> Optional[Decimal]:
+    """What Safaricom deducts from the PAYER's own balance, or None when unknown.
 
-    Rounding happens ONCE, on gross, after the charge is applied, because
-    M-Pesa takes whole shillings. charge is then gross minus net: the
-    surcharge actually collected, not the theoretical percentage. Those
-    differ by up to a shilling, and a receipt and a reconciliation both
-    have to agree on the figure that really moved.
+    Returns Decimal("0") when the payer genuinely owes nothing (a till, or a
+    paybill on customer_bouquet). Returns None when tariff_type is "unknown",
+    which means "we do not know", and is NOT the same as zero. A caller that
+    conflates the two will tell a patient there is no charge when there is one.
     """
 ```
 
-When `pass_charges_to_customer` is false, gross is `net` rounded up and charge is zero. Never silently apply a charge on a till that has not authorised it.
+Paybill bands, `business_bouquet` (the payer's cost): 1 to 100 free, 101 to 500 is KES 7, 501 to 1,000 is KES 13, 1,001 to 1,500 is KES 23, continuing through the published bands to a **hard cap of KES 108**. `mgao` splits it, with the payer's share capped around KES 54. `customer_bouquet` is zero to the payer. A till (`shortcode_type == "till"`) is always zero to the payer, whatever the tariff.
 
-- [ ] **Step 3: Initiation uses gross, settlement credits net**
+Encode the bands as data, one table, not as a chain of `if` statements. Safaricom revises these, and a table is diffable while a conditional chain is not.
 
-`initiate_stk_push` prompts for gross, persists all three figures, and returns the breakdown so a cashier can see what the patient will actually be asked for.
+- [ ] **Step 2: Schema**
 
-`settle_invoice_match` credits the invoice with **`txn.net_amount`**, not `txn.amount`. This is the rule that silently breaks every invoice if missed: crediting gross overpays each invoice by the surcharge and leaves a phantom credit balance a cashier has to explain to a patient. Fall back to `txn.amount` only when `net_amount` is NULL, which is the pre-migration legacy case.
+```python
+# Which Safaricom tariff this shortcode is on. Defaults to "unknown"
+# deliberately: guessing a tariff to display a number is the same error as
+# guessing one to charge a number, only quieter.
+tariff_type = Column(String(20), nullable=False, server_default="unknown")
+```
 
-The settlement cross-check still compares the callback's claimed amount against `txn.amount` (gross). That is unchanged and must stay unchanged: gross is what we asked Safaricom for.
+No `pass_charges_to_customer` column, and no `customer_charge_percent` column. Nothing in this task changes any amount.
+
+- [ ] **Step 3: Surface it**
+
+`initiate_stk_push` returns the charge alongside the amount, so a cashier can tell the patient what will leave their balance before the prompt arrives. When it is `None`, callers show nothing.
 
 - [ ] **Step 4: Tests**
 
 ```
-test_charge_is_not_applied_when_the_till_has_not_authorised_it
-test_charge_is_applied_when_authorised_and_gross_is_rounded_up_once
-test_charge_amount_recorded_is_gross_minus_net_not_the_raw_percentage
-test_invoice_is_credited_net_not_gross
-test_a_fully_paid_invoice_shows_no_credit_balance_after_a_charged_payment
-test_cross_check_still_compares_against_gross
-test_legacy_transaction_with_null_net_amount_settles_on_amount
-test_rate_is_read_from_the_config_not_a_constant
-test_two_tills_can_have_different_charge_settings
+test_till_is_always_free_to_the_payer_whatever_the_tariff
+test_customer_bouquet_paybill_is_free_to_the_payer
+test_business_bouquet_paybill_charges_the_band_fee
+test_business_bouquet_respects_the_108_cap_on_large_amounts
+test_unknown_tariff_returns_none_not_zero
+test_band_boundaries_are_inclusive_at_both_ends
+test_no_amount_that_reaches_daraja_is_ever_changed_by_this_module
 ```
 
-`test_invoice_is_credited_net_not_gross` and `test_a_fully_paid_invoice_shows_no_credit_balance_after_a_charged_payment` are the load-bearing pair. Prove them: temporarily credit gross instead of net, confirm both fail, restore, confirm they pass. Report the evidence.
+`test_unknown_tariff_returns_none_not_zero` and `test_no_amount_that_reaches_daraja_is_ever_changed_by_this_module` are the load-bearing pair. The first stops us telling a patient a charge is zero when we simply do not know it. The second is the guarantee this whole task rests on.
+
+Test the band BOUNDARIES specifically, at both ends of at least three bands. Off-by-one at a boundary is the classic defect in banded pricing and it is invisible in the middle of a band.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git commit -m "feat(daraja): let a hospital pass the Safaricom charge to the patient"
+git commit -m "feat(daraja): show the Safaricom charge to the payer, without ever adding it"
 ```
 
-**Frontend (folded into Task 11):** a checkbox on the M-Pesa settings page, per till, labelled so it is unambiguous that the patient pays more. Show the configured rate and an example ("a KES 1,000 invoice prompts the patient for KES 1,006"). The payment screen shows the patient the breakdown before they pay, and the receipt shows it after: a patient prompted for KES 1,005 against a KES 1,000 invoice, with no explanation, reasonably believes they have been overcharged.
+**Frontend (folded into Task 11):** the M-Pesa settings page gains a tariff selector, with the three names spelled out as what they MEAN, since Business Bouquet and Customer Bouquet mean the opposite of what they sound like. Label them "Business Bouquet: the patient pays the M-Pesa fee" and "Customer Bouquet: the hospital pays the M-Pesa fee". The payment screen shows the charge when known and nothing when not.
