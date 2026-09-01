@@ -78,6 +78,17 @@ from app.services.daraja.status import (
 )
 from app.utils.log_redact import safe_repr
 
+# match_c2b_invoice moved to c2b_match.py; nothing in THIS file calls it any
+# more (handle_transaction_status_result, its only caller, moved to
+# status.py in the same refactor). It is imported here purely as a
+# backward-compatible re-export, the same pattern stk.py uses for
+# config_for from reservation.py, so existing test imports
+# (`from app.services.daraja.c2b import match_c2b_invoice`) keep working.
+# Listed in __all__, not `# noqa: F401`, because this project's lint step
+# runs bare pyflakes, which does not honour `# noqa` comments (only flake8
+# does); __all__ is what actually suppresses the unused-import warning here.
+__all__ = ["match_c2b_invoice"]
+
 logger = logging.getLogger(__name__)
 
 
