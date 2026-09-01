@@ -125,12 +125,34 @@ def retry_dispatch_refund(
     db: Session = Depends(get_db),
     _user: dict = Depends(RequirePermission("mpesa:refund")),
 ):
-    """Retry submitting an already-approved refund whose previous dispatch
-    attempt could not reach Safaricom. Reuses the same
-    OriginatorConversationID minted at request time, on every attempt."""
+    """Retry submitting a refund whose previous dispatch attempt could not
+    reach Safaricom at all (still Approved). Reuses the same
+    OriginatorConversationID minted at request time.
+
+    Deliberately gated to status == "Approved" only, never "Processing":
+    a Processing refund already has an accepted instruction sitting with
+    Safaricom (a synchronous "0" was returned, or a queue timeout later
+    confirmed Safaricom holds it). Re-dispatching it risks reading
+    Safaricom's own duplicate-instruction rejection as a fresh failure, the
+    exact double-refund path dispatch_refund's own ResponseCode handling
+    guards against for a Processing entry; but this route removes the
+    opportunity to trigger that call in the first place, rather than
+    relying only on that guard. A stuck Processing refund is resolved by
+    asking Safaricom directly (reconciliation), not by dispatching again.
+    """
     refund = db.query(MpesaRefund).filter(MpesaRefund.id == refund_id).first()
     if refund is None:
         raise HTTPException(status_code=404, detail="Refund not found.")
+    if refund.status != "Approved":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Refund is {refund.status}; retry-dispatch only applies to an "
+                "Approved refund that never reached Safaricom. A Processing "
+                "refund is already believed to be in flight; it is resolved "
+                "by reconciliation, not by dispatching again."
+            ),
+        )
     tenant_hint = request.headers.get("X-Tenant-ID")
     refund = dispatch_refund(db, refund=refund, callback_tenant=tenant_hint)
     return _refund_view(refund)
