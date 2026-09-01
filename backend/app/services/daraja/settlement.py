@@ -127,7 +127,7 @@ def _notify_quarantine(db: Session, txn: MpesaTransaction, *, reason: str) -> No
 
     Shared by both the STK callback path (apply_stk_callback, below) and
     the C2B Transaction Status result path
-    (app/services/daraja/c2b.py's handle_transaction_status_result): a C2B
+    (app/services/daraja/status.py's handle_transaction_status_result): a C2B
     row never has a CheckoutRequestID, so a message built only around that
     field would read "CheckoutRequestID None: ..." for every C2B
     quarantine, which tells a cashier nothing they can act on. The

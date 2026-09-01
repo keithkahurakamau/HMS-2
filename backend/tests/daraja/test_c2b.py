@@ -23,11 +23,13 @@ from app.models.patient import Patient
 from app.services.daraja.c2b import (
     c2b_readiness,
     handle_confirmation,
-    handle_transaction_status_result,
-    handle_transaction_status_timeout,
     handle_validation,
     match_c2b_invoice,
     register_c2b_urls,
+)
+from app.services.daraja.status import (
+    handle_transaction_status_result,
+    handle_transaction_status_timeout,
 )
 from app.services.daraja.client import _TOKEN_CACHE
 from app.config.settings import settings

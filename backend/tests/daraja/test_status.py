@@ -4,9 +4,10 @@ Daraja commands: their synchronous response is only an acknowledgment
 covers that acknowledgment step, query_transaction_status. The actual
 Transaction Status verdict, and the settle/quarantine decision it drives, is
 covered in test_c2b.py against
-app.services.daraja.c2b.handle_transaction_status_result, since that is
-where the real cross-check now lives (see status.py's module docstring for
-why an earlier version wrongly put it here instead).
+app.services.daraja.status.handle_transaction_status_result, since that
+test file is where the C2B confirmation fixtures this cross-check depends on
+already live (see status.py's module docstring for why an earlier version
+wrongly treated the query's own synchronous response as that verdict).
 """
 from decimal import Decimal
 
