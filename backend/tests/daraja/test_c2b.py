@@ -578,6 +578,25 @@ def test_c2b_matching_falls_through_bill_ref_then_opd_then_phone(db):
     assert basis == "unmatched"
 
 
+def test_c2b_matching_by_bill_ref_never_matches_a_cancelled_invoice(db):
+    """Cancelled means voided with the ledger posting reversed in this
+    codebase. A patient typing an old or voided invoice number at the till
+    must not have real money posted against it: settle_invoice_match would
+    then mark a voided invoice Paid again, resurrecting it. The bill-ref
+    matcher must apply the same outstanding-status filter its two sibling
+    matchers (OPD number, phone) already use."""
+    cancelled_invoice = make_invoice(db, total_amount=Decimal("400.00"))
+    cancelled_invoice.status = "Cancelled"
+    db.commit()
+
+    invoice, basis = match_c2b_invoice(
+        db, bill_ref_number=f"INV-{cancelled_invoice.invoice_id}", msisdn="254700000099",
+    )
+
+    assert invoice is None
+    assert basis == "unmatched"
+
+
 # ─── Validation ─────────────────────────────────────────────────────────────
 
 

@@ -91,6 +91,12 @@ logger = logging.getLogger(__name__)
 # arbitrary string and treating what's left as an invoice id would risk
 # matching an unrelated invoice by coincidence, which is exactly the kind of
 # guess this module exists to refuse.
+#
+# This relies on OP numbers never satisfying this pattern: they are minted
+# by routes/patients.py as "OP-{year}-{nnnn}" (a literal "OP-", not "INV-",
+# with a hyphen still inside the numeric tail), which the regex's anchored
+# ^...$ and optional-"INV-"-only prefix can never match. If that generation
+# format ever changes, this invariant needs re-checking.
 _INVOICE_REF_RE = re.compile(r"^(?:INV-)?(\d+)$", re.IGNORECASE)
 
 _OUTSTANDING_STATUSES = ("Pending", "Partially Paid")
@@ -198,7 +204,20 @@ def _match_by_bill_ref(db: Session, bill_ref: Optional[str]) -> Optional[Invoice
     match = _INVOICE_REF_RE.match(bill_ref.strip())
     if not match:
         return None
-    return db.query(Invoice).filter(Invoice.invoice_id == int(match.group(1))).first()
+    # Same status filter as the OPD and phone matchers, not "any invoice with
+    # this id": Cancelled means voided with the ledger posting reversed in
+    # this codebase, and a fully Paid invoice needs no further payment
+    # either. Without this, a patient typing an old or voided invoice number
+    # at the till gets real money posted against it, and settle_invoice_match
+    # then marks a voided invoice Paid again, resurrecting it.
+    return (
+        db.query(Invoice)
+        .filter(
+            Invoice.invoice_id == int(match.group(1)),
+            Invoice.status.in_(_OUTSTANDING_STATUSES),
+        )
+        .first()
+    )
 
 
 def _match_by_opd_number(db: Session, bill_ref: Optional[str]) -> Optional[Invoice]:
