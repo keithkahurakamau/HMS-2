@@ -70,7 +70,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.billing import Invoice, Payment
-from app.models.mpesa import MpesaTransaction
+from app.models.mpesa import MpesaConfig, MpesaTransaction
 from app.utils.log_redact import safe_repr
 
 logger = logging.getLogger(__name__)
@@ -106,22 +106,54 @@ def _parse_callback_amount(raw) -> Decimal:
     return amount
 
 
+def _till_label(db: Session, mpesa_config_id: Optional[int]) -> str:
+    """A human-readable till label for a quarantine notification. Never
+    raises: a failed lookup here must not turn a notification failure into
+    a settlement failure, which is exactly the guarantee _notify_quarantine
+    itself exists to provide for its own caller."""
+    if mpesa_config_id is None:
+        return "an unrecorded till"
+    try:
+        config = db.query(MpesaConfig).filter(MpesaConfig.id == mpesa_config_id).first()
+    except Exception:  # noqa: BLE001, see the docstring
+        return f"till #{mpesa_config_id}"
+    if config is None:
+        return f"till #{mpesa_config_id}"
+    return f"till {config.shortcode}"
+
+
 def _notify_quarantine(db: Session, txn: MpesaTransaction, *, reason: str) -> None:
+    """Notify billing:manage that `txn` was quarantined, not settled.
+
+    Shared by both the STK callback path (apply_stk_callback, below) and
+    the C2B Transaction Status result path
+    (app/services/daraja/c2b.py's handle_transaction_status_result): a C2B
+    row never has a CheckoutRequestID, so a message built only around that
+    field would read "CheckoutRequestID None: ..." for every C2B
+    quarantine, which tells a cashier nothing they can act on. The
+    identifier here is whichever of receipt_number or checkout_request_id
+    the row actually carries, plus the till, so a cashier standing at a
+    counter can find the exact payment this refers to.
+    """
     try:
         from app.utils.notify import notify_permission
+        identifier = (
+            f"receipt {txn.receipt_number}" if txn.receipt_number
+            else f"CheckoutRequestID {txn.checkout_request_id}"
+        )
+        till = _till_label(db, txn.mpesa_config_id)
         notify_permission(
             db, "billing:manage",
             title="M-Pesa payment quarantined",
             body=(
-                f"CheckoutRequestID {txn.checkout_request_id}: {reason}. "
-                "Not settled, needs review."
+                f"{identifier} on {till}: {reason}. Not settled, needs review."
             ),
             link="/app/billing",
             category="danger",
         )
     except Exception:  # noqa: BLE001, a notification failure must never
         # be allowed to look like a settlement failure, or vice versa.
-        logger.warning("apply_stk_callback: quarantine notification failed", exc_info=True)
+        logger.warning("_notify_quarantine: quarantine notification failed", exc_info=True)
 
 
 def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]:
