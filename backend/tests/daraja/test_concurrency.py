@@ -571,3 +571,130 @@ def test_concurrent_reuse_of_the_same_key_with_a_different_body_returns_409(
     # The winner's own push happened; the loser's rejection must not have
     # triggered a second, wasted call.
     assert call_count["n"] == 1
+
+
+def test_concurrent_reuse_with_a_different_body_leaves_no_stranded_pending_row(
+    db, _engine, monkeypatch
+):
+    """The loser in the race above still owns a Pending row: _reserve_pending
+    committed it before either thread ever reached the second idempotent_guard
+    check that raises the 409. Without marking that row Failed before
+    re-raising, it is left status="Pending" with checkout_request_id=None
+    forever: Daraja was never called for it, so Task 8's reconciliation job
+    (which needs a checkout_request_id to ask Safaricom via STK Query) can
+    never resolve it, and it becomes a permanent phantom in the transaction
+    log and every pending-transactions report.
+
+    No money is at risk here (Daraja was never called for the loser's row);
+    this guards log integrity, not fund safety. This is the no-invoice path
+    (no invoice_id/dispense_id), since that is the one case where
+    _reserve_pending's partial unique index never blocks the loser's own
+    reservation: both threads reserve their OWN separate row before either
+    reaches the guard that rejects one of them.
+
+    A plain start-of-function barrier does not reliably reproduce this: with
+    everything mocked, one thread can run start-to-finish (including writing
+    the idempotency cache row) before the other even leaves its FIRST
+    idempotent_guard check, in which case the loser is rejected there,
+    before ever reserving a row, and nothing is stranded. The race this test
+    targets needs BOTH threads to have already reserved (and committed)
+    their own row before either reaches its SECOND, gated call. A second
+    barrier, tripped from inside a wrapped idempotent_guard on each thread's
+    second call, forces exactly that interleaving.
+    """
+    _fake_oauth(monkeypatch)
+    call_count = {"n": 0}
+    lock = threading.Lock()
+    _fake_stk_success(monkeypatch, call_count, lock)
+    make_mpesa_config(db)
+    db.commit()
+
+    import app.services.daraja.stk as stk_module
+
+    real_idempotent_guard = stk_module.idempotent_guard
+    second_call_barrier = threading.Barrier(2)
+    call_counts: dict = {}
+    call_counts_lock = threading.Lock()
+
+    def wrapped_idempotent_guard(session, **kwargs):
+        tid = threading.get_ident()
+        with call_counts_lock:
+            call_counts[tid] = call_counts.get(tid, 0) + 1
+            n = call_counts[tid]
+        if n == 2:
+            # Both threads' reservations (_reserve_pending) are already
+            # committed by the time either gets here: this is the SECOND
+            # call per thread, made only after _reserve_pending returned.
+            # Holding both here until both arrive is what forces the race
+            # onto the "already reserved, now racing the guard" path.
+            second_call_barrier.wait(timeout=5)
+        return real_idempotent_guard(session, **kwargs)
+
+    monkeypatch.setattr(stk_module, "idempotent_guard", wrapped_idempotent_guard)
+
+    SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+    start_barrier = threading.Barrier(2)
+    results: list = []
+    errors: list = []
+    results_lock = threading.Lock()
+
+    def worker(amount: Decimal):
+        session = SessionLocal()
+        try:
+            start_barrier.wait(timeout=5)
+            r = initiate_stk_push(
+                session,
+                phone_number="0712345678",
+                amount=amount,
+                callback_tenant="mayoclinic_db",
+                user_id=1,
+                idempotency_key="stranded-row-different-bodies",
+            )
+            with results_lock:
+                results.append(r)
+        except Exception as exc:  # noqa: BLE001, captured for the assertion below
+            with results_lock:
+                errors.append(exc)
+        finally:
+            session.close()
+
+    t1 = threading.Thread(target=worker, args=(Decimal("250.00"),))
+    t2 = threading.Thread(target=worker, args=(Decimal("999.00"),))
+    t1.start()
+    t2.start()
+    t1.join(timeout=15)
+    t2.join(timeout=15)
+
+    # The 409 must still reach the loser: a reused key with a genuinely
+    # different body is a programmer error or an attack and must surface,
+    # never be silently absorbed just to keep the row tidy.
+    assert len(results) == 1
+    assert len(errors) == 1
+    http_errors = [e for e in errors if isinstance(e, HTTPException)]
+    assert len(http_errors) == 1, f"expected an HTTPException, got: {errors}"
+    assert http_errors[0].status_code == 409
+
+    # Both threads did reserve their own row (proof this exercised the
+    # intended race, not the FIRST-check rejection that never reserves).
+    all_rows = db.query(MpesaTransaction).all()
+    assert len(all_rows) == 2
+
+    # The winner's own row legitimately STAYS "Pending" after a successful
+    # push (it is not settled until the callback arrives): that is correct
+    # and must not be mistaken for a stranded row. The bug this guards is
+    # specifically a Pending row with NO checkout_request_id: Daraja was
+    # never called for it, so no callback and no STK Query can ever settle
+    # it, and it is that combination, not "Pending" alone, that never
+    # resolves.
+    orphaned = [
+        t for t in all_rows if t.status == "Pending" and t.checkout_request_id is None
+    ]
+    assert orphaned == [], (
+        "a stranded Pending row survived the concurrent 409: it has no "
+        "checkout_request_id, so reconciliation can never resolve it"
+    )
+
+    failed = [t for t in all_rows if t.status == "Failed"]
+    assert len(failed) == 1
+    assert failed[0].checkout_request_id is None
+    assert failed[0].result_desc

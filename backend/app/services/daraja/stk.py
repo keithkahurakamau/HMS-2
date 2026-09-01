@@ -466,10 +466,31 @@ def initiate_stk_push(
     # concurrent loser blocks until the winner's push and cache write are
     # done, then replays the winner's response instead of its own prompt.
     if idempotency_key is not None and invoice_id is None and dispense_id is None:
-        cached, persist = idempotent_guard(
-            db, user_id=user_id, endpoint=_IDEMPOTENCY_ENDPOINT, key=idempotency_key,
-            body=idempotency_body,
-        )
+        try:
+            cached, persist = idempotent_guard(
+                db, user_id=user_id, endpoint=_IDEMPOTENCY_ENDPOINT, key=idempotency_key,
+                body=idempotency_body,
+            )
+        except HTTPException:
+            # A concurrent caller reused this same key with a genuinely
+            # DIFFERENT body: idempotent_guard raises 409 for that, and it
+            # must still reach this caller, unswallowed, because a reused
+            # key with a different body is a programmer error or an attack.
+            # But _reserve_pending already committed THIS row above, so
+            # without marking it here it is left status="Pending" with
+            # checkout_request_id=None forever: no prompt was ever sent for
+            # it, so Task 8's reconciliation job (which needs a
+            # checkout_request_id to ask Safaricom via STK Query) has
+            # nothing to resolve it with, and it becomes a permanent phantom
+            # in the transaction log and every pending-transactions report.
+            txn.status = "Failed"
+            txn.result_desc = (
+                "No prompt was sent from this row: its idempotency key was "
+                "reused, concurrently, with a different request body, which "
+                "is rejected as a conflict (409) rather than replayed."
+            )
+            db.commit()
+            raise
         if cached is not None:
             # This row was reserved but never pushed: a concurrent request
             # with the same key won the race and its response is being
