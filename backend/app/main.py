@@ -41,6 +41,7 @@ import app.routes.websockets as websockets_module
 import app.routes.radiology as radiology_module
 import app.routes.medical_history as medical_history_module
 import app.routes.public as public_module
+import app.routes.mpesa_refunds as mpesa_refunds_module
 import app.routes.payhero_admin as payhero_admin_module
 import app.routes.payhero_payment as payhero_payment_module
 import app.routes.payhero_superadmin as payhero_superadmin_module
@@ -382,6 +383,7 @@ app.include_router(websockets_module.router)
 app.include_router(radiology_module.router)
 app.include_router(medical_history_module.router)
 app.include_router(public_module.router)
+app.include_router(mpesa_refunds_module.router)  # Daraja migration Task 7: B2C refunds
 app.include_router(payhero_admin_module.router)  # PAY-001: per-tenant Pay Hero config
 app.include_router(payhero_payment_module.router)  # PAY-001: Pay Hero aggregator
 app.include_router(payhero_superadmin_module.router)  # operator-only Pay Hero provisioning
