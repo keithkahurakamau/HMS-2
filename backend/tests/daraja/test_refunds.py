@@ -33,7 +33,7 @@ from app.services.daraja.b2c import (
 )
 from app.services.daraja.client import _TOKEN_CACHE
 from app.utils.encryption import encrypt_data
-from tests.daraja.conftest import make_mpesa_config
+from tests.daraja.conftest import make_invoice, make_mpesa_config
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -139,7 +139,7 @@ def test_refund_cannot_exceed_the_original_receipt(db):
 
     with pytest.raises(HTTPException) as exc_info:
         request_refund(
-            db, source_transaction_id=txn.id, amount=Decimal("1000.01"),
+            db, source_transaction_id=txn.id, amount=Decimal("1001.00"),
             reason="too much", user_id=1,
         )
     assert exc_info.value.status_code == 400
@@ -533,9 +533,11 @@ def test_b2c_result_failure_code_marks_failed(db):
 
 def test_b2c_result_cannot_complete_a_different_refund(db):
     """A result must not be able to complete a DIFFERENT refund than the
-    one it belongs to: the ConversationID cross-check must reject a
-    payload that names the right OriginatorConversationID but the wrong
-    ConversationID."""
+    one it belongs to. A payload naming the right OriginatorConversationID
+    but a DIFFERENT ConversationID than the one recorded at dispatch is
+    treated as a double-dispatch alarm (Safaricom may hold two distinct
+    instructions for one refund): never overwritten, never used to
+    complete the refund, recorded and notified instead."""
     config = _refund_config(db)
     txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
     db.commit()
@@ -561,11 +563,13 @@ def test_b2c_result_cannot_complete_a_different_refund(db):
         }
     }
     result = handle_b2c_result(db, payload)
-    assert result is None
+    assert result is not None
+    assert "ALARM" in result.result_desc
 
     db.refresh(refund)
     assert refund.status == "Processing"
     assert refund.transaction_receipt is None
+    assert refund.conversation_id == "AG_REAL"  # never overwritten
 
 
 # ─── Refunds disabled ───────────────────────────────────────────────────────
@@ -620,3 +624,358 @@ def test_request_refund_requires_a_settled_receipt(db):
             reason="not settled yet", user_id=1,
         )
     assert exc_info.value.status_code == 400
+
+
+# ─── Fix round 1: C2, a stranded Approved refund must still be resolvable ───
+
+
+def test_b2c_result_applies_to_an_approved_refund_whose_dispatch_response_was_lost(db):
+    """C2 (revert-evidence target). dispatch_refund's own synchronous
+    response can be lost (a read timeout, a dropped connection, a breaker
+    trip on the response leg) even though Safaricom already accepted the
+    request; the refund is then correctly left Approved, since nothing was
+    known at that moment. Safaricom's result callback for that
+    already-accepted instruction still arrives later and MUST be applied,
+    not discarded as unrecognised: discarding it strands the refund
+    Approved forever while the money has already left the till."""
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="lost dispatch response", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+    assert refund.status == "Approved"
+    assert refund.conversation_id is None
+
+    payload = {
+        "Result": {
+            "ResultCode": 0,
+            "ResultDesc": "The service request is processed successfully.",
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "ConversationID": "AG_STRANDED_1",
+            "ResultParameters": {"ResultParameter": [
+                {"Key": "TransactionReceipt", "Value": "RBXSTRANDED"},
+                {"Key": "TransactionAmount", "Value": 200},
+            ]},
+        }
+    }
+    result = handle_b2c_result(db, payload)
+    assert result is not None
+    assert result.status == "Completed"
+    assert result.transaction_receipt == "RBXSTRANDED"
+    assert result.conversation_id == "AG_STRANDED_1"
+
+
+def test_b2c_timeout_confirms_an_approved_refund_and_moves_it_to_processing(db):
+    """C2's companion case for the timeout handler: a queue timeout can
+    also arrive for a refund still at Approved (the synchronous ack was
+    lost, but Safaricom queued the request). This confirms Safaricom holds
+    it, so the refund moves to Processing, not left stranded at Approved."""
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="lost dispatch ack, then a timeout", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+    assert refund.status == "Approved"
+
+    payload = {
+        "Result": {
+            "ResultType": 1,
+            "ResultCode": 1,
+            "ResultDesc": "The service request timed out.",
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "ConversationID": "AG_STRANDED_TIMEOUT",
+        }
+    }
+    result = handle_b2c_timeout(db, payload)
+    assert result is not None
+    assert result.status == "Processing"
+    assert result.conversation_id == "AG_STRANDED_TIMEOUT"
+
+
+# ─── Fix round 1: C1, a retry's own duplicate-rejection must not be Failed ──
+
+
+def test_dispatch_retry_nonzero_response_code_does_not_fail_a_processing_refund(db, monkeypatch):
+    """C1 (revert-evidence target). A refund that entered dispatch_refund
+    already Processing (a retry) and gets a non-zero synchronous
+    ResponseCode must NOT be marked Failed: that is exactly the shape of
+    Safaricom recognising the retry as a duplicate of the instruction it
+    already holds, i.e. the OriginatorConversationID reuse defence working
+    as intended. Marking it Failed here is how the next operator action (a
+    brand new refund, a brand new originator id) pays the patient twice."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="retry duplicate rejection", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+
+    def fake_post_first_accept(url, **kw):
+        return FakeResponse(200, {
+            "ConversationID": "AG_FIRST", "ResponseCode": "0",
+            "ResponseDescription": "Accept the service request successfully.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_first_accept)
+    refund = dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+    assert refund.status == "Processing"
+
+    def fake_post_duplicate_rejection(url, **kw):
+        return FakeResponse(200, {
+            "ResponseCode": "1",
+            "ResponseDescription": "Duplicate OriginatorConversationID.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_duplicate_rejection)
+    refund = dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+
+    assert refund.status == "Processing"
+    assert refund.result_desc is not None
+    assert "manual review" in refund.result_desc
+
+
+def test_dispatch_first_attempt_nonzero_response_code_fails_an_approved_refund(db, monkeypatch):
+    """The counterpart to the test above: a non-zero synchronous
+    ResponseCode on the FIRST attempt (entered as Approved) is a genuine,
+    definitive rejection; no async result will ever follow it, so Failed
+    is correct here."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="first attempt rejected", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+
+    def fake_post_reject(url, **kw):
+        return FakeResponse(200, {
+            "ResponseCode": "2001", "ResponseDescription": "Invalid initiator credentials.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_reject)
+    refund = dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+
+    assert refund.status == "Failed"
+
+
+# ─── Fix round 1: I2, ConversationID is written once, never overwritten ────
+
+
+def test_dispatch_never_overwrites_an_already_recorded_conversation_id(db, monkeypatch):
+    """A second, DIFFERENT ConversationID arriving on a later dispatch call
+    is direct evidence Safaricom may hold two distinct instructions for one
+    refund. It must be recorded as an alarm, never silently overwritten:
+    overwriting it would erase that evidence and retarget every later
+    cross-check at the second instruction."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="conversation id integrity", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+
+    def fake_post_one(url, **kw):
+        return FakeResponse(200, {"ConversationID": "AG_ONE", "ResponseCode": "0", "ResponseDescription": "ok"})
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_one)
+    refund = dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+    assert refund.conversation_id == "AG_ONE"
+
+    def fake_post_two(url, **kw):
+        return FakeResponse(200, {"ConversationID": "AG_TWO", "ResponseCode": "0", "ResponseDescription": "ok"})
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_two)
+    refund = dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+
+    assert refund.conversation_id == "AG_ONE"
+    assert refund.result_desc is not None
+    assert "ALARM" in refund.result_desc
+
+
+# ─── Fix round 1: I3, the result's amount is actually compared ─────────────
+
+
+def test_b2c_result_amount_mismatch_does_not_complete(db):
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="amount cross-check", user_id=1,
+    )
+    refund.status = "Processing"
+    refund.conversation_id = "AG_AMOUNT_1"
+    db.commit()
+
+    payload = {
+        "Result": {
+            "ResultCode": 0,
+            "ResultDesc": "ok",
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "ConversationID": "AG_AMOUNT_1",
+            "ResultParameters": {"ResultParameter": [
+                {"Key": "TransactionReceipt", "Value": "RBXMISMATCH"},
+                {"Key": "TransactionAmount", "Value": 50},
+            ]},
+        }
+    }
+    result = handle_b2c_result(db, payload)
+    assert result.status == "Processing"
+    assert "KES" in result.result_desc
+    assert result.transaction_receipt is None
+
+
+# ─── Fix round 1: I1, the rolling cap is tenant-wide, not per-till ─────────
+
+
+def test_rolling_24h_cap_applies_to_legacy_transactions_with_no_till(db):
+    """I1 (also proves the tenant-wide scope). mpesa_config_id is nullable
+    and NULL on every transaction written before per-department tills
+    existed. A cap query joined to mpesa_config_id == config.id would
+    never see a refund against such a receipt (NULL == id is NULL, never
+    true in SQL), silently exempting that whole class of receipts from one
+    of four load-bearing controls. It must count toward the same
+    tenant-wide rolling total as every other refund."""
+    config = _refund_config(db, refund_daily_cap=Decimal("500.00"))
+    legacy_txn = _make_settled_txn(db, amount=Decimal("1000.00"), receipt="LEGACY1", config=None)
+    normal_txn = _make_settled_txn(db, amount=Decimal("1000.00"), receipt="NORMAL1", config=config)
+    db.commit()
+
+    first = request_refund(
+        db, source_transaction_id=legacy_txn.id, amount=Decimal("400.00"),
+        reason="refund against a legacy, till-less receipt", user_id=1,
+    )
+    assert first.amount == Decimal("400.00")
+
+    with pytest.raises(HTTPException) as exc_info:
+        request_refund(
+            db, source_transaction_id=normal_txn.id, amount=Decimal("200.00"),
+            reason="pushes the tenant-wide total past the cap", user_id=1,
+        )
+    assert exc_info.value.status_code == 400
+    assert "24-hour" in exc_info.value.detail
+
+
+# ─── Fix round 1: I4, a non-integral amount is rejected up front ───────────
+
+
+def test_request_refund_rejects_a_non_integral_amount(db):
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        request_refund(
+            db, source_transaction_id=txn.id, amount=Decimal("250.75"),
+            reason="fractional shillings", user_id=1,
+        )
+    assert exc_info.value.status_code == 400
+
+
+# ─── Fix round 1: M4, a completed refund adjusts the invoice ───────────────
+
+
+def test_completed_refund_decrements_invoice_amount_paid_and_recalculates_status(db):
+    """A Completed refund must update no fewer books than the payment it
+    reverses did. Without this, the invoice still says fully paid after
+    part of that payment went back out to the patient: an accounting
+    hole, not a missing nicety. (The ledger half is tracked separately,
+    blocked on a known post_from_event/created_by defect; see the TODO
+    at _apply_completed_refund_to_invoice's call site.)"""
+    config = _refund_config(db)
+    invoice = make_invoice(db, total_amount=Decimal("1000.00"))
+    invoice.amount_paid = Decimal("1000.00")
+    invoice.status = "Paid"
+    db.flush()
+
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    txn.invoice_id = invoice.invoice_id
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("300.00"),
+        reason="partial refund, invoice adjustment", user_id=1,
+    )
+    refund.status = "Processing"
+    refund.conversation_id = "AG_INVOICE_1"
+    db.commit()
+
+    payload = {
+        "Result": {
+            "ResultCode": 0,
+            "ResultDesc": "ok",
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "ConversationID": "AG_INVOICE_1",
+            "ResultParameters": {"ResultParameter": [
+                {"Key": "TransactionReceipt", "Value": "RBXINVOICE"},
+                {"Key": "TransactionAmount", "Value": 300},
+            ]},
+        }
+    }
+    result = handle_b2c_result(db, payload)
+    assert result.status == "Completed"
+
+    db.refresh(invoice)
+    assert invoice.amount_paid == Decimal("700.00")
+    assert invoice.status == "Partially Paid"
+
+
+# ─── Fix round 1: I6, a route-protection regression net ───────────────────
+
+
+def test_every_state_changing_refund_route_requires_exactly_mpesa_refund():
+    """A one-time reading that mpesa:refund gates the refund routes is not
+    a net: a future edit that drops the dependency, or widens it to an
+    any-of with billing:manage or another permission, would silently hand
+    every holder of that other permission the ability to send money out.
+    This iterates the app's actual registered routes so it fails the
+    moment that happens, rather than relying on someone noticing.
+    """
+    import app.main as app_module
+    from app.core.dependencies import RequirePermission
+
+    refund_routes = [
+        route for route in app_module.app.routes
+        if "/api/payments/mpesa/refunds" in getattr(route, "path", "")
+    ]
+    assert refund_routes, "no refund routes found; the router may not be mounted"
+
+    checked = 0
+    for route in refund_routes:
+        methods = getattr(route, "methods", None) or set()
+        if "GET" in methods:
+            continue  # read endpoints may reasonably allow billing:read too
+        checked += 1
+        required = [
+            dep.call.required_permissions
+            for dep in route.dependant.dependencies
+            if isinstance(dep.call, RequirePermission)
+        ]
+        assert required, (
+            f"{methods} {route.path} carries no RequirePermission dependency at all"
+        )
+        assert required == [("mpesa:refund",)], (
+            f"{methods} {route.path} must require exactly ('mpesa:refund',), "
+            f"found {required}"
+        )
+    assert checked >= 3, "expected at least the request/approve/retry-dispatch routes"
