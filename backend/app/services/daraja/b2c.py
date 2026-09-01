@@ -15,7 +15,12 @@ design rationale this module implements:
     the source MpesaTransaction) so two concurrent requests against the same
     receipt serialise instead of both reading a stale balance.
   * A per-transaction cap (refund_max_amount) and a rolling 24-hour cap
-    (refund_daily_cap), both read from MpesaConfig, both enforced here.
+    (refund_daily_cap), both enforced here. The per-transaction cap is the
+    till's own; the rolling cap's ceiling is also read from the till this
+    refund is paid from, but the total it bounds is the whole TENANT's
+    refund activity in the window, matching the design's per-tenant cap
+    (see the comment in request_refund for why a per-till total would also
+    silently exempt every legacy, till-less transaction).
   * OriginatorConversationID is minted once, in request_refund, and reused on
     every dispatch_refund retry: this is the primary double-refund defence,
     since Safaricom recognises a retried request as the same instruction
@@ -133,6 +138,21 @@ def request_refund(
         raise HTTPException(status_code=400, detail="Invalid refund amount.") from exc
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Refund amount must be greater than zero.")
+    if amount != amount.to_integral_value():
+        # dispatch_refund's B2C payload sends Amount as int(refund.amount):
+        # Daraja's B2C API pays whole shillings only. Rejecting a
+        # fractional amount HERE, at the input boundary, is what keeps the
+        # record and the actual payout from ever disagreeing; catching it
+        # only at dispatch time would still let a fractional amount sit on
+        # the row (and count against caps and the refundable balance) as
+        # something the payout can never actually match.
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Refund amount must be a whole number of shillings: M-Pesa "
+                "B2C cannot pay fractional shillings."
+            ),
+        )
     reason = (reason or "").strip()
     if not reason:
         raise HTTPException(status_code=400, detail="A refund reason is required.")
@@ -180,12 +200,22 @@ def request_refund(
             detail=f"Refund of KES {amount} exceeds the per-transaction cap of KES {max_amount}.",
         )
 
+    # The design's cap is per TENANT, counted across every till, not per
+    # till: the ceiling compared against is still the value configured on
+    # the till THIS refund would be paid from (there is no separate
+    # tenant-wide cap field), but the running total it is compared to is
+    # every refund the tenant has made in the window, full stop. A join on
+    # MpesaTransaction.mpesa_config_id would also silently exempt every
+    # transaction that predates the per-department-tills migration: that
+    # column is nullable and NULL on every such row, and `NULL == id` is
+    # NULL, never true in SQL, so a refund against a legacy receipt would
+    # neither count toward, nor be bounded by, any till's total at all.
+    # Counting across the whole tenant by MpesaRefund alone closes both
+    # gaps at once.
     window_start = datetime.now(timezone.utc) - timedelta(hours=24)
     rolling_total = (
         db.query(func.coalesce(func.sum(MpesaRefund.amount), 0))
-        .join(MpesaTransaction, MpesaRefund.source_transaction_id == MpesaTransaction.id)
         .filter(
-            MpesaTransaction.mpesa_config_id == config.id,
             MpesaRefund.status.in_(_HOLDS_FUNDS),
             MpesaRefund.requested_at >= window_start,
         )
@@ -197,8 +227,8 @@ def request_refund(
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Refund of KES {amount} would push this till's rolling 24-hour "
-                f"refund total past its KES {daily_cap} cap."
+                f"Refund of KES {amount} would push the hospital's rolling "
+                f"24-hour refund total past its KES {daily_cap} cap."
             ),
         )
 
