@@ -11,7 +11,7 @@ app.services.daraja.client, exercised through the real DarajaClient exactly
 as production traffic is.
 """
 import secrets
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -21,6 +21,7 @@ from app.models.billing import Payment
 from app.models.mpesa import MpesaTransaction
 from app.models.patient import Patient
 from app.services.daraja.c2b import (
+    c2b_readiness,
     handle_confirmation,
     handle_transaction_status_result,
     handle_transaction_status_timeout,
@@ -660,6 +661,11 @@ def test_register_c2b_urls_registers_every_active_till(db, monkeypatch):
     result = register_c2b_urls(db, callback_tenant="mayoclinic_db")
 
     assert result["results"][0]["registered"] is True
+    # No initiator credentials were set on config_a: registration succeeds
+    # (Safaricom's registerurl call neither needs nor checks them), but
+    # verification_ready must say plainly that this till can never verify
+    # a payment yet, rather than the response implying setup is complete.
+    assert result["results"][0]["verification_ready"] is False
     db.refresh(config_a)
     assert config_a.c2b_urls_registered_at is not None
 
@@ -700,3 +706,50 @@ def test_register_c2b_urls_does_not_stop_on_one_failing_config(db, monkeypatch):
     assert by_shortcode["200002"]["registered"] is True
     db.refresh(good)
     assert good.c2b_urls_registered_at is not None
+
+
+def test_register_c2b_urls_reports_verification_ready_when_initiator_credentials_set(db, monkeypatch):
+    _fake_oauth(monkeypatch)
+    monkeypatch.setattr(
+        "app.services.daraja.client.requests.post",
+        lambda url, **kw: FakeResponse(200, {"ResponseDescription": "success"}),
+    )
+
+    config = _make_config_with_initiator(db, shortcode="300003")
+
+    result = register_c2b_urls(db, callback_tenant="mayoclinic_db")
+
+    assert result["results"][0]["registered"] is True
+    assert result["results"][0]["verification_ready"] is True
+    assert config.initiator_name and config.initiator_password_encrypted
+
+
+def test_c2b_readiness_flags_a_registered_till_with_no_initiator_credentials(db):
+    """The exact blocker the coupling fix exists to surface: an active till
+    with C2B registered that LOOKS complete but can never verify a payment.
+    A health panel reads this to catch it before a hospital discovers it
+    only after taking real, unverifiable money."""
+    config = make_mpesa_config(db, shortcode="400004")
+    config.c2b_urls_registered_at = datetime.now(timezone.utc)
+    db.commit()
+
+    readiness = c2b_readiness(db)
+
+    row = next(r for r in readiness if r["shortcode"] == "400004")
+    assert row["c2b_urls_registered_at"] is not None
+    assert row["verification_ready"] is False
+
+
+def test_c2b_readiness_is_a_pure_read_and_never_calls_daraja(db, monkeypatch):
+    def _fail_if_called(*args, **kwargs):
+        raise AssertionError("c2b_readiness must never call Safaricom")
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", _fail_if_called)
+    monkeypatch.setattr("app.services.daraja.client.requests.get", _fail_if_called)
+
+    _make_config_with_initiator(db, shortcode="500005")
+
+    readiness = c2b_readiness(db)
+
+    row = next(r for r in readiness if r["shortcode"] == "500005")
+    assert row["verification_ready"] is True

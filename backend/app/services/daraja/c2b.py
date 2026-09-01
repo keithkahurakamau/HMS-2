@@ -105,6 +105,18 @@ _OUTSTANDING_STATUSES = ("Pending", "Partially Paid")
 # ─── Till registration ──────────────────────────────────────────────────────
 
 
+def _verification_ready(config: MpesaConfig) -> bool:
+    """True only when a Transaction Status query can actually be SIGNED for
+    this till: both initiator fields must be set. Safaricom's
+    /mpesa/c2b/v1/registerurl endpoint neither needs nor validates initiator
+    credentials, so registration succeeding says nothing about whether a
+    payment on this till can ever be verified; this is the separate check
+    that closes that gap. Shared by register_c2b_urls and c2b_readiness so
+    the two can never disagree about what "ready" means.
+    """
+    return bool(config.initiator_name) and bool(config.initiator_password_encrypted)
+
+
 def register_c2b_urls(db: Session, *, callback_tenant: Optional[str] = None) -> dict:
     """Register the Confirmation and Validation URLs for EVERY active till in
     this tenant, not once per tenant. With per-department tills, each config
@@ -114,6 +126,17 @@ def register_c2b_urls(db: Session, *, callback_tenant: Optional[str] = None) -> 
     Records c2b_urls_registered_at per config on success. A failure on one
     config does not stop the others: an operator adding a fifth department
     till should not be blocked by an unrelated fourth till's bad credentials.
+
+    Registers a till REGARDLESS of whether it has initiator credentials:
+    Safaricom's registerurl call does not need them and does not check for
+    them, so refusing to register without them would only make the
+    problem harder to see, not solve it. Instead each result carries
+    verification_ready, so the admin surface that calls this can stop
+    claiming setup is "complete" the moment registration succeeds, when in
+    fact a till with no initiator credentials can be registered, take real
+    money, and never verify or settle a single payment: the only trace
+    left is a receipt on the unmatched queue with a result_desc explaining
+    why (see handle_confirmation's credential-failure handling).
     """
     configs = db.query(MpesaConfig).filter(MpesaConfig.is_active == True).all()  # noqa: E712
     results = []
@@ -134,7 +157,12 @@ def register_c2b_urls(db: Session, *, callback_tenant: Optional[str] = None) -> 
             logger.warning(
                 "C2B URL registration failed for config %s: %s", config.id, safe_repr(str(exc))
             )
-            results.append({"config_id": config.id, "shortcode": config.shortcode, "registered": False})
+            results.append({
+                "config_id": config.id,
+                "shortcode": config.shortcode,
+                "registered": False,
+                "verification_ready": _verification_ready(config),
+            })
             continue
 
         config.c2b_urls_registered_at = datetime.now(timezone.utc)
@@ -142,11 +170,34 @@ def register_c2b_urls(db: Session, *, callback_tenant: Optional[str] = None) -> 
             "config_id": config.id,
             "shortcode": config.shortcode,
             "registered": True,
+            "verification_ready": _verification_ready(config),
             "response_description": data.get("ResponseDescription"),
         })
 
     db.commit()
     return {"results": results}
+
+
+def c2b_readiness(db: Session) -> list[dict]:
+    """Per-till C2B readiness: registered-with-Safaricom status alongside
+    verification_ready, for a health panel (or any other operator-facing
+    surface) to report an ACTIVE till that has C2B registered and shows
+    green, but has no initiator credentials and so can never verify a
+    payment it receives. This is a pure read, unlike register_c2b_urls: it
+    never calls Safaricom and never writes anything, so it can be polled
+    freely without re-registering URLs or risking a rate limit.
+    """
+    configs = db.query(MpesaConfig).filter(MpesaConfig.is_active == True).all()  # noqa: E712
+    return [
+        {
+            "config_id": config.id,
+            "shortcode": config.shortcode,
+            "department_id": config.department_id,
+            "c2b_urls_registered_at": config.c2b_urls_registered_at,
+            "verification_ready": _verification_ready(config),
+        }
+        for config in configs
+    ]
 
 
 # ─── Validation ─────────────────────────────────────────────────────────────
