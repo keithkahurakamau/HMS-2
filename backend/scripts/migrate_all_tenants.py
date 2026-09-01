@@ -31,6 +31,7 @@ tenant gets a chance.
 """
 from __future__ import annotations
 
+import importlib.util
 import logging
 import os
 import subprocess
@@ -726,6 +727,15 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
         "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS last_test_status VARCHAR(40);"),
     ("mpesa_configs",
         "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS last_test_message TEXT;"),
+    # f2a3b4c5d6e7: per-department tills. department_id and mpesa_config_id
+    # must exist before _apply_mpesa_till_indexes (below) can create its four
+    # partial unique indexes, two of which are on department_id itself.
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS department_id INTEGER "
+        "REFERENCES departments(department_id) ON DELETE SET NULL;"),
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS mpesa_config_id INTEGER "
+        "REFERENCES mpesa_configs(id);"),
     # c4e62d8a1f37 — bidirectional cheque register
     ("cheques",
         "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS direction VARCHAR(20) NOT NULL DEFAULT 'incoming';"),
@@ -827,6 +837,111 @@ def _apply_tenant_column_patches(tenant_url: str) -> None:
                 LOG.debug("[%s] column patches: no drift", label)
     except Exception as exc:  # noqa: BLE001
         LOG.error("[%s] column patch pass failed: %s", label, exc)
+    finally:
+        engine.dispose()
+
+
+def _load_department_tills_migration():
+    """Load alembic/versions/f2a3b4c5d6e7_department_tills.py by file path.
+
+    alembic/versions has no ``__init__.py`` (it isn't an importable
+    package), so this is the same pattern
+    tests/daraja/test_department_tills.py already uses to reach
+    ``pending_dedup_sql``. Loading it rather than retyping the SQL means the
+    legacy/safety-net path below and the migration's own dedup pass cannot
+    silently drift apart.
+    """
+    path = BACKEND_DIR / "alembic" / "versions" / "f2a3b4c5d6e7_department_tills.py"
+    spec = importlib.util.spec_from_file_location("department_tills_migration", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _apply_mpesa_till_indexes(tenant_url: str) -> None:
+    """Create the four partial unique indexes from f2a3b4c5d6e7 (per-department
+    tills, and one Pending push per invoice/dispense) on tenants that will
+    never actually run that migration.
+
+    A legacy tenant (no alembic_version) is bootstrapped by
+    ``_bootstrap_legacy_tenant``: create_all, then stamp straight to head.
+    create_all does not add columns or indexes to a table that already
+    exists, and stamping head means ``alembic upgrade head`` is a permanent
+    no-op for that tenant afterwards, so the migration's own upgrade(),
+    dedup-then-index-create included, never runs. Silently: two terminals in
+    one department can push two STK prompts for the same invoice, with no
+    error anywhere, on exactly the tenants nobody tests.
+
+    TENANT_COLUMN_PATCHES (applied just before this, in migrate_one) is what
+    guarantees mpesa_configs.department_id and
+    mpesa_transactions.mpesa_config_id exist first; two of these four
+    indexes are on department_id itself.
+
+    The same legacy data problem the migration guards against exists here
+    too: these are exactly the tenants still carrying Pay Hero era rows with
+    two Pending transactions for one invoice (no per-invoice guard existed
+    before this task), so the duplicate-resolution pass runs BEFORE the
+    CREATE UNIQUE INDEX statements, using the migration's own
+    ``pending_dedup_sql`` rather than a second copy that could drift from it.
+
+    Every statement here is IF NOT EXISTS / idempotent: safe to run on every
+    deploy, against every tenant, converged or not.
+    """
+    engine = create_engine(tenant_url)
+    label = tenant_url.rsplit("@", 1)[-1]
+    try:
+        with engine.begin() as conn:
+            existing_tables = set(inspect(conn).get_table_names())
+            if "mpesa_configs" not in existing_tables or "mpesa_transactions" not in existing_tables:
+                return
+
+            indexes_before = {ix["name"] for ix in inspect(conn).get_indexes("mpesa_configs")}
+            indexes_before |= {ix["name"] for ix in inspect(conn).get_indexes("mpesa_transactions")}
+
+            mig = _load_department_tills_migration()
+            resolved = 0
+            for scope_column in ("invoice_id", "dispense_id"):
+                result = conn.execute(
+                    text(mig.pending_dedup_sql(scope_column)),
+                    {"desc": mig.SUPERSEDED_PENDING_RESULT_DESC},
+                )
+                resolved += result.rowcount or 0
+            if resolved:
+                LOG.warning(
+                    "[%s] resolved %d pre-existing duplicate Pending mpesa_transactions "
+                    "row(s) before creating the till concurrency indexes",
+                    label, resolved,
+                )
+
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_configs_department "
+                "ON mpesa_configs (department_id) WHERE department_id IS NOT NULL;"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_configs_default "
+                "ON mpesa_configs ((department_id IS NULL)) WHERE department_id IS NULL;"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_txn_one_pending_per_invoice "
+                "ON mpesa_transactions (invoice_id) "
+                "WHERE status = 'Pending' AND invoice_id IS NOT NULL;"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_txn_one_pending_per_dispense "
+                "ON mpesa_transactions (dispense_id) "
+                "WHERE status = 'Pending' AND dispense_id IS NOT NULL;"
+            ))
+
+            indexes_after = {ix["name"] for ix in inspect(conn).get_indexes("mpesa_configs")}
+            indexes_after |= {ix["name"] for ix in inspect(conn).get_indexes("mpesa_transactions")}
+            added = indexes_after - indexes_before
+            if added:
+                LOG.warning(
+                    "[%s] created till concurrency index(es): %s",
+                    label, ", ".join(sorted(added)),
+                )
+    except Exception as exc:  # noqa: BLE001
+        LOG.error("[%s] mpesa till index pass failed: %s", label, exc)
     finally:
         engine.dispose()
 
@@ -1067,6 +1182,12 @@ def migrate_one(tenant_db_name: str, default_url: str) -> None:
     # ADD COLUMN IF NOT EXISTS statements the relevant migrations carry so
     # legacy-stamped tenants pick up columns added since their bootstrap.
     _apply_tenant_column_patches(tenant_url)
+    # Safety net (I6): legacy-stamped tenants never run f2a3b4c5d6e7's
+    # upgrade(), so they never get its four partial unique indexes (two
+    # terminals in a department can otherwise push two STK prompts for one
+    # invoice, silently). Resolves the same legacy duplicate-Pending data
+    # problem first, then creates the indexes; both steps are idempotent.
+    _apply_mpesa_till_indexes(tenant_url)
     # Accounting reference data (CoA, currency, settings, ledger mappings) —
     # without it post_from_event skips every payment and the transaction log
     # stays empty (idempotent; customised tenants untouched).
