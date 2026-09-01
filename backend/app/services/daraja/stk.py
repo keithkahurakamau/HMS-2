@@ -29,7 +29,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config.settings import settings
-from app.core.idempotency import idempotent_guard
+from app.core.idempotency import idempotent_guard, persist_and_commit
 from app.models.mpesa import MpesaConfig, MpesaTransaction
 from app.services.daraja.client import DarajaClient, DarajaError
 from app.services.daraja.credentials import daraja_timestamp, normalize_msisdn, stk_password
@@ -305,34 +305,22 @@ def _finalize(
 
     _reserve_pending's own commit (see its docstring) ends the transaction
     idempotent_guard took its Postgres advisory lock in, on purpose, so a
-    second terminal is not blocked for the whole Daraja round trip. That
-    means the lock no longer serialises two terminals racing on the SAME
-    (user_id, endpoint, key): both can reach here, and the loser's INSERT
-    into idempotency_keys collides with the winner's on
-    pk_idempotency_keys. Rather than let that surface as an uncaught
-    IntegrityError, a 500 on the exact double-click path idempotency exists
-    to protect, the loser rolls back its own attempt and replays
-    idempotent_guard to read back the winner's now-committed response, so
-    both terminals see the SAME answer.
+    second terminal is not blocked for the whole Daraja round trip. Two
+    callers racing on the SAME (user_id, endpoint, key) can therefore both
+    reach here; app.core.idempotency.persist_and_commit is what makes that
+    survivable (see its own docstring): the loser rolls back its own INSERT
+    and replays idempotent_guard for the winner's now-committed response
+    instead of surfacing an uncaught IntegrityError, so both terminals see
+    the SAME answer.
     """
-    if persist:
-        persist(result, status=200)
-    try:
+    if persist is None:
         db.commit()
-    except IntegrityError:
-        db.rollback()
-        if idempotency_key is not None:
-            cached, _ = idempotent_guard(
-                db,
-                user_id=user_id,
-                endpoint=_IDEMPOTENCY_ENDPOINT,
-                key=idempotency_key,
-                body=idempotency_body,
-            )
-            if cached is not None:
-                return cached
-        raise
-    return result
+        return result
+    return persist_and_commit(
+        db, persist, result, status=200,
+        user_id=user_id, endpoint=_IDEMPOTENCY_ENDPOINT,
+        key=idempotency_key, body=idempotency_body,
+    )
 
 
 def initiate_stk_push(
@@ -359,7 +347,11 @@ def initiate_stk_push(
     (user_id, endpoint, key). Pass `user_id` and `idempotency_key` to use
     it; a repeated key with the same body returns the first response
     without pushing a second prompt, and the same key with a different
-    body raises 409.
+    body raises 409. For a push with NEITHER invoice_id nor dispense_id,
+    the guard is checked a SECOND time too, right before the Daraja call:
+    see the comment at that call site, below, for why one check is not
+    enough there and why the second check must NOT run for an invoice or
+    dispense push.
 
     Problem B, two different cashiers on two different terminals both
     pushing for the same invoice or dispense: no per-user key catches
@@ -456,6 +448,40 @@ def initiate_stk_push(
             db, result, persist=persist, user_id=user_id,
             idempotency_key=idempotency_key, idempotency_body=idempotency_body,
         )
+
+    # Second idempotency check, right before the network call, ONLY when
+    # there is neither an invoice_id nor a dispense_id. The FIRST check
+    # (above, before _reserve_pending) cannot protect THIS push:
+    # _reserve_pending's own commit already ended that check's transaction
+    # and released its advisory lock. With an invoice_id or dispense_id
+    # that gap is already closed by the partial unique index (every OTHER
+    # caller fails its OWN reservation and never reaches this line), so a
+    # second check there would be worse than useless: it would race the
+    # `not reserved` branch's own cache write and could wrongly treat the
+    # caller that actually holds the reservation as the loser, skipping
+    # the real push. Without either id there is no such index, so two
+    # callers sharing a key can both reserve their OWN row and both arrive
+    # here with reserved=True; re-acquiring the SAME lock here, with no
+    # commit before the eventual persist below, closes THAT gap: a
+    # concurrent loser blocks until the winner's push and cache write are
+    # done, then replays the winner's response instead of its own prompt.
+    if idempotency_key is not None and invoice_id is None and dispense_id is None:
+        cached, persist = idempotent_guard(
+            db, user_id=user_id, endpoint=_IDEMPOTENCY_ENDPOINT, key=idempotency_key,
+            body=idempotency_body,
+        )
+        if cached is not None:
+            # This row was reserved but never pushed: a concurrent request
+            # with the same key won the race and its response is being
+            # replayed instead. Marking it Failed is a documented fact,
+            # not a guess about a push that never happened.
+            txn.status = "Failed"
+            txn.result_desc = (
+                "Superseded by a concurrent request with the same idempotency "
+                "key that reached M-Pesa first. No prompt was sent from this row."
+            )
+            db.commit()
+            return cached
 
     # From here on this call owns the reserved Pending row. Any failure
     # below marks it Failed (a real, known outcome) rather than leaving it

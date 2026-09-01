@@ -380,15 +380,19 @@ def test_two_terminals_with_the_same_idempotency_key_and_no_invoice_push_once(
     """The one case with no partial-unique-index backstop: a push with
     neither invoice_id nor dispense_id reserves a slot that never
     conflicts with anything, so _reserve_pending's own commit ends the
-    idempotency lock's transaction on BOTH threads before either has
-    written the idempotency cache row. Both can genuinely reach Daraja: the
-    reservation guard cannot save this case, and does not claim to.
+    FIRST idempotency check's transaction on BOTH threads before either has
+    written the idempotency cache row. The reservation guard alone cannot
+    save this case, and never claimed to.
 
-    What must still hold: neither terminal 500s (the INSERT race on
-    pk_idempotency_keys must not surface as an uncaught IntegrityError),
-    and both terminals are handed back the SAME final answer, because the
-    loser replays idempotent_guard after its own insert collides rather
-    than returning its own, different, wasted push's result.
+    What closes it is initiate_stk_push's SECOND idempotent_guard check,
+    taken again right before the Daraja call with no commit in between it
+    and the eventual cache write: whichever thread gets there first holds
+    the advisory lock across its own Daraja call and cache write, so the
+    other blocks until that is done, then replays the winner's response
+    instead of pushing its own prompt. This is genuinely concurrent: two
+    threads, two separate Sessions on separate connections, and a
+    threading.Barrier so both reach the guard together. A sequential test
+    would prove nothing here.
     """
     _fake_oauth(monkeypatch)
     call_count = {"n": 0}
@@ -432,10 +436,138 @@ def test_two_terminals_with_the_same_idempotency_key_and_no_invoice_push_once(
 
     assert not errors, f"unexpected errors from concurrent pushes: {errors}"
     assert len(results) == 2
-    # No database backstop means Daraja may genuinely be asked twice here;
-    # that is the accepted, called-out limitation of the no-invoice case.
-    # What matters is that both terminals are handed back the SAME answer,
-    # not two different half-completed ones and not a crash.
-    assert call_count["n"] in (1, 2)
+    # The proof that matters: Daraja was only ever asked once, even with no
+    # invoice/dispense to fall back on. Two calls here would mean the
+    # patient's handset got two prompts from one double-click.
+    assert call_count["n"] == 1
     assert results[0]["checkout_request_id"] == results[1]["checkout_request_id"]
     assert results[0]["transaction_id"] == results[1]["transaction_id"]
+
+
+def test_two_terminals_with_the_same_idempotency_key_and_invoice_push_once(
+    db, _engine, monkeypatch
+):
+    """The WITH-invoice counterpart: here the partial unique index already
+    stops a second reservation, so the loser takes the "not reserved"
+    branch straight to _finalize. What this test guards is the OTHER half
+    of I3: that loser's own persist attempt races the winner's on
+    pk_idempotency_keys (both used the same idempotency key), and before
+    persist_and_commit existed that surfaced as an uncaught IntegrityError,
+    a 500 on the exact double-click path idempotency exists to serve. Only
+    one Daraja call, and neither terminal raises.
+    """
+    _fake_oauth(monkeypatch)
+    call_count = {"n": 0}
+    lock = threading.Lock()
+    _fake_stk_success(monkeypatch, call_count, lock)
+
+    make_mpesa_config(db)
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+    db.commit()  # visible to the two independent connections below
+
+    SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+    barrier = threading.Barrier(2)
+    results: list = []
+    errors: list = []
+    results_lock = threading.Lock()
+
+    def worker():
+        session = SessionLocal()
+        try:
+            barrier.wait(timeout=5)
+            r = initiate_stk_push(
+                session,
+                phone_number="0712345678",
+                amount=Decimal("500.00"),
+                invoice_id=invoice.invoice_id,
+                callback_tenant="mayoclinic_db",
+                user_id=1,
+                idempotency_key="invoice-race-key",
+            )
+            with results_lock:
+                results.append(r)
+        except Exception as exc:  # noqa: BLE001, captured for the assertion below
+            with results_lock:
+                errors.append(exc)
+        finally:
+            session.close()
+
+    t1 = threading.Thread(target=worker)
+    t2 = threading.Thread(target=worker)
+    t1.start()
+    t2.start()
+    t1.join(timeout=15)
+    t2.join(timeout=15)
+
+    assert not errors, f"unexpected errors from concurrent pushes: {errors}"
+    assert len(results) == 2
+    assert call_count["n"] == 1
+    assert results[0]["checkout_request_id"] == results[1]["checkout_request_id"]
+    assert results[0]["transaction_id"] == results[1]["transaction_id"]
+
+
+def test_concurrent_reuse_of_the_same_key_with_a_different_body_returns_409(
+    db, _engine, monkeypatch
+):
+    """A DIFFERENT body under the same key is a programmer error or an
+    attack whether or not it arrives concurrently: the racing terminal must
+    still get 409, never the other terminal's unrelated cached answer.
+
+    This exercises the lock's OWN post-acquisition re-check, not just the
+    unlocked pre-check: both threads reach idempotent_guard with nothing
+    cached yet, so neither is rejected before taking the lock. Whichever
+    is second only discovers the mismatch after it is granted the lock,
+    which is exactly the path that must still raise 409 rather than
+    silently return the winner's response.
+    """
+    _fake_oauth(monkeypatch)
+    call_count = {"n": 0}
+    lock = threading.Lock()
+    _fake_stk_success(monkeypatch, call_count, lock)
+    make_mpesa_config(db)
+    db.commit()
+
+    SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+    barrier = threading.Barrier(2)
+    results: list = []
+    errors: list = []
+    results_lock = threading.Lock()
+
+    def worker(amount: Decimal):
+        session = SessionLocal()
+        try:
+            barrier.wait(timeout=5)
+            r = initiate_stk_push(
+                session,
+                phone_number="0712345678",
+                amount=amount,
+                callback_tenant="mayoclinic_db",
+                user_id=1,
+                idempotency_key="same-key-different-bodies",
+            )
+            with results_lock:
+                results.append(r)
+        except Exception as exc:  # noqa: BLE001, captured for the assertion below
+            with results_lock:
+                errors.append(exc)
+        finally:
+            session.close()
+
+    t1 = threading.Thread(target=worker, args=(Decimal("250.00"),))
+    t2 = threading.Thread(target=worker, args=(Decimal("999.00"),))
+    t1.start()
+    t2.start()
+    t1.join(timeout=15)
+    t2.join(timeout=15)
+
+    # Exactly one of the two genuinely different requests succeeds; the
+    # other is rejected as a key reuse with a different body, not silently
+    # handed the first one's answer and not left to crash.
+    assert len(results) == 1
+    assert len(errors) == 1
+    http_errors = [e for e in errors if isinstance(e, HTTPException)]
+    assert len(http_errors) == 1, f"expected an HTTPException, got: {errors}"
+    assert http_errors[0].status_code == 409
+    # The winner's own push happened; the loser's rejection must not have
+    # triggered a second, wasted call.
+    assert call_count["n"] == 1
