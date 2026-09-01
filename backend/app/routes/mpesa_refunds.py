@@ -46,7 +46,7 @@ from app.services.daraja.b2c import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/payments/mpesa", tags=["Payments — M-Pesa Refunds"])
+router = APIRouter(prefix="/api/payments/mpesa", tags=["Payments, M-Pesa Refunds"])
 
 
 # ─── Schemas ────────────────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ async def b2c_result(tenant_hint: str, token: str, request: Request):
     db = _tenant_session(db_name)
     try:
         handle_b2c_result(db, payload)
-    except Exception:  # noqa: BLE001 — never let a handler bug surface as a
+    except Exception:  # noqa: BLE001, never let a handler bug surface as a
         # non-200 to Safaricom; the callback is always acknowledged, the
         # failure is ours to chase from the logs.
         logger.exception("B2C result: handler raised")
