@@ -40,13 +40,14 @@ import hashlib
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from app.models.billing import Invoice
 from app.models.mpesa import MpesaConfig, MpesaRefund, MpesaTransaction
 from app.services.daraja.client import DarajaError
 from app.services.daraja.credentials import normalize_msisdn
@@ -503,17 +504,78 @@ def _notify_refund_needs_review(db: Session, refund: MpesaRefund, *, reason: str
         logger.warning("_notify_refund_needs_review: notification failed", exc_info=True)
 
 
+def _apply_completed_refund_to_invoice(db: Session, refund: MpesaRefund) -> None:
+    """Decrement the invoice's amount_paid by the refunded amount and
+    recalculate its status. Called only once a refund is genuinely
+    Completed (Safaricom's own result confirmed the money moved).
+
+    Without this, a Completed refund updates no invoice: the books would
+    still say the invoice is fully paid after part of that payment went
+    back out to the patient, an accounting hole, not a missing nicety.
+
+    TODO(ledger): this does not post a ledger entry for the refund.
+    settle_invoice_match posts through post_from_event, and that path has
+    a known, separately-tracked defect: JournalEntry.created_by is
+    NOT NULL while post_from_event defaults user_id=None, so a call with
+    no human actor (exactly what an unattended B2C result callback is)
+    poisons the session on its own INSERT. Do not add a ledger post here
+    until that is fixed, or every unattended completion fails here
+    instead of merely failing to post. The invoice adjustment above is
+    unaffected by that defect and must not wait on it.
+    """
+    if not refund.invoice_id:
+        return
+    invoice = (
+        db.query(Invoice)
+        .filter(Invoice.invoice_id == refund.invoice_id)
+        .with_for_update()
+        .first()
+    )
+    if invoice is None:
+        return
+    invoice.amount_paid = max(
+        Decimal("0"),
+        Decimal(str(invoice.amount_paid or 0)) - Decimal(str(refund.amount)),
+    )
+    total_amount = Decimal(str(invoice.total_amount or 0))
+    if invoice.amount_paid <= 0:
+        invoice.status = "Pending"
+    elif invoice.amount_paid >= total_amount:
+        invoice.status = "Paid"
+    else:
+        invoice.status = "Partially Paid"
+
+
 def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
     """Apply Safaricom's asynchronous B2C result.
 
-    Correlated by OriginatorConversationID (the id WE minted and control,
-    unique per refund) against a row this tenant created and is still
-    waiting on (status == "Processing"). Cross-checked against
-    ConversationID (Safaricom's own id for the accepted instruction,
-    recorded on the row at dispatch time) before acting: a result must not
-    be able to complete a DIFFERENT refund than the one it belongs to,
-    the same discipline status.py's Transaction Status result handler
-    applies via its receipt cross-check.
+    Correlated by OriginatorConversationID ALONE (the id WE minted, unique
+    per refund by a real database constraint). Earlier versions of this
+    handler additionally required status == "Processing", which discards
+    the single most important delivery this flow can receive: if
+    dispatch_refund's own synchronous response was lost (a read timeout, a
+    dropped connection, a breaker trip on the response leg) after
+    Safaricom had already accepted the request, the refund is correctly
+    left Approved (nothing was known at the time), but Safaricom's result
+    callback for that already-accepted instruction still arrives. A
+    status == "Processing" filter would call that "unrecognised" and
+    discard Safaricom's only definitive statement about money that has
+    already left the till, stranding the refund Approved forever: money
+    out, record says not yet sent. So the row is found by
+    OriginatorConversationID alone, and the STATUS FOUND decides what
+    happens next:
+      - Approved or Processing: apply the result below.
+      - Completed, Failed, or Reversed: already resolved, a repeat
+        delivery; no-op.
+      - anything else (e.g. Requested): should not happen, ignored.
+
+    ConversationID (Safaricom's own id for the accepted instruction) is
+    recorded the first time it is learned and cross-checked on every
+    later arrival via _record_conversation_id: a result must not be able
+    to complete a DIFFERENT refund than the one it belongs to, the same
+    discipline status.py's Transaction Status result handler applies via
+    its receipt cross-check, and a genuinely different ConversationID is
+    itself an alarm (see _record_conversation_id), not a discard.
     """
     result = (payload or {}).get("Result") or {}
     originator_id = result.get("OriginatorConversationID")
@@ -523,24 +585,12 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
 
     refund = (
         db.query(MpesaRefund)
-        .filter(
-            MpesaRefund.originator_conversation_id == originator_id,
-            MpesaRefund.status == "Processing",
-        )
+        .filter(MpesaRefund.originator_conversation_id == originator_id)
         .first()
     )
     if refund is None:
         logger.warning(
-            "B2C result for an unrecognised or already-resolved "
-            "OriginatorConversationID; ignored"
-        )
-        return None
-
-    conversation_id = result.get("ConversationID")
-    if refund.conversation_id and conversation_id and refund.conversation_id != conversation_id:
-        logger.error(
-            "B2C result ConversationID mismatch for refund %s: expected %s, got %s; ignored",
-            refund.id, safe_repr(refund.conversation_id), safe_repr(conversation_id),
+            "B2C result for an unrecognised OriginatorConversationID; ignored"
         )
         return None
 
@@ -552,8 +602,25 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
 
     try:
         db.refresh(refund)
-        if refund.status != "Processing":
+
+        if refund.status in ("Completed", "Failed", "Reversed"):
+            logger.info(
+                "B2C result for refund %s already %s; repeat delivery, no-op",
+                refund.id, refund.status,
+            )
             db.commit()
+            return refund
+
+        if refund.status not in ("Approved", "Processing"):
+            logger.warning(
+                "B2C result for refund %s in unexpected status %s; ignored",
+                refund.id, refund.status,
+            )
+            db.commit()
+            return None
+
+        if not _record_conversation_id(db, refund, result.get("ConversationID")):
+            db.refresh(refund)
             return refund
 
         result_code = result.get("ResultCode")
@@ -599,10 +666,43 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
             _notify_refund_needs_review(db, refund, reason=refund.result_desc)
             return refund
 
+        try:
+            reported_amount = Decimal(str(raw_amount))
+        except (InvalidOperation, ValueError, TypeError):
+            refund.result_desc = f"B2C result reported an unparseable amount: {raw_amount!r}"[:255]
+            logger.error(
+                "B2C result for refund %s reported an unparseable amount: %r",
+                refund.id, raw_amount,
+            )
+            db.commit()
+            _notify_refund_needs_review(db, refund, reason=refund.result_desc)
+            return refund
+
+        # THE amount cross-check. Without this, a result reporting KES 200
+        # against a refund of KES 2,000 would complete the full KES 2,000
+        # on the strength of a result that never actually confirmed it;
+        # requiring the field to be PRESENT (above) is not the same as
+        # requiring it to AGREE. Mirrors status.py's Transaction Status
+        # cross-check: a mismatch settles nothing, quarantines to a human.
+        if reported_amount != Decimal(str(refund.amount)):
+            refund.result_desc = (
+                f"B2C result reported KES {reported_amount}, this refund "
+                f"requested KES {refund.amount}. Not completed, pending review."
+            )[:255]
+            logger.error(
+                "B2C result amount mismatch for refund %s: reported KES %s, "
+                "requested KES %s",
+                refund.id, reported_amount, refund.amount,
+            )
+            db.commit()
+            _notify_refund_needs_review(db, refund, reason=refund.result_desc)
+            return refund
+
         refund.transaction_receipt = str(reported_receipt)
         refund.result_desc = str(result.get("ResultDesc") or "")[:255]
         refund.status = "Completed"
         refund.completed_at = datetime.now(timezone.utc)
+        _apply_completed_refund_to_invoice(db, refund)
         db.commit()
         return refund
     except Exception:
@@ -615,11 +715,21 @@ def handle_b2c_timeout(db: Session, payload: dict) -> Optional[MpesaRefund]:
 
     THE rule that matters most: a queue timeout is NOT a failure. It means
     Safaricom has not told us the outcome yet, exactly the same resting
-    state as if no result had arrived at all. The refund stays Processing;
-    reconciliation resolves it later by asking Safaricom directly.
-    Marking it Failed here is how a refund goes out twice: an operator
-    sees Failed, retries with a fresh request, and the original payout may
-    still land, or already has.
+    state as if no result had arrived at all. The refund stays (or moves
+    to) Processing; reconciliation resolves it later by asking Safaricom
+    directly. Marking it Failed here is how a refund goes out twice: an
+    operator sees Failed, retries with a fresh request, and the original
+    payout may still land, or already has.
+
+    Correlated by OriginatorConversationID ALONE, the same reasoning as
+    handle_b2c_result: a timeout callback can arrive for a refund still
+    sitting at Approved (dispatch_refund's own synchronous response was
+    lost, but Safaricom had already queued the request), and a
+    status == "Processing" filter would discard that arrival as
+    "unrecognised" instead of learning from it that Safaricom does hold
+    the instruction. An Approved refund that receives a timeout moves to
+    Processing: the timeout itself is confirmation Safaricom has it, even
+    though the outcome is still unknown.
     """
     result = (payload or {}).get("Result") or {}
     originator_id = result.get("OriginatorConversationID")
@@ -630,31 +740,60 @@ def handle_b2c_timeout(db: Session, payload: dict) -> Optional[MpesaRefund]:
 
     refund = (
         db.query(MpesaRefund)
-        .filter(
-            MpesaRefund.originator_conversation_id == originator_id,
-            MpesaRefund.status == "Processing",
-        )
+        .filter(MpesaRefund.originator_conversation_id == originator_id)
         .first()
     )
     if refund is None:
-        logger.warning(
-            "B2C timeout for an unrecognised or already-resolved "
-            "OriginatorConversationID; ignored"
-        )
+        logger.warning("B2C timeout for an unrecognised OriginatorConversationID; ignored")
         db.commit()
         return None
 
-    conversation_id = result.get("ConversationID")
-    if refund.conversation_id and conversation_id and refund.conversation_id != conversation_id:
-        logger.error(
-            "B2C timeout ConversationID mismatch for refund %s; ignored", refund.id
-        )
-        db.commit()
-        return None
+    # Serialise concurrent deliveries the same way handle_b2c_result does:
+    # this handler now performs real state changes (a possible
+    # Approved -> Processing transition, a ConversationID write), not just
+    # a confirmation, so it needs the same protection against a race with
+    # another delivery of the same or a related callback.
+    lock_id = int(hashlib.sha1(originator_id.encode("utf-8")).hexdigest()[:15], 16)
+    db.execute(text("SELECT pg_advisory_xact_lock(:lid)"), {"lid": lock_id})
 
-    refund.result_desc = (
-        "Daraja queue timeout: outcome not yet known, awaiting reconciliation."
-    )[:255]
-    logger.info("B2C queue timeout for refund %s; left Processing", refund.id)
-    db.commit()
-    return refund
+    try:
+        db.refresh(refund)
+
+        if refund.status in ("Completed", "Failed", "Reversed"):
+            logger.info(
+                "B2C timeout for refund %s already %s; repeat/late delivery, no-op",
+                refund.id, refund.status,
+            )
+            db.commit()
+            return refund
+
+        if refund.status not in ("Approved", "Processing"):
+            logger.warning(
+                "B2C timeout for refund %s in unexpected status %s; ignored",
+                refund.id, refund.status,
+            )
+            db.commit()
+            return None
+
+        if not _record_conversation_id(db, refund, result.get("ConversationID")):
+            db.refresh(refund)
+            return refund
+
+        was_approved = refund.status == "Approved"
+        refund.status = "Processing"
+        if was_approved:
+            refund.result_desc = (
+                "Daraja queue timeout confirms Safaricom accepted this refund "
+                "(an earlier dispatch attempt's own synchronous response was "
+                "lost); outcome not yet known, awaiting reconciliation."
+            )[:255]
+        else:
+            refund.result_desc = (
+                "Daraja queue timeout: outcome not yet known, awaiting reconciliation."
+            )[:255]
+        logger.info("B2C queue timeout for refund %s; left Processing", refund.id)
+        db.commit()
+        return refund
+    except Exception:
+        db.rollback()
+        raise
