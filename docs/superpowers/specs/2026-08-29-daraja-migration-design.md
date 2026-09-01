@@ -85,10 +85,31 @@ So authentication has to be rebuilt from different parts:
      by `CheckoutRequestID`. The amount in the callback must equal the amount we
      requested. A mismatch is quarantined, never settled.
    - **C2B confirmations** have no prior record by definition: the customer just
-     paid the till. These are verified by calling Daraja's **Transaction Status**
-     API for the receipt before any money is posted to the ledger. If Safaricom
-     does not confirm it, the receipt is recorded as unverified and shown on the
-     unmatched queue for a human, but nothing posts.
+     paid the till. These are verified against Daraja's **Transaction Status**
+     API before any money is posted to the ledger. If Safaricom does not confirm
+     it, the receipt is recorded as unverified and shown on the unmatched queue
+     for a human, but nothing posts.
+
+     **Correction, 2026-09-01.** An earlier version of this section assumed that
+     verification could happen synchronously, in the moment the confirmation
+     arrives. It cannot. Daraja's Transaction Status API is ASYNCHRONOUS: the
+     immediate HTTP response only acknowledges that the query was queued and
+     returns a ConversationID, while the actual answer arrives later at a
+     `ResultURL` callback. Treating that acknowledgement as the verdict verifies
+     nothing at all.
+
+     So the verification is deferred, and settlement with it. A C2B confirmation
+     is recorded `Unverified` and posts nothing. A Transaction Status query is
+     fired. When Safaricom's result callback arrives, the amount it reports is
+     compared against the amount the confirmation claimed: on a match the
+     transaction settles, on a mismatch it is quarantined. If no result ever
+     arrives, the row stays `Unverified` on the unmatched queue for a human,
+     which is the correct resting place for money we cannot account for.
+
+     This makes C2B settle a few seconds later than a naive implementation would.
+     That is the price of the guarantee, and it is worth paying: the alternative
+     is posting real money to a patient's invoice on the strength of an unsigned
+     callback that nothing has corroborated.
 4. **Replay protection.** `receipt_number` keeps its unique constraint; a repeated
    callback for a receipt already settled is a no-op that returns 200. Safaricom
    retries, and a retry must never double-credit.
