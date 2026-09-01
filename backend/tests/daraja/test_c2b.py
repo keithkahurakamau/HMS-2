@@ -607,11 +607,32 @@ def test_handle_validation_accepts_a_known_active_till(db):
     assert handle_validation(db, payload) is True
 
 
-def test_handle_validation_rejects_an_unknown_shortcode(db):
+def test_handle_validation_accepts_an_unknown_shortcode(db):
+    """Safaricom only ever calls the URL we ourselves registered for a
+    specific till. An unknown or inactive shortcode reaching validation
+    means OUR configuration drifted, not that the payment is illegitimate:
+    declining here would cost a real patient their payment for a problem
+    that is entirely ours, and confirmation plus Transaction Status is
+    already the gate that stops unverified money from posting."""
     make_mpesa_config(db, shortcode="174379")
     payload = {"BusinessShortCode": "999999", "TransAmount": "100"}
 
-    assert handle_validation(db, payload) is False
+    assert handle_validation(db, payload) is True
+
+
+def test_handle_validation_accepts_when_the_config_lookup_fails(db, monkeypatch):
+    """No route exists yet to decide what an exception here should become,
+    so a database error must accept rather than leave that decision
+    undefined."""
+    make_mpesa_config(db, shortcode="174379")
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("db unavailable")
+
+    monkeypatch.setattr(db, "query", _boom)
+    payload = {"BusinessShortCode": "174379", "TransAmount": "100"}
+
+    assert handle_validation(db, payload) is True
 
 
 def test_handle_validation_rejects_a_non_positive_amount(db):

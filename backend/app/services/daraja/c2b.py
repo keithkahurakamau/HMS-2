@@ -160,12 +160,36 @@ def handle_validation(db: Session, payload: dict) -> bool:
     is simply never invoked. Either way the behaviour here must be correct
     on its own: no state elsewhere depends on validation having run.
 
-    Deliberately shallow. TransID does not exist yet at validation time (the
-    payment has not completed), so there is no receipt to verify and nothing
-    to match against an invoice yet; that all happens at confirmation. This
-    only rejects what can be known to be wrong right now: an amount that
-    is not a positive number, or a shortcode that does not belong to any
-    active till in this tenant.
+    This is the one Daraja path where a rejection reaches a real patient
+    standing at a counter, so it fails toward ACCEPT on anything it cannot
+    be certain is wrong, and only ever declines a genuinely malformed
+    amount:
+
+    - An unknown or inactive shortcode is NOT declined. Safaricom only ever
+      calls the URL we ourselves registered for a specific till's own
+      shortcode, so reaching this function with a shortcode that matches no
+      active till means OUR configuration drifted (a till deactivated
+      after registering its URLs, a shortcode edited without
+      re-registering), not that the payment is illegitimate. Confirmation
+      plus the Transaction Status cross-check downstream is already the
+      gate that stops unverified money from posting to an invoice; it
+      costs nothing to accept here and let that gate do its job, and it
+      costs a real patient their payment to decline.
+    - A database error looking up the config is likewise not a decline: no
+      route exists yet to decide what an exception here should become, so
+      guarding it explicitly here and accepting is the only choice that
+      does not leave that decision to code that has not been written.
+
+    TransID does not exist yet at validation time (the payment has not
+    completed), so there is no receipt to verify and nothing to match
+    against an invoice yet; that all happens at confirmation.
+
+    NOTE for the go-live smoke test: shortcode_type (paybill vs till) is
+    never consulted here, and for a Buy Goods till the shortcode Safaricom
+    includes in a C2B payload may not be the exact one registration used.
+    Flagged rather than guessed at: a real Buy Goods validation payload
+    from sandbox or production is what will show whether this needs to
+    widen, not speculation now.
     """
     try:
         amount = Decimal(str(payload.get("TransAmount")))
@@ -175,15 +199,26 @@ def handle_validation(db: Session, payload: dict) -> bool:
         return False
 
     shortcode = str(payload.get("BusinessShortCode") or "").strip()
-    if not shortcode:
-        return False
+    try:
+        config = (
+            db.query(MpesaConfig)
+            .filter(MpesaConfig.shortcode == shortcode, MpesaConfig.is_active == True)  # noqa: E712
+            .first()
+        )
+    except Exception:  # noqa: BLE001, see the docstring: a lookup failure must accept, not decline
+        logger.warning(
+            "C2B validation: config lookup failed for shortcode %s; accepting by default",
+            safe_repr(shortcode), exc_info=True,
+        )
+        return True
 
-    config = (
-        db.query(MpesaConfig)
-        .filter(MpesaConfig.shortcode == shortcode, MpesaConfig.is_active == True)  # noqa: E712
-        .first()
-    )
-    return config is not None
+    if config is None:
+        logger.warning(
+            "C2B validation for shortcode %s matches no active till in this tenant; "
+            "accepting anyway (see handle_validation's docstring)",
+            safe_repr(shortcode),
+        )
+    return True
 
 
 # ─── Matching ───────────────────────────────────────────────────────────────
