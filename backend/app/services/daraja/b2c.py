@@ -16,11 +16,14 @@ design rationale this module implements:
     receipt serialise instead of both reading a stale balance.
   * A per-transaction cap (refund_max_amount) and a rolling 24-hour cap
     (refund_daily_cap), both enforced here. The per-transaction cap is the
-    till's own; the rolling cap's ceiling is also read from the till this
-    refund is paid from, but the total it bounds is the whole TENANT's
-    refund activity in the window, matching the design's per-tenant cap
-    (see the comment in request_refund for why a per-till total would also
-    silently exempt every legacy, till-less transaction).
+    requesting till's own. The rolling cap is coherently per-TENANT on
+    both sides: the total it bounds is every refund the tenant has made in
+    the window (not scoped to any one till, and not blind to legacy,
+    till-less receipts), and the ceiling it is compared against is the
+    hospital DEFAULT till's own refund_daily_cap, never whichever till a
+    given refund happens to be filed against (see the comment in
+    request_refund for why mixing those two scopes is incoherent, not a
+    tradeoff).
   * OriginatorConversationID is minted once, in request_refund, and reused on
     every dispatch_refund retry: this is the primary double-refund defence,
     since Safaricom recognises a retried request as the same instruction
@@ -201,11 +204,9 @@ def request_refund(
             detail=f"Refund of KES {amount} exceeds the per-transaction cap of KES {max_amount}.",
         )
 
-    # The design's cap is per TENANT, counted across every till, not per
-    # till: the ceiling compared against is still the value configured on
-    # the till THIS refund would be paid from (there is no separate
-    # tenant-wide cap field), but the running total it is compared to is
-    # every refund the tenant has made in the window, full stop. A join on
+    # The design's cap is per TENANT, counted across every till: the
+    # running total is every refund the tenant has made in the window,
+    # full stop, not scoped to any one till. A join on
     # MpesaTransaction.mpesa_config_id would also silently exempt every
     # transaction that predates the per-department-tills migration: that
     # column is nullable and NULL on every such row, and `NULL == id` is
@@ -213,6 +214,30 @@ def request_refund(
     # neither count toward, nor be bounded by, any till's total at all.
     # Counting across the whole tenant by MpesaRefund alone closes both
     # gaps at once.
+    #
+    # The CEILING must match that pool: the hospital DEFAULT till's own
+    # refund_daily_cap (the department_id IS NULL row, which IS the
+    # hospital-level configuration), never the cap configured on whichever
+    # till this particular refund happens to be filed against. Comparing a
+    # tenant-wide total to a department till's own cap is incoherent, not
+    # a tradeoff: a conservative cap set on one till would be void the
+    # moment a refund is routed through a different till with more
+    # headroom, and which receipt a refund is filed against is something
+    # staff can influence. A department that genuinely needs a LOWER limit
+    # than the hospital is a separate, additional per-till sub-limit,
+    # checked on top of this one, not instead of it; that is not this
+    # control and is not implemented here.
+    hospital_default_config = (
+        db.query(MpesaConfig)
+        .filter(MpesaConfig.department_id.is_(None), MpesaConfig.is_active == True)  # noqa: E712
+        .first()
+    )
+    # Falls back to the requesting till's own cap only in the unusual case
+    # of no hospital-default row existing at all (every hospital is
+    # expected to have one; a department-only shop with none configured
+    # must still get a real cap, not an unrelated "M-Pesa not configured"
+    # error from a different code path).
+    daily_cap_config = hospital_default_config if hospital_default_config is not None else config
     window_start = datetime.now(timezone.utc) - timedelta(hours=24)
     rolling_total = (
         db.query(func.coalesce(func.sum(MpesaRefund.amount), 0))
@@ -223,7 +248,7 @@ def request_refund(
         .scalar()
     )
     rolling_total = Decimal(str(rolling_total or 0))
-    daily_cap = Decimal(str(config.refund_daily_cap))
+    daily_cap = Decimal(str(daily_cap_config.refund_daily_cap))
     if rolling_total + amount > daily_cap:
         raise HTTPException(
             status_code=400,
