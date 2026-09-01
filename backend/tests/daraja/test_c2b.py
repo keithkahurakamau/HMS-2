@@ -127,14 +127,29 @@ def _c2b_confirmation(
 def _status_result(
     *, conversation_id, originator_conversation_id="OC-1", result_code=0,
     result_desc="The service request is processed successfully.", amount=None,
+    amount_key="TransactionAmount", receipt=None, receipt_key="TransactionReceipt",
+    transaction_status="Completed", extra_params=None,
 ) -> dict:
     """Shaped like Safaricom's real asynchronous Transaction Status result
     callback: the verdict lives here, never in query_transaction_status's
-    own synchronous return value."""
+    own synchronous return value.
+
+    `amount_key` and `receipt_key` default to one spelling each so callers
+    can deliberately build the OTHER spelling too (Amount vs
+    TransactionAmount, ReceiptNo vs TransactionReceipt): Safaricom's own key
+    name for each field is not settled between documentation sources, and a
+    test suite that only ever builds one spelling would never catch the
+    implementation silently assuming the wrong one.
+    """
     result_parameters = []
     if amount is not None:
-        result_parameters.append({"Key": "TransactionAmount", "Value": amount})
-        result_parameters.append({"Key": "TransactionStatus", "Value": "Completed"})
+        result_parameters.append({"Key": amount_key, "Value": amount})
+    if receipt is not None:
+        result_parameters.append({"Key": receipt_key, "Value": receipt})
+    if transaction_status is not None:
+        result_parameters.append({"Key": "TransactionStatus", "Value": transaction_status})
+    if extra_params:
+        result_parameters.extend(extra_params)
     return {
         "Result": {
             "ResultType": 0,
@@ -291,7 +306,9 @@ def test_transaction_status_result_corroborating_amount_settles(db, monkeypatch)
     txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
     assert txn.status == "Unverified"
 
-    result_payload = _status_result(conversation_id="AG-TSR001", result_code=0, amount="500")
+    result_payload = _status_result(
+        conversation_id="AG-TSR001", result_code=0, amount="500", receipt="TSR001",
+    )
     resolved = handle_transaction_status_result(db, result_payload)
 
     assert resolved.status == "Success"
@@ -318,7 +335,9 @@ def test_transaction_status_result_contradicting_amount_quarantines(db, monkeypa
     _fake_status_ack(monkeypatch, conversation_id="AG-MISMATCH")
     handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
 
-    result_payload = _status_result(conversation_id="AG-MISMATCH", result_code=0, amount="1.00")
+    result_payload = _status_result(
+        conversation_id="AG-MISMATCH", result_code=0, amount="1.00", receipt="MISMATCH001",
+    )
     resolved = handle_transaction_status_result(db, result_payload)
 
     assert resolved.status == "Quarantined"
@@ -339,7 +358,10 @@ def test_transaction_status_result_for_unknown_conversation_id_is_ignored(db, mo
     txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
 
     resolved = handle_transaction_status_result(
-        db, _status_result(conversation_id="AG-DOES-NOT-EXIST", result_code=0, amount="300"),
+        db, _status_result(
+            conversation_id="AG-DOES-NOT-EXIST", result_code=0, amount="300",
+            receipt="REALROW001",
+        ),
     )
 
     assert resolved is None
@@ -383,7 +405,9 @@ def test_transaction_status_result_with_no_invoice_match_is_unmatched(db, monkey
     handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
 
     resolved = handle_transaction_status_result(
-        db, _status_result(conversation_id="AG-NOMATCH", result_code=0, amount="750"),
+        db, _status_result(
+            conversation_id="AG-NOMATCH", result_code=0, amount="750", receipt="NOMATCH001",
+        ),
     )
 
     assert resolved.status == "Unmatched"
@@ -391,6 +415,108 @@ def test_transaction_status_result_with_no_invoice_match_is_unmatched(db, monkey
     assert resolved.verified_at is not None
     assert resolved.invoice_id is None
     assert db.query(Payment).count() == 0
+
+
+def test_transaction_status_result_settles_using_the_other_amount_and_receipt_spelling(db, monkeypatch):
+    """Safaricom's key names for the amount and the receipt are not settled
+    between documentation sources (Amount vs TransactionAmount, ReceiptNo vs
+    TransactionReceipt). This test deliberately builds the OTHER spelling
+    from every other test in this file, so the suite as a whole does not
+    assume either one is correct."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    invoice = make_invoice(db, total_amount=Decimal("650.00"))
+    payload = _c2b_confirmation(
+        receipt="ALTSPELL001", amount="650", shortcode=config.shortcode,
+        bill_ref=f"INV-{invoice.invoice_id}",
+    )
+    _fake_status_ack(monkeypatch, conversation_id="AG-ALTSPELL")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    result_payload = _status_result(
+        conversation_id="AG-ALTSPELL", result_code=0,
+        amount="650", amount_key="Amount",
+        receipt="ALTSPELL001", receipt_key="ReceiptNo",
+    )
+    resolved = handle_transaction_status_result(db, result_payload)
+
+    assert resolved.status == "Success"
+    assert db.query(Payment).count() == 1
+
+
+def test_transaction_status_result_missing_amount_is_a_diagnostic_quarantine_not_kes_none(db, monkeypatch):
+    """When NEITHER amount spelling is present, the quarantine reason must
+    name the keys that actually arrived rather than claim Safaricom reported
+    "KES None", which would misrepresent a missing field as a wrong value
+    Safaricom never sent."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    payload = _c2b_confirmation(receipt="NOAMOUNT001", amount="400", shortcode=config.shortcode)
+    _fake_status_ack(monkeypatch, conversation_id="AG-NOAMOUNT")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    result_payload = _status_result(
+        conversation_id="AG-NOAMOUNT", result_code=0,
+        receipt="NOAMOUNT001",  # receipt present, amount deliberately absent
+        extra_params=[{"Key": "SomeOtherKey", "Value": "whatever"}],
+    )
+    resolved = handle_transaction_status_result(db, result_payload)
+
+    assert resolved.status == "Quarantined"
+    assert "KES None" not in resolved.result_desc
+    assert "SomeOtherKey" in resolved.result_desc
+    assert db.query(Payment).count() == 0
+
+
+def test_transaction_status_result_receipt_mismatch_quarantines(db, monkeypatch):
+    """conversation_id carries no unique constraint. If a result's own
+    reported receipt does not match the receipt THIS row recorded, settling
+    anyway would risk applying Safaricom's answer to the wrong row's
+    patient. Cross-checked and refused here rather than trusted."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    invoice = make_invoice(db, total_amount=Decimal("900.00"))
+    payload = _c2b_confirmation(
+        receipt="REALRECEIPT001", amount="900", shortcode=config.shortcode,
+        bill_ref=f"INV-{invoice.invoice_id}",
+    )
+    _fake_status_ack(monkeypatch, conversation_id="AG-RECEIPTMISMATCH")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    result_payload = _status_result(
+        conversation_id="AG-RECEIPTMISMATCH", result_code=0,
+        amount="900", receipt="SOMEOTHERRECEIPT999",
+    )
+    resolved = handle_transaction_status_result(db, result_payload)
+
+    assert resolved.status == "Quarantined"
+    assert db.query(Payment).count() == 0
+    db.refresh(invoice)
+    assert invoice.status == "Pending"
+
+
+def test_transaction_status_result_not_completed_quarantines_not_settles(db, monkeypatch):
+    """ResultCode 0 only means the QUERY succeeded, not that the payment
+    itself did. A receipt Safaricom knows about but marks Reversed (or
+    Failed) must never settle just because the query worked."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    invoice = make_invoice(db, total_amount=Decimal("1200.00"))
+    payload = _c2b_confirmation(
+        receipt="REVERSED001", amount="1200", shortcode=config.shortcode,
+        bill_ref=f"INV-{invoice.invoice_id}",
+    )
+    _fake_status_ack(monkeypatch, conversation_id="AG-REVERSED")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    result_payload = _status_result(
+        conversation_id="AG-REVERSED", result_code=0,
+        amount="1200", receipt="REVERSED001", transaction_status="Reversed",
+    )
+    resolved = handle_transaction_status_result(db, result_payload)
+
+    assert resolved.status == "Quarantined"
+    assert "Reversed" in resolved.result_desc
+    assert db.query(Payment).count() == 0
+    db.refresh(invoice)
+    assert invoice.amount_paid == 0
+    assert invoice.status == "Pending"
 
 
 # ─── The match-order test ────────────────────────────────────────────────────

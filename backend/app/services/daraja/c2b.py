@@ -314,9 +314,15 @@ def handle_confirmation(
     # apply_stk_callback uses for the same reason: without it, two callbacks
     # can both observe "not yet recorded" and both try to insert.
     lock_id = int(hashlib.sha1(receipt.encode("utf-8")).hexdigest()[:15], 16)
-    db.execute(text("SELECT pg_advisory_xact_lock(:lid)"), {"lid": lock_id})
 
     try:
+        # The lock acquisition itself is inside this try/except: a failure
+        # here (a poisoned session, a lost connection) must roll back the
+        # same way a failure anywhere else in this unit does, rather than
+        # leaving the session in an unrolled-back state for whatever caller
+        # happens to reuse it next.
+        db.execute(text("SELECT pg_advisory_xact_lock(:lid)"), {"lid": lock_id})
+
         existing = (
             db.query(MpesaTransaction)
             .filter(MpesaTransaction.receipt_number == receipt)
@@ -363,6 +369,17 @@ def handle_confirmation(
                 "C2B Transaction Status query failed for receipt %s: %s",
                 safe_repr(receipt), safe_repr(str(exc)),
             )
+            # A cashier reading the unmatched queue cannot see this log line.
+            # The most common cause here is a till missing its initiator
+            # credentials (register_c2b_urls happily registers a till that
+            # can never verify a payment; see its own docstring), and
+            # without this the only clue a hospital gets is a receipt with
+            # no explanation at all. Both an HTTPException.detail from this
+            # module's own credential checks and a DarajaError's message are
+            # already written to be safe to display: neither ever carries a
+            # secret.
+            detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+            txn.result_desc = str(detail)[:255]
             ack = None
 
         if ack is not None:
@@ -450,17 +467,98 @@ def handle_transaction_status_result(db: Session, payload: dict) -> Optional[Mpe
             return txn
 
         params = _result_parameters(result)
+
+        # I3: ResultCode 0 only means the QUERY succeeded, not that the
+        # transaction itself did. The transaction's own outcome lives in
+        # TransactionStatus. A receipt Safaricom knows about but marks
+        # Failed or Reversed must never settle just because the query
+        # worked; anything other than Completed is quarantined, the same
+        # as a disagreeing amount, because a "successful-looking" query
+        # result for a transaction Safaricom itself did not complete is
+        # exactly the kind of thing a human needs to see, not silently
+        # leave Unverified.
+        transaction_status = params.get("TransactionStatus")
+        if transaction_status != "Completed":
+            txn.status = "Quarantined"
+            txn.result_desc = (
+                f"Transaction Status reported status {transaction_status!r}, not Completed"
+            )[:255]
+            db.commit()
+            _notify_quarantine(db, txn, reason=txn.result_desc)
+            return txn
+
+        # C1: Safaricom's key names for the amount and the receipt are not
+        # settled between documentation sources (Amount vs TransactionAmount,
+        # ReceiptNo vs TransactionReceipt); public sources disagree and the
+        # authoritative docs need a login this task cannot obtain. Reading
+        # only one spelling risks EVERY genuine result missing the field,
+        # quarantining every real payment and training staff to distrust
+        # (and bypass) this queue. Read whichever spelling is present.
+        reported_receipt = params.get("TransactionReceipt")
+        if reported_receipt is None:
+            reported_receipt = params.get("ReceiptNo")
         raw_amount = params.get("TransactionAmount")
+        if raw_amount is None:
+            raw_amount = params.get("Amount")
+
+        if reported_receipt is None or raw_amount is None:
+            # Neither spelling was found for one of the fields. This is not
+            # "the values disagree", it is "we could not find the value at
+            # all": reporting a mismatch against a fabricated None would
+            # read as a wrong-amount claim Safaricom never made. Naming the
+            # keys that actually arrived is what turns the first real
+            # sandbox delivery into a one-line answer instead of a mystery.
+            missing = []
+            if reported_receipt is None:
+                missing.append("receipt (checked TransactionReceipt, ReceiptNo)")
+            if raw_amount is None:
+                missing.append("amount (checked TransactionAmount, Amount)")
+            keys_present = sorted(params.keys())
+            txn.status = "Quarantined"
+            txn.result_desc = (
+                f"Transaction Status result missing {' and '.join(missing)}; "
+                f"keys present: {keys_present}"
+            )[:255]
+            logger.error(
+                "C2B Transaction Status result for receipt %s missing expected "
+                "field(s) (%s); keys present: %s",
+                safe_repr(txn.receipt_number), " and ".join(missing), keys_present,
+            )
+            db.commit()
+            _notify_quarantine(db, txn, reason=txn.result_desc)
+            return txn
+
+        # I2: correlate on the receipt too, not ConversationID alone.
+        # conversation_id carries no unique constraint, so if two rows ever
+        # shared one, settling purely by ConversationID would apply
+        # Safaricom's answer to whichever row Postgres happened to return
+        # first, posting real money against a different patient's invoice.
+        # The receipt this query answers must be the exact one this row
+        # recorded at confirmation time.
+        if reported_receipt != txn.receipt_number:
+            txn.status = "Quarantined"
+            txn.result_desc = (
+                f"Transaction Status reported receipt {reported_receipt}, "
+                f"this row recorded {txn.receipt_number}"
+            )[:255]
+            db.commit()
+            _notify_quarantine(db, txn, reason=txn.result_desc)
+            return txn
+
         try:
-            reported_amount = Decimal(str(raw_amount)) if raw_amount is not None else None
+            reported_amount = Decimal(str(raw_amount))
         except (InvalidOperation, ValueError, TypeError):
-            reported_amount = None
+            txn.status = "Quarantined"
+            txn.result_desc = f"Transaction Status reported an unparseable amount: {raw_amount!r}"[:255]
+            db.commit()
+            _notify_quarantine(db, txn, reason=txn.result_desc)
+            return txn
 
         expected_amount = Decimal(str(txn.amount or 0))
-        if reported_amount is None or reported_amount != expected_amount:
+        if reported_amount != expected_amount:
             # THE cross-check. Safaricom's own Transaction Status disagrees
-            # with (or omits) the amount the confirmation claimed: settle
-            # nothing, quarantine, tell a human.
+            # with the amount the confirmation claimed: settle nothing,
+            # quarantine, tell a human.
             txn.status = "Quarantined"
             txn.result_desc = (
                 f"Transaction Status reported KES {reported_amount}, "
@@ -516,6 +614,12 @@ def handle_transaction_status_timeout(db: Session, payload: dict) -> Optional[Mp
     conversation_id = result.get("ConversationID")
     if not conversation_id:
         logger.warning("Transaction Status timeout missing ConversationID; ignored")
+        # This function never writes, but the query above still opened a
+        # transaction on this session (any SELECT does under Postgres's
+        # default isolation), and nothing else here will ever end it.
+        # Commit rather than leave the caller holding an idle-in-transaction
+        # session.
+        db.commit()
         return None
 
     txn = (
@@ -531,9 +635,11 @@ def handle_transaction_status_timeout(db: Session, payload: dict) -> Optional[Mp
             "Transaction Status timeout for an unrecognised or "
             "already-resolved ConversationID; ignored"
         )
+        db.commit()
         return None
 
     logger.info(
         "Transaction Status query timed out for MpesaTransaction %s; left Unverified", txn.id
     )
+    db.commit()
     return txn
