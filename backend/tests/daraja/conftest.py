@@ -218,9 +218,12 @@ def seed_mpesa_ledger_mapping(session: Session) -> tuple[Account, Account]:
 # both build fixtures the same way.
 
 
-def make_invoice(session: Session, *, total_amount, created_by: int = 1) -> Invoice:
+def make_invoice(
+    session: Session, *, total_amount, created_by: int = 1, patient_id: Optional[int] = None
+) -> Invoice:
     invoice = Invoice(
-        total_amount=total_amount, amount_paid=0, status="Pending", created_by=created_by
+        total_amount=total_amount, amount_paid=0, status="Pending", created_by=created_by,
+        patient_id=patient_id,
     )
     session.add(invoice)
     session.flush()
