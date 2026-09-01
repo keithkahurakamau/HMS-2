@@ -1,0 +1,622 @@
+"""B2C refunds: the only path by which money leaves a hospital.
+
+Every test here targets one of the controls listed in app/services/daraja/
+b2c.py's module docstring and docs/superpowers/specs/2026-08-29-daraja-
+migration-design.md's "Refunds (B2C)" section. Three of them (over-refund,
+concurrent double-request, timeout-not-failure) are the ones this task's
+brief calls out as needing revert-evidence: broken deliberately, confirmed
+to fail, restored, confirmed to pass again. See task-7-report.md for that
+evidence; the tests themselves are unconditional, they do not toggle
+anything at runtime.
+"""
+from __future__ import annotations
+
+import threading
+from datetime import datetime, timezone
+from decimal import Decimal
+
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi import HTTPException
+from sqlalchemy import text
+from sqlalchemy.orm import sessionmaker
+
+from app.config.settings import settings
+from app.models.mpesa import MpesaTransaction
+from app.services.daraja.b2c import (
+    approve_refund,
+    dispatch_refund,
+    handle_b2c_result,
+    handle_b2c_timeout,
+    refundable_amount,
+    request_refund,
+)
+from app.services.daraja.client import _TOKEN_CACHE
+from app.utils.encryption import encrypt_data
+from tests.daraja.conftest import make_mpesa_config
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _second_user(_engine):
+    """A second real user row, for the dual-approval tests: the requester
+    and the approver must be different real users, not just different ids
+    that happen to violate no foreign key."""
+    with _engine.connect() as conn:
+        conn.execute(text(
+            "INSERT INTO users (user_id, email, full_name, hashed_password, role_id) "
+            "SELECT 2, 'daraja.refund.approver@hms.local', 'Refund Approver', 'x', 1 "
+            "WHERE NOT EXISTS (SELECT 1 FROM users WHERE user_id = 2)"
+        ))
+        conn.commit()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _clear_token_cache():
+    _TOKEN_CACHE.clear()
+    yield
+    _TOKEN_CACHE.clear()
+
+
+@pytest.fixture(autouse=True)
+def _public_base_url(monkeypatch):
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://mayoclinic.medifleet.app")
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _fake_safaricom_public_key(monkeypatch):
+    """The real Safaricom .cer files are not in this repo (see
+    tests/daraja/test_credentials.py). A locally generated RSA keypair
+    stands in for the certificate, exercising every line of
+    security_credential's real RSA-encryption without needing Safaricom's
+    actual public key. Never a fabricated certificate: a different object
+    entirely, monkeypatched at the one seam credentials.py exposes for
+    exactly this."""
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    monkeypatch.setattr(
+        "app.services.daraja.credentials._public_key",
+        lambda environment: private_key.public_key(),
+    )
+    yield
+
+
+class FakeResponse:
+    def __init__(self, status_code=200, payload=None):
+        self.status_code = status_code
+        self._payload = payload if payload is not None else {}
+        self.text = str(self._payload)
+
+    def json(self):
+        return self._payload
+
+
+def _fake_oauth(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.daraja.client.requests.get",
+        lambda url, **kw: FakeResponse(200, {"access_token": "tok", "expires_in": "3599"}),
+    )
+
+
+def _refund_config(db, **overrides):
+    defaults = dict(
+        refunds_enabled=True,
+        refund_max_amount=Decimal("100000.00"),
+        refund_daily_cap=Decimal("100000.00"),
+        refund_dual_approval_above=Decimal("100000.00"),
+        initiator_name="testapi",
+    )
+    defaults.update(overrides)
+    config = make_mpesa_config(db, **defaults)
+    config.initiator_password_encrypted = encrypt_data("initiator-pass")
+    db.flush()
+    return config
+
+
+def _make_settled_txn(db, *, amount, receipt="RCPT-REFUND-1", config=None, phone="254712345678"):
+    txn = MpesaTransaction(
+        phone_number=phone,
+        amount=amount,
+        receipt_number=receipt,
+        status="Success",
+        transaction_type="STK",
+        mpesa_config_id=config.id if config is not None else None,
+        verified_at=datetime.now(timezone.utc),
+        verification_source="stk_callback",
+    )
+    db.add(txn)
+    db.flush()
+    return txn
+
+
+# ─── Over-refund guard ──────────────────────────────────────────────────────
+
+
+def test_refund_cannot_exceed_the_original_receipt(db):
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        request_refund(
+            db, source_transaction_id=txn.id, amount=Decimal("1000.01"),
+            reason="too much", user_id=1,
+        )
+    assert exc_info.value.status_code == 400
+    assert "exceeds" in exc_info.value.detail
+
+    # The exact receipt amount is fine.
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("1000.00"),
+        reason="full refund", user_id=1,
+    )
+    assert refund.amount == Decimal("1000.00")
+
+
+def test_refund_cannot_exceed_the_receipt_minus_refunds_already_in_flight(db, _engine):
+    """Two concurrent requests for 60% each of a receipt must not both
+    pass. GENUINELY concurrent: two threads, two separate Sessions on two
+    separate connections, and a threading.Barrier so both reach
+    request_refund's row-locking SELECT at the same moment. A sequential
+    test would prove nothing: the bug only exists when the two overlap.
+    """
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()  # visible to the two independent connections below
+
+    SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+    barrier = threading.Barrier(2)
+    results: list = []
+    errors: list = []
+    lock = threading.Lock()
+
+    def worker():
+        session = SessionLocal()
+        try:
+            barrier.wait(timeout=5)
+            r = request_refund(
+                session, source_transaction_id=txn.id, amount=Decimal("600.00"),
+                reason="60 percent", user_id=1,
+            )
+            with lock:
+                results.append(r)
+        except HTTPException as exc:
+            with lock:
+                errors.append(exc)
+        finally:
+            session.close()
+
+    t1 = threading.Thread(target=worker)
+    t2 = threading.Thread(target=worker)
+    t1.start()
+    t2.start()
+    t1.join(timeout=15)
+    t2.join(timeout=15)
+
+    assert not (len(results) == 2), "both 60% requests passed: the receipt was over-refunded"
+    assert len(results) == 1, f"expected exactly one success, got {len(results)}"
+    assert len(errors) == 1, f"expected exactly one rejection, got {len(errors)}"
+    assert errors[0].status_code == 400
+
+
+# ─── Caps ───────────────────────────────────────────────────────────────────
+
+
+def test_over_per_transaction_cap_is_rejected(db):
+    config = _refund_config(db, refund_max_amount=Decimal("200.00"))
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        request_refund(
+            db, source_transaction_id=txn.id, amount=Decimal("300.00"),
+            reason="over cap", user_id=1,
+        )
+    assert exc_info.value.status_code == 400
+    assert "per-transaction cap" in exc_info.value.detail
+
+
+def test_over_rolling_24h_cap_is_rejected(db):
+    config = _refund_config(db, refund_daily_cap=Decimal("500.00"))
+    txn1 = _make_settled_txn(db, amount=Decimal("1000.00"), receipt="R1", config=config)
+    txn2 = _make_settled_txn(db, amount=Decimal("1000.00"), receipt="R2", config=config)
+    db.commit()
+
+    first = request_refund(
+        db, source_transaction_id=txn1.id, amount=Decimal("400.00"),
+        reason="first refund today", user_id=1,
+    )
+    assert first.amount == Decimal("400.00")
+
+    with pytest.raises(HTTPException) as exc_info:
+        request_refund(
+            db, source_transaction_id=txn2.id, amount=Decimal("200.00"),
+            reason="second refund today, different receipt", user_id=1,
+        )
+    assert exc_info.value.status_code == 400
+    assert "24-hour" in exc_info.value.detail
+
+
+# ─── Two-person rule ────────────────────────────────────────────────────────
+
+
+def test_requester_cannot_approve_their_own_refund_above_the_threshold(db):
+    config = _refund_config(db, refund_dual_approval_above=Decimal("500.00"))
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("600.00"),
+        reason="above threshold", user_id=1,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        approve_refund(db, refund_id=refund.id, user_id=1)
+    assert exc_info.value.status_code == 403
+
+    # A DIFFERENT approver may approve the same refund.
+    approved = approve_refund(db, refund_id=refund.id, user_id=2)
+    assert approved.status == "Approved"
+    assert approved.approved_by == 2
+
+
+def test_self_approval_is_fine_below_the_threshold(db):
+    config = _refund_config(db, refund_dual_approval_above=Decimal("500.00"))
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("100.00"),
+        reason="small, self-approved", user_id=1,
+    )
+    approved = approve_refund(db, refund_id=refund.id, user_id=1)
+    assert approved.status == "Approved"
+    assert approved.approved_by == 1
+
+
+# ─── Permission separation ──────────────────────────────────────────────────
+
+
+def test_refund_permission_is_separate_from_billing_manage():
+    """Being able to TAKE a payment must not imply being able to SEND one
+    back: mpesa:refund is a real, distinct codename, and no role that
+    holds billing:manage may also hold it."""
+    from app.services.tenant_provisioning import PERMISSIONS, ROLE_GRANTS
+
+    assert "mpesa:refund" in PERMISSIONS
+    # Admin is deliberately granted every permission, including this one;
+    # it is the one role for which "holds both" is expected and correct.
+    for role, grants in ROLE_GRANTS.items():
+        if role == "Admin":
+            continue
+        if "billing:manage" in grants:
+            assert "mpesa:refund" not in grants, (
+                f"{role} holds both billing:manage and mpesa:refund; "
+                "taking a payment must not imply sending one back"
+            )
+    assert "mpesa:refund" in ROLE_GRANTS["Admin"]
+
+
+# ─── OriginatorConversationID retry idempotency ─────────────────────────────
+
+
+def test_retry_reuses_the_originator_conversation_id(db, monkeypatch):
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="retry test", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+    minted_id = refund.originator_conversation_id
+    assert minted_id
+
+    captured_payloads = []
+
+    def fake_post(url, **kw):
+        captured_payloads.append(kw.get("json"))
+        return FakeResponse(200, {
+            "ConversationID": "AG_20230101_1",
+            "OriginatorConversationID": kw["json"]["OriginatorConversationID"],
+            "ResponseCode": "0",
+            "ResponseDescription": "Accept the service request successfully.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+    first = dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+    assert first.status == "Processing"
+
+    # Simulate a retried dispatch (e.g. an operator re-triggers it while it
+    # is still Processing, or the caller retries after a dropped response).
+    second = dispatch_refund(db, refund=first, callback_tenant="mayoclinic_db")
+    assert second.status == "Processing"
+
+    assert first.originator_conversation_id == minted_id
+    assert second.originator_conversation_id == minted_id
+    assert len(captured_payloads) == 2
+    assert captured_payloads[0]["OriginatorConversationID"] == minted_id
+    assert captured_payloads[1]["OriginatorConversationID"] == minted_id
+    assert captured_payloads[0]["CommandID"] == "BusinessPayment"
+
+
+def test_dispatch_uses_the_till_that_received_the_money(db, monkeypatch):
+    _fake_oauth(monkeypatch)
+    import secrets
+    from app.models.messaging import Department
+
+    dept = Department(name=f"refund-dept-{secrets.token_hex(4)}", is_active=True)
+    db.add(dept)
+    db.flush()
+
+    default_config = _refund_config(db, shortcode="100001", initiator_name="default-api")
+    receiving_config = _refund_config(
+        db, shortcode="200002", initiator_name="receiving-api",
+        department_id=dept.department_id,
+    )
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=receiving_config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("100.00"),
+        reason="till check", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+
+    captured = {}
+
+    def fake_post(url, **kw):
+        captured["payload"] = kw.get("json")
+        return FakeResponse(200, {
+            "ConversationID": "AG_1", "ResponseCode": "0",
+            "ResponseDescription": "Accept the service request successfully.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+    dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+
+    assert captured["payload"]["PartyA"] == "200002"
+    assert captured["payload"]["InitiatorName"] == "receiving-api"
+    assert default_config.shortcode == "100001"  # sanity: the default was never used
+
+
+# ─── B2C queue timeout: NOT a failure ───────────────────────────────────────
+
+
+def test_b2c_timeout_moves_to_processing_not_failed(db):
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="timeout test", user_id=1,
+    )
+    refund.status = "Processing"
+    refund.conversation_id = "AG_TIMEOUT_1"
+    db.commit()
+
+    payload = {
+        "Result": {
+            "ResultType": 1,
+            "ResultCode": 1,
+            "ResultDesc": "The service request timed out.",
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "ConversationID": "AG_TIMEOUT_1",
+        }
+    }
+
+    result = handle_b2c_timeout(db, payload)
+    assert result is not None
+    assert result.status == "Processing"
+
+    db.refresh(refund)
+    assert refund.status == "Processing"
+
+
+def test_b2c_timeout_for_an_unknown_originator_id_is_ignored(db):
+    result = handle_b2c_timeout(db, {"Result": {"OriginatorConversationID": "does-not-exist"}})
+    assert result is None
+
+
+# ─── B2C result: success completes, both key spellings ──────────────────────
+
+
+@pytest.mark.parametrize(
+    "result_parameters",
+    [
+        pytest.param(
+            [
+                {"Key": "TransactionReceipt", "Value": "RBX0000001"},
+                {"Key": "TransactionAmount", "Value": 200},
+            ],
+            id="documented-spelling",
+        ),
+        pytest.param(
+            [
+                {"Key": "ReceiptNo", "Value": "RBX0000002"},
+                {"Key": "Amount", "Value": 200},
+            ],
+            id="alternate-spelling",
+        ),
+    ],
+)
+def test_b2c_result_success_records_the_receipt_and_completes(db, result_parameters):
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="result test", user_id=1,
+    )
+    refund.status = "Processing"
+    refund.conversation_id = "AG_1"
+    db.commit()
+
+    payload = {
+        "Result": {
+            "ResultCode": 0,
+            "ResultDesc": "The service request is processed successfully.",
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "ConversationID": "AG_1",
+            "ResultParameters": {"ResultParameter": result_parameters},
+        }
+    }
+
+    result = handle_b2c_result(db, payload)
+    assert result is not None
+    assert result.status == "Completed"
+    assert result.transaction_receipt in ("RBX0000001", "RBX0000002")
+    assert result.completed_at is not None
+
+
+def test_b2c_result_missing_expected_keys_stays_processing_with_a_diagnostic(db):
+    """Neither plausible spelling is present. This must not be silently
+    treated as a failure: it stays Processing (an ambiguous result is not a
+    verdict), and the diagnostic names the keys that actually arrived."""
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="missing keys", user_id=1,
+    )
+    refund.status = "Processing"
+    refund.conversation_id = "AG_1"
+    db.commit()
+
+    payload = {
+        "Result": {
+            "ResultCode": 0,
+            "ResultDesc": "ok",
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "ConversationID": "AG_1",
+            "ResultParameters": {"ResultParameter": [{"Key": "SomeOtherField", "Value": "x"}]},
+        }
+    }
+
+    result = handle_b2c_result(db, payload)
+    assert result.status == "Processing"
+    assert "keys present" in result.result_desc
+    assert "SomeOtherField" in result.result_desc
+
+
+def test_b2c_result_failure_code_marks_failed(db):
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="will fail", user_id=1,
+    )
+    refund.status = "Processing"
+    refund.conversation_id = "AG_1"
+    db.commit()
+
+    payload = {
+        "Result": {
+            "ResultCode": 1,
+            "ResultDesc": "Insufficient funds in the organization's account.",
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "ConversationID": "AG_1",
+        }
+    }
+    result = handle_b2c_result(db, payload)
+    assert result.status == "Failed"
+
+
+def test_b2c_result_cannot_complete_a_different_refund(db):
+    """A result must not be able to complete a DIFFERENT refund than the
+    one it belongs to: the ConversationID cross-check must reject a
+    payload that names the right OriginatorConversationID but the wrong
+    ConversationID."""
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="cross-check", user_id=1,
+    )
+    refund.status = "Processing"
+    refund.conversation_id = "AG_REAL"
+    db.commit()
+
+    payload = {
+        "Result": {
+            "ResultCode": 0,
+            "ResultDesc": "forged or misrouted",
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "ConversationID": "AG_FORGED",
+            "ResultParameters": {"ResultParameter": [
+                {"Key": "TransactionReceipt", "Value": "RBXHACK"},
+                {"Key": "TransactionAmount", "Value": 200},
+            ]},
+        }
+    }
+    result = handle_b2c_result(db, payload)
+    assert result is None
+
+    db.refresh(refund)
+    assert refund.status == "Processing"
+    assert refund.transaction_receipt is None
+
+
+# ─── Refunds disabled ───────────────────────────────────────────────────────
+
+
+def test_disabled_refunds_reject_at_the_service_layer_not_just_the_ui(db):
+    config = _refund_config(db, refunds_enabled=False)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        request_refund(
+            db, source_transaction_id=txn.id, amount=Decimal("100.00"),
+            reason="should be blocked", user_id=1,
+        )
+    assert exc_info.value.status_code == 400
+    assert "not enabled" in exc_info.value.detail
+
+
+# ─── refundable_amount / misc guards ────────────────────────────────────────
+
+
+def test_refundable_amount_excludes_failed_and_reversed_refunds(db):
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("300.00"),
+        reason="will fail", user_id=1,
+    )
+    refund.status = "Failed"
+    db.commit()
+
+    # A Failed refund never sent money, so the full receipt is still
+    # refundable.
+    assert refundable_amount(db, txn=txn) == Decimal("1000.00")
+
+
+def test_request_refund_requires_a_settled_receipt(db):
+    config = _refund_config(db)
+    pending_txn = MpesaTransaction(
+        phone_number="254712345678", amount=Decimal("500.00"),
+        status="Pending", transaction_type="STK", mpesa_config_id=config.id,
+    )
+    db.add(pending_txn)
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        request_refund(
+            db, source_transaction_id=pending_txn.id, amount=Decimal("100.00"),
+            reason="not settled yet", user_id=1,
+        )
+    assert exc_info.value.status_code == 400
