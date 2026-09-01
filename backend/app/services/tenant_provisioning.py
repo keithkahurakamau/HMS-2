@@ -228,6 +228,11 @@ PERMISSION_CATALOG: tuple[tuple[str, str], ...] = (
     ("cheques:manage",         "Receipt and reconcile cheques"),
     ("mpesa:read",             "View Pay Hero (M-Pesa rail) transaction log and reconciliation"),
     ("payhero:manage",         "Configure the Pay Hero payment gateway"),
+    # Deliberately separate from billing:manage, and granted only to Admin
+    # below: being able to TAKE a payment must not imply being able to SEND
+    # one back. See docs/superpowers/specs/2026-08-29-daraja-migration-design.md,
+    # "Refunds (B2C)".
+    ("mpesa:refund",           "Request and approve B2C M-Pesa refunds back to a patient"),
 
     # ── Internal collaboration ───────────────────────────────────────────
     ("messaging:read",         "Read internal staff messages"),
