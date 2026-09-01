@@ -8,10 +8,14 @@ department here gets a name unique to the test, not a fixed literal, to
 avoid colliding with department rows left behind by other tests in the
 same session-scoped database.
 """
+import importlib.util
+from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.models.messaging import Department
@@ -150,3 +154,96 @@ def test_transaction_records_which_till_took_the_money(db, monkeypatch):
     )
     assert txn is not None
     assert txn.mpesa_config_id == dept_config.id
+
+
+def _load_department_tills_migration():
+    """Load the f2a3b4c5d6e7 revision by file path (same pattern as
+    test_schema.py): the dedup statements under test are the migration's
+    own, not a retyped lookalike that could drift from it."""
+    path = (
+        Path(__file__).resolve().parent.parent.parent
+        / "alembic" / "versions" / "f2a3b4c5d6e7_department_tills.py"
+    )
+    spec = importlib.util.spec_from_file_location("department_tills_migration", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_PENDING_GUARD_INDEX_DDL = (
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_txn_one_pending_per_invoice "
+    "ON mpesa_transactions (invoice_id) "
+    "WHERE status = 'Pending' AND invoice_id IS NOT NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_txn_one_pending_per_dispense "
+    "ON mpesa_transactions (dispense_id) "
+    "WHERE status = 'Pending' AND dispense_id IS NOT NULL",
+)
+
+
+def test_migration_resolves_legacy_duplicate_pending_rows_newest_kept(db):
+    """C2 regression: mpesa_transactions is the renamed payhero_transactions,
+    and the old Pay Hero path had no per-invoice pending guard, so a real
+    tenant holds several Pending rows for one invoice (any push whose
+    callback never arrived stayed Pending forever). The migration's dedup
+    statements must keep the NEWEST Pending row per invoice
+    (transaction_date first, id only as the tiebreaker) and mark every
+    older one Failed with the explanatory result_desc; without them the
+    CREATE UNIQUE INDEX aborts the whole migration on ordinary legacy
+    data. The guards are dropped here to recreate the pre-migration shape,
+    and restored before the next test."""
+    mig = _load_department_tills_migration()
+    db.execute(text("DROP INDEX IF EXISTS uq_mpesa_txn_one_pending_per_invoice"))
+    db.execute(text("DROP INDEX IF EXISTS uq_mpesa_txn_one_pending_per_dispense"))
+    try:
+        invoice = make_invoice(db, total_amount=Decimal("500.00"))
+        dates = {
+            "ws_CO_newest": datetime(2026, 3, 1, tzinfo=timezone.utc),
+            "ws_CO_oldest": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            "ws_CO_middle": datetime(2026, 2, 1, tzinfo=timezone.utc),
+        }
+        # Inserted newest-by-date FIRST, so it holds the LOWEST id of the
+        # three: proves the ordering is by transaction_date, not id.
+        for checkout_id, when in dates.items():
+            db.add(MpesaTransaction(
+                invoice_id=invoice.invoice_id,
+                phone_number="254712345678",
+                amount=Decimal("500.00"),
+                checkout_request_id=checkout_id,
+                status="Pending",
+                transaction_type="STK",
+                transaction_date=when,
+            ))
+        db.flush()
+
+        for scope_column in ("invoice_id", "dispense_id"):
+            db.execute(
+                text(mig.pending_dedup_sql(scope_column)),
+                {"desc": mig.SUPERSEDED_PENDING_RESULT_DESC},
+            )
+
+        rows = {
+            r.checkout_request_id: r
+            for r in db.query(MpesaTransaction)
+            .filter(MpesaTransaction.invoice_id == invoice.invoice_id)
+            .all()
+        }
+        assert rows["ws_CO_newest"].status == "Pending"
+        assert rows["ws_CO_newest"].result_desc is None
+        for superseded in ("ws_CO_oldest", "ws_CO_middle"):
+            assert rows[superseded].status == "Failed"
+            assert rows[superseded].result_desc == mig.SUPERSEDED_PENDING_RESULT_DESC
+
+        # A second pass is a no-op: nothing else gets failed once at most
+        # one Pending row per invoice remains.
+        again = db.execute(
+            text(mig.pending_dedup_sql("invoice_id")),
+            {"desc": mig.SUPERSEDED_PENDING_RESULT_DESC},
+        )
+        assert again.rowcount == 0
+    finally:
+        # Restore the guards for the rest of the session-scoped database.
+        db.rollback()
+        db.execute(text("DELETE FROM mpesa_transactions"))
+        for ddl in _PENDING_GUARD_INDEX_DDL:
+            db.execute(text(ddl))
+        db.commit()
