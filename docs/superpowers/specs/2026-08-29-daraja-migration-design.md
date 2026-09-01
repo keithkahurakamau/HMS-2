@@ -272,6 +272,54 @@ two workers to fetch a token at once. That is harmless: Daraja issues a valid to
 per request and both are usable. It is called out here only so nobody later adds a
 lock and serialises the payment path to fix a non-problem.
 
+### Passing the Safaricom charge to the patient
+
+Safaricom takes a percentage of every M-Pesa collection. On a business-pays
+tariff that comes out of the hospital's side, so a hospital collecting KES 1,000
+nets less than KES 1,000. The operator requires that a hospital be able to pass
+that cost on to the patient instead, and that doing so be an explicit,
+per-hospital authorisation rather than a platform default.
+
+**It is opt-in, off by default, and authorised in the admin portal.** A checkbox
+on the M-Pesa settings page, per till, so a pharmacy can pass charges on while an
+outpatient desk absorbs them. Off means nothing changes and the patient is
+prompted for the invoice amount, exactly as today.
+
+**The rate is a setting, not a constant.** It defaults to 0.55 percent, and it
+lives on the config row because Safaricom changes its tariffs and that must be a
+form edit rather than a deploy.
+
+**How the arithmetic must work, and the part that silently breaks invoices.**
+Three amounts exist and they are not interchangeable:
+
+- **net**: the invoice amount, what the hospital is owed
+- **charge**: the surcharge added when the hospital has authorised it
+- **gross**: net plus charge, what the patient is actually prompted for
+
+The patient is prompted for gross. The cross-check compares the callback's
+claimed amount against gross, because gross is what we asked Safaricom for.
+**But the invoice is credited net, never gross.** Credit the invoice with gross
+and every single invoice ends up overpaid by the surcharge, showing a phantom
+credit balance that a cashier then has to explain to a patient. The surcharge is
+not hospital revenue: it is money passing through to Safaricom.
+
+`mpesa_transactions` therefore records all three: `amount` stays the gross figure
+that anchors the cross-check, alongside `net_amount` and `charge_amount`. Storing
+only two and deriving the third invites the derivation being done differently in
+two places.
+
+**Rounding interacts with the existing rule.** M-Pesa takes whole shillings, so
+gross is already rounded up to the next shilling. That rounding happens once, on
+gross, after the charge is applied. `charge_amount` is then recorded as gross
+minus net, which is the surcharge actually collected rather than the theoretical
+percentage. Those differ by up to a shilling and the recorded figure must be the
+one that really moved, because that is what a receipt and a reconciliation have
+to agree on.
+
+**The patient sees the breakdown before they pay**, and the receipt shows it
+after. A patient prompted for KES 1,005 against a KES 1,000 invoice, with no
+explanation, reasonably believes they have been overcharged.
+
 ### Refunds (B2C)
 
 This is the only part of the system that moves money *out*, and it is designed

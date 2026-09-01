@@ -1486,3 +1486,87 @@ A prune command removing events older than a configurable window, and a note in 
 cd backend && REDIS_URL="" ./venv/bin/python -m pytest tests/daraja -q
 cd ../frontend && npm run build && npx vitest run --no-file-parallelism && npm run lint
 ```
+
+---
+
+## Task 16: Passing the Safaricom charge to the patient
+
+**Runs after Task 14 and before Task 11 (frontend).** It changes what a patient is prompted for, so it must land before the pages that display amounts.
+
+**Spec:** the section "Passing the Safaricom charge to the patient" in `docs/superpowers/specs/2026-08-29-daraja-migration-design.md`. Read it first: it contains the one rule that silently breaks invoices if got wrong.
+
+**Files:**
+- Create: a new alembic revision on top of `f2a3b4c5d6e7`
+- Modify: `backend/app/models/mpesa.py`, `backend/app/services/daraja/stk.py`, `backend/app/services/daraja/settlement.py`
+- Test: `backend/tests/daraja/test_customer_charge.py`
+
+- [ ] **Step 1: Schema**
+
+On `MpesaConfig`:
+```python
+# Off by default. A hospital passing Safaricom's collection charge to the
+# patient is a commercial decision the hospital authorises for itself, not
+# a platform default applied to everyone.
+pass_charges_to_customer = Column(Boolean, nullable=False, server_default="false")
+# A setting rather than a constant: Safaricom changes tariffs, and that
+# must be a form edit rather than a deploy.
+customer_charge_percent = Column(Numeric(6, 4), nullable=False, server_default="0.0055")
+```
+
+On `MpesaTransaction`, alongside the existing `amount`:
+```python
+net_amount = Column(Numeric(12, 2), nullable=True)     # what the hospital is owed
+charge_amount = Column(Numeric(12, 2), nullable=True)  # the surcharge actually collected
+```
+
+`amount` keeps its current meaning: the GROSS figure we asked Safaricom for, which is what the settlement cross-check compares against. Do not repurpose it.
+
+Backfill existing rows: `net_amount = amount`, `charge_amount = 0`. Every existing transaction predates this feature, so its gross and net are the same figure.
+
+- [ ] **Step 2: The arithmetic, in one place**
+
+```python
+def apply_customer_charge(net: Decimal, config: MpesaConfig) -> tuple[Decimal, Decimal, Decimal]:
+    """Return (net, charge, gross) for a payment of `net` on this till.
+
+    Rounding happens ONCE, on gross, after the charge is applied, because
+    M-Pesa takes whole shillings. charge is then gross minus net: the
+    surcharge actually collected, not the theoretical percentage. Those
+    differ by up to a shilling, and a receipt and a reconciliation both
+    have to agree on the figure that really moved.
+    """
+```
+
+When `pass_charges_to_customer` is false, gross is `net` rounded up and charge is zero. Never silently apply a charge on a till that has not authorised it.
+
+- [ ] **Step 3: Initiation uses gross, settlement credits net**
+
+`initiate_stk_push` prompts for gross, persists all three figures, and returns the breakdown so a cashier can see what the patient will actually be asked for.
+
+`settle_invoice_match` credits the invoice with **`txn.net_amount`**, not `txn.amount`. This is the rule that silently breaks every invoice if missed: crediting gross overpays each invoice by the surcharge and leaves a phantom credit balance a cashier has to explain to a patient. Fall back to `txn.amount` only when `net_amount` is NULL, which is the pre-migration legacy case.
+
+The settlement cross-check still compares the callback's claimed amount against `txn.amount` (gross). That is unchanged and must stay unchanged: gross is what we asked Safaricom for.
+
+- [ ] **Step 4: Tests**
+
+```
+test_charge_is_not_applied_when_the_till_has_not_authorised_it
+test_charge_is_applied_when_authorised_and_gross_is_rounded_up_once
+test_charge_amount_recorded_is_gross_minus_net_not_the_raw_percentage
+test_invoice_is_credited_net_not_gross
+test_a_fully_paid_invoice_shows_no_credit_balance_after_a_charged_payment
+test_cross_check_still_compares_against_gross
+test_legacy_transaction_with_null_net_amount_settles_on_amount
+test_rate_is_read_from_the_config_not_a_constant
+test_two_tills_can_have_different_charge_settings
+```
+
+`test_invoice_is_credited_net_not_gross` and `test_a_fully_paid_invoice_shows_no_credit_balance_after_a_charged_payment` are the load-bearing pair. Prove them: temporarily credit gross instead of net, confirm both fail, restore, confirm they pass. Report the evidence.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -m "feat(daraja): let a hospital pass the Safaricom charge to the patient"
+```
+
+**Frontend (folded into Task 11):** a checkbox on the M-Pesa settings page, per till, labelled so it is unambiguous that the patient pays more. Show the configured rate and an example ("a KES 1,000 invoice prompts the patient for KES 1,006"). The payment screen shows the patient the breakdown before they pay, and the receipt shows it after: a patient prompted for KES 1,005 against a KES 1,000 invoice, with no explanation, reasonably believes they have been overcharged.
