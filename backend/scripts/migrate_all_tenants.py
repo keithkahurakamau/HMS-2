@@ -802,6 +802,12 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
     ("patients", "CREATE INDEX IF NOT EXISTS ix_patients_id_number_bidx ON patients (id_number_bidx);"),
     ("patients", "CREATE INDEX IF NOT EXISTS ix_patients_telephone_1_bidx ON patients (telephone_1_bidx);"),
     ("patients", "CREATE INDEX IF NOT EXISTS ix_patients_email_bidx ON patients (email_bidx);"),
+    # d6e7f8a9b0c1 — B2C refund dispatch-attempt marker. Written and
+    # committed by dispatch_refund BEFORE it calls Safaricom, so it
+    # survives a lost response and can tell "never dispatched" apart from
+    # "dispatched once, outcome unknown".
+    ("mpesa_refunds",
+        "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS first_dispatch_attempted_at TIMESTAMPTZ;"),
 ]
 
 

@@ -227,4 +227,16 @@ class MpesaRefund(Base):
     approved_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Written and COMMITTED by dispatch_refund BEFORE it calls Safaricom,
+    # specifically so it survives a lost response (a read timeout, a
+    # dropped connection, a breaker trip on the response leg). Without
+    # this, "Approved" is ambiguous between "never sent" and "sent once,
+    # outcome unknown": both leave entry_status == "Approved" and
+    # conversation_id == NULL, and no amount of reasoning about status
+    # alone can recover a fact that was never recorded. NULL means no
+    # dispatch attempt has ever been made; once set, it is never cleared,
+    # even across a later Failed classification, since it is a historical
+    # fact about what was attempted, not a current-state flag.
+    first_dispatch_attempted_at = Column(DateTime(timezone=True), nullable=True)
+
     source_transaction = relationship("MpesaTransaction")
