@@ -303,6 +303,49 @@ def approve_refund(db: Session, *, refund_id: int, user_id: int) -> MpesaRefund:
 # ─── Dispatch ────────────────────────────────────────────────────────────
 
 
+def _record_conversation_id(
+    db: Session, refund: MpesaRefund, reported: Optional[str]
+) -> bool:
+    """Record Safaricom's ConversationID on `refund` the first time it is
+    learned. A LATER, DIFFERENT value is treated as a double-dispatch
+    alarm, never silently overwritten.
+
+    ConversationID is Safaricom's own identifier for the specific
+    instruction it accepted. If a second, different value ever arrives for
+    the same refund (the same OriginatorConversationID), that is direct
+    evidence Safaricom holds TWO distinct instructions for what should be
+    one payout, the single most important alarm this flow can raise.
+    Overwriting it would erase that evidence and retarget every later
+    cross-check at the second instruction, silently disowning the first
+    one's own result when it arrives.
+
+    Returns False when an alarm was raised: the caller must stop and must
+    not resolve the refund from the response/result that triggered this
+    call. Returns True otherwise, including the ordinary case of nothing
+    to record yet.
+    """
+    if not reported:
+        return True
+    if refund.conversation_id and refund.conversation_id != reported:
+        refund.result_desc = (
+            f"ALARM: a second ConversationID ({reported}) arrived for this "
+            f"refund; the recorded ConversationID is {refund.conversation_id}. "
+            "Safaricom may hold two distinct instructions for one refund. "
+            "Left untouched pending manual review."
+        )[:255]
+        logger.error(
+            "B2C double-dispatch alarm for refund %s: recorded ConversationID "
+            "%s, new arrival %s",
+            refund.id, safe_repr(refund.conversation_id), safe_repr(reported),
+        )
+        db.commit()
+        _notify_refund_needs_review(db, refund, reason=refund.result_desc)
+        return False
+    if not refund.conversation_id:
+        refund.conversation_id = reported
+    return True
+
+
 def dispatch_refund(
     db: Session, *, refund: MpesaRefund, callback_tenant: Optional[str] = None
 ) -> MpesaRefund:
@@ -318,6 +361,10 @@ def dispatch_refund(
             status_code=409,
             detail=f"Refund is {refund.status}; nothing to dispatch.",
         )
+    # Captured before anything below can mutate refund.status: the
+    # synchronous-rejection branch needs to know what this refund WAS when
+    # this specific call started, not what it becomes partway through.
+    entry_status = refund.status
 
     txn = (
         db.query(MpesaTransaction)
@@ -367,13 +414,51 @@ def dispatch_refund(
 
     response_code = str(response.get("ResponseCode", ""))
     if response_code != "0":
-        # A definitive SYNCHRONOUS rejection (bad initiator credentials, an
-        # invalid shortcode, a malformed request): this is real information
-        # Safaricom gave us, not an unknown. No asynchronous result will
-        # ever follow for a request Safaricom refused to queue in the first
-        # place, so Failed is correct here. This is a different fact from a
-        # queue timeout on a request Safaricom DID accept (see
-        # handle_b2c_timeout, below), which must never be marked Failed.
+        if entry_status != "Approved":
+            # This refund entered dispatch_refund already Processing: an
+            # earlier attempt already got a synchronous "0" from Safaricom
+            # (or a timeout later confirmed Safaricom holds it) and this
+            # call is a RETRY. A non-zero ResponseCode on a retry is
+            # exactly what a duplicate-OriginatorConversationID rejection
+            # looks like: Safaricom recognising the retry as the same
+            # instruction it already has, which is precisely what the
+            # OriginatorConversationID reuse defence is FOR. Reading this
+            # as "the refund failed" would convert Safaricom's own
+            # dedup-rejection into a false negative: the operator sees
+            # Failed, requests a brand-new refund with a brand-new
+            # originator id, and that second, genuinely distinct
+            # instruction pays the patient again on top of the first,
+            # already-accepted one. So this must never resolve a refund
+            # that entered as Processing; it stays Processing, exactly the
+            # same resting state as an unresolved queue timeout, and a
+            # human is told now rather than the record silently
+            # disagreeing with reality.
+            logger.warning(
+                "B2C dispatch retry for refund %s (entered Processing) got a "
+                "non-zero synchronous ResponseCode (%s: %s); left Processing, "
+                "not Failed, because Safaricom may already hold the original "
+                "instruction.",
+                refund.id, response_code, safe_repr(response.get("ResponseDescription")),
+            )
+            refund.result_desc = (
+                f"Retry got ResponseCode {response_code} "
+                f"({response.get('ResponseDescription')}); left Processing "
+                "pending manual review, not Failed, because Safaricom may "
+                "already hold the original instruction."
+            )[:255]
+            db.commit()
+            db.refresh(refund)
+            _notify_refund_needs_review(db, refund, reason=refund.result_desc)
+            return refund
+
+        # entry_status == "Approved": this IS the first dispatch attempt's
+        # own synchronous verdict for THIS submission, a definitive
+        # rejection Safaricom gave for an instruction it never accepted
+        # into its queue. No asynchronous result will ever follow for it,
+        # so Failed is genuinely correct here. This is a different fact
+        # from a queue timeout on a request Safaricom DID accept (see
+        # handle_b2c_timeout, below), which must never be marked Failed,
+        # and a different fact from the retry case just above.
         refund.status = "Failed"
         refund.result_desc = str(
             response.get("ResponseDescription") or "Daraja rejected the B2C request"
@@ -382,7 +467,10 @@ def dispatch_refund(
         db.refresh(refund)
         return refund
 
-    refund.conversation_id = response.get("ConversationID")
+    if not _record_conversation_id(db, refund, response.get("ConversationID")):
+        db.refresh(refund)
+        return refund
+
     refund.status = "Processing"
     db.commit()
     db.refresh(refund)
