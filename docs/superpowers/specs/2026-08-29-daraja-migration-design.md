@@ -274,6 +274,59 @@ lock and serialises the payment path to fix a non-problem.
 
 ### Passing the Safaricom charge to the patient
 
+**RESEARCHED 2026-09-01, and the findings contradict the original request. This
+section is on hold pending an operator decision. Do not implement Task 16 until
+it is resolved.**
+
+What the Safaricom tariffs actually say:
+
+**Paybill charges are banded flat fees, not a percentage.** The bands run
+KES 1 to 100 free, 101 to 500 costs KES 7, 501 to 1,000 costs KES 13, 1,001 to
+1,500 costs KES 23, rising to a hard cap of KES 108 for large amounts. A flat
+0.55 percent is not how Safaricom bills paybill at all. The 0.55 figure appears
+in secondary sources as an effective blended merchant rate over a mid band, not
+as a charging mechanism.
+
+**There are three tariffs and their names are inverted from intuition**, which is
+the single easiest thing to get backwards here:
+
+| Tariff | Who actually pays |
+|---|---|
+| Business Bouquet | The CUSTOMER pays the whole fee. The business pays nothing. |
+| Customer Bouquet | The BUSINESS pays the whole fee. The customer pays nothing. |
+| Mgao | Split between them, and not evenly. |
+
+**Under Business Bouquet the fee is already deducted from the customer's own
+M-Pesa balance during the transaction, and the business receives the full amount
+entered.** Utilities, schools and hospitals are the usual Business Bouquet
+holders. So for a hospital on that tariff the patient is ALREADY paying the
+charge, and adding a surcharge to the prompt would charge them twice for the
+same thing.
+
+**Buy Goods tills are free for the customer, always.** The merchant pays roughly
+0.5 percent, capped at KES 200, dropping to 0.25 percent under KES 200. Our
+system supports both paybill and till shortcodes, so any charge logic has to
+branch on `shortcode_type` or it is wrong for half the configurations.
+
+**What a flat 0.55 percent surcharge would therefore do wrong**, in four separate
+ways: double-charge every patient of a Business Bouquet hospital; use the wrong
+figure even where the hospital genuinely bears the cost, since the real charge is
+banded; ignore the KES 108 cap, so a KES 100,000 payment would be surcharged
+KES 550 against a real charge of KES 108; and apply a paybill-shaped charge to
+till shortcodes where the customer owes nothing by design.
+
+**What a correct implementation needs**, if the operator still wants pass-through
+after seeing the above: the hospital's tariff type as a setting (Business
+Bouquet, Customer Bouquet, or Mgao), a band table rather than a percentage,
+respect for the cap, a branch on paybill versus till, and the whole thing off
+unless the hospital is on a tariff where it actually bears a cost. Sources are
+listed in the ledger.
+
+---
+
+#### Original design, retained for reference. Do not build this as written.
+
+
 Safaricom takes a percentage of every M-Pesa collection. On a business-pays
 tariff that comes out of the hospital's side, so a hospital collecting KES 1,000
 nets less than KES 1,000. The operator requires that a hospital be able to pass
