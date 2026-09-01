@@ -27,6 +27,13 @@ _SENSITIVE_KEYS = {
     "access_token", "refresh_token", "superadmin_token",
     "authorization", "x-csrf-token",
     "payhero_username", "payhero_password", "payhero_webhook_secret",
+    # B2C (app/services/daraja/b2c.py) is the first Daraja flow to build a
+    # payload containing a SecurityCredential, the RSA-encrypted initiator
+    # password Safaricom requires on every B2C request. Redacted here even
+    # though nothing currently logs the raw payload, so the planned event
+    # log gets this for free rather than needing to remember it later.
+    "securitycredential", "initiator_password", "initiator_password_encrypted",
+    "callback_token",
 }
 
 
