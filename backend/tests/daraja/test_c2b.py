@@ -275,7 +275,9 @@ def test_c2b_confirmation_for_an_unknown_shortcode_is_recorded_unverified(db):
 def test_c2b_confirmation_survives_a_query_failure(db, monkeypatch):
     """A network hiccup submitting the Transaction Status query is not a
     reason to lose the record of money that already reached the till: the
-    row is still created, Unverified, with no correlation ids."""
+    row is still created, Unverified, with no correlation ids. result_desc
+    must still say something a human can act on: a message this test does
+    not check is a guarantee nobody is actually holding this code to."""
     config = _make_config_with_initiator(db, shortcode="174379")
     payload = _c2b_confirmation(receipt="NETFAIL001", amount="200", shortcode=config.shortcode)
 
@@ -293,6 +295,38 @@ def test_c2b_confirmation_survives_a_query_failure(db, monkeypatch):
     assert txn.status == "Unverified"
     assert txn.conversation_id is None
     assert db.query(Payment).count() == 0
+    # Not an exact string: the message must exist and must actually
+    # describe a network problem, so a cashier reading the unmatched queue
+    # is not left with an empty or meaningless field.
+    assert txn.result_desc
+    assert "unreachable" in txn.result_desc.lower()
+
+
+def test_c2b_confirmation_result_desc_names_missing_initiator_credentials(db):
+    """This IS the entire point of the initiator-credential coupling work:
+    a till can be fully registered with Safaricom and still be unable to
+    verify a single payment because nobody set its initiator credentials.
+    result_desc is the ONE human-facing signal that tells a cashier why a
+    verifying-nothing till is verifying nothing; if this message were
+    silently empty or wrong, a hospital would see a green till, take real
+    money, and have no way to learn why nothing settles.
+
+    Deliberately asserts on MEANING (non-empty, names the missing
+    credential) rather than an exact string, so a later wording change does
+    not break this test but a silently empty or wrong message does.
+    """
+    # No initiator_name / initiator_password_encrypted set: make_mpesa_config
+    # (unlike _make_config_with_initiator) leaves both unset.
+    config = make_mpesa_config(db, shortcode="174379")
+    payload = _c2b_confirmation(receipt="NOINITIATOR001", amount="300", shortcode=config.shortcode)
+
+    txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    assert txn.status == "Unverified"
+    assert txn.conversation_id is None
+    assert db.query(Payment).count() == 0
+    assert txn.result_desc
+    assert "initiator" in txn.result_desc.lower()
 
 
 # ─── The critical test: the Transaction Status result decides everything ───
@@ -349,6 +383,47 @@ def test_transaction_status_result_contradicting_amount_quarantines(db, monkeypa
     db.refresh(invoice)
     assert invoice.amount_paid == 0
     assert invoice.status == "Pending"
+
+
+def test_c2b_quarantine_notification_identifies_the_receipt_and_till(db, monkeypatch):
+    """_notify_quarantine (settlement.py) swallows every exception raised
+    inside it, since a notification failure must never look like a
+    settlement failure. That is exactly the combination, untested plus
+    silent, that hides a defect indefinitely: before this fix, every C2B
+    quarantine notification read "CheckoutRequestID None: ...", which told
+    a cashier nothing about which payment to look for. Monkeypatches
+    notify_permission directly and asserts the actual body names both the
+    receipt and the till, rather than trusting that _notify_quarantine ran
+    without raising."""
+    config = _make_config_with_initiator(db, shortcode="900009")
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+    payload = _c2b_confirmation(
+        receipt="QUARANTINE001", amount="500", shortcode=config.shortcode,
+        bill_ref=f"INV-{invoice.invoice_id}",
+    )
+    _fake_status_ack(monkeypatch, conversation_id="AG-QUARANTINE")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    captured = {}
+
+    def fake_notify_permission(db, codename, *, title, body=None, **kwargs):
+        captured["codename"] = codename
+        captured["title"] = title
+        captured["body"] = body
+        return 0
+
+    monkeypatch.setattr("app.utils.notify.notify_permission", fake_notify_permission)
+
+    result_payload = _status_result(
+        conversation_id="AG-QUARANTINE", result_code=0, amount="1.00", receipt="QUARANTINE001",
+    )
+    resolved = handle_transaction_status_result(db, result_payload)
+
+    assert resolved.status == "Quarantined"
+    assert captured.get("codename") == "billing:manage"
+    assert captured.get("body")
+    assert "QUARANTINE001" in captured["body"]
+    assert "900009" in captured["body"]
 
 
 def test_transaction_status_result_for_unknown_conversation_id_is_ignored(db, monkeypatch):
