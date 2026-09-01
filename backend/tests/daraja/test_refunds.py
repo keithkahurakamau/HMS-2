@@ -16,13 +16,14 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
+import requests
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
 from app.config.settings import settings
-from app.models.mpesa import MpesaTransaction
+from app.models.mpesa import MpesaRefund, MpesaTransaction
 from app.services.daraja.b2c import (
     approve_refund,
     dispatch_refund,
@@ -31,7 +32,7 @@ from app.services.daraja.b2c import (
     refundable_amount,
     request_refund,
 )
-from app.services.daraja.client import _TOKEN_CACHE
+from app.services.daraja.client import DarajaError, _TOKEN_CACHE
 from app.utils.encryption import encrypt_data
 from tests.daraja.conftest import make_invoice, make_mpesa_config
 
@@ -979,3 +980,218 @@ def test_every_state_changing_refund_route_requires_exactly_mpesa_refund():
             f"found {required}"
         )
     assert checked >= 3, "expected at least the request/approve/retry-dispatch routes"
+
+
+# ─── Fix round 2: FIX 1, Approved is ambiguous, the marker resolves it ─────
+
+
+def test_retry_dispatch_after_a_lost_first_response_does_not_fail(db, monkeypatch):
+    """FIX 1 (revert-evidence target). The first dispatch attempt reaches
+    Safaricom, which accepts it, but the response is lost before we learn
+    the outcome (a read timeout, a dropped connection). The refund is left
+    Approved with no conversation_id, exactly indistinguishable, by status
+    and conversation_id alone, from a refund that was never dispatched at
+    all. first_dispatch_attempted_at is what tells them apart. A
+    subsequent retry-dispatch that gets a non-zero ResponseCode, exactly
+    what Safaricom's own duplicate-instruction rejection looks like, must
+    move the refund to Processing and must NEVER reach Failed: Failed
+    would release the balance and let a fresh refund pay out on top of the
+    one Safaricom already accepted.
+    """
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="lost first response", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+    assert refund.first_dispatch_attempted_at is None
+
+    def fake_post_response_lost(url, **kw):
+        raise requests.exceptions.ReadTimeout(
+            "simulated: Safaricom may have already processed this request"
+        )
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_response_lost)
+    with pytest.raises(DarajaError):
+        dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+
+    db.refresh(refund)
+    assert refund.status == "Approved"  # unchanged: nothing was learned
+    assert refund.conversation_id is None
+    # But the fact that an attempt was made IS now durably recorded, which
+    # is the entire point: this is what a genuinely never-dispatched
+    # refund would NOT have.
+    assert refund.first_dispatch_attempted_at is not None
+
+    def fake_post_duplicate_rejection(url, **kw):
+        return FakeResponse(200, {
+            "ResponseCode": "1",
+            "ResponseDescription": "Duplicate OriginatorConversationID.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_duplicate_rejection)
+    refund = dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+
+    assert refund.status == "Processing"
+    assert refund.status != "Failed"
+
+
+def test_first_ever_attempt_rejection_still_fails_correctly(db, monkeypatch):
+    """The counterpart to the test above, so FIX 1 is not a one-way door:
+    a refund with NO prior recorded attempt that gets a non-zero
+    ResponseCode on its actual first try is a genuine, definitive
+    rejection. Failed is still correct in that case."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="genuine first rejection", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+    assert refund.first_dispatch_attempted_at is None
+
+    def fake_post_reject(url, **kw):
+        return FakeResponse(200, {
+            "ResponseCode": "2001", "ResponseDescription": "Invalid initiator credentials.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_reject)
+    refund = dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+
+    assert refund.status == "Failed"
+    assert refund.first_dispatch_attempted_at is not None
+
+
+# ─── Fix round 2: FIX 2, the refund row is locked for the whole dispatch ───
+
+
+def test_concurrent_dispatch_of_the_same_refund_never_double_fails(db, _engine, monkeypatch):
+    """FIX 2 (revert-evidence target). Two concurrent dispatch attempts
+    against the SAME refund (a double-click, a manual retry racing an
+    automated one) with no network fault at all: both would, without the
+    row lock, read entry_status == "Approved" with no prior attempt, both
+    dispatch, and whichever received the (simulated) duplicate rejection
+    would incorrectly hit Failed. With the lock, exactly one of the two
+    is the genuine first attempt (and may legitimately fail on its own
+    rejection); the other necessarily observes the marker the first one
+    committed and can never be marked Failed.
+
+    Two real threads, two separate Sessions on two separate connections,
+    a threading.Barrier so both reach dispatch_refund's row lock at the
+    same moment, matching the shape of the earlier over-refund concurrency
+    test.
+    """
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="concurrent dispatch", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+    refund_id = refund.id
+    db.commit()
+
+    def fake_post_always_rejects(url, **kw):
+        return FakeResponse(200, {
+            "ResponseCode": "1", "ResponseDescription": "Duplicate OriginatorConversationID.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_always_rejects)
+
+    SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+    barrier = threading.Barrier(2)
+    results: list = []
+    errors: list = []
+    lock = threading.Lock()
+
+    def worker():
+        session = SessionLocal()
+        try:
+            r = session.query(MpesaRefund).filter(MpesaRefund.id == refund_id).first()
+            barrier.wait(timeout=5)
+            outcome = dispatch_refund(session, refund=r, callback_tenant="mayoclinic_db")
+            with lock:
+                results.append(outcome.status)
+        except Exception as exc:  # noqa: BLE001, captured for the assertion below
+            with lock:
+                errors.append(exc)
+        finally:
+            session.close()
+
+    t1 = threading.Thread(target=worker)
+    t2 = threading.Thread(target=worker)
+    t1.start()
+    t2.start()
+    t1.join(timeout=15)
+    t2.join(timeout=15)
+
+    assert not errors, f"unexpected errors from concurrent dispatch: {errors}"
+    assert len(results) == 2
+    # The safety property: never both Failed. Exactly one of the two
+    # observed no prior attempt (and may legitimately fail on its own
+    # rejection); the other is guaranteed to have observed the marker the
+    # first one committed, and must resolve to Processing instead.
+    assert results.count("Failed") <= 1, (
+        f"both concurrent dispatches reached Failed: {results}"
+    )
+    assert set(results) <= {"Failed", "Processing"}
+
+
+# ─── Fix round 2: FIX 3, the rolling cap ceiling is the hospital default ───
+
+
+def test_rolling_cap_ceiling_is_the_hospital_default_not_the_departments_own(db):
+    """A department till configured with a HIGHER cap than the hospital
+    default must not let a refund through past the hospital's own
+    tenant-wide ceiling: the ceiling compared against the tenant-wide
+    total is always the hospital default's refund_daily_cap, never the
+    requesting till's own value."""
+    import secrets
+    from app.models.messaging import Department
+
+    hospital_default = _refund_config(db, refund_daily_cap=Decimal("500.00"))
+
+    dept = Department(name=f"high-cap-dept-{secrets.token_hex(4)}", is_active=True)
+    db.add(dept)
+    db.flush()
+    dept_config = _refund_config(
+        db, shortcode="300003", initiator_name="dept-api",
+        department_id=dept.department_id, refund_daily_cap=Decimal("50000.00"),
+    )
+
+    hospital_txn = _make_settled_txn(
+        db, amount=Decimal("1000.00"), receipt="HOSP1", config=hospital_default,
+    )
+    dept_txn = _make_settled_txn(
+        db, amount=Decimal("1000.00"), receipt="DEPT1", config=dept_config,
+    )
+    db.commit()
+
+    first = request_refund(
+        db, source_transaction_id=hospital_txn.id, amount=Decimal("400.00"),
+        reason="against the hospital default till", user_id=1,
+    )
+    assert first.amount == Decimal("400.00")
+
+    # Filed against the department's OWN higher-cap till, but the running
+    # tenant-wide total (400 already spent) plus this 200 would push past
+    # the HOSPITAL's 500 cap, not the department's 50,000 one.
+    with pytest.raises(HTTPException) as exc_info:
+        request_refund(
+            db, source_transaction_id=dept_txn.id, amount=Decimal("200.00"),
+            reason="filed against the high-cap department till", user_id=1,
+        )
+    assert exc_info.value.status_code == 400
+    assert "24-hour" in exc_info.value.detail
+    assert "500" in exc_info.value.detail
+    assert dept_config.refund_daily_cap == Decimal("50000.00")  # untouched, just not used
