@@ -304,6 +304,8 @@ _CSRF_EXEMPT_PATHS = (
     "/api/payments/mpesa/c2b/confirmation/",
     "/api/payments/mpesa/b2c/result/",
     "/api/payments/mpesa/b2c/timeout/",
+    "/api/payments/mpesa/status/result/",
+    "/api/payments/mpesa/status/timeout/",
     "/api/payments/mpesa/platform/stk/callback/",
     # Inbound support email — called by the mail provider, not a browser.
     # Gated by HMAC signature instead of CSRF (EMAIL-003).

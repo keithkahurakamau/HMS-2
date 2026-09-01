@@ -736,6 +736,16 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
     ("mpesa_transactions",
         "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS mpesa_config_id INTEGER "
         "REFERENCES mpesa_configs(id);"),
+    # b4c5d6e7f8a9: C2B Transaction Status correlation. The async result
+    # callback identifies which row it answers by conversation_id, since the
+    # receipt itself is exactly what that callback is trying to confirm.
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS conversation_id VARCHAR(64);"),
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS originator_conversation_id VARCHAR(64);"),
+    ("mpesa_transactions",
+        "CREATE INDEX IF NOT EXISTS ix_mpesa_transactions_conversation_id "
+        "ON mpesa_transactions (conversation_id);"),
     # c4e62d8a1f37 — bidirectional cheque register
     ("cheques",
         "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS direction VARCHAR(20) NOT NULL DEFAULT 'incoming';"),

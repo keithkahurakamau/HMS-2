@@ -1,42 +1,41 @@
 """Transaction Status and Account Balance, the two Daraja queries that answer
 "what actually happened" rather than initiate something new.
 
-Transaction Status is what makes C2B safe. A C2B confirmation has no prior
-record: the customer just walked up and paid the till, so there is nothing
-local to compare an unsigned callback against. verify_receipt closes that gap
-by asking Safaricom directly, for the one receipt the confirmation claims,
-before app/services/daraja/c2b.py posts anything to the ledger. It requires
-BOTH that Safaricom knows the receipt and that the amount it reports equals
-the amount the confirmation claimed; either failing means unverified, never
-"probably fine".
+**Both are genuinely asynchronous.** This was gotten wrong in an earlier
+version of this module: it treated the synchronous response to
+POST /mpesa/transactionstatus/v1/query as the verdict on whether a receipt
+was real. It is not. That response only acknowledges the query was queued
+and hands back a ConversationID; the actual answer, whether Safaricom knows
+the receipt and what amount it reports, arrives later, at a separate
+ResultURL callback. Treating the acknowledgment as the verdict verifies
+nothing at all: a forged confirmation would sail through it every time,
+since nothing in the acknowledgment even mentions the receipt's outcome.
 
-Honest caveat about the real Daraja Transaction Status API: its documented
-behaviour is asynchronous. The synchronous response to
-POST /mpesa/transactionstatus/v1/query is only an acknowledgment that the
-request was accepted for processing (or a same-request validation error);
-the actual verdict is meant to arrive later on ResultURL. This module
-currently treats the synchronous response itself as authoritative, which is
-what lets a C2B confirmation be verified inline rather than left pending on a
-callback route this task does not build. If a future task wires up a real
-ResultURL handler for Transaction Status, this is the seam to revisit: the
-right fix is for that handler to update MpesaTransaction.verified_at when the
-async result lands, not to remove this synchronous check, since something
-must still decide within handle_confirmation whether to settle immediately.
+So this module's job is split in two, matching Safaricom's own split:
 
-Account Balance is a genuinely async, low-frequency admin query: Safaricom
-never answers it in the synchronous response either, and this module makes
-no attempt to pretend otherwise. account_balance submits the request and
-returns None for both balances, because a value we do not have must never be
-shown as zero (a hospital reading "zero float" when the real answer is
-"Safaricom has not replied yet" is a materially different, misleading fact).
+  - query_transaction_status fires the query and returns the acknowledgment
+    (ConversationID, OriginatorConversationID). It decides nothing.
+  - The actual verdict is handled where it is used: see
+    app/services/daraja/c2b.py's handle_transaction_status_result, which
+    receives Safaricom's later callback, correlates it back to the row that
+    asked (by ConversationID), and is the ONLY place that decides settle,
+    quarantine, or leave unverified. If no result ever arrives, the row
+    stays Unverified forever rather than being resolved by a local guess:
+    the exact same lesson that removed a local expiry timer from the STK
+    reservation path (see reservation.py) for the same reason, silent money
+    loss from a guessed outcome.
+
+Account Balance is asynchronous the same way, and this module does not even
+attempt the two-step split for it: no result-callback handler exists for
+Account Balance in this codebase yet, on either endpoint family. See
+account_balance's own docstring for what that means for its return value.
 """
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
-from types import SimpleNamespace
 from typing import Optional
+from types import SimpleNamespace
 from urllib.parse import quote
 
 from fastapi import HTTPException
@@ -140,9 +139,8 @@ def _config_for_receipt(db: Session, *, receipt: str) -> MpesaConfig:
     """The till that took `receipt`, so Transaction Status is signed with the
     same shortcode/credentials the payment actually landed on. Falls back to
     config_for's hospital default only when there is no transaction row yet
-    to ask (the receipt is being verified for the very first time, from
-    inside handle_confirmation, which sets mpesa_config_id before calling
-    verify_receipt) or it predates mpesa_config_id."""
+    to ask (handle_confirmation sets mpesa_config_id and flushes the row
+    before firing this query) or it predates mpesa_config_id."""
     txn = (
         db.query(MpesaTransaction)
         .filter(MpesaTransaction.receipt_number == receipt)
@@ -158,13 +156,12 @@ def _config_for_receipt(db: Session, *, receipt: str) -> MpesaConfig:
 def query_transaction_status(
     db: Session, *, receipt: str, callback_tenant: Optional[str] = None
 ) -> dict:
-    """Ask Safaricom about `receipt` directly. See the module docstring's
-    caveat: the synchronous response is treated as the verdict here, which is
-    a simplification against Daraja's documented async behaviour.
-
-    Returns Daraja's raw response. Does not itself decide verified or not;
-    verify_receipt is what interprets the response against an expected
-    amount."""
+    """Fire a Transaction Status query for `receipt` and return Safaricom's
+    acknowledgment (OriginatorConversationID, ConversationID,
+    ResponseDescription). This is NOT the verdict: see the module docstring.
+    The caller (c2b.handle_confirmation) stores the two ids on its
+    MpesaTransaction row so the later result callback can be correlated back
+    to it; nothing here decides verified, matched, or settled."""
     if not receipt:
         raise HTTPException(status_code=400, detail="receipt is required")
 
@@ -193,41 +190,17 @@ def query_transaction_status(
         raise
 
 
-def _status_confirms_receipt(data: dict, *, expected_amount: Decimal) -> bool:
-    """True only when Safaricom's response BOTH reports success AND states an
-    amount equal to what the confirmation claimed. Either half missing or
-    wrong is not verified: a found-but-wrong-amount receipt is exactly the
-    forged-callback shape this whole module exists to catch, and a
-    ResultCode that is not success means Safaricom does not recognise the
-    receipt at all."""
-    if str(data.get("ResultCode")) != "0":
-        return False
-    raw_amount = data.get("Amount", data.get("TransactionAmount"))
-    if raw_amount is None:
-        return False
-    try:
-        reported = Decimal(str(raw_amount))
-    except (InvalidOperation, ValueError, TypeError):
-        return False
-    return reported == expected_amount
-
-
-def verify_receipt(
-    db: Session, *, txn: MpesaTransaction, callback_tenant: Optional[str] = None
-) -> bool:
-    """Verify `txn.receipt_number` with Safaricom before any settlement
-    against it. Never raises: a Daraja failure or a missing/unparseable
-    response is "not verified", the same outcome as an explicit rejection,
-    because the caller (handle_confirmation) must never treat "we could not
-    check" as "it is probably fine"."""
-    if not txn.receipt_number:
-        return False
-    try:
-        data = query_transaction_status(db, receipt=txn.receipt_number, callback_tenant=callback_tenant)
-    except (DarajaError, HTTPException) as exc:
-        logger.warning("C2B receipt verification could not reach Daraja: %s", safe_repr(str(exc)))
-        return False
-    return _status_confirms_receipt(data, expected_amount=Decimal(str(txn.amount or 0)))
+def _result_parameters(result: dict) -> dict:
+    """Flatten Safaricom's Result.ResultParameters.ResultParameter list (the
+    same shape B2C and Transaction Status results both use) into a plain
+    {Key: Value} dict. Shared here rather than duplicated in c2b.py because
+    a future B2C result handler (Task 7) will need the identical shape."""
+    items = ((result.get("ResultParameters") or {}).get("ResultParameter")) or []
+    return {
+        item.get("Key"): item.get("Value")
+        for item in items
+        if isinstance(item, dict) and item.get("Key")
+    }
 
 
 def account_balance(
@@ -235,8 +208,19 @@ def account_balance(
 ) -> dict:
     """Request the shortcode's utility and working balances, for the admin UI
     to show an operator before they promise a refund. Never called on the
-    refund hot path: see the module docstring for why the balances in the
-    return value are always None here, not a stale or zero figure."""
+    refund hot path.
+
+    NOT USABLE for its stated purpose yet. This submits the request and
+    returns Safaricom's acknowledgment, but the actual balances arrive
+    later on an Account Balance result callback, and no handler for that
+    callback exists in this codebase (unlike Transaction Status, which
+    c2b.handle_transaction_status_result now handles). Until that handler
+    is built, utility_balance and working_balance are always None here,
+    deliberately never a stale or zero figure standing in for an answer
+    that has not arrived: showing an operator "no float" when the truth is
+    "Safaricom has not replied" would be the exact wrong-fact failure this
+    guards against. Treat this function today as "ask Safaricom to answer",
+    not "get the answer"."""
     config = config_for(db, department_id=department_id)
     initiator, credential = _initiator_credentials(config)
     result_url, timeout_url = _flow_urls(config, callback_tenant, flow="balance")

@@ -1,15 +1,16 @@
-"""C2B: validation, confirmation, and the Transaction Status verification
-that stands in for the missing prior record. See app/services/daraja/c2b.py's
-module docstring for why this is the most dangerous flow in the migration:
-a C2B confirmation has no Pending row to cross-check an amount against, so
-verify_receipt (Transaction Status) is the entire third defence.
+"""C2B: validation, confirmation, and the Transaction Status result that
+carries the actual verdict. See app/services/daraja/c2b.py's module
+docstring for why this is the most dangerous flow in the migration, and why
+verification (and settlement with it) is deferred to a separate result
+callback rather than decided inline: Safaricom's Transaction Status query is
+documented as asynchronous, so its synchronous acknowledgment is not a
+verdict on anything.
 
 Daraja itself is mocked at one seam only: requests.* inside
 app.services.daraja.client, exercised through the real DarajaClient exactly
 as production traffic is.
 """
 import secrets
-from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
 
@@ -21,6 +22,8 @@ from app.models.mpesa import MpesaTransaction
 from app.models.patient import Patient
 from app.services.daraja.c2b import (
     handle_confirmation,
+    handle_transaction_status_result,
+    handle_transaction_status_timeout,
     handle_validation,
     match_c2b_invoice,
     register_c2b_urls,
@@ -45,9 +48,9 @@ def _public_base_url(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _fake_safaricom_public_key(monkeypatch):
-    """verify_receipt signs a Transaction Status request the same way B2C
-    does, via SecurityCredential = RSA-encrypt(initiator password). The real
-    Safaricom .cer files are not checked into this repo (see
+    """Firing a Transaction Status query signs it the same way B2C does, via
+    SecurityCredential = RSA-encrypt(initiator password). The real Safaricom
+    .cer files are not checked into this repo (see
     tests/daraja/test_credentials.py), so a locally generated keypair stands
     in for it here, the same technique Task 7 (B2C) uses: this exercises the
     real encryption code path in credentials.security_credential without
@@ -77,46 +80,27 @@ def _fake_oauth(monkeypatch):
     )
 
 
-@contextmanager
-def _daraja_status_returns(*, found: bool, amount=None, capture=None):
-    """Fake Daraja for the duration of the block: OAuth always succeeds, and
-    a POST to the Transaction Status endpoint reports either a confirmed
-    receipt (found=True, with `amount`) or Safaricom not recognising it
-    (found=False). Any other POST (e.g. registerurl) gets a generic accept,
-    since some tests only care about the status endpoint's behaviour.
-    """
-    import app.services.daraja.client as client_module
-
-    original_get = client_module.requests.get
-    original_post = client_module.requests.post
-
-    def fake_get(url, **kw):
-        return FakeResponse(200, {"access_token": "tok", "expires_in": "3599"})
+def _fake_status_ack(monkeypatch, *, conversation_id="AG-1", originator_conversation_id="OC-1"):
+    """Fake Daraja's Transaction Status ACKNOWLEDGMENT only: OAuth succeeds,
+    and a POST to the Transaction Status endpoint returns Safaricom's
+    same-request acceptance (ConversationID/OriginatorConversationID), never
+    a verdict. That is the whole point of the redesign this test file
+    covers: handle_confirmation only ever sees this shape, never an amount
+    or a found/not-found answer, because Safaricom does not put those in
+    this response."""
+    _fake_oauth(monkeypatch)
 
     def fake_post(url, **kw):
-        if capture is not None:
-            capture["url"] = url
-            capture["payload"] = kw.get("json")
         if "/transactionstatus/" in url:
-            if found:
-                return FakeResponse(200, {
-                    "ResultCode": "0",
-                    "ResultDesc": "The service request has been accepted successfully.",
-                    "Amount": str(amount),
-                })
             return FakeResponse(200, {
-                "ResultCode": "1",
-                "ResultDesc": "The transaction could not be found.",
+                "OriginatorConversationID": originator_conversation_id,
+                "ConversationID": conversation_id,
+                "ResponseCode": "0",
+                "ResponseDescription": "Accept the service request successfully.",
             })
         return FakeResponse(200, {"ResponseDescription": "Accepted"})
 
-    client_module.requests.get = fake_get
-    client_module.requests.post = fake_post
-    try:
-        yield
-    finally:
-        client_module.requests.get = original_get
-        client_module.requests.post = original_post
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
 
 
 def _c2b_confirmation(
@@ -140,11 +124,48 @@ def _c2b_confirmation(
     }
 
 
+def _status_result(
+    *, conversation_id, originator_conversation_id="OC-1", result_code=0,
+    result_desc="The service request is processed successfully.", amount=None,
+) -> dict:
+    """Shaped like Safaricom's real asynchronous Transaction Status result
+    callback: the verdict lives here, never in query_transaction_status's
+    own synchronous return value."""
+    result_parameters = []
+    if amount is not None:
+        result_parameters.append({"Key": "TransactionAmount", "Value": amount})
+        result_parameters.append({"Key": "TransactionStatus", "Value": "Completed"})
+    return {
+        "Result": {
+            "ResultType": 0,
+            "ResultCode": result_code,
+            "ResultDesc": result_desc,
+            "OriginatorConversationID": originator_conversation_id,
+            "ConversationID": conversation_id,
+            "TransactionID": "whatever",
+            "ResultParameters": {"ResultParameter": result_parameters},
+            "ReferenceData": {"ReferenceItem": {"Key": "Occasion", "Value": ""}},
+        }
+    }
+
+
+def _status_timeout(*, conversation_id, originator_conversation_id="OC-1") -> dict:
+    return {
+        "Result": {
+            "ResultType": 1,
+            "ResultCode": 1,
+            "ResultDesc": "The service request timed out.",
+            "OriginatorConversationID": originator_conversation_id,
+            "ConversationID": conversation_id,
+        }
+    }
+
+
 def _make_config_with_initiator(db, *, shortcode: str, **overrides):
-    """A config that can actually pass verify_receipt's credential check
-    (Initiator + SecurityCredential), for tests that expect Safaricom's
-    Transaction Status to be genuinely reachable and only fail (or succeed)
-    on the found/amount comparison, not on missing configuration."""
+    """A config that can actually fire a Transaction Status request
+    (Initiator + SecurityCredential), for tests that expect
+    handle_confirmation to genuinely reach Daraja rather than fail on
+    missing configuration."""
     from app.utils.encryption import encrypt_data
 
     config = make_mpesa_config(
@@ -170,87 +191,58 @@ def _make_patient(db, *, phone: str) -> Patient:
     return patient
 
 
-# ─── The critical verification test ─────────────────────────────────────────
+# ─── The critical test: confirmation never settles synchronously ───────────
 
 
-def test_c2b_confirmation_is_not_posted_to_the_ledger_until_verified(db):
+def test_c2b_confirmation_is_not_posted_to_the_ledger_until_verified(db, monkeypatch):
     """A C2B confirmation has no prior record by definition: the customer
-    just walked up and paid the till. Since the callback is unsigned, the
-    receipt is verified against Daraja's Transaction Status API before any
-    money moves. Unverified receipts sit on the unmatched queue for a
-    human."""
-    config = make_mpesa_config(db, shortcode="174379")
+    just walked up and paid the till. Verification is asynchronous
+    (Transaction Status answers on a separate result callback, not in the
+    query's own response), so handle_confirmation itself must NEVER settle:
+    it only records Unverified and fires the query. Unverified receipts sit
+    on the unmatched queue for a human until (if) a result arrives."""
+    config = _make_config_with_initiator(db, shortcode="174379")
     payload = _c2b_confirmation(receipt="XYZ789", amount="1500", shortcode=config.shortcode)
+    _fake_status_ack(monkeypatch, conversation_id="AG-XYZ", originator_conversation_id="OC-XYZ")
 
-    with _daraja_status_returns(found=False):
-        txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+    txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
 
     assert txn.verified_at is None
     assert txn.status == "Unverified"
+    assert txn.conversation_id == "AG-XYZ"
+    assert txn.originator_conversation_id == "OC-XYZ"
     assert db.query(Payment).count() == 0
 
 
-def test_verified_c2b_confirmation_matches_and_settles(db):
-    config = _make_config_with_initiator(db, shortcode="174379")
-    invoice = make_invoice(db, total_amount=Decimal("1500.00"))
-    payload = _c2b_confirmation(
-        receipt="VERIFIED001", amount="1500", shortcode=config.shortcode,
-        bill_ref=f"INV-{invoice.invoice_id}",
-    )
-
-    with _daraja_status_returns(found=True, amount="1500"):
-        txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
-
-    assert txn.status == "Success"
-    assert txn.verified_at is not None
-    assert txn.verification_source == "transaction_status"
-    assert txn.match_basis == "bill_ref_number"
-    assert db.query(Payment).count() == 1
-
-    db.refresh(invoice)
-    assert invoice.amount_paid == Decimal("1500.00")
-    assert invoice.status == "Paid"
-
-
-def test_c2b_confirmation_amount_mismatch_against_safaricom_is_unverified(db):
-    """Safaricom knowing the receipt is not enough on its own: the amount it
-    reports must also match what the confirmation claimed, or a forged
-    confirmation could under-report Safaricom's own figure and still pass."""
-    config = _make_config_with_initiator(db, shortcode="174379")
-    payload = _c2b_confirmation(receipt="MISMATCH001", amount="1500", shortcode=config.shortcode)
-
-    with _daraja_status_returns(found=True, amount="1.00"):
-        txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
-
-    assert txn.status == "Unverified"
-    assert txn.verified_at is None
-    assert db.query(Payment).count() == 0
-
-
-def test_c2b_confirmation_replay_is_a_no_op(db):
+def test_c2b_confirmation_replay_is_a_no_op(db, monkeypatch):
     """Safaricom retries. A second delivery of the same receipt must not
-    create a second MpesaTransaction or a second Payment."""
+    create a second MpesaTransaction or re-fire the Transaction Status
+    query."""
     config = _make_config_with_initiator(db, shortcode="174379")
-    invoice = make_invoice(db, total_amount=Decimal("500.00"))
-    payload = _c2b_confirmation(
-        receipt="REPLAY001", amount="500", shortcode=config.shortcode,
-        bill_ref=f"INV-{invoice.invoice_id}",
-    )
+    payload = _c2b_confirmation(receipt="REPLAY001", amount="500", shortcode=config.shortcode)
 
-    with _daraja_status_returns(found=True, amount="500"):
-        handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
-        assert db.query(Payment).count() == 1
-        handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+    query_calls = {"n": 0}
 
+    def fake_post(url, **kw):
+        if "/transactionstatus/" in url:
+            query_calls["n"] += 1
+            return FakeResponse(200, {"ConversationID": "AG-1", "OriginatorConversationID": "OC-1"})
+        return FakeResponse(200, {})
+
+    _fake_oauth(monkeypatch)
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    assert query_calls["n"] == 1
     assert db.query(MpesaTransaction).filter(MpesaTransaction.receipt_number == "REPLAY001").count() == 1
-    assert db.query(Payment).count() == 1
 
 
 def test_c2b_confirmation_for_an_unknown_shortcode_is_recorded_unverified(db):
-    """A shortcode that matches no active till in this tenant cannot be
-    verified (there is no config to sign a Transaction Status request with),
-    but the money still happened, so it stays on record rather than being
-    dropped."""
+    """A shortcode that matches no active till in this tenant cannot fire a
+    Transaction Status request (there is no config to sign it with), but the
+    money still happened, so it stays on record rather than being dropped."""
     payload = _c2b_confirmation(receipt="NOCFG001", amount="200", shortcode="000000")
 
     txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
@@ -258,6 +250,146 @@ def test_c2b_confirmation_for_an_unknown_shortcode_is_recorded_unverified(db):
     assert txn.status == "Unverified"
     assert txn.verified_at is None
     assert txn.mpesa_config_id is None
+    assert txn.conversation_id is None
+    assert db.query(Payment).count() == 0
+
+
+def test_c2b_confirmation_survives_a_query_failure(db, monkeypatch):
+    """A network hiccup submitting the Transaction Status query is not a
+    reason to lose the record of money that already reached the till: the
+    row is still created, Unverified, with no correlation ids."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    payload = _c2b_confirmation(receipt="NETFAIL001", amount="200", shortcode=config.shortcode)
+
+    _fake_oauth(monkeypatch)
+
+    import requests as requests_module
+
+    def fake_post(url, **kw):
+        raise requests_module.exceptions.ConnectionError("boom")
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+    txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    assert txn.status == "Unverified"
+    assert txn.conversation_id is None
+    assert db.query(Payment).count() == 0
+
+
+# ─── The critical test: the Transaction Status result decides everything ───
+
+
+def test_transaction_status_result_corroborating_amount_settles(db, monkeypatch):
+    config = _make_config_with_initiator(db, shortcode="174379")
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+    payload = _c2b_confirmation(
+        receipt="TSR001", amount="500", shortcode=config.shortcode,
+        bill_ref=f"INV-{invoice.invoice_id}",
+    )
+    _fake_status_ack(monkeypatch, conversation_id="AG-TSR001")
+    txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+    assert txn.status == "Unverified"
+
+    result_payload = _status_result(conversation_id="AG-TSR001", result_code=0, amount="500")
+    resolved = handle_transaction_status_result(db, result_payload)
+
+    assert resolved.status == "Success"
+    assert resolved.verified_at is not None
+    assert resolved.verification_source == "transaction_status"
+    assert resolved.match_basis == "bill_ref_number"
+    assert db.query(Payment).count() == 1
+
+    db.refresh(invoice)
+    assert invoice.amount_paid == Decimal("500.00")
+    assert invoice.status == "Paid"
+
+
+def test_transaction_status_result_contradicting_amount_quarantines(db, monkeypatch):
+    """Safaricom knowing the receipt is not enough: the amount it reports
+    must also match what the confirmation claimed, or a forged/malformed
+    confirmation could under-report Safaricom's own figure and still pass."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    invoice = make_invoice(db, total_amount=Decimal("1500.00"))
+    payload = _c2b_confirmation(
+        receipt="MISMATCH001", amount="1500", shortcode=config.shortcode,
+        bill_ref=f"INV-{invoice.invoice_id}",
+    )
+    _fake_status_ack(monkeypatch, conversation_id="AG-MISMATCH")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    result_payload = _status_result(conversation_id="AG-MISMATCH", result_code=0, amount="1.00")
+    resolved = handle_transaction_status_result(db, result_payload)
+
+    assert resolved.status == "Quarantined"
+    assert resolved.verified_at is None
+    assert db.query(Payment).count() == 0
+    db.refresh(invoice)
+    assert invoice.amount_paid == 0
+    assert invoice.status == "Pending"
+
+
+def test_transaction_status_result_for_unknown_conversation_id_is_ignored(db, monkeypatch):
+    """A result whose ConversationID matches no row we created (forged, for
+    another deployment, or a replay of one already resolved) is ignored, not
+    acted on: there is nothing here to guess at."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    payload = _c2b_confirmation(receipt="REALROW001", amount="300", shortcode=config.shortcode)
+    _fake_status_ack(monkeypatch, conversation_id="AG-REAL")
+    txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    resolved = handle_transaction_status_result(
+        db, _status_result(conversation_id="AG-DOES-NOT-EXIST", result_code=0, amount="300"),
+    )
+
+    assert resolved is None
+    db.refresh(txn)
+    assert txn.status == "Unverified"
+    assert txn.verified_at is None
+    assert db.query(Payment).count() == 0
+
+
+def test_transaction_status_timeout_leaves_row_unverified(db, monkeypatch):
+    """A timeout means Safaricom gave up waiting on the query, not that the
+    money is not real. The row stays Unverified rather than the timeout
+    deciding an outcome on its own."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    payload = _c2b_confirmation(receipt="TIMEOUT001", amount="150", shortcode=config.shortcode)
+    _fake_status_ack(monkeypatch, conversation_id="AG-TIMEOUT")
+    txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    resolved = handle_transaction_status_timeout(
+        db, _status_timeout(conversation_id="AG-TIMEOUT"),
+    )
+
+    assert resolved is not None
+    assert resolved.id == txn.id
+    db.refresh(txn)
+    assert txn.status == "Unverified"
+    assert txn.verified_at is None
+    assert db.query(Payment).count() == 0
+
+
+def test_transaction_status_result_with_no_invoice_match_is_unmatched(db, monkeypatch):
+    """A corroborated receipt that matches no invoice by any basis is
+    recorded Unmatched, on the record, but nothing is posted against any
+    invoice."""
+    config = _make_config_with_initiator(db, shortcode="174379")
+    payload = _c2b_confirmation(
+        receipt="NOMATCH001", amount="750", shortcode=config.shortcode,
+        bill_ref="not-a-reference", msisdn="254700000000",
+    )
+    _fake_status_ack(monkeypatch, conversation_id="AG-NOMATCH")
+    handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
+
+    resolved = handle_transaction_status_result(
+        db, _status_result(conversation_id="AG-NOMATCH", result_code=0, amount="750"),
+    )
+
+    assert resolved.status == "Unmatched"
+    assert resolved.match_basis == "unmatched"
+    assert resolved.verified_at is not None
+    assert resolved.invoice_id is None
     assert db.query(Payment).count() == 0
 
 
@@ -318,25 +450,6 @@ def test_c2b_matching_falls_through_bill_ref_then_opd_then_phone(db):
     )
     assert invoice is None
     assert basis == "unmatched"
-
-
-def test_c2b_confirmation_with_no_invoice_match_is_unmatched_not_guessed(db):
-    """A verified receipt that matches no invoice by any basis is recorded
-    Unmatched, on the record, but nothing is posted against any invoice."""
-    config = _make_config_with_initiator(db, shortcode="174379")
-    payload = _c2b_confirmation(
-        receipt="NOMATCH001", amount="750", shortcode=config.shortcode,
-        bill_ref="not-a-reference", msisdn="254700000000",
-    )
-
-    with _daraja_status_returns(found=True, amount="750"):
-        txn = handle_confirmation(db, payload, callback_tenant="mayoclinic_db")
-
-    assert txn.status == "Unmatched"
-    assert txn.match_basis == "unmatched"
-    assert txn.verified_at is not None
-    assert txn.invoice_id is None
-    assert db.query(Payment).count() == 0
 
 
 # ─── Validation ─────────────────────────────────────────────────────────────

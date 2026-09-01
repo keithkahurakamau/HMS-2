@@ -153,6 +153,16 @@ class MpesaTransaction(Base):
     verified_at = Column(DateTime(timezone=True), nullable=True)
     verification_source = Column(String(30), nullable=True)  # 'stk_query' | 'transaction_status'
 
+    # C2B verification is asynchronous: a Transaction Status query is fired
+    # for a receipt, and the real verdict arrives later on a separate result
+    # callback identified by conversation_id, not by receipt or invoice
+    # (the receipt is exactly what that callback is trying to confirm).
+    # Neither is unique here: unlike MpesaRefund's originator_conversation_id
+    # (which IS a retry-idempotency key), a status query is fire-and-forget
+    # from this table's point of view.
+    conversation_id = Column(String(64), index=True, nullable=True)
+    originator_conversation_id = Column(String(64), nullable=True)
+
     transaction_date = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     transaction_type = Column(String(10), nullable=False, default="STK", index=True)
     bill_ref_number = Column(String(80), nullable=True, index=True)

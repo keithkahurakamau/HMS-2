@@ -1,8 +1,12 @@
-"""Transaction Status and Account Balance. See
-app/services/daraja/status.py's module docstring for the honest caveat about
-Daraja's Transaction Status API being documented as asynchronous while this
-module treats its synchronous response as the verdict, which is what lets
-verify_receipt decide inline whether a C2B confirmation is safe to settle.
+"""Transaction Status and Account Balance. Both are genuinely asynchronous
+Daraja commands: their synchronous response is only an acknowledgment
+(ConversationID/OriginatorConversationID), never a verdict. This file only
+covers that acknowledgment step, query_transaction_status. The actual
+Transaction Status verdict, and the settle/quarantine decision it drives, is
+covered in test_c2b.py against
+app.services.daraja.c2b.handle_transaction_status_result, since that is
+where the real cross-check now lives (see status.py's module docstring for
+why an earlier version wrongly put it here instead).
 """
 from decimal import Decimal
 
@@ -11,12 +15,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import HTTPException
 
 from app.models.mpesa import MpesaTransaction
-from app.services.daraja.client import DarajaError, _TOKEN_CACHE
-from app.services.daraja.status import (
-    account_balance,
-    query_transaction_status,
-    verify_receipt,
-)
+from app.services.daraja.client import _TOKEN_CACHE
+from app.services.daraja.status import account_balance, query_transaction_status
 from app.config.settings import settings
 from tests.daraja.conftest import make_mpesa_config
 
@@ -162,94 +162,6 @@ def test_query_transaction_status_uses_the_transaction_specific_till(db, monkeyp
 
     assert captured["payload"]["PartyA"] == "200002"
     assert captured["payload"]["Initiator"] == "dept-api"
-
-
-# ─── verify_receipt ──────────────────────────────────────────────────────────
-
-
-def test_verify_receipt_true_when_found_and_amount_matches(db, monkeypatch):
-    _fake_oauth(monkeypatch)
-    from app.utils.encryption import encrypt_data
-
-    config = make_mpesa_config(db, shortcode="174379", initiator_name="testapi")
-    config.initiator_password_encrypted = encrypt_data("initiator-pass")
-    db.commit()
-    txn = _make_txn(db, amount=Decimal("1500.00"), receipt="OK001", mpesa_config_id=config.id)
-
-    monkeypatch.setattr(
-        "app.services.daraja.client.requests.post",
-        lambda url, **kw: FakeResponse(200, {"ResultCode": "0", "Amount": "1500.00"}),
-    )
-
-    assert verify_receipt(db, txn=txn, callback_tenant="mayoclinic_db") is True
-
-
-def test_verify_receipt_false_when_not_found(db, monkeypatch):
-    _fake_oauth(monkeypatch)
-    from app.utils.encryption import encrypt_data
-
-    config = make_mpesa_config(db, shortcode="174379", initiator_name="testapi")
-    config.initiator_password_encrypted = encrypt_data("initiator-pass")
-    db.commit()
-    txn = _make_txn(db, amount=Decimal("1500.00"), receipt="NOTFOUND001", mpesa_config_id=config.id)
-
-    monkeypatch.setattr(
-        "app.services.daraja.client.requests.post",
-        lambda url, **kw: FakeResponse(200, {"ResultCode": "1", "ResultDesc": "not found"}),
-    )
-
-    assert verify_receipt(db, txn=txn, callback_tenant="mayoclinic_db") is False
-
-
-def test_verify_receipt_false_when_amount_does_not_match(db, monkeypatch):
-    """Safaricom knowing the receipt is not enough on its own: the reported
-    amount must equal ours too, or a forged claim of a smaller amount than
-    Safaricom actually recorded would still pass."""
-    _fake_oauth(monkeypatch)
-    from app.utils.encryption import encrypt_data
-
-    config = make_mpesa_config(db, shortcode="174379", initiator_name="testapi")
-    config.initiator_password_encrypted = encrypt_data("initiator-pass")
-    db.commit()
-    txn = _make_txn(db, amount=Decimal("1500.00"), receipt="WRONGAMT001", mpesa_config_id=config.id)
-
-    monkeypatch.setattr(
-        "app.services.daraja.client.requests.post",
-        lambda url, **kw: FakeResponse(200, {"ResultCode": "0", "Amount": "1.00"}),
-    )
-
-    assert verify_receipt(db, txn=txn, callback_tenant="mayoclinic_db") is False
-
-
-def test_verify_receipt_false_when_daraja_is_unreachable(db, monkeypatch):
-    """A network failure is "not verified", never "probably fine". It must
-    never raise out of handle_confirmation and never be mistaken for a
-    confirmed receipt."""
-    _fake_oauth(monkeypatch)
-    from app.utils.encryption import encrypt_data
-
-    config = make_mpesa_config(db, shortcode="174379", initiator_name="testapi")
-    config.initiator_password_encrypted = encrypt_data("initiator-pass")
-    db.commit()
-    txn = _make_txn(db, amount=Decimal("1500.00"), receipt="UNREACHABLE001", mpesa_config_id=config.id)
-
-    def fake_post(url, **kw):
-        raise DarajaError("Daraja unreachable: boom", status_code=502)
-
-    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
-
-    assert verify_receipt(db, txn=txn, callback_tenant="mayoclinic_db") is False
-
-
-def test_verify_receipt_false_without_a_receipt_number(db):
-    txn = MpesaTransaction(
-        phone_number="254712345678", amount=Decimal("100.00"),
-        status="Unverified", transaction_type="C2B",
-    )
-    db.add(txn)
-    db.flush()
-
-    assert verify_receipt(db, txn=txn, callback_tenant="mayoclinic_db") is False
 
 
 # ─── account_balance ─────────────────────────────────────────────────────────
