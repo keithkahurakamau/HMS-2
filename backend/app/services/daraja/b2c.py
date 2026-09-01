@@ -377,9 +377,29 @@ def _lock_refund(db: Session, refund_id: int) -> Optional[MpesaRefund]:
     dispatch_refund call site: two concurrent attempts against the SAME
     refund (a double-click, a manual retry racing an automated one) must
     serialise on this row, not both read the same entry_status and both
-    submit."""
+    submit.
+
+    populate_existing() is not optional here. SQLAlchemy's identity map
+    means that if `db` already holds a Python object for this refund_id
+    (the caller's own `refund` argument almost always is exactly that
+    object), a plain query returns that SAME object WITHOUT overwriting
+    its already-loaded attributes from the row this query just fetched,
+    even though the FOR UPDATE clause genuinely executed and genuinely
+    locked the row at the database level. Without populate_existing(), a
+    second caller unblocked by the first caller's commit would still read
+    its own stale, pre-lock copy of first_dispatch_attempted_at and
+    entry_status. Confirmed empirically: the concurrency test below fails
+    with both attempts reaching Failed if this is removed, which is
+    exactly the double-refund shape the lock exists to prevent, caused
+    entirely by the ORM cache, not by anything wrong at the database
+    level.
+    """
     return (
-        db.query(MpesaRefund).filter(MpesaRefund.id == refund_id).with_for_update().first()
+        db.query(MpesaRefund)
+        .filter(MpesaRefund.id == refund_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
     )
 
 
