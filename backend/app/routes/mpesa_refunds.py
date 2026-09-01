@@ -23,7 +23,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, condecimal
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config.database import get_db, get_tenant_engine
@@ -54,7 +54,10 @@ router = APIRouter(prefix="/api/payments/mpesa", tags=["Payments, M-Pesa Refunds
 
 class RefundRequest(BaseModel):
     source_transaction_id: int
-    amount: float = Field(gt=0)
+    # Money is Decimal, never float: a float amount.gt=0 check does not
+    # stop a request from carrying an amount that cannot round-trip
+    # exactly through the KES 12,2 column it is stored in.
+    amount: condecimal(gt=0, max_digits=12, decimal_places=2)
     reason: str = Field(min_length=1, max_length=255)
 
 
