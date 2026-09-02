@@ -35,7 +35,7 @@ import hashlib
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Optional
+from typing import Optional, Union
 from types import SimpleNamespace
 from urllib.parse import quote
 
@@ -45,7 +45,7 @@ from sqlalchemy.orm import Session
 
 from app.config.settings import settings
 from app.models.billing import Invoice
-from app.models.mpesa import MpesaConfig, MpesaTransaction
+from app.models.mpesa import MpesaConfig, MpesaRefund, MpesaTransaction
 from app.services.daraja.c2b_match import match_c2b_invoice
 from app.services.daraja.client import DarajaClient, DarajaError
 from app.services.daraja.credentials import security_credential
@@ -159,18 +159,48 @@ def _config_for_receipt(db: Session, *, receipt: str) -> MpesaConfig:
 
 
 def query_transaction_status(
-    db: Session, *, receipt: str, callback_tenant: Optional[str] = None
+    db: Session,
+    *,
+    receipt: Optional[str] = None,
+    original_conversation_id: Optional[str] = None,
+    config: Optional[MpesaConfig] = None,
+    callback_tenant: Optional[str] = None,
 ) -> dict:
-    """Fire a Transaction Status query for `receipt` and return Safaricom's
-    acknowledgment (OriginatorConversationID, ConversationID,
-    ResponseDescription). This is NOT the verdict: see the module docstring.
-    The caller (c2b.handle_confirmation) stores the two ids on its
-    MpesaTransaction row so the later result callback can be correlated back
-    to it; nothing here decides verified, matched, or settled."""
-    if not receipt:
-        raise HTTPException(status_code=400, detail="receipt is required")
+    """Fire a Transaction Status query and return Safaricom's acknowledgment
+    (OriginatorConversationID, ConversationID, ResponseDescription). This is
+    NOT the verdict: see the module docstring. The caller stores the ids so
+    the later result callback can be correlated back to whatever it asked
+    on behalf of; nothing here decides verified, matched, or settled.
 
-    config = _config_for_receipt(db, receipt=receipt)
+    Two ways to identify the transaction being asked about, exactly one of
+    which is required, because Daraja's TransactionStatusQuery accepts
+    either:
+
+      * `receipt`: the M-Pesa TransactionID, when one exists (the C2B
+        confirmation path: a receipt already arrived, and this asks
+        Safaricom to corroborate it). `config` is resolved from the
+        receipt via `_config_for_receipt` when not supplied.
+      * `original_conversation_id`: Safaricom's own id for an instruction
+        it already accepted, for a payment that has NOT produced a receipt
+        yet (a Processing B2C refund: see reconcile_queries.py's
+        requery_refund). `config` is REQUIRED in this case: there is no
+        receipt to resolve one from, so the caller (which already knows
+        which till the underlying instruction was signed with) must pass
+        it explicitly.
+    """
+    if not receipt and not original_conversation_id:
+        raise HTTPException(
+            status_code=400, detail="receipt or original_conversation_id is required",
+        )
+
+    if config is None:
+        if not receipt:
+            raise HTTPException(
+                status_code=400,
+                detail="config is required when querying by original_conversation_id alone",
+            )
+        config = _config_for_receipt(db, receipt=receipt)
+
     initiator, credential = _initiator_credentials(config)
     result_url, timeout_url = _flow_urls(config, callback_tenant, flow="status")
 
@@ -178,14 +208,19 @@ def query_transaction_status(
         "Initiator": initiator,
         "SecurityCredential": credential,
         "CommandID": "TransactionStatusQuery",
-        "TransactionID": receipt,
+        # Daraja accepts either identifier; TransactionID is set to "" (not
+        # omitted) when only original_conversation_id is known, matching
+        # the shape Safaricom's own documentation uses for this case.
+        "TransactionID": receipt or "",
         "PartyA": config.shortcode,
         "IdentifierType": _IDENTIFIER_TYPE_SHORTCODE,
         "ResultURL": result_url,
         "QueueTimeOutURL": timeout_url,
-        "Remarks": "C2B receipt verification",
-        "Occasion": "C2B verification",
+        "Remarks": "C2B receipt verification" if receipt else "B2C refund status verification",
+        "Occasion": "C2B verification" if receipt else "B2C refund verification",
     }
+    if original_conversation_id:
+        payload["OriginalConversationID"] = original_conversation_id
 
     client = _daraja_client(config)
     try:
@@ -211,7 +246,9 @@ def _result_parameters(result: dict) -> dict:
 # ─── Transaction Status result (the actual verdict) ─────────────────────────
 
 
-def handle_transaction_status_result(db: Session, payload: dict) -> Optional[MpesaTransaction]:
+def handle_transaction_status_result(
+    db: Session, payload: dict,
+) -> Optional[Union[MpesaTransaction, MpesaRefund]]:
     """Apply Safaricom's asynchronous Transaction Status result: the real
     verdict on a C2B receipt, arriving separately from (and generally much
     later than) the acknowledgment query_transaction_status received when
@@ -233,6 +270,19 @@ def handle_transaction_status_result(db: Session, payload: dict) -> Optional[Mpe
     own Transaction Status disagreeing with what the confirmation claimed is
     precisely the forged-or-malformed-callback shape this flow exists to
     catch.
+
+    A ConversationID matching no MpesaTransaction is also checked against
+    MpesaRefund.status_query_conversation_id before giving up: reconciliation
+    (reconcile_queries.py's requery_refund) fires this same query, by the
+    same command, for a refund stuck Processing, using its own dedicated
+    correlation column so it can never collide with (or overwrite) the B2C
+    dispatch's own conversation_id. That branch, handled in
+    refund_status.handle_transaction_status_result_for_refund (imported
+    lazily here to avoid a circular import: that module imports FROM
+    b2c.py, which already imports several helpers FROM this module),
+    records what Safaricom reported and notifies a human. It never writes
+    Completed, Failed, or Reversed: only a human, reading Safaricom's own
+    verdict, may authorise what happens next to money already in flight.
     """
     result = (payload or {}).get("Result") or {}
     conversation_id = result.get("ConversationID")
@@ -249,6 +299,17 @@ def handle_transaction_status_result(db: Session, payload: dict) -> Optional[Mpe
         .first()
     )
     if txn is None:
+        refund = (
+            db.query(MpesaRefund)
+            .filter(MpesaRefund.status_query_conversation_id == conversation_id)
+            .first()
+        )
+        if refund is not None:
+            from app.services.daraja.refund_status import (
+                handle_transaction_status_result_for_refund,
+            )
+            return handle_transaction_status_result_for_refund(db, refund, result)
+
         logger.warning(
             "Transaction Status result for an unrecognised or "
             "already-resolved ConversationID; ignored"
