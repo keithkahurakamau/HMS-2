@@ -385,15 +385,26 @@ def _record_conversation_id(
     not resolve the refund from the response/result that triggered this
     call. Returns True otherwise, including the ordinary case of nothing
     to record yet.
+
+    Also moves `refund` to Processing when the alarm fires, regardless of
+    what it was before. A ConversationID exists at all only because
+    Safaricom has demonstrably engaged with this refund at least once, so
+    Approved (meaning "not yet sent") is never an accurate description of
+    it from this point on, including when this call is dispatch_refund's
+    own success path (ResponseCode == 0) reporting a SECOND, conflicting
+    ConversationID: an operator reading Approved there is exactly the
+    person who would file a fresh refund on top of one Safaricom already
+    accepted.
     """
     if not reported:
         return True
     if refund.conversation_id and refund.conversation_id != reported:
+        refund.status = "Processing"
         refund.result_desc = (
             f"ALARM: a second ConversationID ({reported}) arrived for this "
             f"refund; the recorded ConversationID is {refund.conversation_id}. "
             "Safaricom may hold two distinct instructions for one refund. "
-            "Left untouched pending manual review."
+            "Moved to Processing pending manual review."
         )[:255]
         logger.error(
             "B2C double-dispatch alarm for refund %s: recorded ConversationID "
