@@ -808,6 +808,13 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
     # "dispatched once, outcome unknown".
     ("mpesa_refunds",
         "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS first_dispatch_attempted_at TIMESTAMPTZ;"),
+    # e9f0a1b2c3d4: reconciliation correlation + surfaced-once tracking.
+    ("mpesa_refunds",
+        "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS status_query_conversation_id VARCHAR(64);"),
+    ("mpesa_refunds",
+        "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS surfaced_at TIMESTAMPTZ;"),
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS surfaced_at TIMESTAMPTZ;"),
 ]
 
 

@@ -168,6 +168,14 @@ class MpesaTransaction(Base):
     bill_ref_number = Column(String(80), nullable=True, index=True)
     match_basis = Column(String(20), nullable=True, index=True)
 
+    # Set once by app/services/daraja/reconcile.py the first time this row
+    # is surfaced (stuck past 24 hours with no usable Safaricom verdict).
+    # NULL means never surfaced. Read before notifying, so a row does not
+    # renotify a danger-category channel on every 15-minute cron run
+    # forever: that is how a real forged-callback quarantine gets lost in
+    # the noise of a hundred routine repeats of the same old row.
+    surfaced_at = Column(DateTime(timezone=True), nullable=True)
+
     invoice = relationship("Invoice", backref="mpesa_transactions")
 
     __table_args__ = (
@@ -221,6 +229,18 @@ class MpesaRefund(Base):
     transaction_receipt = Column(String(50), unique=True, index=True, nullable=True)
     result_desc = Column(String(255), nullable=True)
 
+    # Safaricom's own id for a reconciliation Transaction Status query fired
+    # against THIS refund's conversation_id (see
+    # app/services/daraja/reconcile_queries.py's requery_refund), NOT for the
+    # original B2C dispatch. Deliberately a separate column from
+    # conversation_id: writing the query's id there would destroy the B2C
+    # dispatch's own correlation id and the double-dispatch alarm's evidence
+    # (_record_conversation_id in b2c.py). NULL means no status query is
+    # currently outstanding; set once a query is fired, and never
+    # overwritten while still set, so a later reconciliation run cannot
+    # orphan an answer already in flight for an earlier query.
+    status_query_conversation_id = Column(String(64), nullable=True)
+
     requested_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     approved_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
     requested_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
@@ -238,5 +258,12 @@ class MpesaRefund(Base):
     # even across a later Failed classification, since it is a historical
     # fact about what was attempted, not a current-state flag.
     first_dispatch_attempted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Same purpose and same discipline as MpesaTransaction.surfaced_at:
+    # set once, the first time reconciliation surfaces this refund (stuck
+    # Processing past 24 hours, or stuck Approved with a dispatch marker
+    # already set at all, see reconcile.py), and checked before notifying
+    # again.
+    surfaced_at = Column(DateTime(timezone=True), nullable=True)
 
     source_transaction = relationship("MpesaTransaction")
