@@ -75,6 +75,22 @@ import app.routes.accounting_notes as accounting_notes_module
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# SECURITY: a Daraja callback token is a path segment (Safaricom echoes the
+# URL we registered; we cannot make it a header instead), so it lands in
+# gunicorn's access log request line ("METHOD /path HTTP/1.1" status) and
+# in this module's own unhandled-exception handler, which logs
+# request.url.path directly. app/core/daraja_callback.py's whole design
+# treats that token as one of only two authentication layers for an
+# unsigned protocol, and app/utils/log_redact.py already redacts it from
+# every structured payload; a request line is free text, not a payload, so
+# it needs its own filter. One filter, attached to both loggers here,
+# covers every current and future route under /api/payments/mpesa/.
+from app.utils.log_redact import CallbackTokenPathFilter  # noqa: E402
+
+_callback_token_filter = CallbackTokenPathFilter()
+logging.getLogger("gunicorn.access").addFilter(_callback_token_filter)
+logger.addFilter(_callback_token_filter)
+
 # 2. Setup SlowAPI Rate Limiter (Imported from app.core.limiter)
 
 # 3. Initialize FastAPI Application
