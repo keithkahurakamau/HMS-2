@@ -65,6 +65,15 @@ MODULES: Tuple[ModuleDef, ...] = (
     ModuleDef("cheques",      "Cheques",            "Cheque receipting and reconciliation.",    False),
     ModuleDef("medical_history","Medical History",  "Longitudinal patient history.",            False),
     ModuleDef("payhero",      "M-Pesa Payments",    "Mobile-money collections at the till and pharmacy.", True),
+    # Daraja migration: the direct Safaricom integration that replaces the
+    # Pay Hero aggregator. A DIFFERENT key from "payhero" on purpose (never
+    # renamed in place): both must keep working side by side until Task 12
+    # removes Pay Hero, or the still-live /api/admin/payhero/ and
+    # /api/payments/payhero/ prefixes would point at a module key no longer
+    # in MODULES, gating working routes off for every tenant. See
+    # resolve_enabled_modules's alias block below for how an existing
+    # payhero entitlement also unlocks this module during the transition.
+    ModuleDef("mpesa",        "M-Pesa Payments (Daraja)", "Direct Safaricom M-Pesa collection at the till and pharmacy.", True),
     ModuleDef("analytics",    "Analytics",          "Aggregated dashboards and reports.",       False),
     ModuleDef("patient_portal","Patient Portal",    "Self-service portal for patients.",        False),
     ModuleDef("branding",     "Branding",           "Logos, colours, document templates.",      False),
@@ -90,6 +99,7 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     # NOTE: more specific /api/admin/<module>/ prefixes must appear before
     # the broad /api/admin/ rule so module gating routes them correctly.
     ("/api/admin/payhero/",               "payhero"),
+    ("/api/admin/mpesa/",                 "mpesa"),
     ("/api/admin/",                       "users"),
     ("/api/me/",                          "users"),
     ("/api/support/",                     "support"),
@@ -117,6 +127,7 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/medical-history/",             "medical_history"),
     ("/api/medical_history/",             "medical_history"),
     ("/api/payments/payhero/",            "payhero"),
+    ("/api/payments/mpesa/",              "mpesa"),
     ("/api/analytics/",                   "analytics"),
     ("/api/patient-portal/",              "patient_portal"),
     ("/api/branding/",                    "branding"),
@@ -161,12 +172,25 @@ def resolve_enabled_modules(flags_raw: Optional[str]) -> List[str]:
     − explicit-false (for non-always-on modules).
     """
     flags = _parse_flags(flags_raw)
-    # Legacy alias: the ``mpesa`` module was renamed to ``payhero`` in the
-    # Pay Hero swap. Existing tenants still carry the old key in their
-    # feature_flags column — translate it forward so they don't have to
-    # re-save their entitlement.
+    # Legacy alias, round 1 (Pay Hero swap): the ORIGINAL ``mpesa`` module
+    # (the pre-Pay-Hero Daraja integration) was renamed to ``payhero``.
+    # Existing tenants still carrying that old key translate forward so they
+    # don't have to re-save their entitlement. NOTE this predates, and is
+    # unrelated to, the NEW ``mpesa`` module key added below for the Daraja
+    # migration: the same string is reused because the pre-Pay-Hero
+    # integration and the post-Pay-Hero one are, again, the same product
+    # (direct Safaricom M-Pesa), not because either alias assumes the other.
     if "mpesa" in flags and "payhero" not in flags:
         flags["payhero"] = flags.pop("mpesa")
+    # Legacy alias, round 2 (Daraja migration): an existing ``payhero``
+    # entitlement also unlocks the NEW ``mpesa`` module, so a hospital
+    # already collecting M-Pesa through Pay Hero is not locked out of the
+    # Daraja routes the moment this key ships, before anyone has touched
+    # their feature_flags — both integrations must coexist until Task 12
+    # removes Pay Hero. An explicit False stays False: only a truthy
+    # ``payhero`` flag forward-fills ``mpesa``.
+    if flags.get("payhero") and "mpesa" not in flags:
+        flags["mpesa"] = flags["payhero"]
     enabled: set = set(DEFAULT_ENABLED)
     for key, value in flags.items():
         if key not in BY_KEY:
