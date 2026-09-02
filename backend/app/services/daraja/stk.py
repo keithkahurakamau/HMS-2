@@ -454,4 +454,16 @@ def query_stk(db: Session, *, checkout_request_id: str) -> dict:
         return client.post("/mpesa/stkpushquery/v1/query", payload)
     except DarajaError as exc:
         logger.warning("Daraja STK query failed: %s", safe_repr(str(exc)))
-        raise HTTPException(status_code=502, detail="Could not reach M-Pesa. Try again shortly.")
+        # New-5: Daraja's own errorCode is preserved on the exception raised
+        # here, not flattened away, so a caller (reconcile_queries.requery_stk)
+        # can tell "the transaction is still being processed" (errorCode
+        # 500.001.1001, widely documented as the shape stkpushquery returns
+        # for a genuinely in-flight push, though not yet confirmed against
+        # this project's own sandbox credentials) apart from every other
+        # rejection, which is a real "we could not ask" failure. Flattening
+        # this away is exactly what made that distinction unanswerable.
+        http_exc = HTTPException(
+            status_code=502, detail="Could not reach M-Pesa. Try again shortly.",
+        )
+        http_exc.error_code = exc.error_code
+        raise http_exc from exc

@@ -28,10 +28,23 @@ _EXPIRY_MARGIN_SECONDS = 60.0
 
 
 class DarajaError(RuntimeError):
-    def __init__(self, message: str, *, status_code: int | None = None, body: Any = None):
+    def __init__(
+        self, message: str, *, status_code: int | None = None, body: Any = None,
+        error_code: str | None = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.body = body
+        # Daraja's own machine-readable error code (e.g. "500.001.1001",
+        # "The transaction is being processed"), when the rejected response
+        # carried one. Preserved as its own attribute, not just folded into
+        # `body`'s safe_repr string: that string is redacted and truncated
+        # for logging, neither of which this codebase wants to depend on
+        # when deciding what a specific error code MEANS (see
+        # reconcile_queries.requery_stk, which needs to tell "still
+        # processing" apart from every other rejection). errorCode itself
+        # is never a secret, so no redaction is needed for it specifically.
+        self.error_code = error_code
 
 
 class DarajaClient:
@@ -104,7 +117,10 @@ class DarajaClient:
                 or "Daraja rejected the request"
             )
             logger.warning("Daraja %s -> %s %s", path, response.status_code, safe_repr(data))
-            raise DarajaError(message, status_code=response.status_code, body=safe_repr(data))
+            raise DarajaError(
+                message, status_code=response.status_code, body=safe_repr(data),
+                error_code=data.get("errorCode"),
+            )
         return data
 
     def _execute(self, fn, url: str, **kwargs):
