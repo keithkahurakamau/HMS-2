@@ -1,4 +1,4 @@
-"""Platform-level Daraja STK settlement — the operator's OWN subscription
+"""Platform-level Daraja STK settlement, the operator's OWN subscription
 billing rail, the Daraja counterpart to platform_payhero_service.py.
 
 Everything here operates on the MASTER database against

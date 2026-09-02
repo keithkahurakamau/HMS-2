@@ -186,7 +186,7 @@ def resolve_enabled_modules(flags_raw: Optional[str]) -> List[str]:
     # entitlement also unlocks the NEW ``mpesa`` module, so a hospital
     # already collecting M-Pesa through Pay Hero is not locked out of the
     # Daraja routes the moment this key ships, before anyone has touched
-    # their feature_flags — both integrations must coexist until Task 12
+    # their feature_flags: both integrations must coexist until Task 12
     # removes Pay Hero. An explicit False stays False: only a truthy
     # ``payhero`` flag forward-fills ``mpesa``.
     if flags.get("payhero") and "mpesa" not in flags:
