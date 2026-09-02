@@ -51,6 +51,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from app.core.circuit import daraja_breaker
 from app.models.billing import Invoice
 from app.models.mpesa import MpesaConfig, MpesaRefund, MpesaTransaction
 from app.services.daraja.client import DarajaError
@@ -595,21 +596,47 @@ def dispatch_refund(
         client = _daraja_client(config)
 
         # The marker must mean "a request MAY have reached Safaricom", not
-        # merely "dispatch_refund was called". Obtaining an access token
-        # (a cache hit, or a fresh OAuth fetch) can fail on a circuit
-        # breaker trip or on Daraja rejecting the OAuth credentials
-        # themselves, and BOTH of those raise before any request is ever
-        # sent to the B2C endpoint. Setting the marker before this check
-        # would let a misconfigured hospital's very first attempt (bad
-        # credentials, or a tripped breaker) permanently mark
-        # had_prior_attempt True: every later dispatch would then read a
-        # genuine, definitive rejection as "maybe already accepted" and
-        # resolve to Processing forever, holding the balance and the
-        # rolling cap hostage with no in-product recovery, since
-        # retry-dispatch is gated to Approved and this refund would never
-        # be marked Failed to release it. So the token is fetched (or
-        # served from cache) FIRST, outside the marker's scope entirely;
-        # only once that succeeds does a request become imminent.
+        # merely "dispatch_refund was called". Two distinct pre-flight
+        # failures must both be excluded from it, and NEITHER opens a
+        # socket to the B2C endpoint:
+        #
+        #   1. The circuit breaker being open. daraja_breaker is a
+        #      process-wide singleton shared by every Daraja flow (STK,
+        #      C2B, Transaction Status, B2C), so an unrelated STK failure
+        #      can trip it. Checking it via client.access_token() alone is
+        #      NOT enough: access_token() returns a cached token WITHOUT
+        #      consulting the breaker at all when the cache is warm
+        #      (tokens live about an hour, so a live process is warm
+        #      almost always), meaning the breaker would only be hit for
+        #      the first time inside client.post, AFTER the marker below
+        #      is committed. So the breaker's own state is read here,
+        #      explicitly, independent of whether the token call would
+        #      have touched it.
+        #   2. Obtaining a fresh access token failing on its own (a cold
+        #      cache: bad credentials, or the OAuth endpoint unreachable).
+        #
+        # Setting the marker before either of these would let a
+        # misconfigured hospital's very first attempt, or simply an
+        # unrelated STK failure sharing the same breaker, permanently mark
+        # had_prior_attempt True for a refund that was NEVER dispatched
+        # anywhere: every later dispatch would then read a genuine,
+        # definitive rejection as "maybe already accepted" and resolve to
+        # Processing forever, holding the balance and the rolling cap
+        # hostage with no in-product recovery, since retry-dispatch is
+        # gated to Approved and this refund would never be marked Failed
+        # to release it. So both checks happen FIRST, outside the
+        # marker's scope entirely; only once both pass does a request
+        # become imminent.
+        if daraja_breaker.state == daraja_breaker.OPEN:
+            logger.warning(
+                "B2C dispatch for refund %s: Daraja circuit breaker is open; "
+                "no request attempted.",
+                refund.id,
+            )
+            raise DarajaError(
+                "Daraja temporarily unavailable (circuit open)", status_code=503,
+            )
+
         try:
             client.access_token()
         except DarajaError as exc:
