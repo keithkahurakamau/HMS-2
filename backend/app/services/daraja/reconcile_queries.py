@@ -119,7 +119,7 @@ def requery_stk(session: Session, txn: MpesaTransaction) -> None:
 # ─── Case 2: C2B Unverified (asynchronous) ─────────────────────────────────
 
 
-def requery_c2b(session: Session, txn: MpesaTransaction, *, callback_tenant: str) -> None:
+def requery_c2b(session: Session, txn: MpesaTransaction, *, callback_tenant: str) -> bool:
     """Re-fire a Transaction Status query for a C2B receipt still
     Unverified, UNLESS a query is already outstanding.
 
@@ -141,40 +141,43 @@ def requery_c2b(session: Session, txn: MpesaTransaction, *, callback_tenant: str
     overwrite a real, still-live value (or a not-yet-set NULL) with NULL,
     which would silently orphan the row with no way to ever match a later
     result.
+
+    Returns True iff a query was actually fired this call, so the caller's
+    "requeried" count reflects rows genuinely asked about this cycle, not
+    rows that were merely inspected and left waiting.
     """
     if not txn.receipt_number:
         logger.warning(
             "Reconciliation: Unverified transaction %s has no receipt_number; "
             "cannot ask Safaricom, left as is.", txn.id,
         )
-        return
+        return False
     if txn.conversation_id:
         logger.info(
             "Reconciliation: transaction %s already has a Transaction Status "
             "query outstanding; left waiting for its result.", txn.id,
         )
-        return
+        return False
 
     ack = query_transaction_status(
         session, receipt=txn.receipt_number, callback_tenant=callback_tenant
     )
-    if ack is None:
-        return
-
-    new_conversation_id = ack.get("ConversationID")
-    new_originator_id = ack.get("OriginatorConversationID")
-    if new_conversation_id:
-        txn.conversation_id = new_conversation_id
-    if new_originator_id:
-        txn.originator_conversation_id = new_originator_id
-    if new_conversation_id or new_originator_id:
-        session.commit()
+    if ack is not None:
+        new_conversation_id = ack.get("ConversationID")
+        new_originator_id = ack.get("OriginatorConversationID")
+        if new_conversation_id:
+            txn.conversation_id = new_conversation_id
+        if new_originator_id:
+            txn.originator_conversation_id = new_originator_id
+        if new_conversation_id or new_originator_id:
+            session.commit()
+    return True
 
 
 # ─── Case 3: refund stuck Processing (asynchronous) ────────────────────────
 
 
-def requery_refund(session: Session, refund: MpesaRefund, *, callback_tenant: str) -> None:
+def requery_refund(session: Session, refund: MpesaRefund, *, callback_tenant: str) -> bool:
     """Ask Safaricom about a refund stuck Processing, via a GENUINE
     Transaction Status query keyed on the refund's own conversation_id:
     the id Safaricom handed back when it accepted this exact B2C
@@ -206,13 +209,17 @@ def requery_refund(session: Session, refund: MpesaRefund, *, callback_tenant: st
     status_query_conversation_id is already set, a previous query is still
     awaiting its answer, and overwriting it here would orphan that answer
     before it can land.
+
+    Returns True iff a query was actually fired this call, so the
+    caller's "requeried" count reflects rows genuinely asked about this
+    cycle, not rows that were merely inspected and left waiting.
     """
     if refund.status_query_conversation_id:
         logger.info(
             "Reconciliation: refund %s already has a Transaction Status "
             "query outstanding; left waiting for its result.", refund.id,
         )
-        return
+        return False
 
     source_txn = (
         session.query(MpesaTransaction)
@@ -224,7 +231,7 @@ def requery_refund(session: Session, refund: MpesaRefund, *, callback_tenant: st
             "Reconciliation: refund %s has no source transaction on record; "
             "cannot resolve which till to sign the query with.", refund.id,
         )
-        return
+        return False
     config = _config_for_source(session, source_txn)
 
     ack = query_transaction_status(
@@ -237,6 +244,7 @@ def requery_refund(session: Session, refund: MpesaRefund, *, callback_tenant: st
     if new_id:
         refund.status_query_conversation_id = new_id
         session.commit()
+    return True
 
 
 # ─── Surfacing (case 5, and case 4's only handling) ────────────────────────

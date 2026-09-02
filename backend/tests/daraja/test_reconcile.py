@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
@@ -96,10 +97,11 @@ def _counting_post(monkeypatch, response_fn):
     holder so a test can assert on it: a status-only assertion has already
     passed against a real bug twice on this branch, so every test below
     that exercises a Daraja call also checks how many times it happened."""
-    calls = {"count": 0}
+    calls = {"count": 0, "payloads": []}
 
     def fake_post(url, **kw):
         calls["count"] += 1
+        calls["payloads"].append(kw.get("json"))
         return response_fn(url, **kw)
 
     monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
@@ -137,7 +139,7 @@ def _make_pending_stk(db, *, config, minutes_old, checkout_request_id=None):
     return txn
 
 
-def _make_unverified_c2b(db, *, config, minutes_old, receipt=None):
+def _make_unverified_c2b(db, *, config, minutes_old, receipt=None, conversation_id=None):
     txn = MpesaTransaction(
         phone_number="254712345678",
         amount=Decimal("300.00"),
@@ -145,6 +147,7 @@ def _make_unverified_c2b(db, *, config, minutes_old, receipt=None):
         status="Unverified",
         transaction_type="C2B",
         mpesa_config_id=config.id,
+        conversation_id=conversation_id,
         transaction_date=datetime.now(timezone.utc) - timedelta(minutes=minutes_old),
     )
     db.add(txn)
@@ -170,7 +173,7 @@ def _make_settled_txn(db, *, config, amount=Decimal("1000.00")):
 
 def _make_refund(
     db, *, source_txn, status, minutes_since_dispatch, conversation_id=None,
-    amount=Decimal("200.00"),
+    status_query_conversation_id=None, amount=Decimal("200.00"),
 ):
     refund = MpesaRefund(
         source_transaction_id=source_txn.id,
@@ -180,6 +183,7 @@ def _make_refund(
         status=status,
         originator_conversation_id=f"AG_{secrets.token_hex(8)}",
         conversation_id=conversation_id,
+        status_query_conversation_id=status_query_conversation_id,
         first_dispatch_attempted_at=(
             datetime.now(timezone.utc) - timedelta(minutes=minutes_since_dispatch)
         ),
@@ -273,12 +277,13 @@ def test_stk_pending_under_five_minutes_is_left_alone(db, _engine, monkeypatch):
     assert txn.status == "Pending"
     assert calls["count"] == 0
     assert result.transactions_resolved == 0
-    assert result.transactions_requeried == 0
+    assert result.stk_still_pending == 0
 
 
 def test_stk_pending_over_five_minutes_resolves_via_stk_query_failure(db, _engine, monkeypatch):
-    """STK Query answers synchronously: a genuine ResultCode routes through
-    apply_stk_callback and reaches a terminal status in this same run."""
+    """STK Query answers synchronously: a genuine, non-zero ResultCode
+    routes through apply_stk_callback and reaches a terminal status in
+    this same run."""
     _fake_oauth(monkeypatch)
     config = _refund_config(db)
     txn = _make_pending_stk(db, config=config, minutes_old=6)
@@ -286,8 +291,6 @@ def test_stk_pending_over_five_minutes_resolves_via_stk_query_failure(db, _engin
 
     calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
         "ResponseCode": "0",
-        "MerchantRequestID": "mr_1",
-        "CheckoutRequestID": txn.checkout_request_id,
         "ResultCode": "1032",
         "ResultDesc": "Request cancelled by user.",
     }))
@@ -300,32 +303,40 @@ def test_stk_pending_over_five_minutes_resolves_via_stk_query_failure(db, _engin
     assert result.transactions_resolved == 1
 
 
-def test_stk_pending_success_with_no_receipt_is_quarantined_not_settled(db, _engine, monkeypatch):
-    """STK Query never carries CallbackMetadata (Amount, MpesaReceiptNumber);
-    a bare ResultCode 0 must never be read as enough to settle. This is the
-    existing settlement.py cross-check doing its job through reconciliation,
-    not a new rule."""
+def test_stk_pending_bare_success_is_left_pending_not_settled_or_quarantined(
+    db, _engine, monkeypatch,
+):
+    """C4, and one of the two required revert-evidence proofs.
+
+    STK Query never carries CallbackMetadata (Amount, MpesaReceiptNumber),
+    so a bare ResultCode 0 looks IDENTICAL, from this endpoint, whether the
+    real callback was merely delayed or was dropped entirely. Routing this
+    through apply_stk_callback would quarantine the row (settlement.py's
+    own "no MpesaReceiptNumber despite ResultCode 0" step), which moves it
+    out of status == "Pending" and means Safaricom's own retry of the REAL
+    callback (carrying the actual receipt and amount, the only delivery
+    that can safely settle this row) finds no Pending row and settles
+    nothing: character-for-character the "Expired" bug reservation.py's
+    docstring describes removing, reintroduced through STK Query instead
+    of a local timer. So this must leave the row untouched.
+    """
     _fake_oauth(monkeypatch)
     config = _refund_config(db)
     txn = _make_pending_stk(db, config=config, minutes_old=6)
     db.commit()
 
-    _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
+    calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
         "ResponseCode": "0",
-        "MerchantRequestID": "mr_1",
-        "CheckoutRequestID": txn.checkout_request_id,
         "ResultCode": "0",
         "ResultDesc": "The service request is processed successfully.",
     }))
     result = _run(db, _engine)
 
     db.refresh(txn)
-    # Whichever cross-check trips first (settlement.py checks the amount
-    # before the receipt), the outcome that matters here is: quarantined,
-    # never silently settled with no receipt to anchor it to.
-    assert txn.status == "Quarantined"
-    assert txn.result_desc  # a human-readable reason was recorded
-    assert result.transactions_resolved == 1
+    assert txn.status == "Pending"
+    assert calls["count"] == 1  # we did ask; a bare "0" is just not a usable verdict
+    assert result.transactions_resolved == 0
+    assert result.stk_still_pending == 1
 
 
 def test_stk_query_no_verdict_yet_leaves_pending(db, _engine, monkeypatch):
@@ -350,7 +361,7 @@ def test_stk_query_no_verdict_yet_leaves_pending(db, _engine, monkeypatch):
     assert txn.status == "Pending"
     assert calls["count"] == 1  # we did ask; Safaricom just had no verdict yet
     assert result.transactions_resolved == 0
-    assert result.transactions_requeried == 1
+    assert result.stk_still_pending == 1
 
 
 def test_stk_pending_over_24_hours_surfaces_without_further_query(db, _engine, monkeypatch):
@@ -370,9 +381,40 @@ def test_stk_pending_over_24_hours_surfaces_without_further_query(db, _engine, m
 
     db.refresh(txn)
     assert txn.status == "Pending"  # never resolved, just because it is old
+    assert txn.surfaced_at is not None
     assert calls["count"] == 0  # never retried forever
     assert result.transactions_resolved == 0
     assert any("Pending > 24h" in line for line in result.surfaced)
+
+
+def test_surfaced_transaction_does_not_renotify_on_a_second_run(db, _engine, monkeypatch):
+    """I2. A row stuck past 24 hours is surfaced once; a second cron cycle
+    over the same still-stuck row must not renotify a danger-category
+    channel again."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_pending_stk(db, config=config, minutes_old=25 * 60)
+    db.commit()
+
+    notify_calls = {"count": 0}
+    import app.services.daraja.reconcile_queries as reconcile_queries
+    real_notify = reconcile_queries._notify_quarantine
+
+    def counting_notify(session, txn_, *, reason):
+        notify_calls["count"] += 1
+        return real_notify(session, txn_, reason=reason)
+
+    monkeypatch.setattr(reconcile_queries, "_notify_quarantine", counting_notify)
+
+    _run(db, _engine)
+    db.refresh(txn)
+    assert txn.surfaced_at is not None
+    first_surfaced_at = txn.surfaced_at
+
+    _run(db, _engine)
+    db.refresh(txn)
+    assert txn.surfaced_at == first_surfaced_at
+    assert notify_calls["count"] == 1
 
 
 # ─── Case 2: C2B Unverified (asynchronous) ─────────────────────────────────
@@ -397,8 +439,57 @@ def test_c2b_unverified_over_five_minutes_is_requeried_and_stays_unverified(db, 
     assert txn.conversation_id == "AG_CONV_NEW"
     assert txn.originator_conversation_id == "AG_ORIG_NEW"
     assert calls["count"] == 1
-    assert result.transactions_requeried == 1
+    assert result.c2b_requeried == 1
     assert result.transactions_resolved == 0
+
+
+def test_c2b_unverified_with_an_outstanding_query_is_not_reoverwritten(db, _engine, monkeypatch):
+    """C5, and the second required revert-evidence proof.
+
+    txn.conversation_id is the exact key handle_transaction_status_result
+    correlates the eventual answer on. If this job overwrote it on every
+    15-minute cycle, a genuine answer that takes longer than one cycle to
+    arrive could NEVER resolve: each run would invalidate the previous
+    query's own correlation id before its result could land. So once a
+    query is outstanding (conversation_id already set), this job must ask
+    Safaricom nothing further for this row and must not touch the column.
+    """
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_unverified_c2b(
+        db, config=config, minutes_old=6, conversation_id="AG_OUTSTANDING",
+    )
+    db.commit()
+
+    calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
+        "OriginatorConversationID": "AG_SHOULD_NOT_BE_SENT",
+        "ConversationID": "AG_SHOULD_NOT_OVERWRITE",
+        "ResponseCode": "0",
+    }))
+    result = _run(db, _engine)
+
+    db.refresh(txn)
+    assert txn.conversation_id == "AG_OUTSTANDING"  # untouched: the answer is still in flight
+    assert calls["count"] == 0
+    assert result.c2b_requeried == 0
+
+
+def test_c2b_requery_never_writes_a_falsy_ack_value(db, _engine, monkeypatch):
+    """C5's second half. A 200 response that omits ConversationID (or
+    OriginatorConversationID) must never null out the column: that would
+    silently orphan the row with no id left for a later result to
+    correlate against."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_unverified_c2b(db, config=config, minutes_old=6)
+    db.commit()
+
+    _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {"ResponseCode": "0"}))
+    _run(db, _engine)
+
+    db.refresh(txn)
+    assert txn.conversation_id is None
+    assert txn.originator_conversation_id is None
 
 
 def test_c2b_unverified_over_24_hours_surfaces_without_further_query(db, _engine, monkeypatch):
@@ -419,65 +510,74 @@ def test_c2b_unverified_over_24_hours_surfaces_without_further_query(db, _engine
     assert any("Unverified > 24h" in line for line in result.surfaced)
 
 
-# ─── Cases 3 & 4: stuck refunds (asynchronous) ─────────────────────────────
+# ─── Case 3: refund stuck Processing (asynchronous, ask, never dispatch) ───
 
 
-def test_refund_processing_over_ten_minutes_is_redispatched_and_stays_processing(
+def test_refund_processing_over_ten_minutes_is_asked_via_transaction_status(
     db, _engine, monkeypatch,
 ):
-    """Case 3. A duplicate-instruction rejection from Safaricom confirms it
-    already holds this refund; dispatch_refund's own existing logic (not
-    reconciliation) is what keeps this from ever reading as Failed."""
+    """C1. A Processing refund is asked about via a genuine Transaction
+    Status query keyed on its OWN conversation_id (the id Safaricom
+    accepted this instruction under), never re-dispatched. The query's own
+    acknowledgment lands on status_query_conversation_id; conversation_id
+    (the B2C dispatch's own correlation id, and the double-dispatch
+    alarm's evidence) is never touched."""
     _fake_oauth(monkeypatch)
     config = _refund_config(db)
     source_txn = _make_settled_txn(db, config=config)
     refund = _make_refund(
         db, source_txn=source_txn, status="Processing",
-        minutes_since_dispatch=11, conversation_id="AG_FIRST",
+        minutes_since_dispatch=11, conversation_id="AG_DISPATCH_ORIGINAL",
     )
     db.commit()
 
     calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
-        "ResponseCode": "1", "ResponseDescription": "Duplicate OriginatorConversationID.",
-    }))
-    result = _run(db, _engine)
-
-    db.refresh(refund)
-    assert refund.status == "Processing"
-    assert refund.result_desc is not None and "manual review" in refund.result_desc
-    assert calls["count"] == 1
-    assert result.refunds_requeried == 1
-
-
-def test_refund_approved_with_dispatch_marker_over_ten_minutes_is_redispatched(
-    db, _engine, monkeypatch,
-):
-    """Case 4. Approved with first_dispatch_attempted_at already set has NO
-    other in-product recovery (retry-dispatch's route refuses it). A fresh
-    acceptance moves it forward to Processing with a real ConversationID."""
-    _fake_oauth(monkeypatch)
-    config = _refund_config(db)
-    source_txn = _make_settled_txn(db, config=config)
-    refund = _make_refund(
-        db, source_txn=source_txn, status="Approved",
-        minutes_since_dispatch=11, conversation_id=None,
-    )
-    db.commit()
-
-    calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
-        "ConversationID": "AG_RECOVERED", "ResponseCode": "0",
+        "OriginatorConversationID": "AG_STATUS_QUERY_ORIG",
+        "ConversationID": "AG_STATUS_QUERY_CONV",
+        "ResponseCode": "0",
         "ResponseDescription": "Accept the service request successfully.",
     }))
     result = _run(db, _engine)
 
     db.refresh(refund)
-    assert refund.status == "Processing"
-    assert refund.conversation_id == "AG_RECOVERED"
+    assert refund.status == "Processing"  # never resolved by this job
+    assert refund.conversation_id == "AG_DISPATCH_ORIGINAL"  # B2C correlation untouched
+    assert refund.status_query_conversation_id == "AG_STATUS_QUERY_CONV"
     assert calls["count"] == 1
+    assert calls["payloads"][0]["OriginalConversationID"] == "AG_DISPATCH_ORIGINAL"
+    assert calls["payloads"][0]["TransactionID"] == ""
+    assert calls["payloads"][0]["CommandID"] == "TransactionStatusQuery"
     assert result.refunds_requeried == 1
 
 
-def test_refund_stuck_over_24_hours_surfaces_without_further_dispatch(db, _engine, monkeypatch):
+def test_refund_processing_with_an_outstanding_query_is_not_reasked(db, _engine, monkeypatch):
+    """Same discipline as C5's C2B fix, applied to refunds: once a status
+    query is outstanding, this job must not fire a second one and orphan
+    the first one's answer."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    source_txn = _make_settled_txn(db, config=config)
+    refund = _make_refund(
+        db, source_txn=source_txn, status="Processing",
+        minutes_since_dispatch=11, conversation_id="AG_DISPATCH_ORIGINAL",
+        status_query_conversation_id="AG_ALREADY_OUTSTANDING",
+    )
+    db.commit()
+
+    calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
+        "ConversationID": "AG_SHOULD_NOT_OVERWRITE", "ResponseCode": "0",
+    }))
+    result = _run(db, _engine)
+
+    db.refresh(refund)
+    assert refund.status_query_conversation_id == "AG_ALREADY_OUTSTANDING"
+    assert calls["count"] == 0
+    assert result.refunds_requeried == 0
+
+
+def test_refund_stuck_processing_over_24_hours_surfaces_without_further_query(
+    db, _engine, monkeypatch,
+):
     _fake_oauth(monkeypatch)
     config = _refund_config(db)
     source_txn = _make_settled_txn(db, config=config)
@@ -495,8 +595,76 @@ def test_refund_stuck_over_24_hours_surfaces_without_further_dispatch(db, _engin
     db.refresh(refund)
     assert refund.status == "Processing"
     assert refund.conversation_id == "AG_OLD"  # never touched once past 24h
+    assert refund.status_query_conversation_id is None
+    assert refund.surfaced_at is not None
     assert calls["count"] == 0
     assert any("Processing > 24h" in line for line in result.surfaced)
+
+
+# ─── Case 4: refund Approved with a dispatch marker (surfaced, never acted) ─
+
+
+def test_refund_approved_with_marker_is_surfaced_never_dispatched(db, _engine, monkeypatch):
+    """C2/C3. retry-dispatch's own route already covers this shape for a
+    human (gated on status == "Approved" alone, with no check on the
+    marker). Automating a second dispatch here would be indistinguishable,
+    from Safaricom's side, from a genuinely new payout: a case-4 refund by
+    definition has no conversation_id yet, so _record_conversation_id's
+    double-dispatch alarm has nothing to compare a fresh acceptance
+    against and cannot catch it. So this job must never contact Safaricom
+    for this case: it only surfaces the row for a human."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    source_txn = _make_settled_txn(db, config=config)
+    refund = _make_refund(
+        db, source_txn=source_txn, status="Approved",
+        minutes_since_dispatch=11, conversation_id=None,
+    )
+    db.commit()
+
+    calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
+        "ConversationID": "AG_WOULD_BE_A_SECOND_PAYOUT", "ResponseCode": "0",
+    }))
+    result = _run(db, _engine)
+
+    db.refresh(refund)
+    assert refund.status == "Approved"          # never touched
+    assert refund.conversation_id is None        # never acquired one from this job
+    assert refund.surfaced_at is not None
+    assert calls["count"] == 0                   # Safaricom was never contacted
+    assert result.refunds_requeried == 0
+    assert any("Approved-with-marker" in line for line in result.surfaced)
+
+
+# ─── I1: "could not ask" is a failure, not a silent still-pending ──────────
+
+
+def test_could_not_ask_safaricom_is_recorded_as_a_failure(db, _engine, monkeypatch):
+    """I1. "We could not even ask Safaricom" (a Daraja outage, a missing
+    credential) must never look like "Safaricom answered with no verdict
+    yet": the former is a real failure that belongs in
+    ReconcileRunResult.failures, or a total outage silently looks like a
+    quiet, healthy run forever."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_pending_stk(db, config=config, minutes_old=6)
+    db.commit()
+
+    def raise_could_not_ask(session, txn_):
+        raise HTTPException(status_code=502, detail="Could not reach M-Pesa. Try again shortly.")
+
+    monkeypatch.setattr("app.services.daraja.reconcile.requery_stk", raise_could_not_ask)
+
+    result = _run(db, _engine)
+
+    db.refresh(txn)
+    assert txn.status == "Pending"
+    assert result.stk_still_pending == 0
+    assert result.ok is False
+    assert any(
+        f"transaction {txn.id}" in f and "Could not reach M-Pesa" in f
+        for f in result.failures
+    )
 
 
 # ─── Failure visibility ─────────────────────────────────────────────────────
@@ -525,7 +693,6 @@ def test_one_bad_row_is_recorded_as_a_failure_and_does_not_stop_the_others(
     monkeypatch.setattr("app.services.daraja.reconcile.requery_stk", flaky_requery_stk)
     _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
         "ResultCode": "1032", "ResultDesc": "Request cancelled by user.",
-        "CheckoutRequestID": good_txn.checkout_request_id,
     }))
 
     result = _run(db, _engine)

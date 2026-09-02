@@ -337,8 +337,8 @@ def _reconcile_tenant(
                 )
                 surfaced.append(f"{tenant_db_name}: transaction {txn.id} (Unverified > 24h)")
                 continue
-            requery_c2b(session, txn, callback_tenant=tenant_db_name)
-            c2b_requeried += 1
+            if requery_c2b(session, txn, callback_tenant=tenant_db_name):
+                c2b_requeried += 1
         except Exception as exc:  # noqa: BLE001
             logger.exception("Reconciliation: C2B Unverified row %s failed", txn.id)
             failures.append(f"{tenant_db_name}: transaction {txn.id}: {exc}")
@@ -375,8 +375,8 @@ def _reconcile_tenant(
                 )
                 surfaced.append(f"{tenant_db_name}: refund {refund.id} (Processing > 24h)")
                 continue
-            requery_refund(session, refund, callback_tenant=tenant_db_name)
-            refunds_requeried += 1
+            if requery_refund(session, refund, callback_tenant=tenant_db_name):
+                refunds_requeried += 1
         except Exception as exc:  # noqa: BLE001
             logger.exception("Reconciliation: refund %s failed", refund.id)
             failures.append(f"{tenant_db_name}: refund {refund.id}: {exc}")
