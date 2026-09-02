@@ -452,6 +452,22 @@ def _lock_refund(db: Session, refund_id: int) -> Optional[MpesaRefund]:
 # second key is the refund id itself.
 _DISPATCH_LOCK_NAMESPACE = 7825101
 
+# pg_advisory_lock blocks with no timeout of its own, and this project sets
+# no lock_timeout or statement_timeout anywhere else either. Without a
+# bound, a stranded or genuinely slow dispatch (up to 15s OAuth plus 30s
+# POST, doubled by client.py's 401-retry) turns a second caller's request
+# into a hang rather than a clear rejection, and a cashier can retry a 409
+# but a hung request tells them nothing. Chosen over pg_try_advisory_lock
+# plus a manual retry loop: SET LOCAL lock_timeout lets Postgres itself
+# enforce the bound on the blocking acquisition statement, no sleep loop
+# to get wrong.
+_DISPATCH_LOCK_TIMEOUT_MS = 5000
+
+
+class DispatchLockTimeout(RuntimeError):
+    """Another dispatch attempt for the same refund did not finish within
+    _DISPATCH_LOCK_TIMEOUT_MS. Converted to a 409 by dispatch_refund."""
+
 
 @contextmanager
 def _dispatch_lock(db: Session, refund_id: int) -> Iterator[None]:
@@ -498,22 +514,60 @@ def _dispatch_lock(db: Session, refund_id: int) -> Iterator[None]:
     write), so this lock cannot live on `db`'s connection. It opens its
     OWN connection instead, exactly like billing_lock, and for the
     identical reason: that connection's own transaction is kept open
-    (never committed) for the life of this context manager, so closing it
-    in `finally` reliably releases the lock (Postgres always drops a
-    session's advisory locks when its backend disconnects) even if the
-    explicit unlock statement itself fails.
+    (never committed) for the life of this context manager.
 
-    Blocking (pg_advisory_lock, not pg_try_advisory_lock): a second
-    dispatch attempt for the same refund should wait for the first's
-    outcome, not skip or error.
+    THE EXPLICIT UNLOCK IS THE REAL PROTECTION, NOT `conn.close()`. Under
+    the default QueuePool, closing a connection returns it to the pool and
+    issues a ROLLBACK; it does NOT disconnect the backend, and a ROLLBACK
+    does not drop a session-level pg_advisory_lock (unlike the
+    transaction-scoped locks elsewhere in this module, which a rollback
+    does drop). A pooled connection can then be handed back out still
+    holding this lock. So the explicit pg_advisory_unlock above is not a
+    nicety alongside a reliable close, it is the only thing that actually
+    releases the lock in the common case. If that explicit unlock itself
+    fails, `conn.invalidate()` is called before closing: invalidate marks
+    the underlying DBAPI connection as unusable and the pool discards it
+    (a real disconnect) rather than returning it to the pool, which is
+    what actually drops a lock the explicit unlock could not.
+
+    BOUNDED WAIT. pg_advisory_lock blocks with no timeout of its own, and
+    this dedicated connection is a SECOND connection out of the same
+    tenant pool the request session already holds, held across the whole
+    Safaricom round trip (up to 15s OAuth plus 30s POST, doubled by
+    client.py's 401-retry). An unbounded wait would let a double-click, or
+    a stranded lock, pin two connections and turn a second caller's
+    request into a hang rather than a clear rejection. SET LOCAL
+    lock_timeout bounds the acquisition statement itself to
+    _DISPATCH_LOCK_TIMEOUT_MS; a caller that cannot acquire the lock in
+    time gets DispatchLockTimeout (dispatch_refund converts this to a 409)
+    instead of hanging.
     """
     conn = db.get_bind().connect()
     try:
         conn.begin()
-        conn.execute(
-            text("SELECT pg_advisory_lock(:ns, :key)"),
-            {"ns": _DISPATCH_LOCK_NAMESPACE, "key": refund_id},
-        )
+        conn.execute(text(f"SET LOCAL lock_timeout = '{_DISPATCH_LOCK_TIMEOUT_MS}ms'"))
+        try:
+            conn.execute(
+                text("SELECT pg_advisory_lock(:ns, :key)"),
+                {"ns": _DISPATCH_LOCK_NAMESPACE, "key": refund_id},
+            )
+        except Exception as exc:
+            # lock_timeout aborts the current transaction on this
+            # connection; there is nothing to unlock (the lock was never
+            # acquired) and nothing usable left to reuse, so discard the
+            # connection outright rather than attempt any further
+            # statement on it.
+            conn.invalidate()
+            logger.warning(
+                "B2C dispatch lock for refund %s was not acquired within "
+                "%sms; another dispatch attempt is likely still in "
+                "progress.", refund_id, _DISPATCH_LOCK_TIMEOUT_MS,
+            )
+            raise DispatchLockTimeout(
+                f"Another dispatch attempt for refund {refund_id} is still "
+                "in progress; try again shortly."
+            ) from exc
+
         try:
             yield
         finally:
@@ -524,10 +578,12 @@ def _dispatch_lock(db: Session, refund_id: int) -> Iterator[None]:
                 )
             except Exception:
                 logger.exception(
-                    "Explicit pg_advisory_unlock failed for refund %s; closing "
-                    "the dedicated dispatch-lock connection below still "
-                    "releases it.", refund_id,
+                    "Explicit pg_advisory_unlock failed for refund %s; "
+                    "invalidating the dedicated dispatch-lock connection so "
+                    "it is discarded rather than returned to the pool still "
+                    "holding the lock.", refund_id,
                 )
+                conn.invalidate()
     finally:
         conn.close()
 
@@ -551,7 +607,25 @@ def dispatch_refund(
     concurrent second caller for the SAME refund genuinely waits for this
     entire call to finish, rather than racing ahead of it the moment this
     call's marker-write commits.
+
+    That lock has a bounded wait (_DISPATCH_LOCK_TIMEOUT_MS): a caller
+    that cannot acquire it in time gets a 409 here, deliberately, rather
+    than hanging until whatever is holding the lock finishes.
     """
+    try:
+        return _dispatch_refund_locked(db, refund=refund, callback_tenant=callback_tenant)
+    except DispatchLockTimeout as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _dispatch_refund_locked(
+    db: Session, *, refund: MpesaRefund, callback_tenant: Optional[str] = None
+) -> MpesaRefund:
+    """The actual dispatch, run under _dispatch_lock. Split out purely so
+    dispatch_refund's own try/except can convert DispatchLockTimeout (raised
+    by _dispatch_lock before this function's body ever starts) into a
+    clean HTTPException, without wrapping this whole body in a second
+    layer of indentation."""
     with _dispatch_lock(db, refund.id):
         refund = _lock_refund(db, refund.id)
         if refund is None:
