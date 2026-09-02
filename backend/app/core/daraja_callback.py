@@ -77,6 +77,7 @@ __all__ = [
     "ACK_C2B_DECLINE",
     "allowed_networks",
     "clear_negative_cache",
+    "PLATFORM_HINT",
 ]
 
 
@@ -332,6 +333,12 @@ def clear_negative_cache() -> None:
 # hyphen. The collision this guards against is therefore not just unlikely,
 # it is impossible without a change to the provisioning charset itself.
 _PLATFORM_HINT = "platform-rail"
+# Public alias, for a route that needs to compare a resolved hint against
+# this reserved value (app/routes/mpesa_payment.py's platform_stk_callback):
+# reaching into a leading-underscore name from another module is a smell
+# this module can remove for free. _PLATFORM_HINT itself stays, unchanged,
+# since tests/daraja/test_callback_auth.py already exercises it directly.
+PLATFORM_HINT = _PLATFORM_HINT
 
 _VALID_TENANT_DB_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 

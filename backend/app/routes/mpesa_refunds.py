@@ -23,6 +23,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, condecimal
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -202,7 +203,14 @@ def _tenant_session(db_name: str) -> Session:
 async def b2c_result(tenant_hint: str, token: str, request: Request):
     body = await verify_daraja_source(request)
     try:
-        db_name = resolve_tenant_by_hint(tenant_hint, token)
+        # resolve_tenant_by_hint is synchronous, blocking DB work (it opens
+        # a tenant engine and queries). This handler is async because
+        # verify_daraja_source awaits the body; an unguarded synchronous
+        # call here would block the whole event loop for the query's
+        # duration on every single callback, the exact query-cost denial
+        # of service the IP allow-list exists to keep affordable. Run it,
+        # the session open below, and the handler call, all off the loop.
+        db_name = await run_in_threadpool(resolve_tenant_by_hint, tenant_hint, token)
     except TenantLookupUnavailable:
         # We could not evaluate this callback at all (a master- or
         # tenant-DB failure), a different fact from "evaluated and did not
@@ -220,15 +228,15 @@ async def b2c_result(tenant_hint: str, token: str, request: Request):
         logger.warning("B2C result: unparseable JSON body; acknowledged, not processed")
         return ACK_OK
 
-    db = _tenant_session(db_name)
+    db = await run_in_threadpool(_tenant_session, db_name)
     try:
-        handle_b2c_result(db, payload)
+        await run_in_threadpool(handle_b2c_result, db, payload)
     except Exception:  # noqa: BLE001, never let a handler bug surface as a
         # non-200 to Safaricom; the callback is always acknowledged, the
         # failure is ours to chase from the logs.
         logger.exception("B2C result: handler raised")
     finally:
-        db.close()
+        await run_in_threadpool(db.close)
     return ACK_OK
 
 
@@ -236,7 +244,7 @@ async def b2c_result(tenant_hint: str, token: str, request: Request):
 async def b2c_timeout(tenant_hint: str, token: str, request: Request):
     body = await verify_daraja_source(request)
     try:
-        db_name = resolve_tenant_by_hint(tenant_hint, token)
+        db_name = await run_in_threadpool(resolve_tenant_by_hint, tenant_hint, token)
     except TenantLookupUnavailable:
         logger.error("B2C timeout: tenant lookup unavailable, cannot evaluate callback")
         raise HTTPException(status_code=503, detail="Temporarily unable to process callback.")
@@ -249,11 +257,11 @@ async def b2c_timeout(tenant_hint: str, token: str, request: Request):
         logger.warning("B2C timeout: unparseable JSON body; acknowledged, not processed")
         return ACK_OK
 
-    db = _tenant_session(db_name)
+    db = await run_in_threadpool(_tenant_session, db_name)
     try:
-        handle_b2c_timeout(db, payload)
+        await run_in_threadpool(handle_b2c_timeout, db, payload)
     except Exception:  # noqa: BLE001, same reasoning as b2c_result above.
         logger.exception("B2C timeout: handler raised")
     finally:
-        db.close()
+        await run_in_threadpool(db.close)
     return ACK_OK
