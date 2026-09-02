@@ -12,6 +12,7 @@ anything at runtime.
 from __future__ import annotations
 
 import threading
+import time
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -23,8 +24,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
 from app.config.settings import settings
+from app.core.circuit import daraja_breaker
 from app.models.mpesa import MpesaRefund, MpesaTransaction
 from app.services.daraja.b2c import (
+    _DISPATCH_LOCK_NAMESPACE,
     approve_refund,
     dispatch_refund,
     handle_b2c_result,
@@ -57,6 +60,24 @@ def _clear_token_cache():
     _TOKEN_CACHE.clear()
     yield
     _TOKEN_CACHE.clear()
+
+
+def _reset_breaker():
+    daraja_breaker._state = daraja_breaker.CLOSED
+    daraja_breaker._failures = 0
+    daraja_breaker._opened_at = 0.0
+
+
+@pytest.fixture(autouse=True)
+def _clear_circuit_breaker():
+    """daraja_breaker is a process-wide singleton shared by every Daraja
+    flow (STK, C2B, Transaction Status, B2C), instantiated once at import
+    time. A test that trips it (Finding A's warm-cache test does, on
+    purpose) must not leak that state into every other test in this
+    session, in this file or any other."""
+    _reset_breaker()
+    yield
+    _reset_breaker()
 
 
 @pytest.fixture(autouse=True)
@@ -812,6 +833,45 @@ def test_dispatch_never_overwrites_an_already_recorded_conversation_id(db, monke
     assert "ALARM" in refund.result_desc
 
 
+def test_double_dispatch_alarm_from_an_approved_entry_moves_to_processing(db, monkeypatch):
+    """Fix round 4 minor. When the double-dispatch alarm fires on
+    dispatch_refund's own success path (ResponseCode == 0) for a refund
+    that entered as Approved, the refund must move to Processing, not
+    stay Approved. Approved means "not yet sent", which stops being an
+    accurate description the moment Safaricom reports ANY ConversationID
+    for this refund; an operator reading Approved is exactly the person
+    who would file a fresh refund on top of one Safaricom already
+    accepted."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="alarm from an approved entry", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+    # A ConversationID already recorded while the row is still, for
+    # whatever reason, at Approved.
+    refund.conversation_id = "AG_EXISTING"
+    db.commit()
+
+    def fake_post_conflicting(url, **kw):
+        return FakeResponse(200, {
+            "ConversationID": "AG_DIFFERENT", "ResponseCode": "0",
+            "ResponseDescription": "Accept the service request successfully.",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post_conflicting)
+    refund = dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+
+    assert refund.status == "Processing"
+    assert refund.conversation_id == "AG_EXISTING"
+    assert refund.result_desc is not None
+    assert "ALARM" in refund.result_desc
+
+
 # ─── Fix round 1: I3, the result's amount is actually compared ─────────────
 
 
@@ -1123,6 +1183,54 @@ def test_marker_is_not_set_on_a_pre_flight_credential_failure(db, monkeypatch):
     assert refund.status == "Failed"
 
 
+def test_marker_is_not_set_on_an_open_breaker_with_a_warm_token_cache(db, monkeypatch):
+    """Finding A (revert-evidence target). client.access_token() returns a
+    cached token WITHOUT consulting the circuit breaker at all when the
+    cache is warm (tokens live about an hour, so a live process is warm
+    almost always). Every other test in this file runs with a cold cache
+    (_clear_token_cache is autouse), which always takes the OAuth network
+    path and therefore always would have hit the breaker check inside
+    that path anyway, masking this gap entirely. This test warms the
+    cache directly and trips the breaker, proving zero requests reach
+    Safaricom's OAuth or B2C endpoints and the marker stays unset."""
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="warm cache, open breaker", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+    assert refund.first_dispatch_attempted_at is None
+
+    # Warm the cache for the exact consumer key make_mpesa_config uses.
+    _TOKEN_CACHE["test-consumer-key"] = ("warm-cached-token", time.monotonic() + 3600)
+
+    # Trip the breaker directly, the same way a completely unrelated STK
+    # failure sharing this process-wide singleton would.
+    daraja_breaker._state = daraja_breaker.OPEN
+    daraja_breaker._opened_at = time.monotonic()
+
+    request_count = {"n": 0}
+
+    def fail_if_called(*args, **kwargs):
+        request_count["n"] += 1
+        raise AssertionError("no request should reach Daraja with the breaker open")
+
+    monkeypatch.setattr("app.services.daraja.client.requests.get", fail_if_called)
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fail_if_called)
+
+    with pytest.raises(DarajaError):
+        dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+
+    assert request_count["n"] == 0, "a request reached Daraja despite the open breaker"
+
+    db.refresh(refund)
+    assert refund.status == "Approved"
+    assert refund.first_dispatch_attempted_at is None
+
+
 # ─── Fix round 2: FIX 2, the refund row is locked for the whole dispatch ───
 
 
@@ -1337,3 +1445,79 @@ def test_rolling_cap_ceiling_survives_deactivating_the_hospital_default(db):
     assert exc_info.value.status_code == 400
     assert "500" in exc_info.value.detail
     assert "50000" not in exc_info.value.detail
+
+
+def test_rolling_cap_raises_a_clear_error_when_no_active_till_exists_anywhere(db):
+    """Fix round 4 minor. With no hospital-default row (no department_id
+    IS NULL config exists at all) and no active till anywhere, the cap
+    fallback must be a hard 400, never the requesting till's own cap:
+    that is exactly the bypass this whole control exists to close, and a
+    refund can legitimately be filed against an inactive till (see
+    _config_for_source, which does not filter on is_active)."""
+    import secrets
+    from app.models.messaging import Department
+
+    dept = Department(name=f"inactive-only-dept-{secrets.token_hex(4)}", is_active=True)
+    db.add(dept)
+    db.flush()
+    config = _refund_config(
+        db, shortcode="500005", initiator_name="inactive-api",
+        department_id=dept.department_id,
+    )
+    config.is_active = False
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        request_refund(
+            db, source_transaction_id=txn.id, amount=Decimal("100.00"),
+            reason="no active till anywhere", user_id=1,
+        )
+    assert exc_info.value.status_code == 400
+    assert "active M-Pesa till" in exc_info.value.detail
+
+
+def test_dispatch_lock_timeout_returns_a_clean_409_not_a_hang(db, _engine):
+    """Finding C. pg_advisory_lock blocks with no timeout of its own, and
+    dispatch_refund's dedicated lock connection is a second connection
+    from the same tenant pool the request session already holds, held
+    across the whole Safaricom round trip. Without a bound, a stranded or
+    genuinely slow dispatch turns a second caller's request into a hang
+    rather than a clear rejection: a cashier can retry a 409, a hung
+    request tells them nothing. Holds the SAME advisory lock directly, on
+    a separate raw connection standing in for "another dispatch attempt
+    already in progress", and confirms dispatch_refund raises a clean 409
+    within the configured lock_timeout rather than hanging.
+    """
+    config = _refund_config(db)
+    txn = _make_settled_txn(db, amount=Decimal("1000.00"), config=config)
+    db.commit()
+
+    refund = request_refund(
+        db, source_transaction_id=txn.id, amount=Decimal("200.00"),
+        reason="lock timeout", user_id=1,
+    )
+    refund = approve_refund(db, refund_id=refund.id, user_id=2)
+
+    holder_conn = _engine.connect()
+    holder_conn.begin()
+    holder_conn.execute(
+        text("SELECT pg_advisory_lock(:ns, :key)"),
+        {"ns": _DISPATCH_LOCK_NAMESPACE, "key": refund.id},
+    )
+    try:
+        started = time.monotonic()
+        with pytest.raises(HTTPException) as exc_info:
+            dispatch_refund(db, refund=refund, callback_tenant="mayoclinic_db")
+        elapsed = time.monotonic() - started
+        assert exc_info.value.status_code == 409
+        assert "still in progress" in exc_info.value.detail
+        # Bounded well under a hang. Not asserting a tight lower bound:
+        # the point is "does not wait forever", not the exact millisecond.
+        assert elapsed < 15.0
+    finally:
+        holder_conn.execute(
+            text("SELECT pg_advisory_unlock(:ns, :key)"),
+            {"ns": _DISPATCH_LOCK_NAMESPACE, "key": refund.id},
+        )
+        holder_conn.close()
