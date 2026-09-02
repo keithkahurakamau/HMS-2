@@ -410,9 +410,21 @@ def handle_transaction_status_result(db: Session, payload: dict) -> Optional[Mpe
             db.commit()
             return txn
 
+        # populate_existing() is not optional here, for the identical
+        # reason it is required in app/services/daraja/b2c.py's
+        # _lock_refund: match_c2b_invoice loaded this same Invoice into
+        # the session a few statements above with no intervening commit,
+        # so a plain query would return that already-identity-mapped
+        # object WITHOUT overwriting its attributes from the row this
+        # FOR UPDATE query just locked. settle_invoice_match then adds to
+        # amount_paid read off that stale, pre-lock value: two
+        # verifications settling different receipts against the same
+        # invoice concurrently would have the second discard the first's
+        # credit, under-crediting a patient for money they already paid.
         invoice = (
             db.query(Invoice)
             .filter(Invoice.invoice_id == invoice.invoice_id)
+            .populate_existing()
             .with_for_update()
             .first()
         )
