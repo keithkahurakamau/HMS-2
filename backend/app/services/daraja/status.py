@@ -503,15 +503,29 @@ def handle_transaction_status_result(
         raise
 
 
-def handle_transaction_status_timeout(db: Session, payload: dict) -> Optional[MpesaTransaction]:
-    """Acknowledge a Transaction Status timeout. Decides NOTHING: a timeout
-    means Safaricom gave up waiting on the query, not that the money is not
-    real. The row stays Unverified, the same resting state as if no result
-    had arrived at all. A human resolves it from the unmatched queue, or a
-    future reconciliation job re-fires the query; this function does
-    neither, on purpose, for the same reason a local expiry timer was
-    removed from the STK reservation path (reservation.py): a guessed
-    outcome here is how a real payment goes missing silently.
+def handle_transaction_status_timeout(
+    db: Session, payload: dict,
+) -> Optional[Union[MpesaTransaction, MpesaRefund]]:
+    """Acknowledge a Transaction Status timeout. Decides NOTHING about
+    whether the underlying payment is real: a timeout means Safaricom gave
+    up waiting on THIS QUERY, not that the money is not real. Never marks
+    a row settled, quarantined, matched, Completed, or Failed here, for
+    the same reason a local expiry timer was removed from the STK
+    reservation path (reservation.py): a guessed outcome here is how a
+    real payment goes missing silently.
+
+    It DOES clear the correlation id this specific query was waiting on
+    (MpesaTransaction.conversation_id, or MpesaRefund.status_query_conversation_id),
+    which is the one thing a timeout genuinely proves: Safaricom will never
+    answer THIS id. Leaving it in place would permanently satisfy
+    reconcile_queries.py's own "a query is outstanding, do not re-ask"
+    guard (see requery_c2b and requery_refund), silently converting "ask
+    again later" into "never ask again", the exact one-way door
+    status.py's own module docstring promises reconciliation will not be:
+    "A human resolves it from the unmatched queue, or a future
+    reconciliation job re-fires the query." Clearing the dead id is what
+    makes that second option possible; nothing here decides anything about
+    the payment or refund itself.
     """
     result = (payload or {}).get("Result") or {}
     conversation_id = result.get("ConversationID")
@@ -533,19 +547,37 @@ def handle_transaction_status_timeout(db: Session, payload: dict) -> Optional[Mp
         )
         .first()
     )
-    if txn is None:
-        logger.warning(
-            "Transaction Status timeout for an unrecognised or "
-            "already-resolved ConversationID; ignored"
+    if txn is not None:
+        logger.info(
+            "Transaction Status query timed out for MpesaTransaction %s; left "
+            "Unverified, dead conversation_id cleared so reconciliation can "
+            "re-ask.", txn.id,
         )
+        txn.conversation_id = None
         db.commit()
-        return None
+        return txn
 
-    logger.info(
-        "Transaction Status query timed out for MpesaTransaction %s; left Unverified", txn.id
+    refund = (
+        db.query(MpesaRefund)
+        .filter(MpesaRefund.status_query_conversation_id == conversation_id)
+        .first()
+    )
+    if refund is not None:
+        logger.info(
+            "Transaction Status query timed out for refund %s's status "
+            "query; dead status_query_conversation_id cleared so "
+            "reconciliation can re-ask.", refund.id,
+        )
+        refund.status_query_conversation_id = None
+        db.commit()
+        return refund
+
+    logger.warning(
+        "Transaction Status timeout for an unrecognised or "
+        "already-resolved ConversationID; ignored"
     )
     db.commit()
-    return txn
+    return None
 
 
 def account_balance(
