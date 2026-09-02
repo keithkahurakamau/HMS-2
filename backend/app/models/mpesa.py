@@ -168,13 +168,23 @@ class MpesaTransaction(Base):
     bill_ref_number = Column(String(80), nullable=True, index=True)
     match_basis = Column(String(20), nullable=True, index=True)
 
-    # Set once by app/services/daraja/reconcile.py the first time this row
-    # is surfaced (stuck past 24 hours with no usable Safaricom verdict).
-    # NULL means never surfaced. Read before notifying, so a row does not
-    # renotify a danger-category channel on every 15-minute cron run
-    # forever: that is how a real forged-callback quarantine gets lost in
-    # the noise of a hundred routine repeats of the same old row.
+    # Set together by app/services/daraja/reconcile.py the first time this
+    # row is surfaced for a GIVEN reason (stuck past 24 hours with no usable
+    # Safaricom verdict). NULL means never surfaced. Read before notifying,
+    # so a row does not renotify a danger-category channel on every
+    # 15-minute cron run forever for the SAME reason: that is how a real
+    # forged-callback quarantine gets lost in the noise of a hundred
+    # routine repeats of the same old row.
+    #
+    # Keyed on the reason text, not on the row alone (New-3): a row can be
+    # surfaced once, have its status change under it (a human acts, or a
+    # callback lands), and later become stuck again for a DIFFERENT reason.
+    # Throttling on surfaced_at alone would then notify nobody the second
+    # time, which is worse than never surfacing at all: the log still says
+    # a human was told. Comparing the reason text means a genuinely new
+    # problem always notifies once, even if this row was surfaced before.
     surfaced_at = Column(DateTime(timezone=True), nullable=True)
+    surfaced_reason = Column(String(255), nullable=True)
 
     invoice = relationship("Invoice", backref="mpesa_transactions")
 
@@ -259,11 +269,15 @@ class MpesaRefund(Base):
     # fact about what was attempted, not a current-state flag.
     first_dispatch_attempted_at = Column(DateTime(timezone=True), nullable=True)
 
-    # Same purpose and same discipline as MpesaTransaction.surfaced_at:
-    # set once, the first time reconciliation surfaces this refund (stuck
-    # Processing past 24 hours, or stuck Approved with a dispatch marker
-    # already set at all, see reconcile.py), and checked before notifying
-    # again.
+    # Same purpose and same discipline as MpesaTransaction.surfaced_at,
+    # including the reason-keyed throttle (New-3): set together, the first
+    # time reconciliation surfaces this refund for a GIVEN reason (stuck
+    # Processing past 24 hours, stuck Processing with no conversation_id at
+    # all, or stuck Approved with a dispatch marker already set, see
+    # reconcile.py), and checked before notifying again for that SAME
+    # reason. A later, different reason (this refund moved on, then got
+    # stuck again a different way) always notifies once.
     surfaced_at = Column(DateTime(timezone=True), nullable=True)
+    surfaced_reason = Column(String(255), nullable=True)
 
     source_transaction = relationship("MpesaTransaction")

@@ -364,6 +364,61 @@ def test_stk_query_no_verdict_yet_leaves_pending(db, _engine, monkeypatch):
     assert result.stk_still_pending == 1
 
 
+def test_stk_query_still_processing_http_error_code_leaves_pending_not_failed(
+    db, _engine, monkeypatch,
+):
+    """New-5. Daraja's stkpushquery is widely documented to return a
+    non-2xx response carrying errorCode 500.001.1001 ("The transaction is
+    being processed") while a push is genuinely still in flight, not yet
+    confirmed against this project's own sandbox. client.py now preserves
+    that code on the DarajaError/HTTPException it raises instead of
+    flattening every non-2xx response into one generic failure, so
+    requery_stk can tell this apart from a real "could not ask" failure:
+    this must be treated exactly like the 200-with-no-ResultCode shape
+    (left Pending, not a job failure), not like an outage."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_pending_stk(db, config=config, minutes_old=6)
+    db.commit()
+
+    calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(500, {
+        "requestId": "16712-79390-1",
+        "errorCode": "500.001.1001",
+        "errorMessage": "The transaction is being processed",
+    }))
+    result = _run(db, _engine)
+
+    db.refresh(txn)
+    assert txn.status == "Pending"
+    assert calls["count"] == 1
+    assert result.ok is True                # not a failure: routine in-flight traffic
+    assert result.stk_still_pending == 1
+
+
+def test_stk_query_other_http_error_code_is_a_real_failure(db, _engine, monkeypatch):
+    """The other half of New-5: a non-2xx response carrying a DIFFERENT
+    errorCode (or none at all) is a genuine "we could not ask Safaricom"
+    failure and must still reach ReconcileRunResult.failures (I1), not be
+    silently folded into the same bucket as routine in-flight traffic."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    txn = _make_pending_stk(db, config=config, minutes_old=6)
+    db.commit()
+
+    calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(500, {
+        "requestId": "16712-79390-2",
+        "errorCode": "404.001.03",
+        "errorMessage": "Invalid Access Token",
+    }))
+    result = _run(db, _engine)
+
+    db.refresh(txn)
+    assert txn.status == "Pending"
+    assert calls["count"] == 1
+    assert result.ok is False
+    assert any(f"transaction {txn.id}" in f for f in result.failures)
+
+
 def test_stk_pending_over_24_hours_surfaces_without_further_query(db, _engine, monkeypatch):
     """THE no-retry-forever guard. Once a row is 24+ hours stuck, it must
     stop being asked about (call count 0 for this row) and instead be
@@ -415,6 +470,59 @@ def test_surfaced_transaction_does_not_renotify_on_a_second_run(db, _engine, mon
     db.refresh(txn)
     assert txn.surfaced_at == first_surfaced_at
     assert notify_calls["count"] == 1
+
+
+def test_surfaced_refund_renotifies_when_the_reason_changes(db, _engine, monkeypatch):
+    """New-3. surfaced_at alone throttles per ROW, not per REASON. A
+    case-4 refund surfaced once, whose status later changes (a human acts)
+    and which then becomes stuck again for a COMPLETELY DIFFERENT reason,
+    must still notify: throttling on the bare timestamp would silently
+    drop that second alarm, which is worse than no throttle, since the
+    log would still assert a human was told about money in flight."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    source_txn = _make_settled_txn(db, config=config)
+    refund = _make_refund(
+        db, source_txn=source_txn, status="Approved",
+        minutes_since_dispatch=11, conversation_id=None,
+    )
+    db.commit()
+
+    import app.services.daraja.reconcile_queries as reconcile_queries
+    real_notify = reconcile_queries._notify_refund_needs_review
+    notify_calls = []
+
+    def counting_notify(session, refund_, *, reason):
+        notify_calls.append(reason)
+        return real_notify(session, refund_, reason=reason)
+
+    monkeypatch.setattr(reconcile_queries, "_notify_refund_needs_review", counting_notify)
+
+    _run(db, _engine)
+    db.refresh(refund)
+    assert len(notify_calls) == 1
+    first_reason = refund.surfaced_reason
+    assert first_reason is not None
+    assert "dispatch attempt already marked" in first_reason
+
+    # A second run with the SAME reason must not renotify.
+    _run(db, _engine)
+    assert len(notify_calls) == 1
+
+    # Simulate a human running retry-dispatch outside this job: Safaricom
+    # accepts it for real this time, moving the refund to Processing with
+    # a genuine conversation_id, then it sticks there past 24 hours.
+    refund.status = "Processing"
+    refund.conversation_id = "AG_REAL_DISPATCH"
+    refund.first_dispatch_attempted_at = (
+        datetime.now(timezone.utc) - timedelta(hours=25)
+    )
+    db.commit()
+
+    _run(db, _engine)
+    db.refresh(refund)
+    assert len(notify_calls) == 2  # a genuinely new reason notified again
+    assert refund.surfaced_reason != first_reason
 
 
 # ─── Case 2: C2B Unverified (asynchronous) ─────────────────────────────────
@@ -599,6 +707,44 @@ def test_refund_stuck_processing_over_24_hours_surfaces_without_further_query(
     assert refund.surfaced_at is not None
     assert calls["count"] == 0
     assert any("Processing > 24h" in line for line in result.surfaced)
+
+
+def test_refund_processing_with_no_conversation_id_is_surfaced_not_asked(
+    db, _engine, monkeypatch,
+):
+    """New-4. b2c.py's own dispatch_refund and handle_b2c_timeout both move
+    a refund to Processing unconditionally once _record_conversation_id
+    returns True, which it also does, as a documented no-op, when
+    Safaricom's response carried no ConversationID at all. So Processing
+    with conversation_id IS NULL is reachable. There is no id to ask
+    Safaricom about (TransactionStatusQuery needs either a receipt, which a
+    Processing refund never has, or this exact id), so asking would raise
+    on every run forever, a permanent non-outage failure that would drown
+    out I1's real signal. This must surface instead, immediately, not wait
+    out the full 24 hours for a condition that time cannot fix."""
+    _fake_oauth(monkeypatch)
+    config = _refund_config(db)
+    source_txn = _make_settled_txn(db, config=config)
+    refund = _make_refund(
+        db, source_txn=source_txn, status="Processing",
+        minutes_since_dispatch=11, conversation_id=None,
+    )
+    db.commit()
+
+    calls = _counting_post(monkeypatch, lambda url, **kw: FakeResponse(200, {
+        "ConversationID": "AG_SHOULD_NOT_BE_SENT", "ResponseCode": "0",
+    }))
+    result = _run(db, _engine)
+
+    db.refresh(refund)
+    assert refund.status == "Processing"
+    assert refund.conversation_id is None
+    assert refund.status_query_conversation_id is None
+    assert refund.surfaced_at is not None
+    assert calls["count"] == 0                    # Safaricom was never contacted
+    assert result.refunds_requeried == 0
+    assert result.ok is True                       # surfaced, not a job failure
+    assert any("no conversation_id" in line for line in result.surfaced)
 
 
 # ─── Case 4: refund Approved with a dispatch marker (surfaced, never acted) ─

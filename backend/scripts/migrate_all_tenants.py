@@ -815,6 +815,12 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
         "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS surfaced_at TIMESTAMPTZ;"),
     ("mpesa_transactions",
         "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS surfaced_at TIMESTAMPTZ;"),
+    # f0a1b2c3d4e5: reason-keyed surfacing throttle, so a row surfaced once
+    # can still notify again for a genuinely different reason later.
+    ("mpesa_refunds",
+        "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS surfaced_reason VARCHAR(255);"),
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS surfaced_reason VARCHAR(255);"),
 ]
 
 

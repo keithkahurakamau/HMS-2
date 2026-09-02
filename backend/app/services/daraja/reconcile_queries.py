@@ -7,21 +7,25 @@ directly. See reconcile.py's module docstring for the full picture: which
 of these resolve synchronously, which are asynchronous, and which cases
 this job may act on at all versus only surface.
 
-I1 (silent-failure fix): none of these functions catch DarajaError or
-HTTPException any more. "We could not even ask Safaricom" (a missing
-passkey, a Daraja outage, bad initiator credentials) is a REAL failure,
-not the same fact as "Safaricom answered and had no verdict yet", and
-must reach ReconcileRunResult.failures, not be logged and silently
-swallowed. Every caller in reconcile.py already wraps each row in its own
-try/except that does exactly this, so letting these exceptions propagate
-is the fix: it costs nothing here and buys the caller the distinction it
-needs.
+I1 (silent-failure fix): these functions do not catch DarajaError or
+HTTPException to swallow them. "We could not even ask Safaricom" (a
+missing passkey, a Daraja outage, bad initiator credentials) is a REAL
+failure, not the same fact as "Safaricom answered and had no verdict
+yet", and must reach ReconcileRunResult.failures, not be logged and
+silently discarded. Every caller in reconcile.py already wraps each row
+in its own try/except that does exactly this, so letting these exceptions
+propagate is the fix. The one exception, literally: requery_stk catches
+HTTPException for exactly one purpose (New-5, telling Daraja's
+"still processing" errorCode apart from every other rejection) and
+re-raises anything that is not that one specific code, so the I1
+guarantee holds for everything else unchanged.
 """
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.mpesa import MpesaRefund, MpesaTransaction
@@ -38,6 +42,16 @@ logger = logging.getLogger("daraja_reconcile")
 # docstring), so they are counted separately by the caller instead of
 # being folded into the same number.
 TXN_TERMINAL = frozenset({"Success", "Failed", "Quarantined"})
+
+# New-5: Daraja's own code for "the transaction is still being processed",
+# widely documented for stkpushquery on an in-flight push. NOT YET
+# CONFIRMED against this project's own sandbox credentials (none are in
+# this repo); implemented defensively regardless, because the alternative,
+# client.py flattening every non-2xx response into one generic
+# HTTPException, is exactly what makes the question unanswerable. If
+# sandbox testing shows a different code (or none at all, a bare non-2xx
+# with no body), update this constant; nothing else here needs to change.
+STILL_PROCESSING_ERROR_CODE = "500.001.1001"
 
 
 # ─── Case 1: STK Pending (synchronous) ──────────────────────────────────────
@@ -73,13 +87,28 @@ def requery_stk(session: Session, txn: MpesaTransaction) -> None:
     the 24-hour surface path is the backstop if that retry never comes.
 
     A transaction genuinely still being processed comes back from Daraja
-    either as a non-2xx response (query_stk raises HTTPException, which
-    propagates: see the module docstring, I1) or as a 200 with no
-    ResultCode field at all (Safaricom's "still processing" body carries
-    only errorCode/errorMessage/requestId). Both are left exactly as
-    Pending: neither is a verdict, so neither is treated as one.
+    either as a 200 with no ResultCode field at all (Safaricom's "still
+    processing" body carries only errorCode/errorMessage/requestId) or,
+    per widely documented Daraja behaviour not yet confirmed against this
+    project's own sandbox (New-5, flagged for the operator to verify), as
+    a non-2xx response carrying errorCode STILL_PROCESSING_ERROR_CODE.
+    Both are left exactly as Pending: neither is a verdict, so neither is
+    treated as one. Any OTHER non-2xx response (query_stk raises
+    HTTPException with a different or missing error_code) is a genuine
+    "we could not ask Safaricom" failure and propagates: see the module
+    docstring, I1.
     """
-    data = query_stk(session, checkout_request_id=txn.checkout_request_id)
+    try:
+        data = query_stk(session, checkout_request_id=txn.checkout_request_id)
+    except HTTPException as exc:
+        if getattr(exc, "error_code", None) == STILL_PROCESSING_ERROR_CODE:
+            logger.info(
+                "Reconciliation: STK query for transaction %s reports still "
+                "processing (errorCode %s); left Pending.",
+                txn.id, STILL_PROCESSING_ERROR_CODE,
+            )
+            return
+        raise
 
     if "ResultCode" not in data:
         logger.info(
@@ -221,6 +250,25 @@ def requery_refund(session: Session, refund: MpesaRefund, *, callback_tenant: st
         )
         return False
 
+    if not refund.conversation_id:
+        # New-4: b2c.py's own dispatch_refund and handle_b2c_timeout both
+        # move a refund to Processing unconditionally once
+        # _record_conversation_id returns True, which it also does (as a
+        # documented no-op) when Safaricom's response carried no
+        # ConversationID at all. So status == "Processing" with
+        # conversation_id IS NULL is reachable, and there is nothing here
+        # to ask Safaricom ABOUT: TransactionStatusQuery needs either a
+        # receipt (which a Processing refund never has) or this exact id.
+        # Calling query_transaction_status anyway would raise on every
+        # 15-minute run forever, a permanent non-outage failure that would
+        # drown out I1's real signal. The caller (reconcile.py) surfaces
+        # this row instead of asking.
+        logger.warning(
+            "Reconciliation: refund %s is Processing with no conversation_id "
+            "recorded; there is no id to ask Safaricom about.", refund.id,
+        )
+        return False
+
     source_txn = (
         session.query(MpesaTransaction)
         .filter(MpesaTransaction.id == refund.source_transaction_id)
@@ -254,27 +302,39 @@ def surface_transaction(session: Session, txn: MpesaTransaction, *, reason: str)
     """Tell a human, never resolve locally. Reuses settlement.py's own
     quarantine notification (billing:manage) rather than reinventing it.
 
-    I2: notifies only the FIRST time a given row is surfaced
-    (txn.surfaced_at is None), then records surfaced_at and never notifies
-    that row again. Without this, a row stuck for weeks renotifies a
-    danger-category channel every 15-minute cron run forever, which trains
-    billing staff to dismiss the channel, and the next quarantine, the
-    forged-callback one this whole architecture exists to catch, gets
-    dismissed along with it.
+    I2/New-3: notifies only the FIRST time a given row is surfaced for a
+    GIVEN reason (txn.surfaced_reason != reason, including the initial
+    None), then records surfaced_at and surfaced_reason together and does
+    not notify again for that SAME reason. Without this throttle, a row
+    stuck for weeks renotifies a danger-category channel every 15-minute
+    cron run forever, which trains billing staff to dismiss the channel,
+    and the next quarantine, the forged-callback one this whole
+    architecture exists to catch, gets dismissed along with it.
+
+    Keyed on the reason text, not the row alone, because a row can be
+    surfaced, have its status change under it (a human acts, or a callback
+    lands), and later become stuck again for a COMPLETELY DIFFERENT
+    reason: throttling on surfaced_at alone would then notify nobody the
+    second time, which is worse than no throttle, since the log still
+    records that a human was told about money in flight.
     """
     logger.error("Reconciliation: %s (transaction %s)", reason, txn.id)
-    if txn.surfaced_at is None:
+    truncated_reason = reason[:255]
+    if txn.surfaced_reason != truncated_reason:
         _notify_quarantine(session, txn, reason=reason)
         txn.surfaced_at = datetime.now(timezone.utc)
+        txn.surfaced_reason = truncated_reason
         session.commit()
 
 
 def surface_refund(session: Session, refund: MpesaRefund, *, reason: str) -> None:
     """Tell a human, never resolve locally. Reuses b2c.py's own
-    needs-review notification (mpesa:refund). Same once-only discipline as
-    surface_transaction; see its docstring (I2)."""
+    needs-review notification (mpesa:refund). Same reason-keyed throttle as
+    surface_transaction; see its docstring (I2/New-3)."""
     logger.error("Reconciliation: %s (refund %s)", reason, refund.id)
-    if refund.surfaced_at is None:
+    truncated_reason = reason[:255]
+    if refund.surfaced_reason != truncated_reason:
         _notify_refund_needs_review(session, refund, reason=reason)
         refund.surfaced_at = datetime.now(timezone.utc)
+        refund.surfaced_reason = truncated_reason
         session.commit()

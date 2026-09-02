@@ -24,6 +24,18 @@ reconciliation ask Safaricom" over "guess locally":
   5. Anything unresolved after 24 hours, which must surface to a human
      instead of being retried forever.
 
+ACCEPTED ONE-WAY DOOR: once a row is surfaced past 24 hours, this job
+never asks Safaricom about it again automatically (the age check's
+`continue` in each per-category loop below is permanent: age only grows).
+A late, genuine, non-zero verdict arriving after that point is therefore
+NOT picked up on its own; a human must resolve it from the surfaced row
+(or a fresh manual STK Query / retry-dispatch action). This is a
+deliberate consequence of "surface, do not retry forever", written down
+here rather than left to be rediscovered: the alternative, resuming
+automatic queries on an already-surfaced row, would silently undermine
+the "notify once, not every cycle" guarantee (I2) the moment that row's
+last verdict finally arrived.
+
 THE RULE. Only Safaricom's own verdict may resolve a payment. Never a local
 inference, never a timer, never an assumption from elapsed time, and never
 a payment instruction sent in place of a question. Every operation in
@@ -140,6 +152,16 @@ SURFACE_AFTER = timedelta(hours=24)
 # picks up where it left off 15 minutes later: nothing here is lost, only
 # deferred, and the per-row 5/10-minute thresholds mean nothing deferred by
 # one cycle becomes newly ineligible by the next.
+#
+# KNOWN GAP (New-7, not fixed this round): the budget is spent in a fixed
+# order WITHIN one tenant, case 1 (STK) before case 2 (C2B) before cases 3
+# and 4 (refunds). A tenant with 200+ stuck STK rows can therefore exhaust
+# the entire budget before this tenant's own C2B or refund rows are ever
+# looked at, every single run, not just once. The cross-tenant rotation
+# above does not help here: it only reorders which TENANT goes first, not
+# which CASE within a tenant does. A fair fix would interleave the four
+# categories (round-robin one row from each in turn) rather than draining
+# them in sequence; left as a follow-up.
 MAX_ROWS_PER_RUN = 200
 
 
@@ -374,6 +396,25 @@ def _reconcile_tenant(
                     ),
                 )
                 surfaced.append(f"{tenant_db_name}: refund {refund.id} (Processing > 24h)")
+                continue
+            if not refund.conversation_id:
+                # New-4: a Processing refund with no conversation_id at all
+                # (a reachable gap in b2c.py's own status transitions, see
+                # requery_refund's own guard for the same case) has no id
+                # for a Transaction Status query to ask about. Asking
+                # anyway would raise on every run, a permanent non-outage
+                # failure that would drown out I1's real signal. Surface
+                # it immediately rather than waiting out the full 24 hours
+                # for a condition that will never resolve on its own.
+                surface_refund(
+                    session, refund,
+                    reason=(
+                        "Refund stuck Processing with no ConversationID recorded; "
+                        "there is no id to ask Safaricom about. Check the "
+                        "Safaricom portal directly."
+                    ),
+                )
+                surfaced.append(f"{tenant_db_name}: refund {refund.id} (Processing, no conversation_id)")
                 continue
             if requery_refund(session, refund, callback_tenant=tenant_db_name):
                 refunds_requeried += 1
