@@ -150,3 +150,48 @@ services:
         sync: false
       - key: CORS_ORIGINS
         value: "https://www.medifleet.app,https://medifleet.app,https://hms-2-psi.vercel.app"
+
+  # Daraja reconciliation: resolves STK pushes stuck Pending, C2B receipts
+  # stuck Unverified, and B2C refunds stuck Processing (or Approved with a
+  # dispatch attempt already marked) by asking Safaricom directly, never by
+  # guessing locally. Anything still unresolved after 24 hours is surfaced
+  # rather than retried forever. Same idempotent-run shape as
+  # medifleet-billing above: serialised against itself (and any future
+  # operator console "Run reconciliation now" button) with its own
+  # Postgres advisory lock (app/services/daraja/reconcile.py's
+  # reconcile_lock), so overlapping runs skip rather than race.
+  #
+  # Every 15 minutes: STK Pending and C2B Unverified rows are only acted on
+  # once they are 5+ minutes old, and refunds once 10+ minutes old, so a
+  # 15-minute cadence catches each as soon as it is eligible without
+  # hammering Safaricom on a still-genuinely-in-flight payment.
+  #
+  # IMPORTANT: DATABASE_URL is sync: false, same as medifleet-billing, and
+  # MUST be set in the Render dashboard. Unlike a code bug, an unset value
+  # here does not crash the job: it simply finds an empty (or wrong) tenant
+  # registry and exits 0, which looks exactly like a healthy "nothing was
+  # stuck" run. ENCRYPTION_KEY must likewise be set: every Daraja call this
+  # job makes decrypts a tenant's stored credentials first.
+  - type: cron
+    name: medifleet-daraja-reconcile
+    runtime: python
+    rootDir: backend
+    plan: starter
+    schedule: "*/15 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.cli.run_reconcile
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: PASSWORD_PEPPER
+        sync: false
+      - key: CORS_ORIGINS
+        value: "https://www.medifleet.app,https://medifleet.app,https://hms-2-psi.vercel.app"
