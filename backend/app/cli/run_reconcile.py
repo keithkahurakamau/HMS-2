@@ -47,15 +47,18 @@ def main() -> int:
             "Resolved %d STK transaction(s) synchronously", result.transactions_resolved
         )
         log.info(
-            "Re-queried %d C2B transaction(s) (answer, if any, arrives later)",
-            result.transactions_requeried,
+            "STK: %d transaction(s) asked again, no verdict yet", result.stk_still_pending,
         )
         log.info(
-            "Re-dispatched %d refund(s) (answer, if any, arrives later)",
-            result.refunds_requeried,
+            "C2B: %d transaction(s) re-queried (answer, if any, arrives later)",
+            result.c2b_requeried,
+        )
+        log.info(
+            "Refunds: %d asked again via Transaction Status (answer, if any, "
+            "arrives later)", result.refunds_requeried,
         )
         if result.surfaced:
-            log.warning("Surfaced %d row(s) stuck over 24 hours:", len(result.surfaced))
+            log.warning("Surfaced %d row(s):", len(result.surfaced))
             for line in result.surfaced:
                 log.warning("  - %s", line)
 

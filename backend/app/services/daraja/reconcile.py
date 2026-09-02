@@ -10,62 +10,61 @@ reconciliation ask Safaricom" over "guess locally":
      until Safaricom corroborates it; if the Transaction Status result
      never arrives, the row sits Unverified forever unless re-asked).
   3. MpesaRefund stuck Processing (a B2C queue timeout means "we do not
-     know yet", never failure).
+     know yet", never failure). Resolved by ASKING (a genuine Transaction
+     Status query), never by sending anything.
   4. MpesaRefund stuck Approved with first_dispatch_attempted_at set (a
      crash between the marker commit and the wire, or a breaker trip in a
-     narrow window; retry-dispatch's route is deliberately gated away from
-     this shape, so today it has no in-product recovery besides this job).
+     narrow window). retry-dispatch's route already covers this shape (it
+     is gated on status == "Approved" alone, with no check on the marker),
+     so a human already has an in-product recovery for it. This module
+     does NOT act automatically here at all: it only surfaces the row so a
+     human checks the Safaricom portal and uses that route deliberately.
+     See _reconcile_tenant's docstring for why automating a second
+     dispatch here specifically would be unsafe.
   5. Anything unresolved after 24 hours, which must surface to a human
      instead of being retried forever.
 
 THE RULE. Only Safaricom's own verdict may resolve a payment. Never a local
-inference, never a timer, never an assumption from elapsed time. Every
-operation in reconcile_queries.py either gets a real answer from Safaricom
-and routes it through the SAME cross-checked handlers apply_stk_callback and
-dispatch_refund already use (the amount comparison, the receipt
-cross-check, the replay guards), or it leaves the row exactly as it is and,
-past 24 hours, tells a human. Nothing here ever writes Success, Failed,
-Quarantined, or Completed directly.
+inference, never a timer, never an assumption from elapsed time, and never
+a payment instruction sent in place of a question. Every operation in
+reconcile_queries.py either gets a real answer from Safaricom and routes it
+through the SAME cross-checked handlers apply_stk_callback already uses (the
+amount comparison, the receipt cross-check, the replay guards), or it
+leaves the row exactly as it is and, past its threshold, tells a human.
+Nothing here ever writes Success, Failed, Quarantined, Completed, or
+Reversed directly.
 
 SYNCHRONOUS VS ASYNCHRONOUS, spelled out because it changes what "resolved"
-means for each case:
+means for each case (full reasoning lives in each requery_*/surface_*
+function's own docstring in reconcile_queries.py; this is the summary):
 
-  * Case 1 (STK Pending) is genuinely synchronous. STK Query answers in the
-    same HTTP response, so requery_stk can settle, fail, or quarantine a
-    row before this job moves on to the next one. Caveat: Daraja's STK
-    Query response never carries CallbackMetadata (Amount,
-    MpesaReceiptNumber), only ResultCode/ResultDesc. A ResultCode 0
-    response therefore still has no receipt to settle against, and
-    apply_stk_callback correctly quarantines it (see settlement.py's
-    "no MpesaReceiptNumber despite ResultCode 0" step) rather than
-    fabricating one. That is the existing, correct behaviour for
-    "Safaricom confirms this succeeded but we cannot safely credit it
-    without a receipt", not a defect introduced here.
-  * Case 2 (C2B Unverified) is genuinely asynchronous, exactly as
-    status.py's own module docstring insists: query_transaction_status
-    only ever returns an acknowledgment (a fresh ConversationID). The
-    verdict, if Safaricom ever sends one, arrives later at the existing
-    /api/payments/mpesa/status/result callback. This job's job is only to
-    re-ask and record the new correlation id; it can never itself resolve
-    this case.
-  * Cases 3 and 4 (refunds) are also asynchronous, and for a reason worth
-    stating plainly: Safaricom's TransactionStatusQuery is keyed on a
-    receipt (TransactionID) a Processing B2C payout, by definition, does
-    not have yet, and this codebase has no result-callback handler that
-    could correlate a fresh status query's own ConversationID back to a
-    MpesaRefund row without a schema change (handle_transaction_status_result
-    is hard-wired to MpesaTransaction). Firing that query anyway, with
-    nowhere for its answer to land, is exactly the "looks like progress
-    while accomplishing nothing" shape status.py's own account_balance
-    refuses outright rather than fake. So this module asks Safaricom the
-    one way that both reaches it for real and has a working answer path:
-    it calls dispatch_refund again. OriginatorConversationID is minted
-    once and reused unchanged, so Safaricom recognises this as the SAME
-    instruction, never a second payout, and dispatch_refund's own,
-    already-tested branches decide everything from here (see
-    reconcile_queries.requery_refund's docstring). The real verdict, if
-    one ever arrives, still only lands at the existing, already-wired
-    /api/payments/mpesa/b2c/result and /b2c/timeout callbacks.
+  * Case 1 (STK Pending) is SYNCHRONOUS for a genuine, final, non-zero
+    ResultCode: requery_stk can settle or fail the row in this same run.
+    A bare ResultCode 0 is NOT such a verdict (STK Query never carries
+    CallbackMetadata) and is left untouched, so Safaricom's own retry of
+    the real callback can still settle it safely later.
+  * Case 2 (C2B Unverified) is ASYNCHRONOUS: query_transaction_status only
+    returns an acknowledgment. The verdict, if any, lands later at the
+    existing status/result callback. This job re-asks at most once per
+    outstanding query and never resolves this case itself.
+  * Case 3 (refund Processing) is ASYNCHRONOUS, resolved by asking, not by
+    sending: Daraja's TransactionStatusQuery accepts an
+    OriginalConversationID in place of a receipt, and a Processing refund
+    holds conversation_id precisely because Safaricom already accepted and
+    named that instruction. The query's own acknowledgment is recorded on
+    the dedicated status_query_conversation_id column, never on
+    conversation_id itself. The real verdict, when Safaricom sends one,
+    is routed to refund_status.handle_transaction_status_result_for_refund,
+    which records and notifies a human and never writes Completed or
+    Failed.
+  * Case 4 (refund Approved with a dispatch marker) is not resolved by
+    this job at all. It is surfaced immediately past its threshold and
+    left for a human, who already has a real recovery (retry-dispatch).
+    Re-dispatching automatically here would be indistinguishable, from
+    Safaricom's side, from a genuinely new payout: a case-4 refund has no
+    conversation_id yet for _record_conversation_id's double-dispatch
+    alarm to compare a fresh acceptance against, so the alarm that
+    protects every other retry path in this codebase cannot fire here.
 
 MULTI-TENANT. Unlike subscription billing (master DB only), Daraja
 transactions and refunds live one database per tenant. This job takes a
@@ -75,10 +74,19 @@ to serialise the ORCHESTRATION: only one reconciliation run, cron or a
 future "run now" button, proceeds at a time. It does not need a per-tenant
 lock in addition: tenants are visited one at a time within that single run.
 
+A single run also bounds how much of that time any one tenant, or the run
+as a whole, can consume: see _RowBudget and the tenant start-offset
+rotation in run_reconciliation, both added so a tenant with many stuck
+rows cannot hold RECONCILE_LOCK_KEY for the better part of an hour while
+tenants later in the registry are never reached.
+
 FAILURES ARE NEVER SILENT. ReconcileRunResult mirrors BillingRunResult: one
 line per tenant or row that could not even be attempted, so a run that logs
 "0 resolved" while every tenant errored out is visibly different from a
-run that genuinely found nothing to do.
+run that genuinely found nothing to do. "We could not even ask Safaricom"
+(a missing credential, a Daraja outage) is exactly such a failure, and is
+never the same fact as "Safaricom answered and had no verdict yet": see
+reconcile_queries.py's module docstring for how that distinction is kept.
 """
 from __future__ import annotations
 
@@ -114,13 +122,40 @@ RECONCILE_LOCK_KEY = 7825201
 # "Pending over 5 minutes", "Processing over 10 minutes", and "surface after
 # 24 hours" straight from the design doc's Reconciliation section. Unverified
 # C2B rows get the same 5-minute grace as Pending: Daraja's own
-# QueueTimeOutURL fires well inside that window, so re-asking sooner would
-# risk overwriting a still-in-flight query's own conversation_id before its
-# answer (or its timeout) has had a chance to arrive.
+# QueueTimeOutURL fires well inside that window, so a query that is still
+# genuinely outstanding at 5 minutes almost never is; requery_c2b's own
+# outstanding-query guard is what actually prevents an overwrite past that,
+# not this threshold.
 PENDING_STALE_AFTER = timedelta(minutes=5)
 UNVERIFIED_STALE_AFTER = timedelta(minutes=5)
 REFUND_STALE_AFTER = timedelta(minutes=10)
 SURFACE_AFTER = timedelta(hours=24)
+
+# Bounds how many stuck rows a single run will touch, across every tenant
+# combined. Each row is at worst one Daraja network round trip (OAuth plus
+# the query itself, each with client.py's own timeout and 401-retry), so an
+# unbounded per-run row count turns one tenant with many stuck rows into a
+# run that holds RECONCILE_LOCK_KEY, and this process, for the better part
+# of an hour. A run that hits the budget simply stops for THIS cycle and
+# picks up where it left off 15 minutes later: nothing here is lost, only
+# deferred, and the per-row 5/10-minute thresholds mean nothing deferred by
+# one cycle becomes newly ineligible by the next.
+MAX_ROWS_PER_RUN = 200
+
+
+class _RowBudget:
+    """Shared, mutable row counter threaded through a single run. Not a
+    dataclass field on ReconcileRunResult: this is a resource the run
+    consumes, not a fact about what it did."""
+
+    def __init__(self, remaining: int):
+        self.remaining = remaining
+
+    def take(self) -> bool:
+        if self.remaining <= 0:
+            return False
+        self.remaining -= 1
+        return True
 
 
 @dataclass
@@ -128,9 +163,10 @@ class ReconcileRunResult:
     """What a reconciliation run actually did. Modelled on BillingRunResult
     for the identical reason: "0 resolved" must never be the same shape as
     "everything failed"."""
-    transactions_resolved: int = 0     # STK Pending rows settled, failed, or quarantined this run
-    transactions_requeried: int = 0    # C2B Unverified rows re-asked; answer, if any, arrives later
-    refunds_requeried: int = 0         # Refunds re-dispatched; answer, if any, arrives later
+    transactions_resolved: int = 0     # STK Pending rows reaching a genuine, final verdict this run
+    stk_still_pending: int = 0         # STK Pending rows asked again; Safaricom had no verdict yet
+    c2b_requeried: int = 0             # C2B Unverified rows re-asked; answer, if any, arrives later
+    refunds_requeried: int = 0         # Processing refunds asked again; answer, if any, arrives later
     surfaced: list[str] = field(default_factory=list)
     failures: list[str] = field(default_factory=list)
     # True only when this run did not execute at all because another run
@@ -214,20 +250,29 @@ def _age(reference: Optional[datetime], now: datetime) -> Optional[timedelta]:
 
 
 def _reconcile_tenant(
-    session: Session, tenant_db_name: str, *, now: datetime,
-) -> tuple[int, int, int, list[str], list[str]]:
+    session: Session, tenant_db_name: str, *, now: datetime, budget: _RowBudget,
+) -> tuple[int, int, int, int, list[str], list[str]]:
     """Run every reconciliation check against one tenant's own Daraja
-    tables. Returns (transactions_resolved, transactions_requeried,
-    refunds_requeried, surfaced, failures): plain values, not a dataclass,
-    so this function stays independent of ReconcileRunResult's shape.
+    tables. Returns (transactions_resolved, stk_still_pending,
+    c2b_requeried, refunds_requeried, surfaced, failures): plain values,
+    not a dataclass, so this function stays independent of
+    ReconcileRunResult's shape.
 
     Every row is wrapped in its own try/except: one bad row (a bug, a
-    poisoned session, an unexpected exception) must not stop the rest of
-    this tenant's rows or any other tenant's run, the same discipline
-    subscription_billing.ensure_invoices uses per-subscription.
+    poisoned session, an unexpected exception, OR a genuine "could not ask
+    Safaricom" failure now that reconcile_queries.py's requery_* functions
+    no longer swallow those, see reconcile_queries.py's module docstring)
+    must not stop the rest of this tenant's rows or any other tenant's
+    run, the same discipline subscription_billing.ensure_invoices uses
+    per-subscription; it must, however, still be recorded, which this
+    try/except's own `failures.append` is what actually does.
+
+    Stops early, mid-tenant, once `budget` is exhausted: see
+    MAX_ROWS_PER_RUN's own docstring.
     """
     transactions_resolved = 0
-    transactions_requeried = 0
+    stk_still_pending = 0
+    c2b_requeried = 0
     refunds_requeried = 0
     surfaced: list[str] = []
     failures: list[str] = []
@@ -247,6 +292,8 @@ def _reconcile_tenant(
             age = _age(txn.transaction_date, now)
             if age is None or age < PENDING_STALE_AFTER:
                 continue
+            if not budget.take():
+                break
             if age >= SURFACE_AFTER:
                 surface_transaction(
                     session, txn,
@@ -262,7 +309,7 @@ def _reconcile_tenant(
             if txn.status != before_status and txn.status in TXN_TERMINAL:
                 transactions_resolved += 1
             else:
-                transactions_requeried += 1
+                stk_still_pending += 1
         except Exception as exc:  # noqa: BLE001, one bad row must not stop the rest
             logger.exception("Reconciliation: STK Pending row %s failed", txn.id)
             failures.append(f"{tenant_db_name}: transaction {txn.id}: {exc}")
@@ -278,6 +325,8 @@ def _reconcile_tenant(
             age = _age(txn.transaction_date, now)
             if age is None or age < UNVERIFIED_STALE_AFTER:
                 continue
+            if not budget.take():
+                break
             if age >= SURFACE_AFTER:
                 surface_transaction(
                     session, txn,
@@ -289,36 +338,42 @@ def _reconcile_tenant(
                 surfaced.append(f"{tenant_db_name}: transaction {txn.id} (Unverified > 24h)")
                 continue
             requery_c2b(session, txn, callback_tenant=tenant_db_name)
-            transactions_requeried += 1
+            c2b_requeried += 1
         except Exception as exc:  # noqa: BLE001
             logger.exception("Reconciliation: C2B Unverified row %s failed", txn.id)
             failures.append(f"{tenant_db_name}: transaction {txn.id}: {exc}")
 
-    # Cases 3 & 4: refunds stuck Processing, or Approved with a dispatch
-    # marker already set. Both share one clock (first_dispatch_attempted_at)
-    # and one recovery mechanism (requery_refund); see its docstring.
-    stuck_refunds = (
+    # Case 3: refunds stuck Processing. Asked via a genuine Transaction
+    # Status query (requery_refund), never re-dispatched: see
+    # reconcile_queries.requery_refund's docstring and
+    # routes/mpesa_refunds.py's retry-dispatch route, which says in
+    # writing that a stuck Processing refund is resolved by asking
+    # Safaricom directly, not by dispatching again. This module must never
+    # contradict that.
+    processing_refunds = (
         session.query(MpesaRefund)
         .filter(
+            MpesaRefund.status == "Processing",
             MpesaRefund.first_dispatch_attempted_at.isnot(None),
-            MpesaRefund.status.in_(("Processing", "Approved")),
         )
         .all()
     )
-    for refund in stuck_refunds:
+    for refund in processing_refunds:
         try:
             age = _age(refund.first_dispatch_attempted_at, now)
             if age is None or age < REFUND_STALE_AFTER:
                 continue
+            if not budget.take():
+                break
             if age >= SURFACE_AFTER:
                 surface_refund(
                     session, refund,
                     reason=(
-                        f"Refund stuck {refund.status} for over 24 hours since "
-                        "its first dispatch attempt"
+                        "Refund stuck Processing for over 24 hours since its "
+                        "first dispatch attempt"
                     ),
                 )
-                surfaced.append(f"{tenant_db_name}: refund {refund.id} ({refund.status} > 24h)")
+                surfaced.append(f"{tenant_db_name}: refund {refund.id} (Processing > 24h)")
                 continue
             requery_refund(session, refund, callback_tenant=tenant_db_name)
             refunds_requeried += 1
@@ -326,7 +381,47 @@ def _reconcile_tenant(
             logger.exception("Reconciliation: refund %s failed", refund.id)
             failures.append(f"{tenant_db_name}: refund {refund.id}: {exc}")
 
-    return transactions_resolved, transactions_requeried, refunds_requeried, surfaced, failures
+    # Case 4: refunds stuck Approved with a dispatch marker already set.
+    # NOT resolved automatically, at all: see this module's own docstring
+    # and reconcile_queries.py's for why a case-4 refund is exactly the
+    # shape _record_conversation_id's double-dispatch alarm cannot protect
+    # (it has no conversation_id yet to compare a fresh acceptance
+    # against), so an automatic re-dispatch here would be indistinguishable
+    # from Safaricom's side from a genuinely new payout. retry-dispatch
+    # already covers this shape for a human (gated on status == "Approved"
+    # alone); this job's only role is to make sure a human notices.
+    approved_with_marker = (
+        session.query(MpesaRefund)
+        .filter(
+            MpesaRefund.status == "Approved",
+            MpesaRefund.first_dispatch_attempted_at.isnot(None),
+        )
+        .all()
+    )
+    for refund in approved_with_marker:
+        try:
+            age = _age(refund.first_dispatch_attempted_at, now)
+            if age is None or age < REFUND_STALE_AFTER:
+                continue
+            if not budget.take():
+                break
+            surface_refund(
+                session, refund,
+                reason=(
+                    "Refund stuck Approved with a dispatch attempt already "
+                    "marked; check the Safaricom portal, then use "
+                    "retry-dispatch deliberately if appropriate"
+                ),
+            )
+            surfaced.append(f"{tenant_db_name}: refund {refund.id} (Approved-with-marker)")
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Reconciliation: refund %s failed", refund.id)
+            failures.append(f"{tenant_db_name}: refund {refund.id}: {exc}")
+
+    return (
+        transactions_resolved, stk_still_pending, c2b_requeried, refunds_requeried,
+        surfaced, failures,
+    )
 
 
 def run_reconciliation(
@@ -339,7 +434,16 @@ def run_reconciliation(
     """The one reconciliation entry point the cron (and, eventually, an
     operator console button, the same shape run_billing_cycle already
     offers) should call. Serialises on reconcile_lock, then visits every
-    active tenant in turn.
+    active tenant in turn, bounded by MAX_ROWS_PER_RUN combined across all
+    of them.
+
+    Tenant order is rotated by the current wall-clock minute, not always
+    read in the same registry order: without this, a tenant early in the
+    master registry that regularly has enough stuck rows to exhaust the
+    row budget on its own would starve every tenant that sorts after it,
+    forever, since each run would restart from the same first tenant.
+    Rotating by the minute is stateless (no cursor to persist between
+    cron invocations) and spreads the budget round-robin over time.
 
     `tenants` and `session_for_tenant` are injectable purely for tests
     (this project has no per-tenant test database infrastructure; tests
@@ -361,9 +465,21 @@ def run_reconciliation(
             master_db.query(Tenant).filter(Tenant.is_active == True)  # noqa: E712
             .order_by(Tenant.tenant_id).all()
         )
+        if tenant_rows:
+            offset = int(run_now.timestamp() // 60) % len(tenant_rows)
+            tenant_rows = tenant_rows[offset:] + tenant_rows[:offset]
 
+        budget = _RowBudget(MAX_ROWS_PER_RUN)
         result = ReconcileRunResult()
         for tenant in tenant_rows:
+            if budget.remaining <= 0:
+                logger.warning(
+                    "Reconciliation: row budget (%d) exhausted; stopping this "
+                    "run before tenant %s. The next cycle picks up where this "
+                    "one left off.", MAX_ROWS_PER_RUN, tenant.db_name,
+                )
+                break
+
             try:
                 session = open_session(tenant.db_name)
             except Exception as exc:  # noqa: BLE001, one bad tenant must not stop the rest
@@ -377,10 +493,11 @@ def run_reconciliation(
 
             try:
                 (
-                    resolved, requeried, refund_requeried, surfaced, failures,
-                ) = _reconcile_tenant(session, tenant.db_name, now=run_now)
+                    resolved, still_pending, c2b_requeried, refund_requeried, surfaced, failures,
+                ) = _reconcile_tenant(session, tenant.db_name, now=run_now, budget=budget)
                 result.transactions_resolved += resolved
-                result.transactions_requeried += requeried
+                result.stk_still_pending += still_pending
+                result.c2b_requeried += c2b_requeried
                 result.refunds_requeried += refund_requeried
                 result.surfaced.extend(surfaced)
                 result.failures.extend(failures)
