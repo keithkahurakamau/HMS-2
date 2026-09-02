@@ -906,6 +906,7 @@ def _apply_completed_refund_to_invoice(db: Session, refund: MpesaRefund) -> None
     invoice = (
         db.query(Invoice)
         .filter(Invoice.invoice_id == refund.invoice_id)
+        .populate_existing()
         .with_for_update()
         .first()
     )

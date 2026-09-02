@@ -278,6 +278,7 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
             invoice = (
                 db.query(Invoice)
                 .filter(Invoice.invoice_id == txn.invoice_id)
+                .populate_existing()
                 .with_for_update()
                 .first()
             )
