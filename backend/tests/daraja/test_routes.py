@@ -20,6 +20,7 @@ from app.config.database import get_db
 from app.core.daraja_callback import ACK_C2B_DECLINE, ACK_OK, TenantLookupUnavailable
 from app.core.dependencies import RequirePermission, get_current_user
 from app.main import app
+from app.utils.encryption import encrypt_data
 from tests.daraja.conftest import make_invoice, make_mpesa_config
 
 # The six token-addressed callback paths Task 9 wires, matching
@@ -31,6 +32,14 @@ CALLBACK_PATH_TEMPLATES = [
     "/api/payments/mpesa/status/result/{hint}/{token}",
     "/api/payments/mpesa/status/timeout/{hint}/{token}",
     "/api/payments/mpesa/platform/stk/callback/{hint}/{token}",
+]
+
+# Same six, minus C2B validation: that one route diverges from the
+# 503-on-TenantLookupUnavailable rule on purpose (I1, never-decline wins
+# there; see test_c2b_validation_accepts_when_tenant_lookup_is_unavailable
+# below), so it is tested separately rather than in this parametrized set.
+CALLBACK_PATH_TEMPLATES_EXCEPT_C2B_VALIDATION = [
+    t for t in CALLBACK_PATH_TEMPLATES if "/c2b/validation/" not in t
 ]
 
 
@@ -55,7 +64,7 @@ class _FakeTenantSession:
 
 @pytest.fixture()
 def _unauthenticated_client() -> Iterator[TestClient]:
-    """No dependency overrides at all — these callbacks are public and
+    """No dependency overrides at all: these callbacks are public and
     token-authenticated, not session-authenticated, and CSRF-exempt by path
     (see app/main.py's _CSRF_EXEMPT_PATHS)."""
     yield TestClient(app)
@@ -77,11 +86,12 @@ def test_callback_acks_200_on_an_evaluated_non_match(template, monkeypatch, _una
     assert resp.json() == dict(ACK_OK)
 
 
-@pytest.mark.parametrize("template", CALLBACK_PATH_TEMPLATES)
+@pytest.mark.parametrize("template", CALLBACK_PATH_TEMPLATES_EXCEPT_C2B_VALIDATION)
 def test_callback_returns_503_when_tenant_lookup_is_unavailable(template, monkeypatch, _unauthenticated_client):
     """A lookup we could NOT perform (a master- or tenant-DB failure) must
     never be acknowledged the same way as one we evaluated: Safaricom has to
-    retry, so this is the one case that is not a 200."""
+    retry, so this is the one case that is not a 200. C2B validation is the
+    one exception (I1) and is tested separately below."""
     def _boom(hint, token):
         raise TenantLookupUnavailable("simulated master-DB outage")
 
@@ -109,6 +119,24 @@ def test_callback_acks_200_on_unparseable_json(template, monkeypatch, _unauthent
 
 
 # ─── C2B validation: the one path that must never turn an error into a decline ─
+
+
+def test_c2b_validation_accepts_when_tenant_lookup_is_unavailable(monkeypatch, _unauthenticated_client):
+    """I1. Every other callback 503s on TenantLookupUnavailable so Safaricom
+    retries. C2B validation is the one route where that would cost a real
+    patient their payment for no gain: validation is synchronous and
+    one-shot, so there is nothing to retry into, and the confirmation that
+    follows carries the same hint/token and IS retried if it 503s."""
+    def _boom(hint, token):
+        raise TenantLookupUnavailable("simulated master-DB outage")
+
+    monkeypatch.setattr("app.routes.mpesa_payment.resolve_tenant_by_hint", _boom)
+    resp = _unauthenticated_client.post(
+        "/api/payments/mpesa/c2b/validation/mayoclinic_db/tok",
+        json={"TransAmount": "100"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == dict(ACK_OK)
 
 
 def test_c2b_validation_accepts_when_the_handler_raises(monkeypatch, _unauthenticated_client):
@@ -307,6 +335,118 @@ def test_stk_push_route_rejects_a_reused_key_with_a_different_body(db, monkeypat
     assert second.status_code == 409
 
 
+def test_stk_push_route_forwards_department_id_to_the_configured_till(db, monkeypatch, _authenticated_client):
+    """I4. Without department_id reaching config_for, every push resolves
+    to the hospital default no matter which till the request named, and
+    Task 14's per-department tills are unreachable from any route. Proves
+    the department's OWN shortcode is what actually gets pushed to
+    Daraja, not the hospital default's."""
+    import secrets as _secrets
+
+    from app.models.messaging import Department
+
+    monkeypatch.setattr("app.config.settings.settings.PUBLIC_BASE_URL", "https://mayoclinic.medifleet.app")
+    dept = Department(name=f"route-dept-{_secrets.token_hex(4)}", is_active=True)
+    db.add(dept)
+    db.flush()
+
+    make_mpesa_config(db, shortcode="100001", initiator_name="default-api")
+    make_mpesa_config(
+        db, shortcode="200002", initiator_name="dept-api", department_id=dept.department_id,
+    )
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+    db.commit()
+
+    captured = {}
+
+    def fake_oauth(url, **kw):
+        return _FakeResponse(200, {"access_token": "tok", "expires_in": "3599"})
+
+    def fake_post(url, **kw):
+        captured["payload"] = kw.get("json")
+        return _FakeResponse(200, {
+            "MerchantRequestID": "mr-dept-route",
+            "CheckoutRequestID": "ws_CO_dept_route",
+            "ResponseCode": "0",
+            "ResponseDescription": "Success. Request accepted for processing",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.get", fake_oauth)
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+    resp = _authenticated_client.post(
+        "/api/payments/mpesa/stk-push",
+        json={
+            "phone_number": "254712345678",
+            "invoice_id": invoice.invoice_id,
+            "amount": "500.00",
+            "department_id": dept.department_id,
+            "idempotency_key": f"route-test-{secrets.token_hex(6)}",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert captured["payload"]["BusinessShortCode"] == "200002"
+
+
+# ─── I2: C2B registration, readiness, callback URLs, token rotation ────────
+
+
+def test_register_c2b_and_readiness_and_callback_urls_routes(db, monkeypatch, _authenticated_client):
+    """I2. register_c2b_urls and c2b_readiness had no route anywhere: an
+    HTTP request could reach neither, so Safaricom would never be told
+    where to send C2B traffic and walk-in payments would go unrecorded
+    with no error anywhere. Exercises all three new read/action routes
+    together against one real, active till."""
+    monkeypatch.setattr("app.config.settings.settings.PUBLIC_BASE_URL", "https://mayoclinic.medifleet.app")
+    config = make_mpesa_config(db, initiator_name="testapi")
+    config.initiator_password_encrypted = encrypt_data("initiator-pass")
+    db.commit()
+
+    def fake_oauth(url, **kw):
+        return _FakeResponse(200, {"access_token": "tok", "expires_in": "3599"})
+
+    def fake_post(url, **kw):
+        return _FakeResponse(200, {"ResponseDescription": "success"})
+
+    monkeypatch.setattr("app.services.daraja.client.requests.get", fake_oauth)
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+    register_resp = _authenticated_client.post("/api/admin/mpesa/register-c2b")
+    assert register_resp.status_code == 200, register_resp.text
+    assert register_resp.json()["results"][0]["registered"] is True
+
+    readiness_resp = _authenticated_client.get("/api/admin/mpesa/c2b-readiness")
+    assert readiness_resp.status_code == 200
+    assert readiness_resp.json()[0]["verification_ready"] is True
+
+    urls_resp = _authenticated_client.get("/api/admin/mpesa/callback-urls")
+    assert urls_resp.status_code == 200
+    till = urls_resp.json()["tills"][0]
+    assert till["stk_callback_url"].startswith("https://mayoclinic.medifleet.app/api/payments/mpesa/stk/callback/")
+    assert "/c2b/confirmation/" in till["c2b_confirmation_url"]
+    assert "/c2b/validation/" in till["c2b_validation_url"]
+    assert "/status/result/" in till["status_result_url"]
+    assert "/status/timeout/" in till["status_timeout_url"]
+
+
+def test_rotate_token_invalidates_the_old_lookup_hash(db, _authenticated_client):
+    """I2. Without a rotate route, a leaked callback token (one of only two
+    authentication layers for an unsigned protocol) had no remediation
+    short of a manual database UPDATE."""
+    config = make_mpesa_config(db)
+    db.commit()
+    old_lookup = config.callback_token_lookup
+    assert old_lookup is not None
+
+    resp = _authenticated_client.post("/api/admin/mpesa/rotate-token")
+    assert resp.status_code == 200, resp.text
+    assert "register-c2b" in resp.json()["message"]
+
+    db.refresh(config)
+    assert config.callback_token_lookup is not None
+    assert config.callback_token_lookup != old_lookup
+
+
 # ─── Route-inventory permission regression net ──────────────────────────────
 
 
@@ -320,6 +460,8 @@ def test_every_mutating_mpesa_route_requires_its_exact_write_permission():
         "/api/payments/mpesa/stk-push": ("billing:manage",),
         "/api/admin/mpesa/config": ("payhero:manage",),
         "/api/admin/mpesa/unmatched/{txn_id}/assign": ("payhero:manage",),
+        "/api/admin/mpesa/register-c2b": ("payhero:manage",),
+        "/api/admin/mpesa/rotate-token": ("payhero:manage",),
     }
 
     checked = 0
