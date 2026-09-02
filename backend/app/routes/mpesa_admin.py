@@ -18,7 +18,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, condecimal
 from sqlalchemy.orm import Session
 
@@ -26,7 +26,9 @@ from app.config.database import get_db
 from app.core.dependencies import RequirePermission, get_current_user
 from app.models.billing import Invoice
 from app.models.mpesa import MpesaConfig, MpesaTransaction
+from app.services.daraja.c2b import c2b_readiness, register_c2b_urls
 from app.services.daraja.settlement import settle_invoice_match
+from app.services.daraja.status import _base_hint_token
 from app.services.daraja.tokens import mint_callback_token, store_callback_token
 from app.utils.encryption import encrypt_data
 
@@ -36,8 +38,8 @@ router = APIRouter(prefix="/api/admin/mpesa", tags=["Payments, M-Pesa Admin"])
 # for the Daraja rail (the earlier "mpesa:manage" codename was renamed to
 # "payhero:manage" by migration aa2b7c3d8e91, see
 # app/core/dependencies.py's RequirePermission docstring), and both
-# integrations configure the same underlying capability — collecting M-Pesa
-# at the till — until Task 12 removes Pay Hero. Introducing a second,
+# integrations configure the same underlying capability, collecting M-Pesa
+# at the till, until Task 12 removes Pay Hero. Introducing a second,
 # parallel write codename here would let a role hold one without the other
 # for no operational reason.
 _MANAGE = "payhero:manage"
@@ -53,7 +55,7 @@ class MpesaConfigSchema(BaseModel):
     environment: str = Field(default="sandbox", pattern="^(sandbox|production)$")
 
     # Secrets: optional on every save. Blank/omitted means "leave the
-    # currently stored value alone" — a config update must never be able to
+    # currently stored value alone": a config update must never be able to
     # wipe a working credential just because the form round-tripped it blank.
     consumer_key: Optional[str] = Field(default=None, max_length=255)
     consumer_secret: Optional[str] = Field(default=None, max_length=255)
@@ -78,7 +80,35 @@ class AssignReceiptRequest(BaseModel):
 
 
 def _default_config(db: Session) -> Optional[MpesaConfig]:
+    """The hospital-wide default config row, active or not.
+
+    Used by the WRITE path (update_mpesa_config): a save must find and
+    reactivate an existing inactive row rather than insert a second
+    department_id IS NULL row, which the partial unique index
+    uq_mpesa_configs_default forbids. Read paths that need to know whether
+    M-Pesa is actually usable right now should use _active_default_config
+    instead.
+    """
     return db.query(MpesaConfig).filter(MpesaConfig.department_id.is_(None)).first()
+
+
+def _active_default_config(db: Session) -> Optional[MpesaConfig]:
+    """The hospital-wide default config, active only.
+
+    Matches app/services/daraja/reservation.py's config_for exactly (it
+    filters on department_id IS NULL AND is_active == True for the same
+    row): a deactivated default must read back as "not configured" here
+    the same way it is treated as "not configured" on the actual payment
+    path, not as a stale-but-visible row.
+    """
+    return (
+        db.query(MpesaConfig)
+        .filter(
+            MpesaConfig.department_id.is_(None),
+            MpesaConfig.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
 
 
 def _public_view(config: Optional[MpesaConfig]) -> dict:
@@ -122,7 +152,7 @@ def get_mpesa_config(
     db: Session = Depends(get_db),
     _user: dict = Depends(RequirePermission(*_READ_ANY)),
 ):
-    return _public_view(_default_config(db))
+    return _public_view(_active_default_config(db))
 
 
 @router.post("/config")
@@ -167,6 +197,120 @@ def update_mpesa_config(
 
     db.commit()
     return {"message": "M-Pesa configuration saved.", **_public_view(config)}
+
+
+# ─── C2B registration, readiness, callback URLs, token rotation ────────────
+# I2: C2B is the "most dangerous flow in the migration" (see
+# app/services/daraja/c2b.py's own module docstring): walk-in payments to a
+# hospital's PayBill have no prior record to check an unsigned callback
+# against, so a till that is never registered with Safaricom simply never
+# receives Confirmation traffic at all, money at the till, nothing on the
+# books, with no error anywhere to notice. register_c2b_urls is the only
+# thing that tells Safaricom where to send that traffic, so it needs a
+# route the same way the six inbound callbacks needed one.
+
+
+@router.post("/register-c2b")
+def register_c2b(
+    request: Request,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(RequirePermission(_MANAGE)),
+):
+    """Register the Confirmation and Validation URLs with Safaricom for
+    every active till in this tenant (hospital default and any department
+    tills). Safe to call again after a token rotation or a shortcode
+    change: it re-registers, it does not toggle anything."""
+    return register_c2b_urls(db, callback_tenant=request.headers.get("X-Tenant-ID"))
+
+
+@router.get("/c2b-readiness")
+def get_c2b_readiness(
+    db: Session = Depends(get_db),
+    _user: dict = Depends(RequirePermission(*_READ_ANY)),
+):
+    """Per-till readiness: whether C2B URLs are registered AND whether
+    initiator credentials exist to verify a payment once one arrives. A
+    till can show registered=true and still never settle a single payment
+    if it has no initiator credentials; see handle_confirmation's own
+    credential-failure handling in app/services/daraja/c2b.py."""
+    return c2b_readiness(db)
+
+
+@router.get("/callback-urls")
+def get_callback_urls(
+    request: Request,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(RequirePermission(_MANAGE)),
+):
+    """The real, live callback URLs for every active till, token included.
+
+    Gated on the WRITE permission, not the any-of read set: unlike every
+    other response in this module, this one deliberately includes the
+    plaintext callback token, because these are exactly the URLs an
+    operator needs to paste into the Safaricom developer portal (some
+    account types require portal-side registration in addition to, or
+    instead of, the registerurl API call register_c2b_urls makes) or hand
+    to support when C2B traffic isn't arriving. That is a different act
+    from reading a config screen, and it is restricted accordingly.
+    """
+    tenant_hint = request.headers.get("X-Tenant-ID")
+    configs = db.query(MpesaConfig).filter(MpesaConfig.is_active == True).all()  # noqa: E712
+    results = []
+    for config in configs:
+        try:
+            base, hint, token = _base_hint_token(config, tenant_hint)
+        except HTTPException as exc:
+            results.append({
+                "config_id": config.id,
+                "shortcode": config.shortcode,
+                "department_id": config.department_id,
+                "error": exc.detail,
+            })
+            continue
+        results.append({
+            "config_id": config.id,
+            "shortcode": config.shortcode,
+            "department_id": config.department_id,
+            "stk_callback_url": f"{base}/api/payments/mpesa/stk/callback/{hint}/{token}",
+            "c2b_validation_url": f"{base}/api/payments/mpesa/c2b/validation/{hint}/{token}",
+            "c2b_confirmation_url": f"{base}/api/payments/mpesa/c2b/confirmation/{hint}/{token}",
+            "status_result_url": f"{base}/api/payments/mpesa/status/result/{hint}/{token}",
+            "status_timeout_url": f"{base}/api/payments/mpesa/status/timeout/{hint}/{token}",
+        })
+    return {"tills": results}
+
+
+@router.post("/rotate-token")
+def rotate_callback_token(
+    db: Session = Depends(get_db),
+    _user: dict = Depends(RequirePermission(_MANAGE)),
+):
+    """Mint a fresh callback token for the hospital-wide default till.
+
+    The whole authentication design in app/core/daraja_callback.py rests
+    on this token being unguessable AND rotatable; without this route a
+    leaked token had no remediation short of a manual database UPDATE.
+    Rotating invalidates every Confirmation/Validation URL already
+    registered with Safaricom for this till (the old token is baked into
+    those URLs at registration time): callback-urls and register-c2b must
+    be used again afterwards, and this response says so rather than
+    leaving that step for the operator to discover the hard way. Scoped to
+    the hospital default only, matching this file's config-CRUD scope; a
+    per-department token rotation route is not part of this surface.
+    """
+    config = _default_config(db)
+    if config is None:
+        raise HTTPException(status_code=400, detail="M-Pesa is not configured yet.")
+    store_callback_token(config, mint_callback_token())
+    db.commit()
+    return {
+        "message": (
+            "Callback token rotated. Existing Confirmation/Validation URLs "
+            "registered with Safaricom now carry a dead token: call "
+            "register-c2b again to re-register with the new one."
+        ),
+        **_public_view(config),
+    }
 
 
 # ─── Unmatched-receipt queue ────────────────────────────────────────────────
@@ -216,6 +360,23 @@ def assign_unmatched_receipt(
     invoice = db.query(Invoice).filter(Invoice.invoice_id == payload.invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found.")
+    if invoice.status == "Paid":
+        raise HTTPException(status_code=400, detail="Invoice is already fully paid.")
+
+    # I3: lock the invoice row before settling, the same discipline every
+    # other Daraja settlement path uses (see status.py's own comment on why
+    # populate_existing() is not optional here: an unlocked read against an
+    # invoice already loaded into this session would settle against a
+    # stale amount_paid). Two settlements racing this invoice without the
+    # lock would have the second discard the first's credit, under-crediting
+    # a patient for money they already paid.
+    invoice = (
+        db.query(Invoice)
+        .filter(Invoice.invoice_id == invoice.invoice_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if invoice.status == "Paid":
         raise HTTPException(status_code=400, detail="Invoice is already fully paid.")
 
