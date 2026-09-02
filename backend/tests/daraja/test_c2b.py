@@ -11,11 +11,13 @@ app.services.daraja.client, exercised through the real DarajaClient exactly
 as production traffic is.
 """
 import secrets
+import threading
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from sqlalchemy.orm import sessionmaker
 
 from app.models.billing import Payment
 from app.models.mpesa import MpesaTransaction
@@ -357,6 +359,94 @@ def test_transaction_status_result_corroborating_amount_settles(db, monkeypatch)
     db.refresh(invoice)
     assert invoice.amount_paid == Decimal("500.00")
     assert invoice.status == "Paid"
+
+
+def test_transaction_status_result_concurrent_settlement_never_loses_a_credit(
+    db, _engine, monkeypatch
+):
+    """FIX 2, Task 7 fix round 3. match_c2b_invoice loads the Invoice into
+    the session with no intervening commit before
+    handle_transaction_status_result's own FOR UPDATE re-query. Without
+    populate_existing() on that re-query, SQLAlchemy's identity map
+    returns the ALREADY-loaded (pre-lock) object rather than the row the
+    lock just fetched, even though the FOR UPDATE genuinely executed and
+    genuinely locked the row in Postgres. Two Transaction Status results
+    settling DIFFERENT receipts against the SAME invoice concurrently
+    would then have whichever settles second read a stale, pre-credit
+    amount_paid and overwrite the first's credit rather than adding to
+    it: the patient ends up shown as owing money they already paid.
+
+    Two real threads, two separate Sessions on two separate connections,
+    a threading.Barrier so both reach the Invoice FOR UPDATE lock at the
+    same moment, matching the shape of app/services/daraja/b2c.py's own
+    dispatch-lock concurrency test (which found the identical defect in
+    that module first).
+    """
+    config = _make_config_with_initiator(db, shortcode="174379")
+    invoice = make_invoice(db, total_amount=Decimal("1000.00"))
+    bill_ref = f"INV-{invoice.invoice_id}"
+
+    _fake_status_ack(monkeypatch, conversation_id="AG-CONC-A", originator_conversation_id="OC-CONC-A")
+    handle_confirmation(
+        db,
+        _c2b_confirmation(receipt="CONCA001", amount="400", shortcode=config.shortcode, bill_ref=bill_ref),
+        callback_tenant="mayoclinic_db",
+    )
+
+    _fake_status_ack(monkeypatch, conversation_id="AG-CONC-B", originator_conversation_id="OC-CONC-B")
+    handle_confirmation(
+        db,
+        _c2b_confirmation(receipt="CONCB001", amount="600", shortcode=config.shortcode, bill_ref=bill_ref),
+        callback_tenant="mayoclinic_db",
+    )
+    db.commit()
+
+    result_a = _status_result(
+        conversation_id="AG-CONC-A", originator_conversation_id="OC-CONC-A",
+        result_code=0, amount="400", receipt="CONCA001",
+    )
+    result_b = _status_result(
+        conversation_id="AG-CONC-B", originator_conversation_id="OC-CONC-B",
+        result_code=0, amount="600", receipt="CONCB001",
+    )
+
+    SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+    barrier = threading.Barrier(2)
+    results: list = []
+    errors: list = []
+    results_lock = threading.Lock()
+
+    def worker(payload):
+        session = SessionLocal()
+        try:
+            barrier.wait(timeout=5)
+            r = handle_transaction_status_result(session, payload)
+            with results_lock:
+                results.append(r)
+        except Exception as exc:  # noqa: BLE001, captured for the assertion below
+            with results_lock:
+                errors.append(exc)
+        finally:
+            session.close()
+
+    t1 = threading.Thread(target=worker, args=(result_a,))
+    t2 = threading.Thread(target=worker, args=(result_b,))
+    t1.start()
+    t2.start()
+    t1.join(timeout=15)
+    t2.join(timeout=15)
+
+    assert not errors, f"unexpected errors from concurrent settlement: {errors}"
+    assert len(results) == 2
+
+    db.refresh(invoice)
+    assert invoice.amount_paid == Decimal("1000.00"), (
+        f"expected both credits (400 + 600) summed to 1000.00, got "
+        f"{invoice.amount_paid}: a stale pre-lock read let the second "
+        "settlement overwrite the first's credit instead of adding to it"
+    )
+    assert invoice.status == "Paid"
+    assert db.query(Payment).count() == 2
 
 
 def test_transaction_status_result_contradicting_amount_quarantines(db, monkeypatch):
