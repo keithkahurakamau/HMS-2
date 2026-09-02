@@ -49,6 +49,16 @@ def handle_transaction_status_result_for_refund(
     status_query_conversation_id so this lock can never collide with
     handle_b2c_result/handle_b2c_timeout's own lock (keyed on
     originator_conversation_id, a different id for a different query).
+
+    New-6: a no-op once `refund` has already reached a terminal state
+    (Completed, Failed, Reversed). handle_b2c_result/handle_b2c_timeout can
+    genuinely resolve a refund BEFORE this status query's own, separately
+    fired result arrives; without this check, a late status answer would
+    overwrite result_desc that already carries handle_b2c_result's own,
+    correct audit text (Safaricom's real ResultDesc for a Completed
+    refund), and would fire a danger-category needs-review notification
+    for a refund that is already finished, exactly the alarm fatigue I2
+    exists to prevent.
     """
     lock_id = int(
         hashlib.sha1(
@@ -59,6 +69,15 @@ def handle_transaction_status_result_for_refund(
 
     try:
         db.refresh(refund)
+
+        if refund.status in ("Completed", "Failed", "Reversed"):
+            logger.info(
+                "Reconciliation Transaction Status result for refund %s "
+                "arrived after it already reached %s; ignored.",
+                refund.id, refund.status,
+            )
+            db.commit()
+            return refund
 
         result_code = result.get("ResultCode")
         params = _result_parameters(result)
