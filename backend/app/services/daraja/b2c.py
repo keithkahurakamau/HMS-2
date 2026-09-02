@@ -975,7 +975,22 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
 
     # Serialise concurrent deliveries of this exact result, the same
     # discipline apply_stk_callback and handle_transaction_status_result
-    # both use, before acting on it.
+    # both use, before acting on it. This lock is keyed on originator_id,
+    # a DIFFERENT key than dispatch_refund's own _dispatch_lock (keyed on
+    # the refund's numeric id): it excludes a second, concurrent delivery
+    # of THIS result, but not a concurrent dispatch_refund call for the
+    # same refund. db.refresh below is therefore an UNLOCKED read relative
+    # to dispatch_refund: the terminal-status check that follows, and this
+    # function's own write, can race with dispatch_refund's write and the
+    # later commit wins, a blind overwrite rather than a serialised one.
+    # Confirmed the only overwrite this can actually produce is a queue
+    # timeout moving a refund from Failed back to Processing (dispatch_refund
+    # can only write Failed for a genuine first attempt, and a timeout for
+    # that same OriginatorConversationID cannot arrive before that
+    # synchronous response does), which is the safe direction (see
+    # handle_b2c_timeout): never the reverse, and never a Completed refund
+    # un-completing. Load-bearing, so documented here explicitly rather
+    # than left to be re-derived under pressure later.
     lock_id = int(hashlib.sha1(originator_id.encode("utf-8")).hexdigest()[:15], 16)
     db.execute(text("SELECT pg_advisory_xact_lock(:lid)"), {"lid": lock_id})
 
@@ -1131,7 +1146,21 @@ def handle_b2c_timeout(db: Session, payload: dict) -> Optional[MpesaRefund]:
     # this handler now performs real state changes (a possible
     # Approved -> Processing transition, a ConversationID write), not just
     # a confirmation, so it needs the same protection against a race with
-    # another delivery of the same or a related callback.
+    # another delivery of the same or a related callback. As in
+    # handle_b2c_result, this lock is keyed on originator_id, a DIFFERENT
+    # key than dispatch_refund's _dispatch_lock, so the db.refresh below
+    # and the terminal-status check that follows are UNLOCKED relative to
+    # a concurrent dispatch_refund call: whichever write commits last
+    # wins, a blind overwrite. The only overwrite this can actually
+    # produce is this function's own Failed-to-Processing move (a timeout
+    # arriving for an OriginatorConversationID that dispatch_refund's
+    # synchronous response already, separately, marked Failed), which is
+    # the safe direction: a timeout can never un-complete a Completed
+    # refund, and dispatch_refund cannot write Failed after this function
+    # has already moved a row to Processing (that branch is gated to
+    # entry_status == "Approved" with no prior attempt, a state a queue
+    # timeout arrival for the same instruction rules out). Load-bearing,
+    # documented here explicitly.
     lock_id = int(hashlib.sha1(originator_id.encode("utf-8")).hexdigest()[:15], 16)
     db.execute(text("SELECT pg_advisory_xact_lock(:lid)"), {"lid": lock_id})
 
