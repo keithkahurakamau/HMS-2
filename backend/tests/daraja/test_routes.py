@@ -1,0 +1,345 @@
+"""Route-level tests for Task 9: the six Daraja callback routes and the
+authenticated STK-push / admin surface in app/routes/mpesa_payment.py and
+app/routes/mpesa_admin.py.
+
+Every callback test monkeypatches resolve_tenant_by_hint as imported into
+the route module (app.routes.mpesa_payment), never the underlying
+app.core.daraja_callback module: the route holds its own name binding, and
+patching the origin module would silently do nothing.
+"""
+from __future__ import annotations
+
+import secrets
+from decimal import Decimal
+from typing import Iterator
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.config.database import get_db
+from app.core.daraja_callback import ACK_C2B_DECLINE, ACK_OK, TenantLookupUnavailable
+from app.core.dependencies import RequirePermission, get_current_user
+from app.main import app
+from tests.daraja.conftest import make_invoice, make_mpesa_config
+
+# The six token-addressed callback paths Task 9 wires, matching
+# app/main.py's _CSRF_EXEMPT_PATHS exactly.
+CALLBACK_PATH_TEMPLATES = [
+    "/api/payments/mpesa/stk/callback/{hint}/{token}",
+    "/api/payments/mpesa/c2b/validation/{hint}/{token}",
+    "/api/payments/mpesa/c2b/confirmation/{hint}/{token}",
+    "/api/payments/mpesa/status/result/{hint}/{token}",
+    "/api/payments/mpesa/status/timeout/{hint}/{token}",
+    "/api/payments/mpesa/platform/stk/callback/{hint}/{token}",
+]
+
+
+class _FakeResponse:
+    def __init__(self, status_code=200, payload=None):
+        self.status_code = status_code
+        self._payload = payload if payload is not None else {}
+        self.text = str(self._payload)
+
+    def json(self):
+        return self._payload
+
+
+class _FakeTenantSession:
+    """Stands in for a real tenant Session where a callback test wants
+    resolution to succeed but never touches the database: cheaper than a
+    real tenant engine and irrelevant to what these tests assert."""
+
+    def close(self):
+        pass
+
+
+@pytest.fixture()
+def _unauthenticated_client() -> Iterator[TestClient]:
+    """No dependency overrides at all — these callbacks are public and
+    token-authenticated, not session-authenticated, and CSRF-exempt by path
+    (see app/main.py's _CSRF_EXEMPT_PATHS)."""
+    yield TestClient(app)
+
+
+# ─── Ordering invariant outcomes, all six callbacks ─────────────────────────
+
+
+@pytest.mark.parametrize("template", CALLBACK_PATH_TEMPLATES)
+def test_callback_acks_200_on_an_evaluated_non_match(template, monkeypatch, _unauthenticated_client):
+    """A tenant_hint/token pair that resolves to nothing (wrong, forged, or
+    simply unrecognised) is a payload we DID evaluate and reject: Safaricom
+    must not retry it, so the response is 200 with the accepting body, never
+    a decline-shaped one."""
+    monkeypatch.setattr("app.routes.mpesa_payment.resolve_tenant_by_hint", lambda hint, token: None)
+    path = template.format(hint="does-not-exist", token="bad-token")
+    resp = _unauthenticated_client.post(path, json={"anything": "here"})
+    assert resp.status_code == 200
+    assert resp.json() == dict(ACK_OK)
+
+
+@pytest.mark.parametrize("template", CALLBACK_PATH_TEMPLATES)
+def test_callback_returns_503_when_tenant_lookup_is_unavailable(template, monkeypatch, _unauthenticated_client):
+    """A lookup we could NOT perform (a master- or tenant-DB failure) must
+    never be acknowledged the same way as one we evaluated: Safaricom has to
+    retry, so this is the one case that is not a 200."""
+    def _boom(hint, token):
+        raise TenantLookupUnavailable("simulated master-DB outage")
+
+    monkeypatch.setattr("app.routes.mpesa_payment.resolve_tenant_by_hint", _boom)
+    path = template.format(hint="whoever", token="whatever")
+    resp = _unauthenticated_client.post(path, json={"anything": "here"})
+    assert resp.status_code == 503
+
+
+@pytest.mark.parametrize("template", CALLBACK_PATH_TEMPLATES)
+def test_callback_acks_200_on_unparseable_json(template, monkeypatch, _unauthenticated_client):
+    """A body that isn't even valid JSON is acknowledged, not processed:
+    there is nothing evaluable to reject, and nothing retryable to gain by
+    a non-200 either."""
+    monkeypatch.setattr(
+        "app.routes.mpesa_payment.resolve_tenant_by_hint", lambda hint, token: "mayoclinic_db",
+    )
+    monkeypatch.setattr(
+        "app.routes.mpesa_payment._tenant_session", lambda name: _FakeTenantSession(),
+    )
+    path = template.format(hint="mayoclinic_db", token="tok")
+    resp = _unauthenticated_client.post(path, content=b"not-json-at-all")
+    assert resp.status_code == 200
+    assert resp.json() == dict(ACK_OK)
+
+
+# ─── C2B validation: the one path that must never turn an error into a decline ─
+
+
+def test_c2b_validation_accepts_when_the_handler_raises(monkeypatch, _unauthenticated_client):
+    monkeypatch.setattr(
+        "app.routes.mpesa_payment.resolve_tenant_by_hint", lambda hint, token: "mayoclinic_db",
+    )
+    monkeypatch.setattr(
+        "app.routes.mpesa_payment._tenant_session", lambda name: _FakeTenantSession(),
+    )
+
+    def _boom(db, payload):
+        raise RuntimeError("simulated handler bug")
+
+    monkeypatch.setattr("app.routes.mpesa_payment.handle_validation", _boom)
+
+    resp = _unauthenticated_client.post(
+        "/api/payments/mpesa/c2b/validation/mayoclinic_db/tok",
+        json={"TransAmount": "100", "BusinessShortCode": "174379"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == dict(ACK_OK), "an internal error must accept, never decline a real payment"
+
+
+def test_c2b_validation_declines_only_on_a_genuine_evaluated_rejection(monkeypatch, _unauthenticated_client):
+    monkeypatch.setattr(
+        "app.routes.mpesa_payment.resolve_tenant_by_hint", lambda hint, token: "mayoclinic_db",
+    )
+    monkeypatch.setattr(
+        "app.routes.mpesa_payment._tenant_session", lambda name: _FakeTenantSession(),
+    )
+    monkeypatch.setattr("app.routes.mpesa_payment.handle_validation", lambda db, payload: False)
+
+    resp = _unauthenticated_client.post(
+        "/api/payments/mpesa/c2b/validation/mayoclinic_db/tok",
+        json={"TransAmount": "-1"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == dict(ACK_C2B_DECLINE)
+
+
+# ─── Platform callback: only the reserved platform hint may settle there ────
+
+
+def test_platform_callback_rejects_a_real_tenant_db_name_resolution(monkeypatch, _unauthenticated_client):
+    """resolve_tenant_by_hint could in principle resolve a token against a
+    real tenant's own MpesaConfig (a wrong token/route pairing); the
+    platform route must refuse to treat that as a platform settlement even
+    though resolution technically "succeeded"."""
+    monkeypatch.setattr(
+        "app.routes.mpesa_payment.resolve_tenant_by_hint", lambda hint, token: "mayoclinic_db",
+    )
+    resp = _unauthenticated_client.post(
+        "/api/payments/mpesa/platform/stk/callback/mayoclinic_db/tok", json={},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == dict(ACK_OK)
+
+
+# ─── Authenticated surface: STK push idempotency ────────────────────────────
+
+
+@pytest.fixture()
+def _authenticated_client(db) -> Iterator[TestClient]:
+    def _get_db():
+        yield db
+
+    def _fake_user():
+        return {
+            "user_id": 1,
+            "email": "route.test@hms.local",
+            "role": "Admin",
+            "full_name": "Route Test User",
+            "permissions": ["billing:manage", "billing:read", "payhero:manage"],
+        }
+
+    app.dependency_overrides[get_db] = _get_db
+    app.dependency_overrides[get_current_user] = _fake_user
+    try:
+        client = TestClient(app)
+        client.cookies.set("csrf_token", "test-csrf-token")
+        client.headers.update({
+            "x-csrf-token": "test-csrf-token",
+            # The STK push route forwards this as the callback's tenant
+            # routing hint (app/services/daraja/stk.py's _callback_url);
+            # without it, initiate_stk_push cannot build a CallBackURL at
+            # all. Module gating never triggers off this header in tests:
+            # ModuleGateMiddleware looks up the tenant's feature_flags from
+            # the MASTER database keyed by this exact value, and no such
+            # tenant row exists here, so get_tenant_flags_cached simply
+            # returns "" and resolve_enabled_modules falls back to
+            # DEFAULT_ENABLED, which already includes "mpesa".
+            "X-Tenant-ID": "mayoclinic_db",
+        })
+        yield client
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture(autouse=True)
+def _clear_daraja_token_cache():
+    from app.services.daraja.client import _TOKEN_CACHE
+
+    _TOKEN_CACHE.clear()
+    yield
+    _TOKEN_CACHE.clear()
+
+
+def test_stk_push_route_is_idempotent_under_a_repeated_key(db, monkeypatch, _authenticated_client):
+    monkeypatch.setattr("app.config.settings.settings.PUBLIC_BASE_URL", "https://mayoclinic.medifleet.app")
+    make_mpesa_config(db)
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+    db.commit()
+
+    call_count = {"n": 0}
+
+    def fake_oauth(url, **kw):
+        return _FakeResponse(200, {"access_token": "tok", "expires_in": "3599"})
+
+    def fake_post(url, **kw):
+        call_count["n"] += 1
+        return _FakeResponse(200, {
+            "MerchantRequestID": "mr-route-1",
+            "CheckoutRequestID": "ws_CO_route_1",
+            "ResponseCode": "0",
+            "ResponseDescription": "Success. Request accepted for processing",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.get", fake_oauth)
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+    body = {
+        "phone_number": "254712345678",
+        "invoice_id": invoice.invoice_id,
+        "amount": "500.00",
+        "idempotency_key": f"route-test-{secrets.token_hex(6)}",
+    }
+
+    first = _authenticated_client.post("/api/payments/mpesa/stk-push", json=body)
+    assert first.status_code == 200, first.text
+
+    second = _authenticated_client.post("/api/payments/mpesa/stk-push", json=body)
+    assert second.status_code == 200, second.text
+
+    first_body, second_body = first.json(), second.json()
+    # The replayed response round-trips through the idempotency cache's own
+    # JSON encoding (app/core/idempotency.py serialises with
+    # `default=str`), so a Decimal field comes back as a string on the
+    # cache hit even though the first, non-cached response serialised it as
+    # a number; that is an existing property of the shared cache, not
+    # something this route controls. Compare the identifying fields
+    # directly and the money field as a string on both sides.
+    assert first_body["checkout_request_id"] == second_body["checkout_request_id"]
+    assert first_body["transaction_id"] == second_body["transaction_id"]
+    assert str(first_body["amount_charged"]) == str(second_body["amount_charged"])
+    assert call_count["n"] == 1, "a repeated key must not push a second STK prompt"
+
+
+def test_stk_push_route_rejects_a_reused_key_with_a_different_body(db, monkeypatch, _authenticated_client):
+    monkeypatch.setattr("app.config.settings.settings.PUBLIC_BASE_URL", "https://mayoclinic.medifleet.app")
+    make_mpesa_config(db)
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+    db.commit()
+
+    def fake_oauth(url, **kw):
+        return _FakeResponse(200, {"access_token": "tok", "expires_in": "3599"})
+
+    def fake_post(url, **kw):
+        return _FakeResponse(200, {
+            "MerchantRequestID": "mr-route-2",
+            "CheckoutRequestID": "ws_CO_route_2",
+            "ResponseCode": "0",
+            "ResponseDescription": "Success. Request accepted for processing",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.get", fake_oauth)
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+    key = f"route-test-{secrets.token_hex(6)}"
+    first = _authenticated_client.post(
+        "/api/payments/mpesa/stk-push",
+        json={
+            "phone_number": "254712345678", "invoice_id": invoice.invoice_id,
+            "amount": "500.00", "idempotency_key": key,
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    second = _authenticated_client.post(
+        "/api/payments/mpesa/stk-push",
+        json={
+            "phone_number": "254799999999", "invoice_id": invoice.invoice_id,
+            "amount": "100.00", "idempotency_key": key,
+        },
+    )
+    assert second.status_code == 409
+
+
+# ─── Route-inventory permission regression net ──────────────────────────────
+
+
+def test_every_mutating_mpesa_route_requires_its_exact_write_permission():
+    """A one-time reading that the right permission gates these routes is
+    not a net: a future edit that drops the dependency, or widens it to an
+    any-of with a read permission, would silently hand every holder of that
+    other permission a write it should not have. Mirrors
+    tests/daraja/test_refunds.py's equivalent for the B2C refund routes."""
+    expectations = {
+        "/api/payments/mpesa/stk-push": ("billing:manage",),
+        "/api/admin/mpesa/config": ("payhero:manage",),
+        "/api/admin/mpesa/unmatched/{txn_id}/assign": ("payhero:manage",),
+    }
+
+    checked = 0
+    for route in app.routes:
+        path = getattr(route, "path", "")
+        if path not in expectations:
+            continue
+        methods = getattr(route, "methods", None) or set()
+        if "GET" in methods:
+            continue
+        checked += 1
+        required = [
+            dep.call.required_permissions
+            for dep in route.dependant.dependencies
+            if isinstance(dep.call, RequirePermission)
+        ]
+        assert required, f"{methods} {path} carries no RequirePermission dependency at all"
+        assert required == [expectations[path]], (
+            f"{methods} {path} must require exactly {expectations[path]}, found {required}"
+        )
+    assert checked == len(expectations), (
+        f"expected to check {len(expectations)} mutating routes, checked {checked}"
+    )
