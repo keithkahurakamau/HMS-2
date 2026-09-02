@@ -42,9 +42,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Optional
+from typing import Iterator, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import func, text
@@ -373,11 +374,7 @@ def _record_conversation_id(
 
 
 def _lock_refund(db: Session, refund_id: int) -> Optional[MpesaRefund]:
-    """Fetch `refund_id` under SELECT ... FOR UPDATE. Shared by every
-    dispatch_refund call site: two concurrent attempts against the SAME
-    refund (a double-click, a manual retry racing an automated one) must
-    serialise on this row, not both read the same entry_status and both
-    submit.
+    """Fetch `refund_id` under SELECT ... FOR UPDATE, freshly.
 
     populate_existing() is not optional here. SQLAlchemy's identity map
     means that if `db` already holds a Python object for this refund_id
@@ -385,14 +382,33 @@ def _lock_refund(db: Session, refund_id: int) -> Optional[MpesaRefund]:
     object), a plain query returns that SAME object WITHOUT overwriting
     its already-loaded attributes from the row this query just fetched,
     even though the FOR UPDATE clause genuinely executed and genuinely
-    locked the row at the database level. Without populate_existing(), a
-    second caller unblocked by the first caller's commit would still read
-    its own stale, pre-lock copy of first_dispatch_attempted_at and
-    entry_status. Confirmed empirically: the concurrency test below fails
-    with both attempts reaching Failed if this is removed, which is
-    exactly the double-refund shape the lock exists to prevent, caused
-    entirely by the ORM cache, not by anything wrong at the database
-    level.
+    locked the row at the database level. Confirmed empirically while
+    building dispatch_refund's concurrency test: without
+    populate_existing(), a caller could read its own stale, pre-lock copy
+    of first_dispatch_attempted_at even after this query returned, which
+    is exactly the ORM-cache-driven route to the double-refund shape the
+    surrounding locking exists to prevent.
+
+    NOTE: populate_existing() also discards any of the caller's own
+    UNFLUSHED changes to this same refund object, and the FOR UPDATE
+    query below runs inside `db`'s current transaction, so it is subject
+    to whatever `db` has pending. dispatch_refund below also commits `db`
+    mid-function (to persist the dispatch-attempt marker before calling
+    Safaricom), which commits whatever else the caller had pending on
+    `db` too. No current caller holds other uncommitted changes on `db`
+    at the point it calls dispatch_refund, but both of these are new
+    couplings a future caller could trip on if that ever changes.
+
+    This row lock is NOT what serialises two concurrent dispatch attempts
+    for the same refund; dispatch_refund's own session-scoped advisory
+    lock (_dispatch_lock, below) is what does that, and unlike a row lock,
+    it survives dispatch_refund's own mid-function commit. This function
+    still adds real value inside that advisory lock: it defends against a
+    concurrent WRITER on a different lock path (a B2C result or timeout
+    callback, which locks by originator_conversation_id, a different key
+    than this refund's id) by blocking until any such writer's own commit
+    completes, and populate_existing() then guarantees the fresh values
+    are actually read into this object rather than a stale cached copy.
     """
     return (
         db.query(MpesaRefund)
@@ -401,6 +417,95 @@ def _lock_refund(db: Session, refund_id: int) -> Optional[MpesaRefund]:
         .with_for_update()
         .first()
     )
+
+
+# Own namespace via the two-key pg_advisory_lock(int, int) form: Postgres
+# treats a single-bigint-key lock and a two-int-key lock as entirely
+# separate spaces, so this can never collide with
+# subscription_billing.BILLING_LOCK_KEY (a single-key lock) or with this
+# module's own pg_advisory_xact_lock calls elsewhere in this file (also
+# single-key, and transaction-scoped rather than session-scoped). The
+# second key is the refund id itself.
+_DISPATCH_LOCK_NAMESPACE = 7825101
+
+
+@contextmanager
+def _dispatch_lock(db: Session, refund_id: int) -> Iterator[None]:
+    """Session-scoped advisory lock spanning the WHOLE dispatch attempt for
+    `refund_id`: the dispatch-attempt marker read and write, and the
+    Safaricom call itself.
+
+    THE PROPERTY A ROW LOCK CANNOT PROVIDE. A first implementation used
+    two phases of SELECT ... FOR UPDATE, reasoning that phase 1 commits
+    the marker before phase 2 re-locks for the network call. That is
+    structurally broken, not merely buggy: the commit that makes the
+    marker durable is the SAME commit that releases a row lock, so the
+    row lock cannot span both. In practice this let a concurrent caller
+    that observed had_prior_attempt=True (because it was unblocked by the
+    first caller's marker-commit) skip the marker write entirely and race
+    straight to the network call without ever committing, while the
+    ORIGINAL caller, still holding only its captured (now stale)
+    entry_status and had_prior_attempt, queued behind it. The genuinely
+    second dispatch happened FIRST, Safaricom answered the true first
+    caller's now-second attempt with a duplicate rejection, and it wrote
+    Failed. pg_advisory_lock does not have this problem: it survives a
+    commit on the connection that holds it (when that connection is not
+    the one being committed, see below), so marker-write order can be
+    made to equal dispatch order.
+
+    Deliberately pg_advisory_lock, NOT pg_advisory_xact_lock (the variant
+    used elsewhere in this module, for the result/timeout callback
+    handlers). The xact variant releases at the next commit or rollback
+    on the connection that holds it, which is exactly the mid-function
+    commit this lock must survive. pg_advisory_lock only releases on an
+    explicit pg_advisory_unlock or the backend disconnecting.
+
+    DEDICATED CONNECTION, not `db`'s. This project already hit the
+    failure mode of a session-scoped advisory lock taken on a pooled ORM
+    session (see subscription_billing.billing_lock's docstring): a commit
+    on that session returns its connection to the pool, and with
+    QueuePool the lock then strands on a now-idle pooled connection
+    forever, since a later pg_advisory_unlock issued on a DIFFERENT
+    connection is a no-op; with PgBouncer transaction pooling the
+    underlying server connection is not even pinned to `db` across a
+    commit at all, so a lock taken "on db" would not reliably mean
+    anything past the first commit either way. dispatch_refund below
+    commits `db` more than once (the marker, then the final status
+    write), so this lock cannot live on `db`'s connection. It opens its
+    OWN connection instead, exactly like billing_lock, and for the
+    identical reason: that connection's own transaction is kept open
+    (never committed) for the life of this context manager, so closing it
+    in `finally` reliably releases the lock (Postgres always drops a
+    session's advisory locks when its backend disconnects) even if the
+    explicit unlock statement itself fails.
+
+    Blocking (pg_advisory_lock, not pg_try_advisory_lock): a second
+    dispatch attempt for the same refund should wait for the first's
+    outcome, not skip or error.
+    """
+    conn = db.get_bind().connect()
+    try:
+        conn.begin()
+        conn.execute(
+            text("SELECT pg_advisory_lock(:ns, :key)"),
+            {"ns": _DISPATCH_LOCK_NAMESPACE, "key": refund_id},
+        )
+        try:
+            yield
+        finally:
+            try:
+                conn.execute(
+                    text("SELECT pg_advisory_unlock(:ns, :key)"),
+                    {"ns": _DISPATCH_LOCK_NAMESPACE, "key": refund_id},
+                )
+            except Exception:
+                logger.exception(
+                    "Explicit pg_advisory_unlock failed for refund %s; closing "
+                    "the dedicated dispatch-lock connection below still "
+                    "releases it.", refund_id,
+                )
+    finally:
+        conn.close()
 
 
 def dispatch_refund(
@@ -413,175 +518,196 @@ def dispatch_refund(
     every call, so a retried dispatch is recognised by Safaricom as the same
     instruction, never a second payout.
 
-    Locking, in two phases, both against the refund row itself (the
-    caller's `refund` object is only used for its id; every decision below
-    reads the freshly locked row):
-
-    Phase 1 locks the row just long enough to read entry_status and decide
-    whether this is the FIRST dispatch attempt ever made for this refund
-    (first_dispatch_attempted_at IS NULL). If so, that column is set and
-    COMMITTED immediately, before any network call: a commit here ends the
-    phase-1 transaction and releases its lock, but the marker it wrote is
-    now durable, which is the property that matters. Any concurrent caller
-    that was blocked on that lock unblocks only after this commit, and so
-    is GUARANTEED to see the marker already set: no two concurrent callers
-    can ever both observe "no prior attempt" for the same refund.
-
-    Phase 2 re-locks the row and holds that second lock for the rest of
-    the function, including the Safaricom call itself: only one dispatch
-    attempt for this refund is ever in flight at a time, so a concurrent
-    caller that raced in during the brief gap between phase 1's commit and
-    phase 2's lock (already guaranteed to see the marker, per the previous
-    paragraph) still waits for this attempt's outcome before it can start
-    its own.
+    The whole attempt (reading and, if unset, writing
+    first_dispatch_attempted_at; resolving credentials and building the
+    payload; the Safaricom call; recording the outcome) runs inside
+    _dispatch_lock, a session-scoped advisory lock keyed on this refund's
+    id (see that function's docstring for why a row lock cannot do this
+    job). That is what makes marker-write order match dispatch order: a
+    concurrent second caller for the SAME refund genuinely waits for this
+    entire call to finish, rather than racing ahead of it the moment this
+    call's marker-write commits.
     """
-    refund = _lock_refund(db, refund.id)
-    if refund is None:
-        raise HTTPException(status_code=404, detail="Refund not found.")
-    if refund.status not in ("Approved", "Processing"):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Refund is {refund.status}; nothing to dispatch.",
-        )
-    # Captured before anything below can mutate refund.status: the
-    # synchronous-rejection branch needs to know what this refund WAS when
-    # this specific call started, not what it becomes partway through.
-    entry_status = refund.status
-    had_prior_attempt = refund.first_dispatch_attempted_at is not None
-    if not had_prior_attempt:
-        refund.first_dispatch_attempted_at = datetime.now(timezone.utc)
-        db.commit()
-
-    refund = _lock_refund(db, refund.id)
-    if refund is None:
-        raise HTTPException(status_code=404, detail="Refund not found.")
-    if refund.status not in ("Approved", "Processing"):
-        # A concurrent call resolved this refund in the gap between phase
-        # 1 and phase 2 (e.g. this attempt observed had_prior_attempt via
-        # the marker but a genuinely earlier attempt's own response then
-        # landed first and completed it). Nothing left to dispatch.
-        raise HTTPException(
-            status_code=409,
-            detail=f"Refund is {refund.status}; nothing to dispatch.",
-        )
-
-    txn = (
-        db.query(MpesaTransaction)
-        .filter(MpesaTransaction.id == refund.source_transaction_id)
-        .first()
-    )
-    if txn is None:
-        raise HTTPException(status_code=404, detail="Source transaction not found.")
-    config = _config_for_source(db, txn)
-    initiator, credential = _initiator_credentials(config)
-    result_url, timeout_url = _flow_urls(config, callback_tenant, flow="b2c")
-
-    payload = {
-        "OriginatorConversationID": refund.originator_conversation_id,
-        "InitiatorName": initiator,
-        "SecurityCredential": credential,
-        # BusinessPayment is the correct code for a refund. PromotionPayment
-        # and SalaryPayment produce the wrong message on the recipient's
-        # handset, so neither is acceptable here even though Daraja would
-        # accept either without complaint.
-        "CommandID": "BusinessPayment",
-        "Amount": int(refund.amount),
-        "PartyA": config.shortcode,
-        "PartyB": normalize_msisdn(refund.phone_number),
-        "Remarks": refund.reason[:100],
-        "QueueTimeOutURL": timeout_url,
-        "ResultURL": result_url,
-        "Occasion": f"REFUND-{refund.id}",
-    }
-
-    client = _daraja_client(config)
-    try:
-        response = client.post("/mpesa/b2c/v3/paymentrequest", payload)
-    except DarajaError as exc:
-        # The request never definitively reached Safaricom: a network
-        # error, a 5xx, or the circuit breaker open. This is NOT the same
-        # fact as Safaricom rejecting it. Nothing is known to be in flight,
-        # so the refund is left exactly where it was (Approved, or still
-        # Processing on a retry of an already-accepted one) and can be
-        # dispatched again safely, because OriginatorConversationID never
-        # changes between attempts.
-        logger.warning(
-            "B2C dispatch for refund %s could not reach Daraja: %s",
-            refund.id, safe_repr(str(exc)),
-        )
-        raise
-
-    response_code = str(response.get("ResponseCode", ""))
-    if response_code != "0":
-        if entry_status == "Processing" or had_prior_attempt:
-            # Either this call entered already Processing (an earlier
-            # attempt already got a synchronous "0", or a timeout later
-            # confirmed Safaricom holds it), or it entered Approved but
-            # had_prior_attempt is True, meaning a PREVIOUS dispatch
-            # attempt for this same refund was already recorded before
-            # this one started, and that earlier attempt's own response
-            # never made it back (a lost read timeout, a dropped
-            # connection, a breaker trip on the response leg): entry_status
-            # stayed "Approved" not because nothing was sent, but because
-            # nothing was ever LEARNED about what was sent. Either way,
-            # Safaricom already holds an accepted instruction, and a
-            # non-zero ResponseCode here is exactly what its own
-            # duplicate-OriginatorConversationID rejection looks like:
-            # proof it holds that instruction, not evidence the refund
-            # failed. Reading this as "the refund failed" is precisely how
-            # the loop closes: the operator sees Failed, requests a fresh
-            # refund with a fresh originator id, and that second,
-            # genuinely distinct instruction pays the patient again on top
-            # of the first, already-accepted one. So this must never
-            # resolve to Failed; it moves to (or stays at) Processing, the
-            # same resting state as an unresolved queue timeout, and a
-            # human is told now rather than the record silently
-            # disagreeing with reality.
-            logger.warning(
-                "B2C dispatch for refund %s (entry_status=%s, had_prior_attempt=%s) "
-                "got a non-zero synchronous ResponseCode (%s: %s); moved to/left "
-                "Processing, not Failed, because Safaricom may already hold the "
-                "original instruction.",
-                refund.id, entry_status, had_prior_attempt,
-                response_code, safe_repr(response.get("ResponseDescription")),
+    with _dispatch_lock(db, refund.id):
+        refund = _lock_refund(db, refund.id)
+        if refund is None:
+            raise HTTPException(status_code=404, detail="Refund not found.")
+        if refund.status not in ("Approved", "Processing"):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Refund is {refund.status}; nothing to dispatch.",
             )
-            refund.status = "Processing"
-            refund.result_desc = (
-                f"Dispatch got ResponseCode {response_code} "
-                f"({response.get('ResponseDescription')}); moved to Processing "
-                "pending manual review, not Failed, because Safaricom may "
-                "already hold a previously accepted instruction."
+        entry_status = refund.status
+        had_prior_attempt = refund.first_dispatch_attempted_at is not None
+
+        txn = (
+            db.query(MpesaTransaction)
+            .filter(MpesaTransaction.id == refund.source_transaction_id)
+            .first()
+        )
+        if txn is None:
+            raise HTTPException(status_code=404, detail="Source transaction not found.")
+        config = _config_for_source(db, txn)
+        initiator, credential = _initiator_credentials(config)
+        result_url, timeout_url = _flow_urls(config, callback_tenant, flow="b2c")
+
+        payload = {
+            "OriginatorConversationID": refund.originator_conversation_id,
+            "InitiatorName": initiator,
+            "SecurityCredential": credential,
+            # BusinessPayment is the correct code for a refund. PromotionPayment
+            # and SalaryPayment produce the wrong message on the recipient's
+            # handset, so neither is acceptable here even though Daraja would
+            # accept either without complaint.
+            "CommandID": "BusinessPayment",
+            "Amount": int(refund.amount),
+            "PartyA": config.shortcode,
+            "PartyB": normalize_msisdn(refund.phone_number),
+            "Remarks": refund.reason[:100],
+            "QueueTimeOutURL": timeout_url,
+            "ResultURL": result_url,
+            "Occasion": f"REFUND-{refund.id}",
+        }
+
+        client = _daraja_client(config)
+
+        # The marker must mean "a request MAY have reached Safaricom", not
+        # merely "dispatch_refund was called". Obtaining an access token
+        # (a cache hit, or a fresh OAuth fetch) can fail on a circuit
+        # breaker trip or on Daraja rejecting the OAuth credentials
+        # themselves, and BOTH of those raise before any request is ever
+        # sent to the B2C endpoint. Setting the marker before this check
+        # would let a misconfigured hospital's very first attempt (bad
+        # credentials, or a tripped breaker) permanently mark
+        # had_prior_attempt True: every later dispatch would then read a
+        # genuine, definitive rejection as "maybe already accepted" and
+        # resolve to Processing forever, holding the balance and the
+        # rolling cap hostage with no in-product recovery, since
+        # retry-dispatch is gated to Approved and this refund would never
+        # be marked Failed to release it. So the token is fetched (or
+        # served from cache) FIRST, outside the marker's scope entirely;
+        # only once that succeeds does a request become imminent.
+        try:
+            client.access_token()
+        except DarajaError as exc:
+            logger.warning(
+                "B2C dispatch for refund %s could not obtain a Daraja access "
+                "token; no request was sent: %s",
+                refund.id, safe_repr(str(exc)),
+            )
+            raise
+
+        if not had_prior_attempt:
+            refund.first_dispatch_attempted_at = datetime.now(timezone.utc)
+            db.commit()
+
+            # Second line of defence, per the coordinator's ruling: re-fetch
+            # and re-validate against the row this transaction actually
+            # committed, rather than trusting the entry_status captured
+            # above to still be current. Under _dispatch_lock this cannot
+            # have changed from a concurrent dispatch_refund call (the
+            # advisory lock excludes those entirely), but a B2C result or
+            # timeout callback locks by a DIFFERENT key
+            # (originator_conversation_id) and could in principle still
+            # land here.
+            refund = _lock_refund(db, refund.id)
+            if refund is None:
+                raise HTTPException(status_code=404, detail="Refund not found.")
+            if refund.status not in ("Approved", "Processing"):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Refund is {refund.status}; nothing to dispatch.",
+                )
+            entry_status = refund.status
+
+        try:
+            response = client.post("/mpesa/b2c/v3/paymentrequest", payload)
+        except DarajaError as exc:
+            # The request never definitively reached Safaricom: a network
+            # error, a 5xx, or the circuit breaker open. This is NOT the same
+            # fact as Safaricom rejecting it. Nothing is known to be in flight,
+            # so the refund is left exactly where it was (Approved, or still
+            # Processing on a retry of an already-accepted one) and can be
+            # dispatched again safely, because OriginatorConversationID never
+            # changes between attempts. The marker (set above, before this
+            # call) still correctly records that an attempt was made.
+            logger.warning(
+                "B2C dispatch for refund %s could not reach Daraja: %s",
+                refund.id, safe_repr(str(exc)),
+            )
+            raise
+
+        response_code = str(response.get("ResponseCode", ""))
+        if response_code != "0":
+            if entry_status == "Processing" or had_prior_attempt:
+                # Either this call entered already Processing (an earlier
+                # attempt already got a synchronous "0", or a timeout later
+                # confirmed Safaricom holds it), or it entered Approved but
+                # had_prior_attempt is True, meaning a PREVIOUS dispatch
+                # attempt for this same refund was already recorded before
+                # this one started, and that earlier attempt's own response
+                # never made it back (a lost read timeout, a dropped
+                # connection, a breaker trip on the response leg): entry_status
+                # stayed "Approved" not because nothing was sent, but because
+                # nothing was ever LEARNED about what was sent. Either way,
+                # Safaricom already holds an accepted instruction, and a
+                # non-zero ResponseCode here is exactly what its own
+                # duplicate-OriginatorConversationID rejection looks like:
+                # proof it holds that instruction, not evidence the refund
+                # failed. Reading this as "the refund failed" is precisely how
+                # the loop closes: the operator sees Failed, requests a fresh
+                # refund with a fresh originator id, and that second,
+                # genuinely distinct instruction pays the patient again on top
+                # of the first, already-accepted one. So this must never
+                # resolve to Failed; it moves to (or stays at) Processing, the
+                # same resting state as an unresolved queue timeout, and a
+                # human is told now rather than the record silently
+                # disagreeing with reality.
+                logger.warning(
+                    "B2C dispatch for refund %s (entry_status=%s, had_prior_attempt=%s) "
+                    "got a non-zero synchronous ResponseCode (%s: %s); moved to/left "
+                    "Processing, not Failed, because Safaricom may already hold the "
+                    "original instruction.",
+                    refund.id, entry_status, had_prior_attempt,
+                    response_code, safe_repr(response.get("ResponseDescription")),
+                )
+                refund.status = "Processing"
+                refund.result_desc = (
+                    f"Dispatch got ResponseCode {response_code} "
+                    f"({response.get('ResponseDescription')}); moved to Processing "
+                    "pending manual review, not Failed, because Safaricom may "
+                    "already hold a previously accepted instruction."
+                )[:255]
+                db.commit()
+                db.refresh(refund)
+                _notify_refund_needs_review(db, refund, reason=refund.result_desc)
+                return refund
+
+            # entry_status == "Approved" and had_prior_attempt is False: this
+            # IS the first dispatch attempt ever made for this refund, and
+            # this IS its own synchronous verdict, a definitive rejection
+            # Safaricom gave for an instruction it never accepted into its
+            # queue. No asynchronous result will ever follow for it, so
+            # Failed is genuinely correct here. This is a different fact from
+            # a queue timeout on a request Safaricom DID accept (see
+            # handle_b2c_timeout, below), which must never be marked Failed,
+            # and a different fact from either case just above.
+            refund.status = "Failed"
+            refund.result_desc = str(
+                response.get("ResponseDescription") or "Daraja rejected the B2C request"
             )[:255]
             db.commit()
             db.refresh(refund)
-            _notify_refund_needs_review(db, refund, reason=refund.result_desc)
             return refund
 
-        # entry_status == "Approved" and had_prior_attempt is False: this
-        # IS the first dispatch attempt ever made for this refund, and
-        # this IS its own synchronous verdict, a definitive rejection
-        # Safaricom gave for an instruction it never accepted into its
-        # queue. No asynchronous result will ever follow for it, so
-        # Failed is genuinely correct here. This is a different fact from
-        # a queue timeout on a request Safaricom DID accept (see
-        # handle_b2c_timeout, below), which must never be marked Failed,
-        # and a different fact from either case just above.
-        refund.status = "Failed"
-        refund.result_desc = str(
-            response.get("ResponseDescription") or "Daraja rejected the B2C request"
-        )[:255]
+        if not _record_conversation_id(db, refund, response.get("ConversationID")):
+            db.refresh(refund)
+            return refund
+
+        refund.status = "Processing"
         db.commit()
         db.refresh(refund)
         return refund
-
-    if not _record_conversation_id(db, refund, response.get("ConversationID")):
-        db.refresh(refund)
-        return refund
-
-    refund.status = "Processing"
-    db.commit()
-    db.refresh(refund)
-    return refund
 
 
 # ─── Result callback ─────────────────────────────────────────────────────
