@@ -259,11 +259,22 @@ def request_refund(
             .filter(MpesaConfig.is_active == True)  # noqa: E712
             .scalar()
         )
-        daily_cap = (
-            Decimal(str(minimum_active_cap))
-            if minimum_active_cap is not None
-            else Decimal(str(config.refund_daily_cap))
-        )
+        if minimum_active_cap is None:
+            # No hospital-default row, and no active till anywhere either.
+            # `config` (the requesting till) can itself be inactive, since
+            # a refund is filed against the RECEIPT's own till regardless
+            # of whether that till is still active (see _config_for_source),
+            # so falling back to config.refund_daily_cap here would be
+            # exactly the bypass this whole control exists to close.
+            # Refuse outright rather than guess at a ceiling.
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "No active M-Pesa till is configured for this hospital; "
+                    "a refund cap cannot be determined safely."
+                ),
+            )
+        daily_cap = Decimal(str(minimum_active_cap))
     window_start = datetime.now(timezone.utc) - timedelta(hours=24)
     rolling_total = (
         db.query(func.coalesce(func.sum(MpesaRefund.amount), 0))
