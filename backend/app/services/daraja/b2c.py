@@ -228,17 +228,41 @@ def request_refund(
     # than the hospital is a separate, additional per-till sub-limit,
     # checked on top of this one, not instead of it; that is not this
     # control and is not implemented here.
+    # Deliberately NOT filtered on is_active. This query reads a POLICY
+    # NUMBER off the hospital-level configuration record; it is not
+    # choosing a till to route a payment through. Requiring is_active
+    # here would let deactivating the default till silently promote the
+    # ceiling to whichever till the refund happens to be filed against,
+    # exactly the higher-headroom bypass this control exists to close: a
+    # single toggle could turn a KES 500 tenant ceiling into a KES 50,000
+    # one with no error and no log line. The default row's cap value is
+    # authoritative regardless of whether that till is currently taking
+    # payments.
     hospital_default_config = (
         db.query(MpesaConfig)
-        .filter(MpesaConfig.department_id.is_(None), MpesaConfig.is_active == True)  # noqa: E712
+        .filter(MpesaConfig.department_id.is_(None))
         .first()
     )
-    # Falls back to the requesting till's own cap only in the unusual case
-    # of no hospital-default row existing at all (every hospital is
-    # expected to have one; a department-only shop with none configured
-    # must still get a real cap, not an unrelated "M-Pesa not configured"
-    # error from a different code path).
-    daily_cap_config = hospital_default_config if hospital_default_config is not None else config
+    if hospital_default_config is not None:
+        daily_cap = Decimal(str(hospital_default_config.refund_daily_cap))
+    else:
+        # No hospital-default row exists at all (unusual: every hospital
+        # is expected to have one). Falls back to the MINIMUM cap
+        # configured on any active till, never the requesting till's own:
+        # the whole point of this control is that staff filing a refund
+        # cannot move the ceiling by choosing which receipt to file it
+        # against, and "whichever till this refund happens to use" is
+        # exactly that.
+        minimum_active_cap = (
+            db.query(func.min(MpesaConfig.refund_daily_cap))
+            .filter(MpesaConfig.is_active == True)  # noqa: E712
+            .scalar()
+        )
+        daily_cap = (
+            Decimal(str(minimum_active_cap))
+            if minimum_active_cap is not None
+            else Decimal(str(config.refund_daily_cap))
+        )
     window_start = datetime.now(timezone.utc) - timedelta(hours=24)
     rolling_total = (
         db.query(func.coalesce(func.sum(MpesaRefund.amount), 0))
@@ -249,7 +273,6 @@ def request_refund(
         .scalar()
     )
     rolling_total = Decimal(str(rolling_total or 0))
-    daily_cap = Decimal(str(daily_cap_config.refund_daily_cap))
     if rolling_total + amount > daily_cap:
         raise HTTPException(
             status_code=400,
