@@ -82,7 +82,7 @@ export const getRefundableAmount = (transactionId) =>
 // attempt (a "Try again" after a resolved failure, a different invoice or
 // amount). Reusing a key past that point would replay the FIRST attempt's
 // cached response, including its now-stale checkout_request_id, instead of
-// sending the customer a fresh prompt — see stk.py's own idempotent_guard,
+// sending the customer a fresh prompt: see stk.py's own idempotent_guard,
 // which caches the synchronous push acknowledgement, not the eventual
 // Safaricom outcome. Callers own an idempotencyKeyRef (useRef(null)) and
 // call newIdempotencyKey() to mint into it; clearing the ref back to null

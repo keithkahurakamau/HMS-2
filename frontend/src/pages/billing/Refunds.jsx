@@ -15,7 +15,7 @@ import {
 /*  Dual approval is enforced by the server (app/services/daraja/b2c.py's    */
 /*  approve_refund rejects a requester approving their own refund above      */
 /*  refund_dual_approval_above). Hiding the button here below the threshold  */
-/*  is a courtesy so nobody clicks into a 403 — it is not the control.       */
+/*  is a courtesy so nobody clicks into a 403, it is not the control.        */
 /* ────────────────────────────────────────────────────────────────────────── */
 
 const STATUS_BADGE = {
