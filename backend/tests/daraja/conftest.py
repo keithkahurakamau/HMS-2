@@ -73,6 +73,7 @@ from app.config.database import Base
 from app.models.accounting import Account, AccountingSettings, LedgerMapping
 from app.models.billing import Invoice
 from app.models.mpesa import MpesaConfig, MpesaRefund, MpesaTransaction  # noqa: F401
+from app.models.mpesa_events import MpesaEvent  # noqa: F401
 from app.models.patient import Patient  # noqa: F401
 from app.utils.encryption import encrypt_data
 from app.services.daraja.tokens import mint_callback_token, store_callback_token
@@ -172,7 +173,7 @@ def db(_engine) -> Iterator[Session]:
     for tbl in [
         "acc_journal_lines", "acc_journal_entries", "acc_fiscal_periods",
         "acc_ledger_mappings", "acc_accounts", "acc_settings",
-        "mpesa_refunds", "mpesa_transactions", "mpesa_configs",
+        "mpesa_events", "mpesa_refunds", "mpesa_transactions", "mpesa_configs",
         "payments", "invoice_items", "invoices",
         # Task 10 (platform Daraja / subscription rail): CASCADE handles the
         # FK ordering (invoice_payments/platform_mpesa_transactions ->
