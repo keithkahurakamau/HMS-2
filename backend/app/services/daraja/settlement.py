@@ -71,6 +71,7 @@ from sqlalchemy.orm import Session
 
 from app.models.billing import Invoice, Payment
 from app.models.mpesa import MpesaConfig, MpesaTransaction
+from app.services.daraja.events import record_event
 from app.utils.log_redact import safe_repr
 
 logger = logging.getLogger(__name__)
@@ -219,10 +220,21 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
     # string from STK Query; normalise once so a string "0" (a genuinely
     # successful payment) is never mistaken for a truthy != 0 and marked
     # Failed.
+    def _emit(outcome: str) -> None:
+        record_event(
+            db, flow="stk_callback", direction="inbound", outcome=outcome,
+            daraja_result_code=str(result_code) if result_code is not None else None,
+            daraja_result_desc=txn.result_desc,
+            mpesa_transaction_id=txn.id, mpesa_config_id=txn.mpesa_config_id,
+            checkout_request_id=checkout_request_id, receipt_number=txn.receipt_number,
+            request_payload=payload,
+        )
+
     result_code = stk_callback.get("ResultCode")
     if str(result_code) != "0":
         txn.status = "Failed"
         txn.result_desc = str(stk_callback.get("ResultDesc") or "")[:255]
+        _emit("failure")
         db.commit()
         return txn
 
@@ -235,6 +247,7 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
     except ValueError as exc:
         txn.status = "Quarantined"
         txn.result_desc = f"Unparseable callback amount: {exc}"[:255]
+        _emit("quarantined")
         db.commit()
         _notify_quarantine(db, txn, reason=txn.result_desc)
         return txn
@@ -247,6 +260,7 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
             f"Callback claimed KES {callback_amount}, we requested KES {expected_amount}"
         )[:255]
         txn.status = "Quarantined"
+        _emit("quarantined")
         db.commit()
         _notify_quarantine(db, txn, reason=txn.result_desc)
         return txn
@@ -260,6 +274,7 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
         # index).
         txn.status = "Quarantined"
         txn.result_desc = "Callback reported success with no MpesaReceiptNumber"[:255]
+        _emit("quarantined")
         db.commit()
         _notify_quarantine(db, txn, reason=txn.result_desc)
         return txn
@@ -316,11 +331,13 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
                     # SettlementExceedsBalance's own docstring.
                     txn.status = "Quarantined"
                     txn.result_desc = str(exc)[:255]
+                    _emit("quarantined")
                     db.commit()
                     _notify_quarantine(db, txn, reason=txn.result_desc)
                     return txn
 
         txn.status = "Success"
+        _emit("success")
         # ONE commit for the whole unit (status, receipt, and settlement
         # together). If settle_invoice_match raises, nothing above is
         # persisted: the transaction is still Pending on disk, so Safaricom's

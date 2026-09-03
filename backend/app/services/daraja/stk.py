@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import time
 from decimal import ROUND_CEILING, Decimal
 from types import SimpleNamespace
 from typing import Optional
@@ -31,6 +32,7 @@ from app.core.idempotency import idempotent_guard, persist_and_commit
 from app.models.mpesa import MpesaConfig, MpesaTransaction
 from app.services.daraja.client import DarajaClient, DarajaError
 from app.services.daraja.credentials import daraja_timestamp, normalize_msisdn, stk_password
+from app.services.daraja.events import record_event
 from app.services.daraja.reservation import config_for, _reserve_pending
 from app.utils.encryption import decrypt_data
 from app.utils.log_redact import safe_repr
@@ -360,11 +362,20 @@ def initiate_stk_push(
         }
 
         client = _daraja_client(config)
+        _t0 = time.monotonic()
         data = client.post("/mpesa/stkpush/v1/processrequest", payload)
     except DarajaError as exc:
         logger.warning("Daraja STK push failed: %s", safe_repr(str(exc)))
         txn.status = "Failed"
         txn.result_desc = "Could not reach M-Pesa."
+        record_event(
+            db, flow="stk_push", direction="outbound", outcome="error",
+            http_status=getattr(exc, "status_code", None),
+            daraja_result_code=getattr(exc, "error_code", None),
+            error_detail=str(exc), duration_ms=int((time.monotonic() - _t0) * 1000),
+            mpesa_transaction_id=txn.id, mpesa_config_id=config.id,
+            checkout_request_id=txn.checkout_request_id, request_payload=payload,
+        )
         db.commit()
         raise HTTPException(status_code=502, detail="Could not reach M-Pesa. Try again shortly.")
     except HTTPException:
@@ -372,17 +383,32 @@ def initiate_stk_push(
         db.commit()
         raise
 
+    duration_ms = int((time.monotonic() - _t0) * 1000)
     checkout_request_id = data.get("CheckoutRequestID")
     merchant_request_id = data.get("MerchantRequestID")
     if not checkout_request_id:
         logger.warning("Daraja STK push returned no CheckoutRequestID: %s", safe_repr(data))
         txn.status = "Failed"
         txn.result_desc = data.get("ResponseDescription") or "M-Pesa did not accept the request."
+        record_event(
+            db, flow="stk_push", direction="outbound", outcome="failure",
+            http_status=200, daraja_result_code=data.get("ResponseCode"),
+            daraja_result_desc=txn.result_desc, duration_ms=duration_ms,
+            mpesa_transaction_id=txn.id, mpesa_config_id=config.id,
+            request_payload=payload, response_payload=data,
+        )
         db.commit()
         raise HTTPException(status_code=502, detail=txn.result_desc)
 
     txn.checkout_request_id = checkout_request_id
     txn.merchant_request_id = merchant_request_id
+    record_event(
+        db, flow="stk_push", direction="outbound", outcome="success",
+        http_status=200, daraja_result_code=data.get("ResponseCode"),
+        daraja_result_desc=data.get("ResponseDescription"), duration_ms=duration_ms,
+        mpesa_transaction_id=txn.id, mpesa_config_id=config.id,
+        checkout_request_id=checkout_request_id, request_payload=payload, response_payload=data,
+    )
 
     result = {
         "checkout_request_id": checkout_request_id,

@@ -71,6 +71,7 @@ from app.models.mpesa import MpesaConfig, MpesaTransaction
 from app.services.daraja.c2b_match import match_c2b_invoice
 from app.services.daraja.client import DarajaError
 from app.services.daraja.credentials import normalize_msisdn
+from app.services.daraja.events import record_event
 from app.services.daraja.status import (
     _base_hint_token,
     _daraja_client,
@@ -374,6 +375,12 @@ def handle_confirmation(
                 "C2B confirmation for shortcode %s matches no active till in this tenant",
                 safe_repr(shortcode),
             )
+            record_event(
+                db, flow="c2b_confirmation", direction="inbound", outcome="failure",
+                daraja_result_desc="No active till in this tenant claims this shortcode",
+                mpesa_transaction_id=txn.id, receipt_number=receipt,
+                request_payload=payload,
+            )
             db.commit()
             return txn
 
@@ -407,6 +414,19 @@ def handle_confirmation(
             txn.conversation_id = ack.get("ConversationID")
             txn.originator_conversation_id = ack.get("OriginatorConversationID")
 
+        # This event is the confirmation itself: money that reached the
+        # till, recorded Unverified. Its outcome is "success" as long as the
+        # confirmation was recorded at all; whether the FOLLOW-UP
+        # verification query could be fired is a diagnostic detail carried
+        # in the payload and result_desc, not a reason to call the
+        # confirmation itself a failure (the money is real either way).
+        record_event(
+            db, flow="c2b_confirmation", direction="inbound", outcome="success",
+            daraja_result_desc=txn.result_desc,
+            mpesa_transaction_id=txn.id, mpesa_config_id=config.id,
+            conversation_id=txn.conversation_id, receipt_number=receipt,
+            request_payload=payload, response_payload=ack,
+        )
         db.commit()
         return txn
     except Exception:

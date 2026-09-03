@@ -56,6 +56,7 @@ from app.models.billing import Invoice
 from app.models.mpesa import MpesaConfig, MpesaRefund, MpesaTransaction
 from app.services.daraja.client import DarajaError
 from app.services.daraja.credentials import normalize_msisdn
+from app.services.daraja.events import record_event
 from app.services.daraja.reservation import config_for
 # Reused, not reinvented, per the brief: status.py already resolves and
 # decrypts initiator credentials, already builds the (ResultURL,
@@ -994,6 +995,17 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
     lock_id = int(hashlib.sha1(originator_id.encode("utf-8")).hexdigest()[:15], 16)
     db.execute(text("SELECT pg_advisory_xact_lock(:lid)"), {"lid": lock_id})
 
+    def _emit(outcome: str) -> None:
+        record_event(
+            db, flow="b2c_result", direction="inbound", outcome=outcome,
+            daraja_result_code=result.get("ResultCode"),
+            daraja_result_desc=refund.result_desc,
+            mpesa_refund_id=refund.id,
+            conversation_id=refund.conversation_id,
+            receipt_number=refund.transaction_receipt,
+            request_payload=payload,
+        )
+
     try:
         db.refresh(refund)
 
@@ -1021,6 +1033,7 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
         if str(result_code) != "0":
             refund.status = "Failed"
             refund.result_desc = str(result.get("ResultDesc") or "")[:255]
+            _emit("failure")
             db.commit()
             return refund
 
@@ -1056,6 +1069,7 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
                 "keys present: %s",
                 refund.id, " and ".join(missing), keys_present,
             )
+            _emit("quarantined")
             db.commit()
             _notify_refund_needs_review(db, refund, reason=refund.result_desc)
             return refund
@@ -1068,6 +1082,7 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
                 "B2C result for refund %s reported an unparseable amount: %r",
                 refund.id, raw_amount,
             )
+            _emit("quarantined")
             db.commit()
             _notify_refund_needs_review(db, refund, reason=refund.result_desc)
             return refund
@@ -1088,6 +1103,7 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
                 "requested KES %s",
                 refund.id, reported_amount, refund.amount,
             )
+            _emit("quarantined")
             db.commit()
             _notify_refund_needs_review(db, refund, reason=refund.result_desc)
             return refund
@@ -1097,6 +1113,7 @@ def handle_b2c_result(db: Session, payload: dict) -> Optional[MpesaRefund]:
         refund.status = "Completed"
         refund.completed_at = datetime.now(timezone.utc)
         _apply_completed_refund_to_invoice(db, refund)
+        _emit("success")
         db.commit()
         return refund
     except Exception:

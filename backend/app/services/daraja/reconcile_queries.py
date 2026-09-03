@@ -23,6 +23,7 @@ guarantee holds for everything else unchanged.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
@@ -30,6 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.models.mpesa import MpesaRefund, MpesaTransaction
 from app.services.daraja.b2c import _config_for_source, _notify_refund_needs_review
+from app.services.daraja.events import record_event
 from app.services.daraja.settlement import _notify_quarantine, apply_stk_callback
 from app.services.daraja.status import query_transaction_status
 from app.services.daraja.stk import query_stk
@@ -98,22 +100,49 @@ def requery_stk(session: Session, txn: MpesaTransaction) -> None:
     "we could not ask Safaricom" failure and propagates: see the module
     docstring, I1.
     """
+    _t0 = time.monotonic()
     try:
         data = query_stk(session, checkout_request_id=txn.checkout_request_id)
     except HTTPException as exc:
+        duration_ms = int((time.monotonic() - _t0) * 1000)
         if getattr(exc, "error_code", None) == STILL_PROCESSING_ERROR_CODE:
             logger.info(
                 "Reconciliation: STK query for transaction %s reports still "
                 "processing (errorCode %s); left Pending.",
                 txn.id, STILL_PROCESSING_ERROR_CODE,
             )
+            record_event(
+                session, flow="stk_query", direction="outbound", outcome="success",
+                daraja_result_code=exc.error_code, daraja_result_desc="Still processing",
+                duration_ms=duration_ms, mpesa_transaction_id=txn.id,
+                mpesa_config_id=txn.mpesa_config_id,
+                checkout_request_id=txn.checkout_request_id,
+            )
             return
+        record_event(
+            session, flow="stk_query", direction="outbound", outcome="error",
+            http_status=getattr(exc, "status_code", None),
+            daraja_result_code=getattr(exc, "error_code", None),
+            error_detail=str(exc.detail) if hasattr(exc, "detail") else str(exc),
+            duration_ms=duration_ms, mpesa_transaction_id=txn.id,
+            mpesa_config_id=txn.mpesa_config_id,
+            checkout_request_id=txn.checkout_request_id,
+        )
         raise
+
+    duration_ms = int((time.monotonic() - _t0) * 1000)
 
     if "ResultCode" not in data:
         logger.info(
             "Reconciliation: STK query for transaction %s carried no "
             "ResultCode (still being processed); left Pending.", txn.id,
+        )
+        record_event(
+            session, flow="stk_query", direction="outbound", outcome="success",
+            daraja_result_desc="No ResultCode yet; still being processed",
+            duration_ms=duration_ms, mpesa_transaction_id=txn.id,
+            mpesa_config_id=txn.mpesa_config_id,
+            checkout_request_id=txn.checkout_request_id, response_payload=data,
         )
         return
 
@@ -124,7 +153,24 @@ def requery_stk(session: Session, txn: MpesaTransaction) -> None:
             "original callback, carrying the real receipt and amount, can "
             "still settle it if Safaricom retries it.", txn.id,
         )
+        record_event(
+            session, flow="stk_query", direction="outbound", outcome="success",
+            daraja_result_code="0",
+            daraja_result_desc=data.get("ResultDesc"),
+            duration_ms=duration_ms, mpesa_transaction_id=txn.id,
+            mpesa_config_id=txn.mpesa_config_id,
+            checkout_request_id=txn.checkout_request_id, response_payload=data,
+        )
         return
+
+    record_event(
+        session, flow="stk_query", direction="outbound", outcome="success",
+        daraja_result_code=str(data.get("ResultCode")),
+        daraja_result_desc=data.get("ResultDesc"),
+        duration_ms=duration_ms, mpesa_transaction_id=txn.id,
+        mpesa_config_id=txn.mpesa_config_id,
+        checkout_request_id=txn.checkout_request_id, response_payload=data,
+    )
 
     # A genuine, final, non-zero verdict. Pinned to txn's own
     # CheckoutRequestID/MerchantRequestID, never Daraja's echo of them: this
