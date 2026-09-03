@@ -76,6 +76,31 @@ from app.utils.log_redact import safe_repr
 logger = logging.getLogger(__name__)
 
 
+class SettlementExceedsBalance(Exception):
+    """Raised by settle_invoice_match when crediting a receipt would push
+    invoice.amount_paid past invoice.total_amount.
+
+    By the time any caller of settle_invoice_match runs, the money has
+    already reached Safaricom (an STK callback, a verified C2B receipt, or
+    an operator manually assigning an unmatched one): rejecting the
+    settlement outright, the way app/routes/receivables.py's record_payment
+    does for a manual entry, would silently lose track of real money.
+    Task 10 made exactly this ruling for the platform rail
+    (app/services/daraja/platform.py's _settle_subscription_invoice); this
+    is the tenant rail's own guard, closing the gap that let a second
+    genuine settlement against one invoice (two independent pushes, each
+    with its own real receipt, so the receipt-keyed replay check in
+    apply_stk_callback never catches it) drive amount_paid past
+    total_amount with no guard, no matter which rail or route reached
+    settle_invoice_match. The caller quarantines the transaction instead
+    of marking it Success; amount_paid is left untouched.
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
 # ─── STK callback ──────────────────────────────────────────────────────────
 
 
@@ -272,7 +297,6 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
         txn.receipt_number = receipt_number
         txn.verified_at = datetime.now(timezone.utc)
         txn.verification_source = "stk_callback"
-        txn.status = "Success"
 
         if txn.invoice_id:
             invoice = (
@@ -283,8 +307,20 @@ def apply_stk_callback(db: Session, payload: dict) -> Optional[MpesaTransaction]
                 .first()
             )
             if invoice is not None:
-                settle_invoice_match(db, invoice=invoice, txn=txn, match_basis="stk_callback")
+                try:
+                    settle_invoice_match(db, invoice=invoice, txn=txn, match_basis="stk_callback")
+                except SettlementExceedsBalance as exc:
+                    # The money already reached Safaricom (this callback IS
+                    # its confirmation); quarantine, never mark Success on
+                    # an over-the-balance settlement. See
+                    # SettlementExceedsBalance's own docstring.
+                    txn.status = "Quarantined"
+                    txn.result_desc = str(exc)[:255]
+                    db.commit()
+                    _notify_quarantine(db, txn, reason=txn.result_desc)
+                    return txn
 
+        txn.status = "Success"
         # ONE commit for the whole unit (status, receipt, and settlement
         # together). If settle_invoice_match raises, nothing above is
         # persisted: the transaction is still Pending on disk, so Safaricom's
@@ -354,6 +390,24 @@ def settle_invoice_match(
 
     if existing:
         return existing
+
+    # THE guard this function shipped without. amount_paid + amount must
+    # never exceed total_amount: two independent, genuinely verified
+    # settlements against the same invoice (two real receipts, so the
+    # receipt-keyed replay check above never fires for either) previously
+    # had nothing stopping the second from driving the balance negative-
+    # equivalent (amount_paid > total_amount) while the invoice quietly
+    # stayed "Paid". Quarantine, do not raise a plain rejection: the money
+    # already reached Safaricom by the time any caller gets here, so
+    # losing track of it is the actual failure mode, not the settlement
+    # itself. See SettlementExceedsBalance's own docstring.
+    balance = (invoice.total_amount or Decimal(0)) - (invoice.amount_paid or Decimal(0))
+    if amount > balance:
+        raise SettlementExceedsBalance(
+            f"settlement of KES {amount} exceeds outstanding balance KES {balance} "
+            f"on invoice {invoice.invoice_id}; money received but NOT credited, "
+            "needs manual review"
+        )
 
     payment = Payment(
         invoice_id=invoice.invoice_id,

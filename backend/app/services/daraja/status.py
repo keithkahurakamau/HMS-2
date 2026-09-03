@@ -50,7 +50,9 @@ from app.services.daraja.c2b_match import match_c2b_invoice
 from app.services.daraja.client import DarajaClient, DarajaError
 from app.services.daraja.credentials import security_credential
 from app.services.daraja.reservation import config_for
-from app.services.daraja.settlement import _notify_quarantine, settle_invoice_match
+from app.services.daraja.settlement import (
+    SettlementExceedsBalance, _notify_quarantine, settle_invoice_match,
+)
 from app.utils.encryption import decrypt_data
 from app.utils.log_redact import safe_repr
 
@@ -489,9 +491,16 @@ def handle_transaction_status_result(
             .with_for_update()
             .first()
         )
-        txn.status = "Success"
-        settle_invoice_match(db, invoice=invoice, txn=txn, match_basis=match_basis)
+        try:
+            settle_invoice_match(db, invoice=invoice, txn=txn, match_basis=match_basis)
+        except SettlementExceedsBalance as exc:
+            txn.status = "Quarantined"
+            txn.result_desc = str(exc)[:255]
+            db.commit()
+            _notify_quarantine(db, txn, reason=txn.result_desc)
+            return txn
 
+        txn.status = "Success"
         # ONE commit for the whole verified-and-matched unit, same reasoning
         # as apply_stk_callback: if settle_invoice_match raises, nothing
         # above persists, so the row is retryable rather than stuck

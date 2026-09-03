@@ -10,7 +10,11 @@ import pytest
 
 from app.models.billing import Payment
 from app.models.mpesa import MpesaTransaction
-from app.services.daraja.settlement import apply_stk_callback, settle_invoice_match
+from app.services.daraja.settlement import (
+    SettlementExceedsBalance,
+    apply_stk_callback,
+    settle_invoice_match,
+)
 from tests.daraja.conftest import (
     make_invoice,
     make_pending_transaction,
@@ -425,6 +429,94 @@ def test_settle_invoice_match_notification_body_has_no_em_dash_when_receipt_miss
     assert "body" in captured
     assert "not recorded" in captured["body"]
     assert "\u2014" not in captured["body"]
+
+
+# ─── The over-the-balance guard: closing the "one rail" gap at settlement ──
+# Task 11's frontend work made one rail (Daraja) the only one Billing and
+# Pharmacy ever call, but that is a UI convention, not an enforced
+# invariant: Pay Hero's routes stay live and reachable by direct URL until
+# Task 12 removes them, and nothing before this guard stopped a second
+# genuine settlement (its own real receipt, so the replay check above never
+# catches it) from driving amount_paid past total_amount. This is the same
+# ruling Task 10 already made for the platform rail
+# (app/services/daraja/platform.py's _settle_subscription_invoice): quarantine
+# an over-the-balance settlement, never silently reject it, because the
+# money already reached Safaricom by the time any caller gets here.
+
+
+def test_second_genuine_settlement_that_would_exceed_the_balance_is_quarantined(db):
+    """Two independent, genuinely verified STK settlements against the SAME
+    invoice, each carrying its own real receipt (so the receipt-keyed
+    replay check never fires for either): the shape a Billing push and a
+    Pharmacy push racing one invoice produces, or simply two terminals
+    both settling before either sees the other's update. Without this
+    guard the second call would silently drive amount_paid past
+    total_amount while recording a clean Success."""
+    invoice = make_invoice(db, total_amount=Decimal("500.00"))
+
+    txn1 = make_pending_transaction(
+        db, amount=Decimal("300.00"), invoice_id=invoice.invoice_id,
+        checkout_request_id="ws_CO_exceed_first",
+    )
+    result1 = apply_stk_callback(db, stk_callback_payload(
+        checkout_request_id=txn1.checkout_request_id, amount=Decimal("300.00"),
+        receipt="EXCEED001",
+    ))
+    assert result1.status == "Success"
+    db.refresh(invoice)
+    assert invoice.amount_paid == Decimal("300.00")
+    assert invoice.status == "Partially Paid"
+
+    # A second, independent push for the same invoice, reserved only after
+    # the first one settled (the partial unique index, at most one Pending
+    # row per invoice, would otherwise block a second one outstanding at
+    # the same time; the sequential case proven here is the one that index
+    # does NOT cover).
+    txn2 = make_pending_transaction(
+        db, amount=Decimal("300.00"), invoice_id=invoice.invoice_id,
+        checkout_request_id="ws_CO_exceed_second",
+    )
+    result2 = apply_stk_callback(db, stk_callback_payload(
+        checkout_request_id=txn2.checkout_request_id, amount=Decimal("300.00"),
+        receipt="EXCEED002",
+    ))
+
+    assert result2.status == "Quarantined"
+    assert "exceeds outstanding balance" in result2.result_desc
+
+    db.refresh(invoice)
+    assert invoice.amount_paid == Decimal("300.00"), (
+        "amount_paid must never exceed total_amount"
+    )
+    assert invoice.status == "Partially Paid"
+
+    payments = db.query(Payment).filter(Payment.invoice_id == invoice.invoice_id).all()
+    assert len(payments) == 1, "the quarantined receipt must not create a second Payment"
+
+
+def test_settle_invoice_match_raises_settlement_exceeds_balance_directly(db):
+    """Unit-level proof independent of the callback plumbing above: calling
+    settle_invoice_match a second time for more than the remaining balance
+    raises SettlementExceedsBalance and leaves amount_paid untouched."""
+    invoice = make_invoice(db, total_amount=Decimal("100.00"))
+    txn1 = make_pending_transaction(db, amount=Decimal("80.00"), invoice_id=invoice.invoice_id)
+    txn1.receipt_number = "DIRECT001"
+    txn1.status = "Success"
+    db.commit()
+    settle_invoice_match(db, invoice=invoice, txn=txn1, match_basis="stk_callback")
+    db.refresh(invoice)
+    assert invoice.amount_paid == Decimal("80.00")
+
+    txn2 = make_pending_transaction(db, amount=Decimal("30.00"), invoice_id=invoice.invoice_id)
+    txn2.receipt_number = "DIRECT002"
+    txn2.status = "Success"
+    db.commit()
+
+    with pytest.raises(SettlementExceedsBalance):
+        settle_invoice_match(db, invoice=invoice, txn=txn2, match_basis="stk_callback")
+
+    db.refresh(invoice)
+    assert invoice.amount_paid == Decimal("80.00"), "a raised guard must not have touched the ledger"
 
 
 # ─── Proof the two critical tests actually test something ──────────────────

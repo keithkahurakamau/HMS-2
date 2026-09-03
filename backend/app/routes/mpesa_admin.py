@@ -37,7 +37,9 @@ from app.core.limiter import limiter
 from app.models.billing import Invoice
 from app.models.mpesa import MpesaConfig, MpesaTransaction
 from app.services.daraja.c2b import c2b_readiness, register_c2b_urls
-from app.services.daraja.settlement import settle_invoice_match
+from app.services.daraja.settlement import (
+    SettlementExceedsBalance, _notify_quarantine, settle_invoice_match,
+)
 from app.services.daraja.status import _base_hint_token
 from app.services.daraja.stk import initiate_stk_push
 from app.services.daraja.tokens import mint_callback_token, store_callback_token
@@ -502,14 +504,30 @@ def assign_unmatched_receipt(
     if invoice.status == "Paid":
         raise HTTPException(status_code=400, detail="Invoice is already fully paid.")
 
+    try:
+        settle_invoice_match(
+            db,
+            invoice=invoice,
+            txn=txn,
+            match_basis="manual",
+            user_id=current_user.get("user_id"),
+        )
+    except SettlementExceedsBalance as exc:
+        # This receipt already sat on the unmatched queue as real money at
+        # the till; quarantine it rather than rejecting the assignment
+        # outright, the same rule every other Daraja settlement path
+        # follows for a receipt that has already reached Safaricom.
+        txn.status = "Quarantined"
+        txn.result_desc = str(exc)[:255]
+        db.commit()
+        _notify_quarantine(db, txn, reason=txn.result_desc)
+        db.refresh(txn)
+        return {
+            "status": "quarantined", "invoice_id": invoice.invoice_id,
+            "transaction_id": txn.id, "reason": txn.result_desc,
+        }
+
     txn.status = "Success"
-    settle_invoice_match(
-        db,
-        invoice=invoice,
-        txn=txn,
-        match_basis="manual",
-        user_id=current_user.get("user_id"),
-    )
     db.commit()
     db.refresh(txn)
     return {"status": "assigned", "invoice_id": invoice.invoice_id, "transaction_id": txn.id}
