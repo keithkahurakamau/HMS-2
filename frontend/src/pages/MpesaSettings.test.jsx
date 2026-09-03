@@ -4,6 +4,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/renderWithProviders';
 
+let _idemCounter = 0;
 vi.mock('../api/mpesa', () => ({
     getConfig: vi.fn(),
     saveConfig: vi.fn(),
@@ -12,7 +13,9 @@ vi.mock('../api/mpesa', () => ({
     registerC2b: vi.fn(),
     rotateToken: vi.fn(),
     testStk: vi.fn(),
-    newIdempotencyKey: vi.fn(() => 'idem-key-1'),
+    // A real counter, not a fixed string: tests that assert two attempts
+    // minted DIFFERENT keys need this to actually vary between calls.
+    newIdempotencyKey: vi.fn(() => `idem-key-${++_idemCounter}`),
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -22,6 +25,7 @@ vi.mock('react-hot-toast', () => ({
 import {
     getConfig, getC2bReadiness, getCallbackUrls, registerC2b, rotateToken, testStk,
 } from '../api/mpesa';
+import toast from 'react-hot-toast';
 import MpesaSettings from './MpesaSettings';
 
 const CONFIGURED = {
@@ -170,5 +174,81 @@ describe('MpesaSettings', () => {
         await waitFor(() => expect(testStk).toHaveBeenCalledWith(
             expect.objectContaining({ phone_number: '0712345678', idempotency_key: expect.any(String) }),
         ));
+    });
+
+    it('reuses the test-push idempotency key for the same phone number, and mints a new one when it changes', async () => {
+        setup();
+        testStk.mockResolvedValue({ status: 'stk_push_sent' });
+        renderWithProviders(<MpesaSettings />);
+        await screen.findByDisplayValue('600123');
+
+        const phoneInput = screen.getByLabelText(/07XXXXXXXX or 2547XXXXXXXX/i);
+        await userEvent.type(phoneInput, '0712345678');
+        await userEvent.click(screen.getByRole('button', { name: /send test/i }));
+        await waitFor(() => expect(testStk).toHaveBeenCalledTimes(1));
+        const firstKey = testStk.mock.calls[0][0].idempotency_key;
+
+        // Resubmit with the SAME phone number: same key, a real retry.
+        await userEvent.click(screen.getByRole('button', { name: /send test/i }));
+        await waitFor(() => expect(testStk).toHaveBeenCalledTimes(2));
+        expect(testStk.mock.calls[1][0].idempotency_key).toBe(firstKey);
+
+        // Change the phone number: this is a new attempt, new key.
+        await userEvent.clear(phoneInput);
+        await userEvent.type(phoneInput, '0798765432');
+        await userEvent.click(screen.getByRole('button', { name: /send test/i }));
+        await waitFor(() => expect(testStk).toHaveBeenCalledTimes(3));
+        expect(testStk.mock.calls[2][0].idempotency_key).not.toBe(firstKey);
+    });
+
+    it('blocks visibly when a registration predates the last token rotation, even with credentials in place', async () => {
+        setup({
+            readiness: [{
+                config_id: 1, shortcode: '600123', department_id: null,
+                c2b_urls_registered_at: '2026-08-01T10:00:00Z', verification_ready: true,
+            }],
+            callbackTills: {
+                tills: [{ ...CALLBACK_TILLS.tills[0], callback_token_rotated_at: '2026-08-20T10:00:00Z' }],
+            },
+        });
+        renderWithProviders(<MpesaSettings />);
+
+        const alert = await screen.findByRole('alert');
+        expect(alert).toHaveTextContent(/cannot be verified/i);
+        expect(alert).toHaveTextContent(/since been rotated/i);
+    });
+
+    it('shows the C2B registration timestamp beside the token rotation timestamp', async () => {
+        setup();
+        renderWithProviders(<MpesaSettings />);
+        await screen.findByDisplayValue('600123');
+        expect(screen.getByText(/c2b registered/i)).toBeInTheDocument();
+    });
+
+    it('reports a partly-failed rotation honestly: the token DID rotate even though re-registration failed', async () => {
+        setup();
+        rotateToken.mockResolvedValue({ message: 'Callback token rotated.', urls: CALLBACK_TILLS.tills[0], ...CONFIGURED });
+        registerC2b.mockRejectedValue({ response: { data: { detail: 'Safaricom timed out.' } } });
+        renderWithProviders(<MpesaSettings />);
+        await screen.findByDisplayValue('600123');
+
+        await userEvent.click(screen.getByRole('button', { name: /rotate callback token/i }));
+        await screen.findByRole('alertdialog');
+        await userEvent.click(screen.getByRole('button', { name: /^rotate token$/i }));
+
+        await waitFor(() => expect(registerC2b).toHaveBeenCalled());
+
+        // The rotation itself must be reported as a success, never folded
+        // into the registration failure's message.
+        expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/^Token rotated\.?$/i));
+        // The registration failure is its own, actionable error, and it
+        // must say the token already rotated, not "could not rotate".
+        const errorCalls = toast.error.mock.calls.map((c) => c[0]);
+        expect(errorCalls.some((m) => /rotated successfully/i.test(m))).toBe(true);
+        expect(errorCalls.some((m) => /^could not rotate the token\.?$/i.test(m))).toBe(false);
+        // The revealed panel still shows: the token really did change.
+        expect(await screen.findByText(/new token, shown once/i)).toBeInTheDocument();
+        // And the page state refreshes regardless of the registration outcome.
+        await waitFor(() => expect(getConfig).toHaveBeenCalledTimes(2));
     });
 });

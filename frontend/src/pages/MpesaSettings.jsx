@@ -61,7 +61,7 @@ export default function MpesaSettings() {
     const [rotateOpen, setRotateOpen] = useState(false);
     const [revealed, setRevealed] = useState(null); // rotate-token's once-only response
 
-    const testKeyRef = useRef(null);
+    const testKeyRef = useRef({ phone: null, key: null });
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -111,16 +111,22 @@ export default function MpesaSettings() {
 
     const runTestPush = async () => {
         if (!testPhone) return toast.error('Enter a phone number to send the test prompt to.');
-        if (!testKeyRef.current) testKeyRef.current = newIdempotencyKey();
+        // Reused only for a resubmit against the SAME phone number (a
+        // double click before the button disables, a dropped response
+        // retried automatically); clearing on success or failure would mint
+        // a fresh key for what might still be the same attempt and fire a
+        // second real prompt. A different phone number is a genuinely new
+        // attempt and gets a fresh key.
+        if (testKeyRef.current.phone !== testPhone) {
+            testKeyRef.current = { phone: testPhone, key: newIdempotencyKey() };
+        }
         setTesting(true);
         try {
-            await testStk({ phone_number: testPhone, idempotency_key: testKeyRef.current });
+            await testStk({ phone_number: testPhone, idempotency_key: testKeyRef.current.key });
             toast.success(`Test M-Pesa prompt sent to ${testPhone}.`);
-            testKeyRef.current = null; // this attempt is done; the next click is a new one
             load();
         } catch (err) {
             toast.error(err?.response?.data?.detail || 'Test prompt failed.');
-            testKeyRef.current = null;
             load();
         } finally { setTesting(false); }
     };
@@ -136,23 +142,74 @@ export default function MpesaSettings() {
     };
 
     const doRotate = async (alsoRegister) => {
+        // The two calls below are reported separately and never folded into
+        // one try/catch: rotation and registration are two different
+        // Safaricom-facing operations, and a rotation that SUCCEEDED must
+        // never be reported through the same failure message as a
+        // registration that failed afterwards. Getting this wrong once
+        // told an operator "Could not rotate the token" while the token had
+        // already rotated and every URL registered with Safaricom was dead,
+        // with the C2B-broken blocker below unable to see it either.
+        let result;
         try {
-            const result = await rotateToken();
-            setRevealed(result);
-            setRotateOpen(false);
-            if (alsoRegister) {
-                await registerC2b();
-                toast.success('Token rotated and C2B URLs re-registered.');
-            } else {
-                toast.success('Token rotated.');
-            }
-            load();
+            result = await rotateToken();
         } catch (err) {
             toast.error(err?.response?.data?.detail || 'Could not rotate the token.');
+            return;
         }
+        setRevealed(result);
+        setRotateOpen(false);
+        toast.success('Token rotated.');
+        if (alsoRegister) {
+            try {
+                await registerC2b();
+                toast.success('C2B URLs re-registered with Safaricom.');
+            } catch (err) {
+                toast.error(
+                    (err?.response?.data?.detail || 'Could not reach Safaricom.') +
+                    ' The token rotated successfully, but C2B URLs were NOT re-registered: ' +
+                    'walk-in payments will not reach MediFleet until you register them ' +
+                    'manually below.'
+                );
+            }
+        }
+        // Always refresh, rotation succeeded either way: the new
+        // callback_token_rotated_at, and whatever registerC2b did or did
+        // not manage to do, both need to be reflected on screen.
+        load();
     };
 
-    const brokenTills = readiness.filter((t) => t.c2b_urls_registered_at && !t.verification_ready);
+    // Merge readiness (c2b_urls_registered_at, verification_ready) into the
+    // callback-urls view (callback_token_rotated_at) by config_id: neither
+    // endpoint returns both, and the blocker below needs both to detect a
+    // registration that predates the token it was signed with.
+    const rotatedAtByConfig = new Map(callbackTills.map((t) => [t.config_id, t.callback_token_rotated_at]));
+    const tillsView = callbackTills.map((t) => {
+        const r = readiness.find((x) => x.config_id === t.config_id);
+        return {
+            ...t,
+            c2b_urls_registered_at: r?.c2b_urls_registered_at ?? null,
+            verification_ready: r?.verification_ready ?? null,
+        };
+    });
+
+    // A till is broken two distinct ways, both meaning "cannot verify a
+    // walk-in payment right now": no initiator credentials at all, or its
+    // C2B registration was made against a token that has since been
+    // rotated (the URLs on file with Safaricom still carry the DEAD
+    // token). Rotating touches neither verification_ready nor
+    // c2b_urls_registered_at by itself, so without the second check a
+    // partly-failed rotation (token rotated, re-registration failed) is
+    // invisible here even though walk-in traffic has already stopped.
+    const brokenTills = readiness.flatMap((t) => {
+        if (!t.c2b_urls_registered_at) return [];
+        if (!t.verification_ready) return [{ ...t, reason: 'no_credentials' }];
+        const rotatedAt = rotatedAtByConfig.get(t.config_id);
+        if (rotatedAt && new Date(t.c2b_urls_registered_at) < new Date(rotatedAt)) {
+            return [{ ...t, reason: 'stale_registration' }];
+        }
+        return [];
+    });
 
     return (
         <div className="space-y-6">
@@ -172,7 +229,7 @@ export default function MpesaSettings() {
                     <EnvironmentSection form={form} setForm={setForm} />
                     <CredentialsSection form={form} setForm={setForm} config={config} />
                     <CallbackUrlsSection
-                        tills={callbackTills}
+                        tills={tillsView}
                         onRegisterC2b={doRegisterC2b}
                         onOpenRotate={() => setRotateOpen(true)}
                     />
@@ -209,18 +266,31 @@ export default function MpesaSettings() {
 /* ─── C2B readiness blocker ──────────────────────────────────────────────── */
 
 function C2bBrokenBanner({ tills }) {
+    const noCreds = tills.filter((t) => t.reason === 'no_credentials');
+    const stale = tills.filter((t) => t.reason === 'stale_registration');
     return (
-        <div role="alert" className="bg-rose-50 dark:bg-rose-500/10 border-2 border-rose-300 dark:border-rose-500/40 rounded-xl p-5">
-            <h3 className="text-sm font-bold text-rose-900 dark:text-rose-300 mb-2 inline-flex items-center gap-2">
+        <div role="alert" className="bg-rose-50 dark:bg-rose-500/10 border-2 border-rose-300 dark:border-rose-500/40 rounded-xl p-5 space-y-2">
+            <h3 className="text-sm font-bold text-rose-900 dark:text-rose-300 mb-1 inline-flex items-center gap-2">
                 <AlertTriangle size={18} /> Walk-in payments cannot be verified
             </h3>
-            <p className="text-sm text-rose-900 dark:text-rose-200 leading-relaxed">
-                {tills.length === 1 ? 'This till has' : `${tills.length} tills have`} C2B registered
-                with Safaricom but no initiator credentials. A payment made directly to{' '}
-                {tills.map((t) => t.shortcode).join(', ')} will be taken from the patient and will
-                never verify or settle: it sits on the unmatched-receipt queue forever. Add the
-                initiator name and password under Credentials below, then save.
-            </p>
+            {noCreds.length > 0 && (
+                <p className="text-sm text-rose-900 dark:text-rose-200 leading-relaxed">
+                    {noCreds.length === 1 ? 'This till has' : `${noCreds.length} tills have`} C2B registered
+                    with Safaricom but no initiator credentials: {noCreds.map((t) => t.shortcode).join(', ')}.
+                    A payment made directly there will be taken from the patient and will never verify
+                    or settle: it sits on the unmatched-receipt queue forever. Add the initiator name
+                    and password under Credentials below, then save.
+                </p>
+            )}
+            {stale.length > 0 && (
+                <p className="text-sm text-rose-900 dark:text-rose-200 leading-relaxed">
+                    {stale.length === 1 ? 'This till is' : `${stale.length} tills are`} registered with
+                    Safaricom using a callback token that has since been rotated:{' '}
+                    {stale.map((t) => t.shortcode).join(', ')}. The URLs on file with Safaricom still
+                    carry the dead token, so Safaricom cannot reach MediFleet for a walk-in payment on
+                    them. Register C2B URLs with Safaricom again below.
+                </p>
+            )}
         </div>
     );
 }
@@ -354,16 +424,31 @@ function CallbackUrlsSection({ tills, onRegisterC2b, onOpenRotate }) {
                 <p className="text-xs text-ink-500 dark:text-ink-400">Save the shortcode above to generate callback URLs.</p>
             ) : (
                 <div className="space-y-4">
-                    {tills.map((t) => (
+                    {tills.map((t) => {
+                        // The comparison the design intends: a registration
+                        // timestamp older than the token's own last
+                        // rotation means the URLs on file with Safaricom
+                        // were signed with a token that no longer exists.
+                        const stale = !!t.callback_token_rotated_at && !!t.c2b_urls_registered_at
+                            && new Date(t.c2b_urls_registered_at) < new Date(t.callback_token_rotated_at);
+                        return (
                         <div key={t.config_id} className="rounded-lg border border-ink-100 dark:border-ink-800 p-3 space-y-1.5">
                             <div className="flex items-center justify-between text-xs">
                                 <span className="font-semibold text-ink-700 dark:text-ink-200">
                                     {t.shortcode}{t.department_id ? ` (department till)` : ' (hospital default)'}
                                 </span>
-                                <span className="text-ink-400 tnum">
-                                    Token last rotated: {t.callback_token_rotated_at
-                                        ? new Date(t.callback_token_rotated_at).toLocaleString()
-                                        : 'never'}
+                                <span className={`tnum text-right ${stale ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-ink-400'}`}>
+                                    <span className="block">
+                                        Token last rotated: {t.callback_token_rotated_at
+                                            ? new Date(t.callback_token_rotated_at).toLocaleString()
+                                            : 'never'}
+                                    </span>
+                                    <span className="block">
+                                        C2B registered: {t.c2b_urls_registered_at
+                                            ? new Date(t.c2b_urls_registered_at).toLocaleString()
+                                            : 'never'}
+                                        {stale ? ' (before the last rotation, re-register)' : ''}
+                                    </span>
                                 </span>
                             </div>
                             {t.error ? (
@@ -387,7 +472,8 @@ function CallbackUrlsSection({ tills, onRegisterC2b, onOpenRotate }) {
                                 ))
                             )}
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
@@ -437,10 +523,11 @@ function RotateConfirmDialog({ onCancel, onConfirm }) {
                     <AlertTriangle size={18} className="text-amber-600" /> Rotate the callback token?
                 </h3>
                 <p className="text-sm text-ink-600 dark:text-ink-300">
-                    Rotating invalidates every callback URL currently registered with Safaricom
-                    for this till: STK, C2B, and status URLs all stop working the moment this
-                    completes. Safaricom will not be able to reach MediFleet again until the
-                    C2B URLs are re-registered.
+                    This rotates the callback token for the hospital-wide default till only,
+                    never a department till. It invalidates every callback URL currently
+                    registered with Safaricom for that till: STK, C2B, and status URLs all stop
+                    working the moment this completes. Safaricom will not be able to reach
+                    MediFleet again until the C2B URLs are re-registered.
                 </p>
                 <label className="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-200">
                     <input type="checkbox" checked={alsoRegister} onChange={(e) => setAlsoRegister(e.target.checked)} />
