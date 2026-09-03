@@ -4,8 +4,8 @@ import { Undo2, Plus, X, CheckCircle2 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import { useAuth } from '../../context/AuthContext';
 import {
-    listRefunds, requestRefund, approveRefund, getRefundableAmount, getConfig,
-    formatKes,
+    listRefunds, requestRefund, approveRefund, retryRefundDispatch, getRefundableAmount,
+    getConfig, formatKes,
 } from '../../api/mpesa';
 
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -34,6 +34,7 @@ export default function Refunds() {
     const [loading, setLoading] = useState(true);
     const [requestOpen, setRequestOpen] = useState(false);
     const [approvingId, setApprovingId] = useState(null);
+    const [retryingId, setRetryingId] = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -57,6 +58,22 @@ export default function Refunds() {
         } catch (err) {
             toast.error(err?.response?.data?.detail || 'Could not approve this refund.');
         } finally { setApprovingId(null); }
+    };
+
+    // Approved-but-never-dispatched (the attempt never reached Safaricom at
+    // all, a network failure, not a rejection) is the one state
+    // retry-dispatch applies to; the server itself refuses a Processing
+    // refund here (see mpesa_refunds.py's retry_dispatch_refund docstring),
+    // so this button only ever appears where retrying is safe.
+    const doRetryDispatch = async (refundId) => {
+        setRetryingId(refundId);
+        try {
+            await retryRefundDispatch(refundId);
+            toast.success('Refund resubmitted to M-Pesa.');
+            load();
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || 'Could not resubmit this refund.');
+        } finally { setRetryingId(null); }
     };
 
     // Server-enforced rule: a requester cannot approve their own refund
@@ -125,6 +142,12 @@ export default function Refunds() {
                                             <span className="text-2xs text-ink-400" title="Above the dual-approval threshold: needs a different approver">
                                                 Awaiting a second approver
                                             </span>
+                                        ) : r.status === 'Approved' ? (
+                                            <button type="button" onClick={() => doRetryDispatch(r.id)} disabled={retryingId === r.id}
+                                                    className="btn-secondary btn-xs"
+                                                    title="Approved but never reached Safaricom (a network failure, not a rejection); resend the same instruction.">
+                                                {retryingId === r.id ? 'Resubmitting…' : 'Retry dispatch'}
+                                            </button>
                                         ) : null}
                                     </td>
                                 </tr>

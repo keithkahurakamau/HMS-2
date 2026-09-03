@@ -8,6 +8,7 @@ vi.mock('../../api/mpesa', () => ({
     listRefunds: vi.fn(),
     requestRefund: vi.fn(),
     approveRefund: vi.fn(),
+    retryRefundDispatch: vi.fn(),
     getRefundableAmount: vi.fn(),
     getConfig: vi.fn(),
     formatKes: (v) => `KES ${v}`,
@@ -23,7 +24,7 @@ vi.mock('../../context/AuthContext', async (orig) => {
 });
 
 import {
-    listRefunds, requestRefund, approveRefund, getRefundableAmount, getConfig,
+    listRefunds, requestRefund, approveRefund, retryRefundDispatch, getRefundableAmount, getConfig,
 } from '../../api/mpesa';
 import Refunds from './Refunds';
 
@@ -112,5 +113,28 @@ describe('Refunds', () => {
         await waitFor(() => expect(requestRefund).toHaveBeenCalledWith({
             source_transaction_id: 42, amount: '500', reason: 'Patient overcharged',
         }));
+    });
+
+    it('offers retry-dispatch for a refund stuck at Approved, and resubmits it', async () => {
+        const stuck = { ...REFUND_BELOW_THRESHOLD, id: 9, status: 'Approved' };
+        listRefunds.mockResolvedValue([stuck]);
+        retryRefundDispatch.mockResolvedValue({ ...stuck, status: 'Processing' });
+        renderWithProviders(<Refunds />);
+        await screen.findByText('Duplicate charge');
+
+        const retryButton = screen.getByRole('button', { name: /retry dispatch/i });
+        expect(retryButton).toBeInTheDocument();
+        await userEvent.click(retryButton);
+        await waitFor(() => expect(retryRefundDispatch).toHaveBeenCalledWith(9));
+    });
+
+    it('offers neither approve nor retry-dispatch for a refund already Processing or Completed', async () => {
+        listRefunds.mockResolvedValue([
+            { ...REFUND_BELOW_THRESHOLD, id: 10, status: 'Processing' },
+        ]);
+        renderWithProviders(<Refunds />);
+        await screen.findByText('Duplicate charge');
+        expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /retry dispatch/i })).not.toBeInTheDocument();
     });
 });
