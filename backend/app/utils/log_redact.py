@@ -1,6 +1,6 @@
 """PII/secret redaction helpers for structured logging.
 
-CACHE-003: callback handlers previously logged Pay Hero / Daraja payloads
+CACHE-003: callback handlers previously logged Daraja payloads
 verbatim (full MSISDN, receipt no., amount, BillRefNumber). On Render those
 go to the shared log stream and any operator with log-read access can
 harvest patient phone numbers and payment receipts. Always pass payloads
@@ -27,7 +27,6 @@ _SENSITIVE_KEYS = {
     "consumer_key_encrypted", "consumer_secret_encrypted", "passkey_encrypted",
     "access_token", "refresh_token", "superadmin_token",
     "authorization", "x-csrf-token",
-    "payhero_username", "payhero_password", "payhero_webhook_secret",
     # B2C (app/services/daraja/b2c.py) is the first Daraja flow to build a
     # payload containing a SecurityCredential, the RSA-encrypted initiator
     # password Safaricom requires on every B2C request. Redacted here even

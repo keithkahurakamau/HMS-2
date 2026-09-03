@@ -17,11 +17,11 @@ This module replays the source tables into the ledger:
     pre-cutover history is included.
   * **Double-count safe.** A single ``payments`` row can map to different
     source keys depending on how it was created (cheque clearance keys on
-    ``cheque_id``, Pay Hero keys on the txn id, deposit applications key on the
+    ``cheque_id``, M-Pesa keys on the txn id, deposit applications key on the
     application's payment). The ``payments`` pass therefore *skips* rows owned
     by another pass, and each entity table is replayed under its own key.
   * **Non-fatal per source.** A missing optional table (a tenant without the
-    Pay Hero or cheque module) is caught so the rest of the backfill still runs.
+    M-Pesa or cheque module) is caught so the rest of the backfill still runs.
 
 The orchestrator returns a per-source ``{posted, skipped, errors}`` summary.
 """
@@ -68,26 +68,28 @@ def _bump(stats: dict, entry) -> None:
 
 # ─── Per-source passes ───────────────────────────────────────────────────────
 
-def _payhero_receipt_refs(db: Session) -> set:
-    """Transaction references of Pay Hero receipts. Payments carrying one of
-    these were posted live under the Pay Hero txn id, so the payments pass must
-    not re-post them under their payment_id."""
+def _mpesa_receipt_refs(db: Session) -> set:
+    """Transaction references of Daraja M-Pesa receipts (``mpesa_transactions``,
+    the table Pay Hero's ``payhero_transactions`` was renamed back to when Pay
+    Hero was removed in Task 12). Payments carrying one of these were posted
+    live under the M-Pesa txn id, so the payments pass must not re-post them
+    under their payment_id."""
     try:
-        from app.models.payhero import PayHeroTransaction
-        rows = db.query(PayHeroTransaction.receipt_number).filter(
-            PayHeroTransaction.receipt_number.isnot(None)
+        from app.models.mpesa import MpesaTransaction
+        rows = db.query(MpesaTransaction.receipt_number).filter(
+            MpesaTransaction.receipt_number.isnot(None)
         ).all()
         return {r[0] for r in rows if r[0]}
-    except Exception:  # noqa: BLE001 — tenant may not have the Pay Hero module
+    except Exception:  # noqa: BLE001 (tenant may not have the M-Pesa module)
         return set()
 
 
 def backfill_payments(db: Session, *, user_id: Optional[int] = None) -> dict:
     """``payments`` table → the payment_id-keyed postings (direct billing &
-    pharmacy OTC receipts, plus deposit applications). Cheque- and Pay Hero-
+    pharmacy OTC receipts, plus deposit applications). Cheque- and M-Pesa-
     originated payments are skipped; their own passes own those keys."""
     stats = _tally()
-    payhero_refs = _payhero_receipt_refs(db)
+    mpesa_refs = _mpesa_receipt_refs(db)
     for p in db.query(Payment).all():
         ref = p.transaction_reference or ""
         method = p.payment_method or ""
@@ -95,8 +97,8 @@ def backfill_payments(db: Session, *, user_id: Optional[int] = None) -> dict:
         if method.lower() == "cheque" or ref.startswith("CHQ-"):
             stats["skipped"] += 1
             continue
-        # Owned by the Pay Hero pass (keyed on the txn id).
-        if ref and ref in payhero_refs:
+        # Owned by the M-Pesa pass (keyed on the txn id).
+        if ref and ref in mpesa_refs:
             stats["skipped"] += 1
             continue
         # Deposit application — distinct source key, still keyed on payment_id.
@@ -175,21 +177,27 @@ def backfill_dispenses(db: Session, *, user_id: Optional[int] = None) -> dict:
     return stats
 
 
-def backfill_payhero(db: Session, *, user_id: Optional[int] = None) -> dict:
-    """Matched Pay Hero receipts → ``billing.payment.mpesa`` (keyed on txn id)."""
+def backfill_mpesa(db: Session, *, user_id: Optional[int] = None) -> dict:
+    """Matched Daraja M-Pesa receipts → ``billing.payment.mpesa`` (keyed on
+    txn id, exactly the way the live settlement path in
+    ``daraja/settlement.py`` keys it). Named ``backfill_mpesa`` (was
+    ``backfill_payhero`` before Pay Hero was removed in Task 12); the
+    ``payhero_transactions`` table this used to read was itself renamed back
+    to ``mpesa_transactions`` by the Daraja migration, so there is nothing
+    left under the old name to backfill from."""
     stats = _tally()
     try:
-        from app.models.payhero import PayHeroTransaction
+        from app.models.mpesa import MpesaTransaction
     except Exception:  # noqa: BLE001
         return stats
-    rows = db.query(PayHeroTransaction).filter(
-        PayHeroTransaction.invoice_id.isnot(None)
+    rows = db.query(MpesaTransaction).filter(
+        MpesaTransaction.invoice_id.isnot(None)
     ).all()
     for t in rows:
         entry = post_from_event(
             db, source_key="billing.payment.mpesa", source_id=t.id,
             amount=t.amount, on_date=_as_date(getattr(t, "transaction_date", None)),
-            memo=f"Pay Hero receipt {t.receipt_number or getattr(t, 'external_reference', '')}",
+            memo=f"M-Pesa receipt {t.receipt_number or getattr(t, 'external_reference', '')}",
             reference=f"INV-{t.invoice_id}", user_id=user_id, ignore_go_live=True,
         )
         _bump(stats, entry)
@@ -260,7 +268,7 @@ _PASSES = {
     "billing_payments": backfill_payments,
     "invoice_charges": backfill_invoice_charges,
     "pharmacy_dispenses": backfill_dispenses,
-    "payhero_receipts": backfill_payhero,
+    "mpesa_receipts": backfill_mpesa,
     "cheques": backfill_cheques,
     "insurance_claims": backfill_claims,
     "deposits": backfill_deposits,

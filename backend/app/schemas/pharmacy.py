@@ -77,17 +77,10 @@ class CashPaymentResponse(BaseModel):
     invoice_status: str
 
 
-class PayHeroInitResponse(BaseModel):
-    status: Literal["stk_push_sent"]
-    external_reference: str
-    payhero_reference: Optional[str] = None
-    transaction_id: int
-
-
 class MpesaInitResponse(BaseModel):
     """Daraja STK push acknowledgement for a pharmacy dispense payment.
-    Replaces PayHeroInitResponse on this route now that dispense payments
-    go through the tenant's own Daraja till, not the Pay Hero aggregator."""
+    Replaces the removed Pay Hero aggregator's init response on this route
+    now that dispense payments go through the tenant's own Daraja till."""
     status: Literal["stk_push_sent"]
     external_reference: str
     checkout_request_id: Optional[str] = None

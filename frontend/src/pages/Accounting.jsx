@@ -1583,14 +1583,13 @@ function DataCard({ loading, empty, emptyMsg, children }) {
 
 /* ─── Transaction Log ────────────────────────────────────────────────────── */
 // A read-only, system-wide register over every posted journal entry. Because
-// billing, pharmacy, Pay Hero, cheques and insurance all auto-post journals,
+// billing, pharmacy, M-Pesa, cheques and insurance all auto-post journals,
 // this is the single place to see every monetary movement in the system.
 
 const SOURCE_OPTIONS = [
     { value: '',          label: 'All sources' },
     { value: 'billing',   label: 'Billing' },
     { value: 'pharmacy',  label: 'Pharmacy' },
-    { value: 'payhero',   label: 'Pay Hero' },
     { value: 'insurance', label: 'Insurance' },
     { value: 'cheque',    label: 'Cheque' },
     { value: 'debtors',   label: 'Debtors' },

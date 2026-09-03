@@ -110,6 +110,11 @@ def _serialize_tenant(t: Tenant, *, include_flags: bool = True) -> Dict[str, Any
         base["feature_flags"] = _decode_json(t.feature_flags, {})
         base["plan_limits"] = _decode_json(t.plan_limits, {})
         base["notes"] = t.notes
+        # Subscription-billing contact (platform Daraja rail): the MSISDN
+        # charged for this tenant's subscription. Superadmin-only, same
+        # gating as feature_flags/notes above.
+        base["billing_contact_msisdn"] = t.billing_contact_msisdn
+        base["billing_contact_name"] = t.billing_contact_name
     return base
 
 
@@ -370,6 +375,12 @@ class TenantUpdate(BaseModel):
     feature_flags: Optional[Dict[str, Any]] = None
     plan_limits: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
+    # Subscription-billing contact (platform Daraja rail): the MSISDN the
+    # superadmin console charges for this tenant's subscription. Lives on
+    # the generic tenant record, not a payments-specific route, the same way
+    # the columns themselves are plain `tenants` table columns.
+    billing_contact_msisdn: Optional[str] = None
+    billing_contact_name: Optional[str] = None
 
 
 @router.patch("/hospitals/{tenant_id}", dependencies=[Depends(require_superadmin)])

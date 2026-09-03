@@ -439,7 +439,7 @@ describe('Pharmacy: payment flow', () => {
                     data: {
                         status: 'stk_push_sent',
                         external_reference: 'INV-999-abc',
-                        payhero_reference: 'PH-77',
+                        checkout_request_id: 'ws_CO_77',
                         transaction_id: 77,
                         invoice_status: 'Pending M-Pesa',
                     },
@@ -558,7 +558,7 @@ describe('Pharmacy: payment flow', () => {
                     data: {
                         status: 'stk_push_sent',
                         external_reference: 'INV-800-xyz',
-                        payhero_reference: 'PH-7700',
+                        checkout_request_id: 'ws_CO_7700',
                         transaction_id: 7700,
                         invoice_status: 'Pending M-Pesa',
                     },

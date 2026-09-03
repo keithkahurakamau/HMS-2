@@ -477,6 +477,25 @@ def test_development_with_empty_allowlist_is_permissive(monkeypatch):
     assert _run(dc.verify_daraja_source(request)) == b'{"ok": 1}'
 
 
+def test_xff_trusted_when_peer_is_private_and_no_proxy_list_configured(monkeypatch):
+    """Ported from the deleted Pay Hero IP tests
+    (tests/accounting/test_payhero_webhook_ip.py): with an empty
+    DARAJA_TRUSTED_PROXIES, _peer_is_trusted_proxy falls back to a
+    private/loopback/link-local heuristic. Behind a platform LB the
+    immediate peer is private, so its claimed X-Forwarded-For is trusted."""
+    monkeypatch.setattr(dc, "_TRUSTED_PROXY_NETS", [])
+    ip = dc._client_ip(_FakeRequest(peer="10.0.0.5", xff="41.90.1.2, 10.0.0.5"))
+    assert ip == ipaddress.ip_address("41.90.1.2")
+
+
+def test_no_xff_header_uses_the_peer_directly(monkeypatch):
+    """Ported from the deleted Pay Hero IP tests. No X-Forwarded-For at all
+    (the common case for a direct connection) must resolve to the peer."""
+    monkeypatch.setattr(dc, "_TRUSTED_PROXY_NETS", [])
+    ip = dc._client_ip(_FakeRequest(peer="10.0.0.5"))
+    assert ip == ipaddress.ip_address("10.0.0.5")
+
+
 def test_body_is_not_read_before_the_ip_check_rejects(monkeypatch):
     """The body used to be read first (Pay Hero needed the bytes for its
     HMAC check). Daraja has no signature, so reading first only lets a

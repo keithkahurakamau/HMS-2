@@ -524,3 +524,43 @@ def test_settle_invoice_match_raises_settlement_exceeds_balance_directly(db):
 # tests above (amount-mismatch quarantine, replay no-op) were run against a
 # deliberately broken settlement.py (cross-check / replay guard commented
 # out) and failed, then passed again once restored.
+
+
+# ─── _parse_callback_amount (audit M-3, ported from the deleted Pay Hero
+#     guard tests, tests/accounting/test_payhero_callback_guards.py) ────────
+#
+# Pure-function coverage for the helper apply_stk_callback's cross-check is
+# built on: a present-but-garbage callback amount must fail loud, never
+# silently floor to something that could dodge the mismatch guard above.
+#
+# One behaviour differs deliberately from the Pay Hero version this replaces:
+# Pay Hero treated a blank/missing amount as Decimal(0); Daraja's STK
+# CallbackMetadata always carries an Amount item, so a missing one is treated
+# as a hostile or malformed callback and raises, exactly like a non-numeric
+# or negative one, per this function's own docstring.
+
+def test_missing_amount_raises_not_zero():
+    from app.services.daraja.settlement import _parse_callback_amount
+    with pytest.raises(ValueError):
+        _parse_callback_amount(None)
+
+
+def test_numeric_amounts_parse():
+    from app.services.daraja.settlement import _parse_callback_amount
+    assert _parse_callback_amount("100") == Decimal("100")
+    assert _parse_callback_amount(100) == Decimal("100")
+    assert _parse_callback_amount("99.50") == Decimal("99.50")
+
+
+@pytest.mark.parametrize("bad", ["abc", "1,000", "10x", "NaN", "Infinity"])
+def test_non_numeric_amount_raises(bad):
+    from app.services.daraja.settlement import _parse_callback_amount
+    # A present-but-garbage amount must NOT floor to zero and silently settle.
+    with pytest.raises(ValueError):
+        _parse_callback_amount(bad)
+
+
+def test_negative_amount_raises():
+    from app.services.daraja.settlement import _parse_callback_amount
+    with pytest.raises(ValueError):
+        _parse_callback_amount("-50")

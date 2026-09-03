@@ -61,7 +61,6 @@ const TenantsManager = lazy(() => import('./pages/superadmin/TenantsManager'));
 const PlatformBilling = lazy(() => import('./pages/superadmin/PlatformBilling'));
 const PlatformSubscriptions = lazy(() => import('./pages/superadmin/PlatformSubscriptions'));
 const Receivables = lazy(() => import('./pages/superadmin/Receivables'));
-const PaymentsManager = lazy(() => import('./pages/superadmin/PaymentsManager'));
 const PlatformSettings = lazy(() => import('./pages/superadmin/PlatformSettings'));
 const SuperAdminPatients = lazy(() => import('./pages/superadmin/SuperAdminPatients'));
 const UsersManager = lazy(() => import('./pages/superadmin/UsersManager'));
@@ -199,7 +198,6 @@ export default function App() {
             <Route path="billing" element={<PlatformBilling />} />
             <Route path="receivables" element={<Receivables />} />
             <Route path="subscriptions" element={<PlatformSubscriptions />} />
-            <Route path="payments" element={<PaymentsManager />} />
             <Route path="settings" element={<PlatformSettings />} />
             <Route path="*" element={<SuperAdminDashboard />} />
           </Route>

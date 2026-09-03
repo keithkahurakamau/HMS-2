@@ -6,7 +6,7 @@ class PaymentRequest(BaseModel):
     idempotency_key: str
     invoice_id: int
     amount: float
-    payment_method: str  # "Cash" or "Card"; M-Pesa flows via /api/payments/payhero/stk-push
+    payment_method: str  # "Cash" or "Card"; M-Pesa flows via /api/payments/mpesa/stk-push
 
 class InvoiceItemResponse(BaseModel):
     id: int

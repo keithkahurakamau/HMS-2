@@ -6,6 +6,12 @@ unit tests rather than route-level ones. mpesa defaults to enabled
 explicit-False direction easy to get wrong: forgetting it means a tenant
 that turned M-Pesa off via the old payhero key sees mpesa silently
 re-appear anyway, on nothing more than the module's own default.
+
+Pay Hero itself (the "payhero" ModuleDef) was removed in the Daraja
+migration's Task 12, so a stored ``payhero`` flag is no longer a real
+module and never appears in the enabled set on its own; these tests now
+check only that it still forward-fills ``mpesa``, not that it enables
+itself.
 """
 from __future__ import annotations
 
@@ -20,7 +26,10 @@ def _flags(**kwargs) -> str:
 
 def test_payhero_true_forward_fills_mpesa():
     enabled = resolve_enabled_modules(_flags(payhero=True))
-    assert "payhero" in enabled
+    # "payhero" is no longer a real ModuleDef (removed in Task 12), so it
+    # never appears in the enabled set itself; only the forward-fill to
+    # "mpesa" is the behaviour under test.
+    assert "payhero" not in enabled
     assert "mpesa" in enabled
 
 

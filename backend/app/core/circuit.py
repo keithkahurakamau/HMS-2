@@ -86,5 +86,4 @@ class CircuitBreaker:
 
 # Shared breakers — instantiated once at import time so all callers see the
 # same state across the process.
-payhero_breaker = CircuitBreaker(name="payhero", failure_threshold=5, recovery_seconds=30.0)
 daraja_breaker = CircuitBreaker(name="daraja", failure_threshold=5, recovery_seconds=30.0)

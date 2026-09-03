@@ -52,7 +52,7 @@ from app.models import medical_history as _medical_history  # noqa: F401
 from app.models import radiology as _radiology  # noqa: F401
 from app.models import auth_tokens as _auth_tokens  # noqa: F401
 from app.models import idempotency as _idempotency  # noqa: F401
-from app.models import payhero as _payhero  # noqa: F401
+from app.models import mpesa as _mpesa  # noqa: F401
 from app.models import breach as _breach  # noqa: F401
 from app.models import notification as _notification  # noqa: F401
 from app.models import messaging as _messaging  # noqa: F401
@@ -226,8 +226,13 @@ PERMISSION_CATALOG: tuple[tuple[str, str], ...] = (
     ("billing:manage",         "Create invoices, take payments, issue refunds"),
     ("cheques:read",           "View the cheque register"),
     ("cheques:manage",         "Receipt and reconcile cheques"),
-    ("mpesa:read",             "View Pay Hero (M-Pesa rail) transaction log and reconciliation"),
-    ("payhero:manage",         "Configure the Pay Hero payment gateway"),
+    ("mpesa:read",             "View the Daraja (M-Pesa rail) transaction log and reconciliation"),
+    # Codename kept as "payhero:manage" (not renamed to "daraja:manage") on
+    # purpose: RequirePermission still accepts it as one of the any-of
+    # codenames during the Pay Hero removal transition, so stored role
+    # grants and cached JWTs keep working until the permission data
+    # migration rolls over. See core/dependencies.py's RequirePermission.
+    ("payhero:manage",         "Configure the Daraja M-Pesa payment gateway"),
     # Deliberately separate from billing:manage, and granted only to Admin
     # below: being able to TAKE a payment must not imply being able to SEND
     # one back. See docs/superpowers/specs/2026-08-29-daraja-migration-design.md,

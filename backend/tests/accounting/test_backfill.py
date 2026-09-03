@@ -12,7 +12,7 @@ These tests cover the load-bearing behaviour:
   * the whole thing is **idempotent** (re-running never double-posts);
   * it is **go-live blind** (pre-cutover rows still post);
   * the **double-count guards** hold — a single ``payments`` row owned by the
-    cheque / Pay Hero / deposit passes is not re-posted under its payment id.
+    cheque / M-Pesa / deposit passes is not re-posted under its payment id.
 """
 from __future__ import annotations
 
@@ -34,8 +34,8 @@ from app.models.inventory import (
     Location,
     StockBatch,
 )
+from app.models.mpesa import MpesaTransaction
 from app.models.patient import Patient
-from app.models.payhero import PayHeroTransaction
 from app.services.accounting_backfill import backfill_all, backfill_payments
 
 
@@ -170,12 +170,12 @@ def test_deposit_application_payment_routes_to_deposit_applied(db):
     assert _entries(db, "billing.payment.cash") == []
 
 
-def test_payhero_payment_keyed_on_txn_not_payment_id(db):
-    """When a payment carries a Pay Hero receipt number, the Pay Hero pass
-    owns it (keyed on the txn id). Exactly one mpesa entry must exist, keyed
-    on the transaction — not a second one keyed on the payment."""
+def test_mpesa_payment_keyed_on_txn_not_payment_id(db):
+    """When a payment carries an M-Pesa receipt number, the M-Pesa pass owns
+    it (keyed on the txn id). Exactly one mpesa entry must exist, keyed on
+    the transaction, not a second one keyed on the payment."""
     inv = _invoice(db)
-    txn = PayHeroTransaction(
+    txn = MpesaTransaction(
         invoice_id=inv.invoice_id,
         phone_number="254700000000",
         amount=Decimal("950"),

@@ -160,10 +160,9 @@ def db(_engine) -> Iterator[Session]:
     the entry to), the failed NOT NULL insert on acc_journal_entries.created_by
     leaves the SQLAlchemy session in a PendingRollbackError state even after
     its own SAVEPOINT rollback, and the caller's next commit raises. That is
-    a pre-existing gap in shared accounting code (services/payhero_service.py's
-    settle_invoice_match calls post_from_event the exact same way and would
-    hit the same wall), not something introduced or fixed here; see the
-    Task 5 report. Most tests below exercise the safe, common state instead
+    a pre-existing gap in shared accounting code, not something introduced or
+    fixed here; see the Task 5 report. Most tests below exercise the safe,
+    common state instead
     (no mapping configured for this source_key), matching most tenants who
     have not wired billing.payment.mpesa into their Chart of Accounts yet.
     """

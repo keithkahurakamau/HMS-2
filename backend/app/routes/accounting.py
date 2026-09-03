@@ -62,7 +62,6 @@ _SOURCE_LABELS = {
     "pharmacy": "Pharmacy",
     "cheque": "Cheque",
     "cheques": "Cheque",
-    "payhero": "Pay Hero",
     "bank": "Bank",
     "debtor": "Debtors",
     "debtors": "Debtors",
@@ -392,7 +391,7 @@ def transaction_log(
     current_user: dict = Depends(get_current_user),
     source: Optional[str] = Query(
         None,
-        description="Source group head, e.g. 'billing', 'pharmacy', 'payhero'. "
+        description="Source group head, e.g. 'billing', 'pharmacy', 'cheques'. "
                     "Use 'manual' for hand-keyed entries (no source).",
     ),
     status: Optional[str] = Query(None, description="draft | posted | reversed"),

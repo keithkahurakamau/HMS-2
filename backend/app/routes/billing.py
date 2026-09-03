@@ -379,16 +379,18 @@ def get_payment_transactions(db: Session = Depends(get_db), limit: int = Query(2
 
 @router.get("/mpesa-transactions", dependencies=[Depends(RequirePermission("billing:read"))])
 def get_billing_mpesa_transactions(db: Session = Depends(get_db)):
-    """Returns Pay Hero (M-Pesa rail) transactions for cashiers to verify receipts.
+    """Returns Daraja (M-Pesa rail) transactions for cashiers to verify receipts.
 
     Route path keeps the legacy ``/mpesa-transactions`` name for frontend
-    compatibility; the rail is Pay Hero. AUTH-002 hardened access to
-    ``billing:read`` (Doctor / Pharmacist / Receptionist / Accountant).
+    compatibility. Pay Hero, the aggregator this endpoint originally queried,
+    was removed in the Daraja migration's Task 12; the rail is now the direct
+    Safaricom Daraja integration. AUTH-002 hardened access to ``billing:read``
+    (Doctor / Pharmacist / Receptionist / Accountant).
     """
-    from app.models.payhero import PayHeroTransaction
+    from app.models.mpesa import MpesaTransaction
     transactions = (
-        db.query(PayHeroTransaction)
-        .order_by(PayHeroTransaction.transaction_date.desc())
+        db.query(MpesaTransaction)
+        .order_by(MpesaTransaction.transaction_date.desc())
         .limit(100)
         .all()
     )

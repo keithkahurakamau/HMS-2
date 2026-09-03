@@ -61,7 +61,7 @@ from app.config.database import Base, DATABASE_URL  # noqa: E402,F401
 from app.models import (  # noqa: E402,F401
     accounting, audit, auth_tokens, billing, breach, calendar, cheque, clinical,
     clinical_extras, clinical_files, dialysis, email_events, idempotency, inventory, laboratory, master, maternity as _maternity,
-    medical_history, messaging, mpesa, notification, patient, payhero, radiology, referral,
+    medical_history, messaging, mpesa, notification, patient, radiology, referral,
     settings as _settings, support, theatre, user, wards,
 )
 
@@ -206,7 +206,10 @@ MASTER_DB_PATCHES: list[str] = [
     # These tables + the tenants billing columns live in the MASTER DB. The
     # alembic revision only runs against tenant DBs, so without these explicit
     # master patches the platform billing tables would never be created in
-    # production. Every statement is idempotent.
+    # production. Every statement is idempotent. Pay Hero code itself was
+    # removed in the Daraja migration's Task 12; these tables are kept
+    # (dropping live tables is a separate, irreversible operator decision,
+    # not made here).
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS billing_contact_msisdn VARCHAR(20);",
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS billing_contact_name VARCHAR(120);",
     """

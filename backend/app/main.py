@@ -44,10 +44,6 @@ import app.routes.public as public_module
 import app.routes.mpesa_refunds as mpesa_refunds_module
 import app.routes.mpesa_payment as mpesa_payment_module
 import app.routes.mpesa_admin as mpesa_admin_module
-import app.routes.payhero_admin as payhero_admin_module
-import app.routes.payhero_payment as payhero_payment_module
-import app.routes.payhero_superadmin as payhero_superadmin_module
-import app.routes.platform_payhero as platform_payhero_module
 import app.routes.mpesa_superadmin as mpesa_superadmin_module
 import app.routes.platform_mpesa as platform_mpesa_module
 import app.routes.receivables as receivables_module
@@ -298,13 +294,6 @@ async def security_headers_middleware(request: Request, call_next):
 #   - External webhooks (M-Pesa callbacks) that can't possibly carry a CSRF
 #     header because they're called by a payment provider's servers, not a
 #     browser.
-#       * /api/payments/payhero/callback: Pay Hero signs every callback with
-#         an HMAC we verify (see core/payhero_webhook.verify_payhero); the
-#         signature is the real gate here, session/CSRF adds nothing.
-#         TODO(daraja migration, pay hero removal task): delete this entry
-#         and this bullet once the Pay Hero routes themselves are removed.
-#         A CSRF exemption for a route that no longer exists is a silent
-#         hole waiting for the path to be reused by something else.
 #       * The six Daraja callback paths below: direct Safaricom integration.
 #         Daraja does NOT sign its callbacks, so there is no signature to
 #         check and a comment claiming otherwise would be actively
@@ -314,22 +303,17 @@ async def security_headers_middleware(request: Request, call_next):
 #         closed in production when unconfigured, and a settlement
 #         cross-check that never trusts a callback's claimed amount (see
 #         core/daraja_callback.py). Each path is listed individually and
-#         precisely, the same way the payhero entry above is: the Pay Hero
-#         precedent is deliberately NOT "/api/payments/payhero" (which would
-#         also cover /api/payments/payhero/stk-push, a browser-initiated,
-#         permission-gated POST that needs its session's CSRF token). A
-#         broad "/api/payments/mpesa/" prefix would make the same mistake
-#         for stk-push and any future config/admin route under this prefix,
-#         and auth on those routes is HttpOnly cookies with SameSite=None,
-#         so cross-site requests DO carry credentials and CSRF is
-#         load-bearing there.
+#         precisely, never as a broad "/api/payments/mpesa/" prefix, which
+#         would also cover stk-push and any future config/admin route under
+#         this prefix, and auth on those routes is HttpOnly cookies with
+#         SameSite=None, so cross-site requests DO carry credentials and
+#         CSRF is load-bearing there.
 # Everything else — including the superadmin /hospitals admin surface, which
 # uses Bearer auth but still benefits from CSRF as defence-in-depth — must
 # present a matching token.
 _CSRF_EXEMPT_PATHS = (
     "/api/auth/login",
     "/api/public/superadmin/login",
-    "/api/payments/payhero/callback",
     # Daraja callback paths only, never the bare "/api/payments/mpesa/"
     # prefix (see the comment above). Trailing slash on each so a route
     # under a similar-looking but different name, e.g. a future
@@ -420,10 +404,6 @@ app.include_router(public_module.router)
 app.include_router(mpesa_refunds_module.router)  # Daraja migration Task 7: B2C refunds
 app.include_router(mpesa_payment_module.router)  # Daraja migration Task 9: STK push + all callbacks
 app.include_router(mpesa_admin_module.router)  # Daraja migration Task 9: per-tenant Daraja config
-app.include_router(payhero_admin_module.router)  # PAY-001: per-tenant Pay Hero config
-app.include_router(payhero_payment_module.router)  # PAY-001: Pay Hero aggregator
-app.include_router(payhero_superadmin_module.router)  # operator-only Pay Hero provisioning
-app.include_router(platform_payhero_module.router)  # superadmin subscription billing (platform rail)
 app.include_router(mpesa_superadmin_module.router)  # Daraja migration Task 10: platform Daraja config
 app.include_router(platform_mpesa_module.router)  # Daraja migration Task 10: platform Daraja charge + transactions
 app.include_router(receivables_module.router)  # superadmin receivables ledger (ageing, payments, dunning controls)
