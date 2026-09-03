@@ -9,13 +9,13 @@ from app.config.database import get_db
 from app.core.idempotency import idempotent_guard
 from app.models.inventory import InventoryItem, StockBatch, DispenseLog, Location
 from app.models.billing import Invoice, InvoiceItem, Payment
-from app.models.payhero import PayHeroTransaction
+from app.models.mpesa import MpesaTransaction
 from app.schemas.pharmacy import (
     CashPaymentResponse,
     DispensePaymentRequest,
     DispenseRequest,
     DispenseResponse,
-    PayHeroInitResponse,
+    MpesaInitResponse,
 )
 from app.core.dependencies import get_current_user, RequirePermission
 from app.services.accounting_posting import (
@@ -23,7 +23,7 @@ from app.services.accounting_posting import (
     post_dispense_pair,
     post_from_event,
 )
-from app.services.payhero_service import initiate_stk_push
+from app.services.daraja.stk import initiate_stk_push
 from app.utils.audit import log_audit
 
 logger = logging.getLogger(__name__)
@@ -200,7 +200,7 @@ def _resolve_dispense_invoice(db: Session, dispense_id: int) -> tuple[DispenseLo
 
 @router.post(
     "/dispense/{dispense_id}/pay",
-    response_model=Union[CashPaymentResponse, PayHeroInitResponse],
+    response_model=Union[CashPaymentResponse, MpesaInitResponse],
     dependencies=[Depends(RequirePermission("pharmacy:manage"))],
 )
 def collect_dispense_payment(
@@ -218,11 +218,15 @@ def collect_dispense_payment(
             billing.payment.bank (cards settle into the bank account
             same as bank transfers). transaction_reference holds the
             card terminal auth code if supplied.
-    mpesa — initiate a Pay Hero STK push tied to (dispense_id, invoice_id).
-            "mpesa" remains the customer-facing label because that is
-            what the patient sees on their phone; the rail is Pay Hero.
-            The actual ledger posting happens in the Pay Hero callback
-            when the customer confirms the prompt.
+    mpesa — initiate an STK push on the hospital's own Daraja till, tied to
+            (dispense_id, invoice_id). Both ids are forwarded, so the SAME
+            one-Pending-per-invoice reservation the Billing desk's push uses
+            (app/services/daraja/reservation.py) also blocks a second push
+            for this invoice started from Billing while this one is in
+            flight, and vice versa: one cashier-facing rail, everywhere in
+            the app, is what stops the same invoice being paid twice on two
+            different Daraja pushes. The actual ledger posting happens in
+            the Daraja callback when the customer confirms the prompt.
     """
     dispense, invoice = _resolve_dispense_invoice(db, dispense_id)
 
@@ -279,25 +283,26 @@ def collect_dispense_payment(
             invoice_status=invoice.status,
         )
 
-    # ── M-Pesa via Pay Hero aggregator ──────────────────────────────────
-    # method == 'mpesa' (customer-facing label; the rail is Pay Hero)
+    # ── M-Pesa via the hospital's own Daraja till ────────────────────────
     if not req.phone_number:
         raise HTTPException(400, detail="phone_number is required for M-Pesa payments.")
+    if not req.idempotency_key:
+        raise HTTPException(400, detail="idempotency_key is required for M-Pesa payments.")
 
     # Idempotency: if there's an existing pending STK for this dispense, return it.
     existing = (
-        db.query(PayHeroTransaction)
+        db.query(MpesaTransaction)
         .filter(
-            PayHeroTransaction.dispense_id == dispense_id,
-            PayHeroTransaction.status == "Pending",
+            MpesaTransaction.dispense_id == dispense_id,
+            MpesaTransaction.status == "Pending",
         )
         .first()
     )
     if existing and existing.external_reference:
-        return PayHeroInitResponse(
+        return MpesaInitResponse(
             status="stk_push_sent",
             external_reference=existing.external_reference,
-            payhero_reference=existing.payhero_reference,
+            checkout_request_id=existing.checkout_request_id,
             transaction_id=existing.id,
         )
 
@@ -305,32 +310,34 @@ def collect_dispense_payment(
         txn_payload = initiate_stk_push(
             db,
             phone_number=req.phone_number,
-            amount=float(amt),
+            amount=amt,
             invoice_id=invoice.invoice_id,
             dispense_id=dispense_id,
             callback_tenant=request.headers.get("X-Tenant-ID"),
+            user_id=current_user["user_id"],
+            idempotency_key=req.idempotency_key,
         )
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Pay Hero STK push failed for dispense=%s", dispense_id)
-        raise HTTPException(status_code=502, detail=f"Could not contact Pay Hero: {exc}")
+        logger.exception("Daraja STK push failed for dispense=%s", dispense_id)
+        raise HTTPException(status_code=502, detail=f"Could not contact M-Pesa: {exc}")
 
     log_audit(
         db,
         current_user["user_id"],
         "CREATE",
-        "PayHeroTransaction",
+        "MpesaTransaction",
         txn_payload.get("transaction_id") or 0,
         None,
         {"dispense_id": dispense_id, "amount": float(amt), "phone": req.phone_number},
         request.client.host,
     )
 
-    return PayHeroInitResponse(
+    return MpesaInitResponse(
         status="stk_push_sent",
         external_reference=txn_payload.get("external_reference", ""),
-        payhero_reference=txn_payload.get("reference"),
+        checkout_request_id=txn_payload.get("checkout_request_id"),
         transaction_id=txn_payload.get("transaction_id") or 0,
     )
 
@@ -344,9 +351,9 @@ def dispense_payment_status(dispense_id: int, db: Session = Depends(get_db)):
     an STK push to resolve."""
     _, invoice = _resolve_dispense_invoice(db, dispense_id)
     pending = (
-        db.query(PayHeroTransaction)
-        .filter(PayHeroTransaction.dispense_id == dispense_id)
-        .order_by(PayHeroTransaction.id.desc())
+        db.query(MpesaTransaction)
+        .filter(MpesaTransaction.dispense_id == dispense_id)
+        .order_by(MpesaTransaction.id.desc())
         .first()
     )
     return {
