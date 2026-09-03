@@ -139,6 +139,13 @@ def _public_view(config: Optional[MpesaConfig]) -> dict:
         "initiator_name": config.initiator_name,
         "has_initiator_password": bool(config.initiator_password_encrypted),
         "callback_token_configured": bool(config.callback_token_encrypted),
+        # Identifies WHICH token is live without revealing any part of it:
+        # strictly better than a partial reveal for the same operator
+        # question ("does the URL I registered with Safaricom still match
+        # what's live"), since a timestamp costs zero credential surface.
+        "callback_token_rotated_at": (
+            config.callback_token_rotated_at.isoformat() if config.callback_token_rotated_at else None
+        ),
         "refunds_enabled": config.refunds_enabled,
         "refund_max_amount": str(config.refund_max_amount),
         "refund_daily_cap": str(config.refund_daily_cap),
@@ -255,15 +262,26 @@ _MASKED_TOKEN = "<redacted>"
 def _callback_urls_for_configs(
     configs: list[MpesaConfig], tenant_hint: Optional[str], *, reveal: bool,
 ) -> list[dict]:
-    """(config_id, shortcode, department_id, the five callback URLs) per
-    config, token segment either real (reveal=True, rotate-token only) or
-    masked (reveal=False, the standing callback-urls GET). Building both
-    shapes through one function keeps the URL structure itself, and the
-    error shape for a config with no token minted yet, identical between
-    the two call sites: only the token segment ever differs.
+    """(config_id, shortcode, department_id, callback_token_rotated_at, the
+    five callback URLs) per config, token segment either real (reveal=True,
+    rotate-token only) or masked (reveal=False, the standing callback-urls
+    GET). Building both shapes through one function keeps the URL
+    structure itself, and the error shape for a config with no token
+    minted yet, identical between the two call sites: only the token
+    segment ever differs.
+
+    callback_token_rotated_at is included on every call, masked or not: a
+    timestamp identifies WHICH token is live ("I rotated at 14:32 today,
+    the portal shows a URL registered last week, so it needs
+    re-registering") without revealing any part of the value that changed,
+    which is strictly better than a partial reveal for that same question.
     """
     results = []
     for config in configs:
+        rotated_at = (
+            config.callback_token_rotated_at.isoformat()
+            if config.callback_token_rotated_at else None
+        )
         try:
             base, hint, token = _base_hint_token(config, tenant_hint)
         except HTTPException as exc:
@@ -271,6 +289,7 @@ def _callback_urls_for_configs(
                 "config_id": config.id,
                 "shortcode": config.shortcode,
                 "department_id": config.department_id,
+                "callback_token_rotated_at": rotated_at,
                 "error": exc.detail,
             })
             continue
@@ -279,6 +298,7 @@ def _callback_urls_for_configs(
             "config_id": config.id,
             "shortcode": config.shortcode,
             "department_id": config.department_id,
+            "callback_token_rotated_at": rotated_at,
             "stk_callback_url": f"{base}/api/payments/mpesa/stk/callback/{hint}/{display_token}",
             "c2b_validation_url": f"{base}/api/payments/mpesa/c2b/validation/{hint}/{display_token}",
             "c2b_confirmation_url": f"{base}/api/payments/mpesa/c2b/confirmation/{hint}/{display_token}",

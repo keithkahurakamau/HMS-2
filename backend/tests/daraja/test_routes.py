@@ -470,17 +470,24 @@ def test_rotate_token_reveals_the_real_token_once_then_callback_urls_masks_it(
 
     rotate_resp = _authenticated_client.post("/api/admin/mpesa/rotate-token")
     assert rotate_resp.status_code == 200, rotate_resp.text
-    revealed = rotate_resp.json()["urls"]
+    rotate_body = rotate_resp.json()
+    # _public_view's own field, spread at the top level of this response.
+    assert rotate_body["callback_token_rotated_at"] is not None
+    revealed = rotate_body["urls"]
     assert revealed is not None
     assert not revealed["stk_callback_url"].endswith("/<redacted>")
     real_token = revealed["stk_callback_url"].rsplit("/", 1)[-1]
     assert len(real_token) > 8, "rotate-token must reveal the real, full-length token"
+    # concern 3's fix: no part of the token is exposed, but WHICH token is
+    # live is still answerable from a timestamp alone.
+    assert revealed["callback_token_rotated_at"] is not None
 
     masked_resp = _authenticated_client.get("/api/admin/mpesa/callback-urls")
     assert masked_resp.status_code == 200
-    masked_url = masked_resp.json()["tills"][0]["stk_callback_url"]
-    assert masked_url.endswith("/<redacted>")
-    assert real_token not in masked_url
+    masked_till = masked_resp.json()["tills"][0]
+    assert masked_till["stk_callback_url"].endswith("/<redacted>")
+    assert real_token not in masked_till["stk_callback_url"]
+    assert masked_till["callback_token_rotated_at"] == revealed["callback_token_rotated_at"]
 
 
 # ─── Route-inventory permission regression net ──────────────────────────────
