@@ -28,8 +28,11 @@ import hmac
 import secrets
 from datetime import datetime, timezone
 
+from typing import Union
+
 from app.config.settings import settings
 from app.models.mpesa import MpesaConfig
+from app.models.platform_mpesa import PlatformMpesaConfig
 from app.utils.encryption import encrypt_data
 
 
@@ -55,9 +58,17 @@ def token_lookup_hash(token: str) -> str:
     return hmac.new(key, token.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def store_callback_token(config: MpesaConfig, token: str) -> None:
+def store_callback_token(config: Union[MpesaConfig, PlatformMpesaConfig], token: str) -> None:
     """Set both callback token columns on config, consistently, and stamp
     callback_token_rotated_at.
+
+    Widened to accept PlatformMpesaConfig as well as MpesaConfig: the
+    platform's own subscription-billing rail (app/models/platform_mpesa.py)
+    reuses this exact function to keep its callback token pair in sync,
+    the same way MpesaConfig does. The body only ever sets attributes that
+    both models carry (callback_token_encrypted, callback_token_lookup,
+    callback_token_rotated_at), so nothing here actually changes; only the
+    type hint was wrong before.
 
     This is the only supported way to write either column: setting one
     without the other leaves the config unable to either send an STK push
