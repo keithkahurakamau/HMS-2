@@ -48,6 +48,8 @@ import app.routes.payhero_admin as payhero_admin_module
 import app.routes.payhero_payment as payhero_payment_module
 import app.routes.payhero_superadmin as payhero_superadmin_module
 import app.routes.platform_payhero as platform_payhero_module
+import app.routes.mpesa_superadmin as mpesa_superadmin_module
+import app.routes.platform_mpesa as platform_mpesa_module
 import app.routes.receivables as receivables_module
 import app.routes.privacy as privacy_module
 import app.routes.notifications as notifications_module
@@ -422,6 +424,8 @@ app.include_router(payhero_admin_module.router)  # PAY-001: per-tenant Pay Hero 
 app.include_router(payhero_payment_module.router)  # PAY-001: Pay Hero aggregator
 app.include_router(payhero_superadmin_module.router)  # operator-only Pay Hero provisioning
 app.include_router(platform_payhero_module.router)  # superadmin subscription billing (platform rail)
+app.include_router(mpesa_superadmin_module.router)  # Daraja migration Task 10: platform Daraja config
+app.include_router(platform_mpesa_module.router)  # Daraja migration Task 10: platform Daraja charge + transactions
 app.include_router(receivables_module.router)  # superadmin receivables ledger (ageing, payments, dunning controls)
 app.include_router(privacy_module.router)
 app.include_router(notifications_module.router)
