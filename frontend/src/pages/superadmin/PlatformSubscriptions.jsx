@@ -79,13 +79,20 @@ export default function PlatformSubscriptions() {
 
     // Live settlement feed: merge incoming frames into the transactions list.
     usePlatformPaymentSocket(true, (evt) => {
+        // A frame for a transaction we are not holding means our list is
+        // stale, so refetch. That refetch must happen AFTER the updater, not
+        // inside it: React runs updater functions twice under StrictMode, so
+        // a fetch in there fires the request twice, and an updater that is
+        // not pure is wrong even where the duplicate happens to be harmless.
+        let listIsStale = false;
         setTxns(prev => {
             const idx = prev.findIndex(t => t.id === evt.transaction_id || t.external_reference === evt.external_reference);
-            if (idx === -1) { loadTxns(); return prev; }
+            if (idx === -1) { listIsStale = true; return prev; }
             const next = [...prev];
             next[idx] = { ...next[idx], status: evt.status, receipt_number: evt.receipt_number, result_desc: evt.result_desc };
             return next;
         });
+        if (listIsStale) loadTxns();
         if (evt.status === 'Success') toast.success(`Subscription settled, receipt ${evt.receipt_number || ''}`);
         else if (evt.status === 'Failed') toast.error(`Subscription charge failed: ${evt.result_desc || ''}`);
     });
