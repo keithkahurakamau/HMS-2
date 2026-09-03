@@ -42,6 +42,13 @@ const emptyForm = {
 // before go-live" state worth calling out, not a hard error.
 const IS_PRODUCTION_DEPLOYMENT = import.meta.env.PROD;
 
+// Module-scope, not rebuilt per render: every URL row (masked or revealed)
+// copies through this one function.
+const copyToClipboard = (text) => {
+    navigator.clipboard?.writeText(text);
+    toast.success('Copied.');
+};
+
 export default function MpesaSettings() {
     const [config, setConfig] = useState(null);
     const [form, setForm] = useState(emptyForm);
@@ -328,10 +335,6 @@ function SecretField({ label, isSet, value, onChange }) {
 /* ─── Callback URLs + rotation ───────────────────────────────────────────── */
 
 function CallbackUrlsSection({ tills, onRegisterC2b, onOpenRotate }) {
-    const copy = (text) => {
-        navigator.clipboard?.writeText(text);
-        toast.success('Copied.');
-    };
     return (
         <div className="bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-6 space-y-3">
             <SectionHead icon={Link2} title="Callback URLs" />
@@ -376,7 +379,7 @@ function CallbackUrlsSection({ tills, onRegisterC2b, onOpenRotate }) {
                                     <div key={label} className="flex items-center gap-2">
                                         <span className="text-2xs w-28 shrink-0 text-ink-500 dark:text-ink-400">{label}</span>
                                         <code className="flex-1 text-2xs font-mono truncate text-ink-600 dark:text-ink-300">{url}</code>
-                                        <button type="button" onClick={() => copy(url)} aria-label={`Copy ${label} URL`}
+                                        <button type="button" onClick={() => copyToClipboard(url)} aria-label={`Copy ${label} URL`}
                                                 className="text-ink-400 hover:text-brand-600 shrink-0">
                                             <Copy size={13} />
                                         </button>
@@ -460,7 +463,6 @@ function RotateConfirmDialog({ onCancel, onConfirm }) {
 
 function RevealedTokenPanel({ result, onDismiss }) {
     const urls = result?.urls;
-    const copy = (text) => { navigator.clipboard?.writeText(text); toast.success('Copied.'); };
     return (
         <div role="alert" className="bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-300 dark:border-emerald-500/30 rounded-xl p-5 space-y-3">
             <h3 className="text-sm font-bold text-emerald-900 dark:text-emerald-300 inline-flex items-center gap-2">
@@ -479,7 +481,7 @@ function RevealedTokenPanel({ result, onDismiss }) {
                         <div key={label} className="flex items-center gap-2">
                             <span className="text-2xs w-28 shrink-0 text-emerald-800 dark:text-emerald-300">{label}</span>
                             <code className="flex-1 text-2xs font-mono truncate text-emerald-900 dark:text-emerald-100">{url}</code>
-                            <button type="button" onClick={() => copy(url)} aria-label={`Copy ${label} URL`}
+                            <button type="button" onClick={() => copyToClipboard(url)} aria-label={`Copy ${label} URL`}
                                     className="text-emerald-700 hover:text-emerald-900 shrink-0">
                                 <Copy size={13} />
                             </button>
