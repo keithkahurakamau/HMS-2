@@ -191,6 +191,15 @@ def resolve_enabled_modules(flags_raw: Optional[str]) -> List[str]:
     # ``payhero`` flag forward-fills ``mpesa``.
     if flags.get("payhero") and "mpesa" not in flags:
         flags["mpesa"] = flags["payhero"]
+    # An explicit False on the legacy key must forward-fill as an explicit
+    # False too. ``mpesa`` defaults to enabled (ModuleDef's default_enabled),
+    # so without this a hospital that deliberately switched M-Pesa off via
+    # ``payhero: false`` would see the module re-appear anyway, the nav
+    # item, the settings page and the route prefix all reachable again,
+    # exactly the silent re-enable this alias exists to prevent in the
+    # other direction.
+    elif "payhero" in flags and not flags["payhero"] and "mpesa" not in flags:
+        flags["mpesa"] = False
     enabled: set = set(DEFAULT_ENABLED)
     for key, value in flags.items():
         if key not in BY_KEY:
