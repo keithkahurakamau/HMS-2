@@ -23,6 +23,7 @@ and it needs no new permission codename beyond the existing write gate.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -32,11 +33,13 @@ from sqlalchemy.orm import Session
 
 from app.config.database import get_db
 from app.core.dependencies import RequirePermission, get_current_user
+from app.core.limiter import limiter
 from app.models.billing import Invoice
 from app.models.mpesa import MpesaConfig, MpesaTransaction
 from app.services.daraja.c2b import c2b_readiness, register_c2b_urls
 from app.services.daraja.settlement import settle_invoice_match
 from app.services.daraja.status import _base_hint_token
+from app.services.daraja.stk import initiate_stk_push
 from app.services.daraja.tokens import mint_callback_token, store_callback_token
 from app.utils.encryption import encrypt_data
 
@@ -82,6 +85,11 @@ class MpesaConfigSchema(BaseModel):
 
 class AssignReceiptRequest(BaseModel):
     invoice_id: int
+
+
+class TestSTKRequest(BaseModel):
+    phone_number: str = Field(min_length=9, max_length=15)
+    idempotency_key: str
 
 
 # ─── Config CRUD ────────────────────────────────────────────────────────────
@@ -212,6 +220,55 @@ def update_mpesa_config(
 
     db.commit()
     return {"message": "M-Pesa configuration saved.", **_public_view(config)}
+
+
+# ─── Test STK push ──────────────────────────────────────────────────────────
+
+
+@router.post("/test-stk")
+@limiter.limit("5/minute")
+def test_stk(
+    request: Request,
+    payload: TestSTKRequest,
+    db: Session = Depends(get_db),
+    user: dict = Depends(RequirePermission(_MANAGE)),
+):
+    """Send a real KES 1 STK push to the saved shortcode's own hospital-wide
+    till, to verify the shortcode + Daraja credentials work end-to-end
+    before a hospital starts collecting real payments on them.
+
+    Neither invoice_id nor dispense_id is passed: this is initiate_stk_push's
+    TEST-{token} external_reference branch, so a test push can never be
+    mistaken for, or reserved against, a real invoice.
+    """
+    config = _active_default_config(db)
+    if not config:
+        raise HTTPException(status_code=400, detail="M-Pesa is not configured yet.")
+    try:
+        result = initiate_stk_push(
+            db,
+            phone_number=payload.phone_number,
+            amount=Decimal("1"),
+            account_reference="TEST",
+            transaction_desc="MediFleet M-Pesa test",
+            callback_tenant=request.headers.get("X-Tenant-ID"),
+            user_id=user["user_id"],
+            idempotency_key=payload.idempotency_key,
+        )
+        config.last_test_at = datetime.now(timezone.utc)
+        config.last_test_status = "STK Push Sent"
+        config.last_test_message = (
+            f"Test KES 1 STK push dispatched to {payload.phone_number}. "
+            "Customer must approve on phone to complete the test."
+        )
+        db.commit()
+        return result
+    except HTTPException as exc:
+        config.last_test_at = datetime.now(timezone.utc)
+        config.last_test_status = f"Failed ({exc.status_code})"
+        config.last_test_message = str(exc.detail)[:1000]
+        db.commit()
+        raise
 
 
 # ─── C2B registration, readiness, callback URLs, token rotation ────────────

@@ -21,7 +21,7 @@ from app.core.daraja_callback import ACK_C2B_DECLINE, ACK_OK, TenantLookupUnavai
 from app.core.dependencies import RequirePermission, get_current_user
 from app.main import app
 from app.utils.encryption import encrypt_data
-from app.models.mpesa import MpesaRefund
+from app.models.mpesa import MpesaRefund, MpesaTransaction
 from tests.daraja.conftest import make_invoice, make_mpesa_config, make_pending_transaction
 
 # The six token-addressed callback paths Task 9 wires, matching
@@ -600,3 +600,63 @@ def test_list_refunds_route_returns_newest_first_and_respects_status_filter(
     filtered = _authenticated_client.get("/api/payments/mpesa/refunds?status=Completed")
     assert filtered.status_code == 200, filtered.text
     assert [r["id"] for r in filtered.json()] == [newer.id]
+
+
+# ─── Test STK push (admin surface) ──────────────────────────────────────────
+
+
+def test_admin_test_stk_push_sends_kes_1_with_no_invoice_and_records_last_test(
+    db, monkeypatch, _authenticated_client,
+):
+    """Task 11's settings page needs a real end-to-end test push. It must
+    never touch a real invoice (TEST-{token} external_reference, no
+    invoice_id/dispense_id) and must record last_test_at/status/message on
+    the config so the settings page can show when it last ran."""
+    monkeypatch.setattr("app.config.settings.settings.PUBLIC_BASE_URL", "https://mayoclinic.medifleet.app")
+    config = make_mpesa_config(db)
+    db.commit()
+
+    def fake_oauth(url, **kw):
+        return _FakeResponse(200, {"access_token": "tok", "expires_in": "3599"})
+
+    def fake_post(url, **kw):
+        return _FakeResponse(200, {
+            "MerchantRequestID": "mr-test-1",
+            "CheckoutRequestID": "ws_CO_test_1",
+            "ResponseCode": "0",
+            "ResponseDescription": "Success. Request accepted for processing",
+        })
+
+    monkeypatch.setattr("app.services.daraja.client.requests.get", fake_oauth)
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+    resp = _authenticated_client.post(
+        "/api/admin/mpesa/test-stk",
+        json={"phone_number": "254712345678", "idempotency_key": f"test-{secrets.token_hex(6)}"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["checkout_request_id"] == "ws_CO_test_1"
+    assert body["external_reference"].startswith("TEST-")
+
+    db.refresh(config)
+    assert config.last_test_status == "STK Push Sent"
+    assert config.last_test_at is not None
+
+    txn = (
+        db.query(MpesaTransaction)
+        .filter(MpesaTransaction.checkout_request_id == "ws_CO_test_1")
+        .first()
+    )
+    assert txn is not None
+    assert txn.invoice_id is None
+    assert txn.dispense_id is None
+
+
+def test_admin_test_stk_push_without_config_is_400(db, _authenticated_client):
+    resp = _authenticated_client.post(
+        "/api/admin/mpesa/test-stk",
+        json={"phone_number": "254712345678", "idempotency_key": f"test-{secrets.token_hex(6)}"},
+    )
+    assert resp.status_code == 400, resp.text
+    assert "not configured" in resp.text.lower()
