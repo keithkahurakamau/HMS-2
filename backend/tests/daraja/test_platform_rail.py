@@ -64,8 +64,13 @@ def _fake_oauth(monkeypatch):
     )
 
 
-def _fake_stk_success(monkeypatch, *, checkout_request_id="ws_CO_plat_1"):
+def _fake_stk_success(monkeypatch, *, checkout_request_id="ws_CO_plat_1", calls=None):
+    """`calls`, when given a list, gets one entry appended per actual POST
+    to Safaricom: evidence that a blocked/cached push never reached Daraja
+    a second time, not just that the visible result looked right."""
     def fake_post(url, **kw):
+        if calls is not None:
+            calls.append(kw.get("json"))
         return FakeResponse(200, {
             "MerchantRequestID": "mr-plat-1",
             "CheckoutRequestID": checkout_request_id,
@@ -280,3 +285,184 @@ def test_platform_config_with_no_credentials_is_reported_as_not_ready(db):
     with pytest.raises(HTTPException) as exc:
         platform_config(db)
     assert exc.value.status_code == 400
+
+
+# ─── Round 1 review, Critical: the duplicate-push / idempotency gap ────────
+#
+# The reviewer's escalation, verified: a double-click is the textbook
+# idempotency case, not an exemption from it, and the receipt-keyed replay
+# check can never catch it, because two genuine STK approvals carry two
+# genuinely different Safaricom receipts. These tests exercise the two
+# independent layers that now close it: the partial unique index /
+# reservation (stops a SECOND prompt from ever being sent while one is
+# still pending), and the balance check in _settle_subscription_invoice
+# (stops the ledger going negative even if two settlements DO arrive).
+
+
+def test_second_push_for_a_pending_invoice_is_blocked_not_duplicated(db, monkeypatch):
+    """A double-click while the first prompt is still on the handset must
+    reuse the existing Pending row, not send a second prompt."""
+    calls: list = []
+    _fake_oauth(monkeypatch)
+    _fake_stk_success(monkeypatch, checkout_request_id="ws_CO_plat_dup_1", calls=calls)
+    make_platform_config(db)
+    tenant = make_tenant(db)
+    invoice = _open_subscription_invoice(db, tenant, amount=Decimal("4000"))
+
+    first = initiate_platform_stk_push(
+        db, tenant_id=tenant.tenant_id, amount=Decimal("4000"), subscription_invoice_id=invoice.id,
+    )
+    second = initiate_platform_stk_push(
+        db, tenant_id=tenant.tenant_id, amount=Decimal("4000"), subscription_invoice_id=invoice.id,
+    )
+
+    assert len(calls) == 1  # Daraja was only ever asked once
+    assert second["already_pending"] is True
+    assert second["transaction_id"] == first["transaction_id"]
+    assert (
+        db.query(PlatformMpesaTransaction)
+        .filter(PlatformMpesaTransaction.subscription_invoice_id == invoice.id)
+        .count()
+        == 1
+    )
+
+
+def test_idempotent_charge_replays_the_cached_response_not_a_second_push(db, monkeypatch):
+    """Same admin, same button, same idempotency key: a retried request
+    (a dropped response, a slow network) must replay the first answer, the
+    same guarantee app/routes/mpesa_payment.py's tenant STK route already
+    requires via the identical app/core/idempotency.py mechanism."""
+    calls: list = []
+    _fake_oauth(monkeypatch)
+    _fake_stk_success(monkeypatch, checkout_request_id="ws_CO_plat_idem_1", calls=calls)
+    make_platform_config(db)
+    tenant = make_tenant(db)
+    invoice = _open_subscription_invoice(db, tenant, amount=Decimal("6000"))
+
+    kwargs = dict(
+        tenant_id=tenant.tenant_id, amount=Decimal("6000"), subscription_invoice_id=invoice.id,
+        user_id=1, idempotency_key="retry-key-1",
+    )
+    first = initiate_platform_stk_push(db, **kwargs)
+    second = initiate_platform_stk_push(db, **kwargs)
+
+    assert len(calls) == 1  # cached, never re-pushed
+    # Compared field-by-field, not with a bare ==: `second` round-tripped
+    # through the idempotency cache's JSON serialisation
+    # (app/core/idempotency.py stores response_body as json.dumps(...,
+    # default=str)), so amount_charged comes back a str ("6000") even
+    # though the live `first` response carries a Decimal. That is expected
+    # cache behaviour, not a bug being tested here.
+    assert second["transaction_id"] == first["transaction_id"]
+    assert second["checkout_request_id"] == first["checkout_request_id"]
+    assert second["external_reference"] == first["external_reference"]
+    assert Decimal(str(second["amount_charged"])) == Decimal(str(first["amount_charged"]))
+
+
+def test_double_settlement_against_an_already_paid_invoice_is_quarantined_not_negative(db, monkeypatch):
+    """CRITICAL, round 1 review. The literal race the reviewer described
+    (two Pending pushes racing each other) is now impossible: the partial
+    unique index in app/models/platform_mpesa.py blocks a second Pending
+    row for the same invoice at the database level, proven by
+    test_second_push_for_a_pending_invoice_is_blocked_not_duplicated above.
+
+    What remains reachable, and what this test proves is still safe, is
+    SEQUENTIAL double settlement: invoice already paid in full, then a
+    second, later charge against the SAME invoice (a stray recharge, a
+    superadmin who didn't check the invoice first) is pushed AFTER the
+    first Pending row is no longer Pending, so the index does not block
+    it. Two genuine Safaricom receipts, so the receipt-keyed replay check
+    never fires for either. Without the balance check in
+    _settle_subscription_invoice, the second settlement would push
+    outstanding_balance negative. With it, the second is quarantined.
+    """
+    make_platform_config(db)
+    tenant = make_tenant(db)
+    invoice = _open_subscription_invoice(db, tenant, amount=Decimal("18500"))
+
+    _fake_oauth(monkeypatch)
+    _fake_stk_success(monkeypatch, checkout_request_id="ws_CO_plat_double_1")
+    txn1 = _platform_push(db, tenant=tenant, invoice=invoice, amount=Decimal("18500"))
+    apply_platform_stk_callback(db, stk_callback_payload(
+        checkout_request_id=txn1.checkout_request_id, amount=Decimal("18500"), receipt="PLTDBL1",
+    ))
+    db.refresh(invoice)
+    assert invoice.status == "paid"
+    assert outstanding_balance(db, invoice) == Decimal("0")
+
+    # A second, independent push against the SAME invoice: its own
+    # checkout_request_id, its own eventual receipt. Allowed by
+    # _reserve_pending because txn1 is no longer Pending.
+    _fake_stk_success(monkeypatch, checkout_request_id="ws_CO_plat_double_2")
+    txn2 = _platform_push(db, tenant=tenant, invoice=invoice, amount=Decimal("18500"))
+    assert txn2.id != txn1.id
+    apply_platform_stk_callback(db, stk_callback_payload(
+        checkout_request_id=txn2.checkout_request_id, amount=Decimal("18500"), receipt="PLTDBL2",
+    ))
+
+    db.refresh(txn2)
+    assert txn2.status == "Quarantined"
+    payments = db.query(InvoicePayment).filter_by(invoice_id=invoice.id).all()
+    assert len(payments) == 1  # NOT two: the second was never credited
+    assert outstanding_balance(db, invoice) == Decimal("0")  # NOT negative
+
+
+def test_replay_filter_status_predicate_excludes_non_success_rows(db):
+    """Follow-up coverage the reviewer identified for the status ==
+    'Success' filter added to apply_platform_stk_callback's replay check.
+
+    A genuine end-to-end version of "two distinct PlatformMpesaTransaction
+    rows share one receipt_number" turned out to be unrealizable against
+    the real schema: receipt_number carries a real unique=True constraint,
+    so Postgres itself refuses to let a second row hold a value another
+    row already holds, regardless of status. An earlier version of this
+    test tried to construct exactly that and the database correctly
+    rejected it with a UniqueViolation. That is a real finding, not an
+    obstacle to work around: the constraint already guarantees, at a
+    stronger level than the application filter does, that this can never
+    happen. See the comment at the filter itself in
+    app/services/daraja/platform.py for the fuller account.
+
+    What IS honest to test directly, without bending the schema, is the
+    predicate itself: given one committed row that holds a receipt_number
+    but is NOT Success (the exact shape my own overpayment-quarantine fix
+    produces, since it sets receipt_number before deciding to quarantine),
+    the fixed query must not treat it as a match, while the pre-fix
+    predicate (no status filter) would have.
+    """
+    tenant = make_tenant(db)
+    quarantined = PlatformMpesaTransaction(
+        tenant_id=tenant.tenant_id,
+        phone_number="254712345678",
+        amount=Decimal("3000"),
+        external_reference="SUB-quarantined-predicate-test",
+        checkout_request_id="ws_CO_plat_quarantined_predicate",
+        status="Quarantined",
+        receipt_number="DUPREC",
+        result_desc="Exceeded outstanding balance; received but not credited",
+    )
+    db.add(quarantined)
+    db.flush()
+
+    # The exact predicate apply_platform_stk_callback's replay check runs
+    # today (the fix).
+    fixed_match = (
+        db.query(PlatformMpesaTransaction)
+        .filter(
+            PlatformMpesaTransaction.receipt_number == "DUPREC",
+            PlatformMpesaTransaction.status == "Success",
+        )
+        .first()
+    )
+    assert fixed_match is None  # a Quarantined row is never mistaken for a settled one
+
+    # The pre-fix predicate, for contrast: this is what WOULD have matched,
+    # which is exactly the bug (a genuine new settlement wrongly
+    # short-circuited as "already settled" the moment any row, of any
+    # status, carried this receipt_number).
+    pre_fix_match = (
+        db.query(PlatformMpesaTransaction)
+        .filter(PlatformMpesaTransaction.receipt_number == "DUPREC")
+        .first()
+    )
+    assert pre_fix_match is not None
