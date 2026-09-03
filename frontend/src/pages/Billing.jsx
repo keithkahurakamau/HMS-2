@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
+import { stkPush, getInvoiceStatus, newIdempotencyKey } from '../api/mpesa';
 import {
     Receipt, Search, Filter, CreditCard, Banknote, Smartphone, CheckCircle2,
-    Activity, ArrowRight, FileText, X, Printer
+    Activity, ArrowRight, FileText, X, Printer, Undo2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printInvoice } from '../utils/printTemplates';
@@ -10,11 +12,14 @@ import PageHeader from '../components/PageHeader';
 import DepartmentQueue from '../components/DepartmentQueue';
 import MpesaStkProgress from '../components/MpesaStkProgress';
 import usePaymentSocket from '../hooks/usePaymentSocket';
+import { useAuth } from '../context/AuthContext';
 
 const STK_TIMEOUT = 60;   // seconds the customer has to enter their PIN
 const POLL_MS = 3000;     // how often we re-check our own DB for the receipt
 
 export default function Billing() {
+    const { user } = useAuth();
+    const canRefund = user?.permissions?.includes('mpesa:refund');
     const [queue, setQueue] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -32,6 +37,11 @@ export default function Billing() {
     // tear both down from one place regardless of how the wait ends.
     const pollRef = useRef(null);
     const countdownRef = useRef(null);
+    // One idempotency key per STK-push attempt: minted on first send, reused
+    // if that same attempt needs resubmitting, cleared by resetMpesa() so
+    // the next attempt (a new invoice, or "try again" after a resolved
+    // failure) mints a fresh one rather than replaying a stale prompt.
+    const mpesaIdemRef = useRef(null);
 
     // Ledger Modal State
     const [isLedgerOpen, setIsLedgerOpen] = useState(false);
@@ -81,9 +91,10 @@ export default function Billing() {
         }
     };
 
-    // Poll our OWN DB (updated by the verified Pay Hero webhook) for the
-    // receipt: not Pay Hero's live API. The callback settles the invoice and
-    // flips the transaction row to Success/Failed; we just watch for that.
+    // Poll our OWN DB (updated by the verified Daraja callback) for the
+    // receipt: never Safaricom's live API from here. The callback settles
+    // the invoice and flips the transaction row to Success/Failed; we just
+    // watch for that.
     const startMpesaPolling = (invoiceId) => {
         stopMpesa();
         setMpesaStatus('waiting');
@@ -106,8 +117,8 @@ export default function Billing() {
 
         pollRef.current = setInterval(async () => {
             try {
-                const res = await apiClient.get(`/payments/payhero/invoice-status/${invoiceId}`);
-                const { invoice_status, mpesa_status, mpesa_receipt_number, mpesa_result_desc } = res.data;
+                const data = await getInvoiceStatus(invoiceId);
+                const { invoice_status, mpesa_status, mpesa_receipt_number, mpesa_result_desc } = data;
                 if (invoice_status === 'Paid' || mpesa_status === 'Success') {
                     markMpesaSuccess(mpesa_receipt_number);
                 } else if (mpesa_status === 'Failed') {
@@ -126,6 +137,7 @@ export default function Billing() {
         setMpesaReceipt(null);
         setSecondsLeft(STK_TIMEOUT);
         setIsProcessing(false);
+        mpesaIdemRef.current = null; // the next send is a new attempt, not a retry
     };
 
     // Terminal handlers, shared by the DB poll and the live WebSocket so both
@@ -169,10 +181,12 @@ export default function Billing() {
                     setIsProcessing(false);
                     return toast.error("Phone number required for M-Pesa");
                 }
-                await apiClient.post('/payments/payhero/stk-push', {
+                if (!mpesaIdemRef.current) mpesaIdemRef.current = newIdempotencyKey();
+                await stkPush({
                     phone_number: mpesaPhone,
                     amount: amountDue,
                     invoice_id: activeInvoice.invoice_id,
+                    idempotency_key: mpesaIdemRef.current,
                 });
 
                 toast.success("STK Push sent to patient's phone. Waiting for PIN...");
@@ -200,7 +214,7 @@ export default function Billing() {
     const fetchMpesaLogs = async () => {
         try {
             // Unified feed: settled cash/card/M-Pesa payments + unsettled
-            // Pay Hero attempts, each with type, receipt, status, description.
+            // Daraja attempts, each with type, receipt, status, description.
             const res = await apiClient.get('/billing/transactions');
             setMpesaLogs(res.data || []);
         } catch (error) {
@@ -233,6 +247,11 @@ export default function Billing() {
                     <button type="button" data-tour="billing-mpesa" onClick={openLedger} className="btn-success cursor-pointer">
                         <Smartphone size={15} /> M-Pesa Ledger
                     </button>
+                    {canRefund && (
+                        <Link to="/app/billing/refunds" className="btn-secondary">
+                            <Undo2 size={15} /> Refunds
+                        </Link>
+                    )}
                     </div>
                 }
             />

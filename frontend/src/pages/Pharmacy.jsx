@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {} from 'react-router-dom';
 import { apiClient } from '../api/client';
+import { newIdempotencyKey } from '../api/mpesa';
 import {
     Search, Pill, CheckCircle2, AlertCircle,
     Printer, XCircle, Stethoscope,
@@ -249,7 +250,9 @@ export default function Pharmacy() {
                 method,
                 amount,
                 phone_number: method === 'mpesa' ? phoneNumber : null,
-                transaction_reference: reference || null });
+                transaction_reference: reference || null,
+                idempotency_key: method === 'mpesa' ? newIdempotencyKey() : null,
+            });
 
             if (method === 'mpesa') {
                 toast.success('STK push sent. Customer to confirm on their phone.');
@@ -260,7 +263,7 @@ export default function Pharmacy() {
                     amount,
                     patientName: 'Walk-in',
                     pendingMpesa: { external_reference: res.data?.external_reference,
-                                    payhero_reference: res.data?.payhero_reference,
+                                    checkout_request_id: res.data?.checkout_request_id,
                                     transaction_id: res.data?.transaction_id,
                                     phone: phoneNumber } });
             } else {
@@ -1029,8 +1032,13 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
     const [secondsLeft, setSecondsLeft] = useState(STK_TIMEOUT);
     const [mpesaError, setMpesaError] = useState(null);
     const [mpesaReceipt, setMpesaReceipt] = useState(null);
+    // One idempotency key per STK-push attempt: reused if this same attempt
+    // needs resubmitting, cleared by retry() so "Try again" after a
+    // resolved failure sends a genuinely new prompt rather than replaying
+    // the dead one.
+    const idemRef = useRef(null);
 
-    // Poll our own DB row (settled by the verified Pay Hero webhook) while a
+    // Poll our own DB row (settled by the verified Daraja callback) while a
     // push is pending, and run a visible countdown alongside it.
     // Cleanup exists: the cleanup clears both intervals.
     // react-doctor-disable-next-line react-doctor/effect-needs-cleanup
@@ -1088,12 +1096,14 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
         setMpesaError(null);
         setMpesaReceipt(null);
         setSecondsLeft(STK_TIMEOUT);
+        idemRef.current = null; // the next send is a new attempt, not a retry
     };
 
     const submit = async () => {
         const amt = Number(amount);
         if (!amt || amt <= 0) return toast.error('Enter a valid amount.');
         if (method === 'mpesa' && !phone) return toast.error('M-Pesa needs a phone number.');
+        if (method === 'mpesa' && !idemRef.current) idemRef.current = newIdempotencyKey();
 
         setSubmitting(true);
         try {
@@ -1101,7 +1111,9 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
                 method,
                 amount: amt,
                 phone_number: method === 'mpesa' ? phone : null,
-                transaction_reference: reference || null };
+                transaction_reference: reference || null,
+                idempotency_key: method === 'mpesa' ? idemRef.current : null,
+            };
             const res = await apiClient.post(`/pharmacy/dispense/${dispenseId}/pay`, payload);
 
             if (method === 'cash') {
