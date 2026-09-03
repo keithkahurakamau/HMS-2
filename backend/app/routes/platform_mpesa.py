@@ -31,7 +31,7 @@ from app.services.daraja.platform_stk import initiate_platform_stk_push
 
 router = APIRouter(
     prefix="/api/public/superadmin/platform-mpesa",
-    tags=["Superadmin — Subscription Billing (Daraja)"],
+    tags=["Superadmin: Subscription Billing (Daraja)"],
     dependencies=[Depends(require_superadmin)],
 )
 

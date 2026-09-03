@@ -33,7 +33,7 @@ from app.utils.encryption import encrypt_data
 
 router = APIRouter(
     prefix="/api/public/superadmin/platform-mpesa",
-    tags=["Superadmin — Subscription Billing (Daraja)"],
+    tags=["Superadmin: Subscription Billing (Daraja)"],
     dependencies=[Depends(require_superadmin)],
 )
 
@@ -133,7 +133,7 @@ def platform_health(master_db: Session = Depends(get_master_db)):
             "shortcode is pending)."
         )
     if not (config and config.callback_token_encrypted):
-        blockers.append("No callback token minted yet — save the config first.")
+        blockers.append("No callback token minted yet, save the config first.")
 
     callback_url = None
     if config and config.callback_token_encrypted and base:
