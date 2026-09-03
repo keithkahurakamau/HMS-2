@@ -175,6 +175,14 @@ def db(_engine) -> Iterator[Session]:
         "acc_ledger_mappings", "acc_accounts", "acc_settings",
         "mpesa_refunds", "mpesa_transactions", "mpesa_configs",
         "payments", "invoice_items", "invoices",
+        # Task 10 (platform Daraja / subscription rail): CASCADE handles the
+        # FK ordering (invoice_payments/platform_mpesa_transactions ->
+        # subscription_invoices -> subscriptions/tenants), so listing order
+        # here doesn't matter, only that every table a test in this package
+        # might touch gets reset between tests.
+        "invoice_payments", "dunning_events", "subscription_invoices",
+        "subscriptions", "platform_mpesa_transactions", "platform_mpesa_configs",
+        "tenants",
     ]:
         try:
             session.execute(text(f"TRUNCATE TABLE {tbl} RESTART IDENTITY CASCADE"))
