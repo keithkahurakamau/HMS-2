@@ -44,6 +44,7 @@ import app.routes.public as public_module
 import app.routes.mpesa_refunds as mpesa_refunds_module
 import app.routes.mpesa_payment as mpesa_payment_module
 import app.routes.mpesa_admin as mpesa_admin_module
+import app.routes.mpesa_events as mpesa_events_module
 import app.routes.mpesa_superadmin as mpesa_superadmin_module
 import app.routes.platform_mpesa as platform_mpesa_module
 import app.routes.receivables as receivables_module
@@ -404,6 +405,7 @@ app.include_router(public_module.router)
 app.include_router(mpesa_refunds_module.router)  # Daraja migration Task 7: B2C refunds
 app.include_router(mpesa_payment_module.router)  # Daraja migration Task 9: STK push + all callbacks
 app.include_router(mpesa_admin_module.router)  # Daraja migration Task 9: per-tenant Daraja config
+app.include_router(mpesa_events_module.router)  # Daraja migration Task 15: the event log read API
 app.include_router(mpesa_superadmin_module.router)  # Daraja migration Task 10: platform Daraja config
 app.include_router(platform_mpesa_module.router)  # Daraja migration Task 10: platform Daraja charge + transactions
 app.include_router(receivables_module.router)  # superadmin receivables ledger (ageing, payments, dunning controls)
