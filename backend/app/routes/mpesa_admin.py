@@ -11,7 +11,15 @@ not part of this task's scope.
 
 Every secret column is Fernet-encrypted at rest and never echoed back: the
 config view returns booleans (``has_consumer_key`` etc.), never the value
-itself, the same discipline routes/payhero_admin.py already documents.
+itself, the same discipline routes/payhero_admin.py already documents. The
+callback token is the one deliberate exception, and it follows the
+reveal-once pattern every API key UI uses: rotate-token hands back the
+plaintext token (embedded in the real callback URLs) exactly once, at the
+moment of rotation, which is the moment an operator actually needs it to
+register with Safaricom. The standing GET (callback-urls) never shows it
+again, only a masked placeholder. An operator who loses the URL rotates to
+get a new one, which also kills the leaked old one: the correct incentive,
+and it needs no new permission codename beyond the existing write gate.
 """
 from __future__ import annotations
 
@@ -236,25 +244,24 @@ def get_c2b_readiness(
     return c2b_readiness(db)
 
 
-@router.get("/callback-urls")
-def get_callback_urls(
-    request: Request,
-    db: Session = Depends(get_db),
-    _user: dict = Depends(RequirePermission(_MANAGE)),
-):
-    """The real, live callback URLs for every active till, token included.
+# The placeholder that stands in for the token segment on a masked (not
+# revealed) callback URL. Matches app/utils/log_redact.py's own
+# "<redacted>" convention so the same word means the same thing everywhere
+# a Daraja callback token is withheld from an output, log line or API
+# response alike.
+_MASKED_TOKEN = "<redacted>"
 
-    Gated on the WRITE permission, not the any-of read set: unlike every
-    other response in this module, this one deliberately includes the
-    plaintext callback token, because these are exactly the URLs an
-    operator needs to paste into the Safaricom developer portal (some
-    account types require portal-side registration in addition to, or
-    instead of, the registerurl API call register_c2b_urls makes) or hand
-    to support when C2B traffic isn't arriving. That is a different act
-    from reading a config screen, and it is restricted accordingly.
+
+def _callback_urls_for_configs(
+    configs: list[MpesaConfig], tenant_hint: Optional[str], *, reveal: bool,
+) -> list[dict]:
+    """(config_id, shortcode, department_id, the five callback URLs) per
+    config, token segment either real (reveal=True, rotate-token only) or
+    masked (reveal=False, the standing callback-urls GET). Building both
+    shapes through one function keeps the URL structure itself, and the
+    error shape for a config with no token minted yet, identical between
+    the two call sites: only the token segment ever differs.
     """
-    tenant_hint = request.headers.get("X-Tenant-ID")
-    configs = db.query(MpesaConfig).filter(MpesaConfig.is_active == True).all()  # noqa: E712
     results = []
     for config in configs:
         try:
@@ -267,48 +274,86 @@ def get_callback_urls(
                 "error": exc.detail,
             })
             continue
+        display_token = token if reveal else _MASKED_TOKEN
         results.append({
             "config_id": config.id,
             "shortcode": config.shortcode,
             "department_id": config.department_id,
-            "stk_callback_url": f"{base}/api/payments/mpesa/stk/callback/{hint}/{token}",
-            "c2b_validation_url": f"{base}/api/payments/mpesa/c2b/validation/{hint}/{token}",
-            "c2b_confirmation_url": f"{base}/api/payments/mpesa/c2b/confirmation/{hint}/{token}",
-            "status_result_url": f"{base}/api/payments/mpesa/status/result/{hint}/{token}",
-            "status_timeout_url": f"{base}/api/payments/mpesa/status/timeout/{hint}/{token}",
+            "stk_callback_url": f"{base}/api/payments/mpesa/stk/callback/{hint}/{display_token}",
+            "c2b_validation_url": f"{base}/api/payments/mpesa/c2b/validation/{hint}/{display_token}",
+            "c2b_confirmation_url": f"{base}/api/payments/mpesa/c2b/confirmation/{hint}/{display_token}",
+            "status_result_url": f"{base}/api/payments/mpesa/status/result/{hint}/{display_token}",
+            "status_timeout_url": f"{base}/api/payments/mpesa/status/timeout/{hint}/{display_token}",
         })
-    return {"tills": results}
+    return results
+
+
+@router.get("/callback-urls")
+def get_callback_urls(
+    request: Request,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(RequirePermission(_MANAGE)),
+):
+    """The callback URL shape for every active till, token MASKED.
+
+    Round 1 of this route returned the plaintext token here, reasoning
+    that an operator legitimately needs the real URL for Safaricom
+    portal-side registration. That need is real but narrower than a
+    standing GET: payhero:manage (this route's own gate) is held by roles
+    documented as read-only for M-Pesa (the Accountant role grants it
+    specifically "for cross-checking"), so a standing reveal handed the
+    live credential to a role never meant to hold one. The plaintext token
+    is now revealed exactly once, in rotate-token's response, at the
+    moment an operator actually needs it. This route stays gated on the
+    write permission regardless, not downgraded to the any-of read set:
+    see tests/daraja/test_routes.py's dedicated permission test for why
+    that boundary is pinned even though nothing secret is returned here
+    any more.
+    """
+    tenant_hint = request.headers.get("X-Tenant-ID")
+    configs = db.query(MpesaConfig).filter(MpesaConfig.is_active == True).all()  # noqa: E712
+    return {"tills": _callback_urls_for_configs(configs, tenant_hint, reveal=False)}
 
 
 @router.post("/rotate-token")
 def rotate_callback_token(
+    request: Request,
     db: Session = Depends(get_db),
     _user: dict = Depends(RequirePermission(_MANAGE)),
 ):
-    """Mint a fresh callback token for the hospital-wide default till.
+    """Mint a fresh callback token for the hospital-wide default till, and
+    reveal it exactly once, embedded in the real callback URLs this
+    response carries: the same reveal-once pattern every API key UI uses.
+    callback-urls never shows the plaintext again after this call returns;
+    an operator who loses this response has to rotate again to see it.
 
     The whole authentication design in app/core/daraja_callback.py rests
     on this token being unguessable AND rotatable; without this route a
     leaked token had no remediation short of a manual database UPDATE.
     Rotating invalidates every Confirmation/Validation URL already
     registered with Safaricom for this till (the old token is baked into
-    those URLs at registration time): callback-urls and register-c2b must
-    be used again afterwards, and this response says so rather than
-    leaving that step for the operator to discover the hard way. Scoped to
-    the hospital default only, matching this file's config-CRUD scope; a
-    per-department token rotation route is not part of this surface.
+    those URLs at registration time): register-c2b must be called again
+    afterwards for the API-based registration path, and the URLs in this
+    response are what a portal-side registration pastes in directly.
+    Scoped to the hospital default only, matching this file's config-CRUD
+    scope; a per-department token rotation route is not part of this
+    surface.
     """
     config = _default_config(db)
     if config is None:
         raise HTTPException(status_code=400, detail="M-Pesa is not configured yet.")
     store_callback_token(config, mint_callback_token())
     db.commit()
+    urls = _callback_urls_for_configs([config], request.headers.get("X-Tenant-ID"), reveal=True)
     return {
         "message": (
-            "Callback token rotated. Existing Confirmation/Validation URLs "
-            "registered with Safaricom now carry a dead token: call "
-            "register-c2b again to re-register with the new one."
+            "Callback token rotated. This is the only time the new token is "
+            "shown: copy the URLs below into the Safaricom developer portal "
+            "if you register manually, or call register-c2b to re-register "
+            "via the API. Existing URLs registered with the old token are "
+            "now dead."
         ),
+        "urls": urls[0] if urls else None,
         **_public_view(config),
     }
 

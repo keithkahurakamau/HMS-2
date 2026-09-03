@@ -427,6 +427,13 @@ def test_register_c2b_and_readiness_and_callback_urls_routes(db, monkeypatch, _a
     assert "/c2b/validation/" in till["c2b_validation_url"]
     assert "/status/result/" in till["status_result_url"]
     assert "/status/timeout/" in till["status_timeout_url"]
+    # Round 2 fix: the standing GET never shows the real token, only a
+    # masked placeholder, the same word app/utils/log_redact.py uses.
+    for url in (
+        till["stk_callback_url"], till["c2b_confirmation_url"], till["c2b_validation_url"],
+        till["status_result_url"], till["status_timeout_url"],
+    ):
+        assert url.endswith("/<redacted>"), f"callback-urls leaked a real token in {url!r}"
 
 
 def test_rotate_token_invalidates_the_old_lookup_hash(db, _authenticated_client):
@@ -445,6 +452,35 @@ def test_rotate_token_invalidates_the_old_lookup_hash(db, _authenticated_client)
     db.refresh(config)
     assert config.callback_token_lookup is not None
     assert config.callback_token_lookup != old_lookup
+
+
+def test_rotate_token_reveals_the_real_token_once_then_callback_urls_masks_it(
+    db, monkeypatch, _authenticated_client,
+):
+    """Round 2 fix: the credential-exposure decision. rotate-token is the
+    ONE place the plaintext token is ever shown, embedded in the real
+    callback URLs, because that is the moment an operator actually needs
+    it (Safaricom portal-side registration). The standing callback-urls
+    GET must never show it, before or after a rotation: a role holding
+    payhero:manage (e.g. Accountant, documented read-only for M-Pesa) must
+    not be able to pull the live credential just by polling that route."""
+    monkeypatch.setattr("app.config.settings.settings.PUBLIC_BASE_URL", "https://mayoclinic.medifleet.app")
+    make_mpesa_config(db)
+    db.commit()
+
+    rotate_resp = _authenticated_client.post("/api/admin/mpesa/rotate-token")
+    assert rotate_resp.status_code == 200, rotate_resp.text
+    revealed = rotate_resp.json()["urls"]
+    assert revealed is not None
+    assert not revealed["stk_callback_url"].endswith("/<redacted>")
+    real_token = revealed["stk_callback_url"].rsplit("/", 1)[-1]
+    assert len(real_token) > 8, "rotate-token must reveal the real, full-length token"
+
+    masked_resp = _authenticated_client.get("/api/admin/mpesa/callback-urls")
+    assert masked_resp.status_code == 200
+    masked_url = masked_resp.json()["tills"][0]["stk_callback_url"]
+    assert masked_url.endswith("/<redacted>")
+    assert real_token not in masked_url
 
 
 # ─── Route-inventory permission regression net ──────────────────────────────
@@ -484,4 +520,29 @@ def test_every_mutating_mpesa_route_requires_its_exact_write_permission():
         )
     assert checked == len(expectations), (
         f"expected to check {len(expectations)} mutating routes, checked {checked}"
+    )
+
+
+def test_callback_urls_get_requires_exactly_the_write_permission_not_any_of():
+    """GET /callback-urls is the one read-shaped route in this module
+    deliberately NOT on the any-of read set (payhero:manage OR mpesa:read):
+    round 1 gated it that way because it returned the plaintext token,
+    round 2 masks that token but keeps the tighter gate on purpose (see
+    the route's own docstring). The general route-inventory test above
+    skips every GET, reasoning that a read endpoint may reasonably accept
+    an any-of; this route is the one exception, so it gets its own pinned
+    assertion rather than being silently exempted along with every other
+    GET. A future "simplify GETs to the read set" pass must not widen this
+    one without a deliberate decision to do so.
+    """
+    route = next(
+        r for r in app.routes if getattr(r, "path", "") == "/api/admin/mpesa/callback-urls"
+    )
+    required = [
+        dep.call.required_permissions
+        for dep in route.dependant.dependencies
+        if isinstance(dep.call, RequirePermission)
+    ]
+    assert required == [("payhero:manage",)], (
+        f"GET /callback-urls must require exactly ('payhero:manage',), found {required}"
     )
