@@ -3,6 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useModules } from '../../context/ModuleContext';
 import { useJourney } from '../../context/JourneyContext';
+import { JOURNEYS } from '../../journeys';
 import {
     LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
@@ -102,9 +103,17 @@ export default function MainLayout() {
     const { branding } = useBranding();
     const { startJourney, forceStartJourney, activeKey } = useJourney();
 
-    const currentJourneyKey = ROUTE_TO_JOURNEY.find(
+    // A route can map to a journey key with no actual tour content yet
+    // (JOURNEYS[key] undefined or empty): forceStartJourney already no-ops
+    // on that, but the manual "?" button must not render at all for it,
+    // or a click on it visibly does nothing. Checked here, once, rather
+    // than at every call site.
+    const mappedJourneyKey = ROUTE_TO_JOURNEY.find(
         ([prefix]) => location.pathname.startsWith(prefix)
     )?.[1] || null;
+    const currentJourneyKey = (mappedJourneyKey && JOURNEYS[mappedJourneyKey]?.length)
+        ? mappedJourneyKey
+        : null;
 
     useEffect(() => {
         if (!currentJourneyKey || activeKey) return;
