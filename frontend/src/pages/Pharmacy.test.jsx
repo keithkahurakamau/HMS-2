@@ -489,7 +489,7 @@ describe('Pharmacy: payment flow', () => {
         await waitFor(() => {
             expect(apiClient.post).toHaveBeenCalledWith(
                 '/pharmacy/dispense/200/pay',
-                expect.objectContaining({ method: 'cash', amount: 10 })
+                expect.objectContaining({ method: 'cash', amount: '10.00' })
             );
         });
         await waitFor(() => {
@@ -527,7 +527,7 @@ describe('Pharmacy: payment flow', () => {
         await waitFor(() => {
             expect(apiClient.post).toHaveBeenCalledWith(
                 '/pharmacy/dispense/201/pay',
-                expect.objectContaining({ method: 'card', amount: 10 })
+                expect.objectContaining({ method: 'card', amount: '10.00' })
             );
         });
         await waitFor(() => {
@@ -581,7 +581,7 @@ describe('Pharmacy: payment flow', () => {
                 '/pharmacy/dispense/700/pay',
                 expect.objectContaining({
                     method: 'mpesa',
-                    amount: 10,
+                    amount: '10.00',
                     phone_number: '0712345678',
                 })
             );
