@@ -28,6 +28,7 @@ const MODULE_LABELS = {
     cheques: 'Cheques',
     medical_history: 'Medical History',
     payhero: 'M-Pesa Payments',
+    mpesa: 'M-Pesa Payments',
     analytics: 'Analytics',
     patient_portal: 'Patient Portal',
     branding: 'Branding',

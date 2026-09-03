@@ -44,6 +44,7 @@ const PatientPortal = lazy(() => import('./pages/PatientPortal'));
 const Messages = lazy(() => import('./pages/Messages'));
 const Settings = lazy(() => import('./pages/Settings'));
 const MpesaSettings = lazy(() => import('./pages/MpesaSettings'));
+const Refunds = lazy(() => import('./pages/billing/Refunds'));
 const Cheques = lazy(() => import('./pages/Cheques'));
 const Support = lazy(() => import('./pages/Support'));
 const Branding = lazy(() => import('./pages/Branding'));
@@ -225,9 +226,10 @@ export default function App() {
             <Route path="calendar" element={<Calendar />} />
             <Route path="profile" element={<Profile />} />
             <Route path="billing" element={<ModuleGuard moduleKey="billing"><Billing /></ModuleGuard>} />
+            <Route path="billing/refunds" element={<ModuleGuard moduleKey="mpesa"><Refunds /></ModuleGuard>} />
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="mpesa-settings" element={<ModuleGuard moduleKey="payhero"><MpesaSettings /></ModuleGuard>} />
+            <Route path="mpesa-settings" element={<ModuleGuard moduleKey="mpesa"><MpesaSettings /></ModuleGuard>} />
             <Route path="branding" element={<ModuleGuard moduleKey="branding"><Branding /></ModuleGuard>} />
             <Route path="cheques" element={<ModuleGuard moduleKey="cheques"><Cheques /></ModuleGuard>} />
             <Route path="accounting" element={<ModuleGuard moduleKey="accounting"><Accounting /></ModuleGuard>} />
