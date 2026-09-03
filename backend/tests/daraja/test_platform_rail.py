@@ -15,10 +15,12 @@ real DarajaClient the same way production traffic does.
 from __future__ import annotations
 
 import secrets
+import threading
 from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy.orm import sessionmaker
 
 from app.config.settings import settings
 from app.models.master import Tenant
@@ -466,3 +468,101 @@ def test_replay_filter_status_predicate_excludes_non_success_rows(db):
         .first()
     )
     assert pre_fix_match is not None
+
+
+# ─── Round 2 review, Critical: the no-invoice idempotency race ─────────────
+#
+# _reserve_pending commits internally, which releases the advisory lock the
+# FIRST idempotent_guard check took, before the live Daraja call. With no
+# subscription_invoice_id there is no partial-unique-index backstop either
+# (its WHERE clause excludes NULL), so two clicks landing inside the
+# Safaricom round trip both reserve their own Pending row and both reach
+# the POST unless a SECOND idempotent_guard check, taken again right before
+# the network call, closes it. Mirrors
+# tests/daraja/test_concurrency.py's
+# test_two_terminals_with_the_same_idempotency_key_and_no_invoice_push_once
+# exactly: genuinely concurrent, two threads, two Sessions on separate
+# connections, a threading.Barrier so both reach the guard together. A
+# sequential test proves nothing here, and asserting on final row status
+# proves nothing either: the loss is two real Daraja calls, not a bad
+# database row, so the assertion that matters is the CALL COUNT.
+
+
+def _fake_stk_success_threadsafe(monkeypatch, counter: dict, lock: threading.Lock):
+    """Counts every actual Daraja STK request across threads. The count,
+    not the final row state, is the proof: two calls here means two real
+    STK prompts reached a real phone from one double-click."""
+    def fake_post(url, **kw):
+        with lock:
+            counter["n"] += 1
+            n = counter["n"]
+        return FakeResponse(200, {
+            "MerchantRequestID": f"mr-plat-conc-{n}",
+            "CheckoutRequestID": f"ws_CO_plat_conc_{n}",
+            "ResponseCode": "0",
+            "ResponseDescription": "Success. Request accepted for processing",
+            "CustomerMessage": "Success. Request accepted for processing",
+        })
+    monkeypatch.setattr("app.services.daraja.client.requests.post", fake_post)
+
+
+def test_two_terminals_with_the_same_idempotency_key_and_no_invoice_push_once(
+    db, _engine, monkeypatch
+):
+    """Two concurrent charge requests, same idempotency key, no
+    subscription_invoice_id: Daraja must be asked exactly once. This is
+    the scenario round 2 review found NOT ADEQUATELY ADDRESSED: a bare
+    test charge (or any charge raised without naming an invoice) has no
+    database backstop against a double-click, only the second
+    idempotent_guard check re-added to initiate_platform_stk_push.
+    """
+    _fake_oauth(monkeypatch)
+    call_count = {"n": 0}
+    lock = threading.Lock()
+    _fake_stk_success_threadsafe(monkeypatch, call_count, lock)
+    make_platform_config(db)
+    tenant = make_tenant(db)
+    db.commit()  # visible to the two independent connections below
+
+    SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+    barrier = threading.Barrier(2)
+    results: list = []
+    errors: list = []
+    results_lock = threading.Lock()
+
+    def worker():
+        session = SessionLocal()
+        try:
+            barrier.wait(timeout=5)
+            r = initiate_platform_stk_push(
+                session,
+                tenant_id=tenant.tenant_id,
+                amount=Decimal("1"),
+                phone_number="0712345678",
+                user_id=1,
+                idempotency_key="no-invoice-platform-race-key",
+            )
+            with results_lock:
+                results.append(r)
+        except Exception as exc:  # noqa: BLE001, captured for the assertion below
+            with results_lock:
+                errors.append(exc)
+        finally:
+            session.close()
+
+    t1 = threading.Thread(target=worker)
+    t2 = threading.Thread(target=worker)
+    t1.start()
+    t2.start()
+    t1.join(timeout=15)
+    t2.join(timeout=15)
+
+    assert not errors, f"unexpected errors from concurrent pushes: {errors}"
+    assert len(results) == 2
+    # THE assertion that matters: Daraja was only ever asked once, even
+    # with no invoice to fall back a database guard on. Two calls here
+    # means two real STK prompts reached the billing contact's phone from
+    # one double-click.
+    assert call_count["n"] == 1
+    assert results[0]["checkout_request_id"] == results[1]["checkout_request_id"]
+    assert results[0]["transaction_id"] == results[1]["transaction_id"]

@@ -374,6 +374,69 @@ def initiate_platform_stk_push(
             idempotency_key=idempotency_key, idempotency_body=idempotency_body,
         )
 
+    # Second idempotency check, right before the network call, ONLY when
+    # there is no subscription_invoice_id. Mirrors
+    # app/services/daraja/stk.py:279-322 exactly (the tenant rail's own
+    # fix for this identical shape), gated on the platform equivalent of
+    # its "invoice_id is None and dispense_id is None" condition.
+    #
+    # Round 2 review, Critical: the FIRST check (above, before
+    # _reserve_pending) cannot protect THIS push. _reserve_pending's own
+    # commit already ended that check's transaction and released its
+    # advisory lock, and only then does control reach the live Daraja
+    # call below, hundreds of milliseconds to a few seconds away. With a
+    # subscription_invoice_id that gap is closed by the partial unique
+    # index (every OTHER caller fails its OWN reservation and never
+    # reaches this line), so a second check there would be worse than
+    # useless: it would race the `not reserved` branch's own cache write
+    # and could wrongly treat the caller that actually holds the
+    # reservation as the loser, skipping the real push. Without a
+    # subscription_invoice_id there is no such index (the partial index's
+    # WHERE clause excludes NULL), so two callers sharing a key can both
+    # reserve their OWN row and both arrive here with reserved=True:
+    # re-acquiring the SAME lock here, with no commit before the eventual
+    # persist below, closes THAT gap. A concurrent loser blocks until the
+    # winner's push and cache write are done, then replays the winner's
+    # response instead of sending its own prompt. This is the exact
+    # commit-releases-the-lock shape that produced the B2C double-dispatch
+    # loop earlier on this branch; skipping this check here is how two
+    # real STK prompts, and two real M-Pesa debits, would otherwise reach
+    # a hospital's billing contact from one double-click.
+    if idempotency_key is not None and subscription_invoice_id is None:
+        try:
+            cached, persist = idempotent_guard(
+                master_db, user_id=user_id, endpoint=_IDEMPOTENCY_ENDPOINT, key=idempotency_key,
+                body=idempotency_body,
+            )
+        except HTTPException:
+            # A concurrent caller reused this same key with a genuinely
+            # DIFFERENT body: idempotent_guard raises 409 for that, and it
+            # must still reach this caller, unswallowed. But
+            # _reserve_pending already committed THIS row above, so
+            # without marking it here it is left status="Pending" with
+            # checkout_request_id=None forever, a permanent phantom in the
+            # transaction log with no prompt ever sent for it.
+            txn.status = "Failed"
+            txn.result_desc = (
+                "No prompt was sent from this row: its idempotency key was "
+                "reused, concurrently, with a different request body, which "
+                "is rejected as a conflict (409) rather than replayed."
+            )
+            master_db.commit()
+            raise
+        if cached is not None:
+            # This row was reserved but never pushed: a concurrent request
+            # with the same key won the race and its response is being
+            # replayed instead. Marking it Failed is a documented fact,
+            # not a guess about a push that never happened.
+            txn.status = "Failed"
+            txn.result_desc = (
+                "Superseded by a concurrent request with the same idempotency "
+                "key that reached M-Pesa first. No prompt was sent from this row."
+            )
+            master_db.commit()
+            return cached
+
     try:
         passkey = _decrypted(config.passkey_encrypted, field="passkey")
         timestamp = daraja_timestamp()
