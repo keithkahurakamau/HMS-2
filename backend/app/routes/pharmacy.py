@@ -218,7 +218,7 @@ def collect_dispense_payment(
             billing.payment.bank (cards settle into the bank account
             same as bank transfers). transaction_reference holds the
             card terminal auth code if supplied.
-    mpesa — initiate an STK push on the hospital's own Daraja till, tied to
+    mpesa: initiate an STK push on the hospital's own Daraja till, tied to
             (dispense_id, invoice_id). Both ids are forwarded, so the SAME
             one-Pending-per-invoice reservation the Billing desk's push uses
             (app/services/daraja/reservation.py) also blocks a second push
@@ -313,6 +313,7 @@ def collect_dispense_payment(
             amount=amt,
             invoice_id=invoice.invoice_id,
             dispense_id=dispense_id,
+            department_id=req.department_id,
             callback_tenant=request.headers.get("X-Tenant-ID"),
             user_id=current_user["user_id"],
             idempotency_key=req.idempotency_key,

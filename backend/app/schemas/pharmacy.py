@@ -63,6 +63,10 @@ class DispensePaymentRequest(BaseModel):
     # so a retried request (a double click, a dropped response) replays the
     # first push instead of sending a second prompt to the same phone.
     idempotency_key: Optional[str] = None
+    # Forwarded to config_for (via initiate_stk_push): resolves the
+    # Pharmacy department's own active till when one exists, otherwise the
+    # hospital default. None (the default) is the hospital-wide till.
+    department_id: Optional[int] = None
 
 
 class CashPaymentResponse(BaseModel):

@@ -1,7 +1,7 @@
 """Pharmacy post-dispense payment flow.
 
 Exercises the cash + M-Pesa (via the hospital's own Daraja till) branches
-of /api/pharmacy/dispense/{id}/pay without going over HTTP — we call the
+of /api/pharmacy/dispense/{id}/pay without going over HTTP: we call the
 route function directly with a fake ``current_user`` dict. Each test
 sets up the inventory + patient + dispense scaffolding it needs.
 
@@ -323,6 +323,38 @@ def test_mpesa_stk_push_creates_pending_transaction_and_links_dispense(db):
     db.refresh(invoice)
     assert invoice.status == "Pending"
     assert invoice.amount_paid == Decimal("0")
+
+
+def test_mpesa_forwards_department_id_to_initiate_stk_push(db):
+    """Pharmacy is the one screen that unambiguously knows its own
+    department; without this forwarded through, config_for always falls
+    back to the hospital default and Task 14's per-department tills are
+    unreachable from the one checkout that most needs one."""
+    dispense, invoice = _seed_dispense_with_invoice(db, total=Decimal("300"))
+    captured = {}
+
+    def _fake_stk(db, *, phone_number, amount, invoice_id, dispense_id=None,
+                  department_id=None, **_):
+        captured["department_id"] = department_id
+        txn = MpesaTransaction(
+            invoice_id=invoice_id, dispense_id=dispense_id, phone_number=phone_number,
+            amount=Decimal(str(amount)), external_reference="INV-DEPT-001",
+            checkout_request_id="ws_CO_DEPT_001", status="Pending",
+        )
+        db.add(txn)
+        db.commit()
+        return {"external_reference": "INV-DEPT-001", "checkout_request_id": "ws_CO_DEPT_001",
+                "transaction_id": txn.id}
+
+    with patch("app.routes.pharmacy.initiate_stk_push", side_effect=_fake_stk):
+        collect_dispense_payment(
+            dispense.dispense_id,
+            DispensePaymentRequest(method="mpesa", amount=300.0, phone_number="0712345678",
+                                    idempotency_key="key-dept-1", department_id=42),
+            _FakeRequest(), db, CURRENT_USER,
+        )
+
+    assert captured["department_id"] == 42
 
 
 def test_mpesa_idempotent_returns_existing_pending(db):
