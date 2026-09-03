@@ -228,10 +228,12 @@ function RequestRefundDialog({ onClose, onRequested }) {
                     </button>
                 </div>
                 <div className="p-5 space-y-4">
-                    <label className="block">
-                        <span className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">M-Pesa transaction ID (the receipt to refund)</span>
+                    <div className="block">
+                        <label htmlFor="refund-source-transaction-id" className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">
+                            M-Pesa transaction ID (the receipt to refund)
+                        </label>
                         <div className="flex gap-2">
-                            <input ref={firstFieldRef} className="input" value={sourceTransactionId}
+                            <input id="refund-source-transaction-id" ref={firstFieldRef} className="input" value={sourceTransactionId}
                                    onChange={(e) => { setSourceTransactionId(e.target.value); setRefundable(null); }}
                                    inputMode="numeric" placeholder="e.g. 482" />
                             <button type="button" onClick={checkRefundable} disabled={checking || !sourceTransactionId}
@@ -244,7 +246,7 @@ function RequestRefundDialog({ onClose, onRequested }) {
                                 <CheckCircle2 size={12} /> Refundable up to {formatKes(refundable)}
                             </p>
                         )}
-                    </label>
+                    </div>
                     <label className="block">
                         <span className="block text-xs font-medium text-ink-600 dark:text-ink-400 mb-1">Amount to refund (KES)</span>
                         <input type="number" min="0" step="0.01" className="input tnum" value={amount}
