@@ -45,6 +45,7 @@ const ROUTE_TO_JOURNEY = [
     ['/app/accounting',      'accounting'],
     ['/app/support',         'support'],
     ['/app/mpesa-settings',  'mpesa'],
+    ['/app/mpesa/events',    'mpesa'],
     ['/app/home',            'dashboard'],
     ['/app/dashboard',       'dashboard'],
     ['/app',                 'dashboard'],   // role-redirect fallback
@@ -81,6 +82,7 @@ const NAVIGATION = [
     { name: 'Accounting',        path: '/app/accounting',      icon: <BookOpen size={18} />,        allowedRoles: ['Admin', 'Accountant'],                            requiredPermission: 'accounting:view',  moduleKey: 'accounting' },
     { name: 'MediFleet Support', path: '/app/support',         icon: <LifeBuoy size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'support:manage',   moduleKey: 'support' },
     { name: 'M-Pesa Payments',   path: '/app/mpesa-settings',  icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: ['payhero:manage', 'mpesa:manage'], moduleKey: 'mpesa' },
+    { name: 'M-Pesa Event Log',  path: '/app/mpesa/events',    icon: <ListChecks size={18} />,      allowedRoles: ['Admin', 'Receptionist', 'Accountant'],            requiredPermission: ['billing:read', 'billing:manage'], moduleKey: 'mpesa' },
     { name: 'Settings',          path: '/app/settings',        icon: <Settings size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'settings:read',    moduleKey: 'settings' },
 ];
 

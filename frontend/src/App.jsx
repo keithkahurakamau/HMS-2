@@ -44,6 +44,7 @@ const PatientPortal = lazy(() => import('./pages/PatientPortal'));
 const Messages = lazy(() => import('./pages/Messages'));
 const Settings = lazy(() => import('./pages/Settings'));
 const MpesaSettings = lazy(() => import('./pages/MpesaSettings'));
+const MpesaEventLog = lazy(() => import('./pages/mpesa/EventLog'));
 const Refunds = lazy(() => import('./pages/billing/Refunds'));
 const Cheques = lazy(() => import('./pages/Cheques'));
 const Support = lazy(() => import('./pages/Support'));
@@ -228,6 +229,7 @@ export default function App() {
             <Route path="messages" element={<Messages />} />
             <Route path="settings" element={<Settings />} />
             <Route path="mpesa-settings" element={<ModuleGuard moduleKey="mpesa"><MpesaSettings /></ModuleGuard>} />
+            <Route path="mpesa/events" element={<ModuleGuard moduleKey="mpesa"><MpesaEventLog /></ModuleGuard>} />
             <Route path="branding" element={<ModuleGuard moduleKey="branding"><Branding /></ModuleGuard>} />
             <Route path="cheques" element={<ModuleGuard moduleKey="cheques"><Cheques /></ModuleGuard>} />
             <Route path="accounting" element={<ModuleGuard moduleKey="accounting"><Accounting /></ModuleGuard>} />
