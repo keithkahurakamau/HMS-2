@@ -13,10 +13,15 @@ import { apiClient } from '../api/client';
  *
  *  What it watches:
  *    - API reachability, the same /api/health probe the workspace pill uses.
- *    - Pay Hero webhook readiness. That endpoint already returns a `blockers`
- *      list of human-readable reasons, and in production any blocker means
- *      every callback returns 500, so money silently stops settling.
- *    - Subscription billing configuration, the operator's own revenue rail.
+ *    - The Daraja subscription rail (the operator's OWN revenue rail):
+ *      credentials, callback token, and PUBLIC_BASE_URL readiness, via the
+ *      same `blockers` list app/routes/mpesa_superadmin.py's /health
+ *      returns. Replaces the old Pay Hero webhook-health + subscription
+ *      billing checks now that Daraja is the platform's payment rail.
+ *    - Quarantined subscription charges: money that reached Safaricom but
+ *      was never credited to an invoice. Not a readiness blocker (a
+ *      quarantined charge does not stop new ones), but a needs-review
+ *      signal that would otherwise sit unseen outside an ERROR log line.
  *
  *  A failed check is itself reported as an issue. Silence is not health: if the
  *  console cannot ask, the operator needs to know that too.
@@ -49,32 +54,29 @@ export default function PlatformHealth() {
         }
 
         try {
-            const { data } = await apiClient.get('/public/superadmin/payhero/webhook-health');
+            const { data } = await apiClient.get('/public/superadmin/platform-mpesa/health');
             (data?.blockers || []).forEach((blocker, i) => {
                 found.push({
-                    id: `webhook-${i}`,
-                    // In production a blocker kills every callback; in development it is advisory.
+                    id: `mpesa-platform-${i}`,
+                    // In production a blocker means the rail cannot collect a
+                    // single subscription charge; in development it is advisory
+                    // (MediFleet's own Safaricom Go-Live is commonly pending).
                     severity: data.environment === 'production' ? 'critical' : 'warning',
-                    title: 'Pay Hero callbacks are not ready',
+                    title: 'The subscription billing rail is not ready',
                     detail: blocker,
                 });
             });
-        } catch {
-            found.push({ id: 'webhook-check', severity: 'warning', title: 'Could not read webhook readiness', detail: 'The webhook health check did not answer.' });
-        }
-
-        try {
-            const { data } = await apiClient.get('/public/superadmin/platform-payhero/health');
-            if (!data?.config?.configured) {
+            const quarantined = data?.quarantined_count || 0;
+            if (quarantined > 0) {
                 found.push({
-                    id: 'billing',
+                    id: 'mpesa-quarantined',
                     severity: 'warning',
-                    title: 'Subscription billing is not configured',
-                    detail: 'The operator revenue rail cannot charge tenants until this is set up.',
+                    title: `${quarantined} quarantined subscription ${quarantined === 1 ? 'charge needs' : 'charges need'} review`,
+                    detail: 'Money reached Safaricom but was not credited to any invoice. Review it on the Subscription Billing screen.',
                 });
             }
         } catch {
-            found.push({ id: 'billing-check', severity: 'warning', title: 'Could not read subscription billing status', detail: 'The billing health check did not answer.' });
+            found.push({ id: 'mpesa-platform-check', severity: 'warning', title: 'Could not read subscription billing readiness', detail: 'The platform Daraja health check did not answer.' });
         }
 
         setIssues(found);
@@ -140,8 +142,8 @@ export default function PlatformHealth() {
 
                     {clear ? (
                         <p className="t-body text-sm">
-                            Every check passed. The API is answering, Pay Hero callbacks are wired, and
-                            subscription billing is configured.
+                            Every check passed. The API is answering, and the Daraja
+                            subscription billing rail is ready with nothing quarantined.
                         </p>
                     ) : (
                         <ul className="flex flex-col gap-2">

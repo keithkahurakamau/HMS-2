@@ -8,8 +8,10 @@ import { apiClient } from '../api/client';
 import PlatformHealth from './PlatformHealth';
 
 const healthy = {
-    '/public/superadmin/payhero/webhook-health': { ready: true, blockers: [], environment: 'development' },
-    '/public/superadmin/platform-payhero/health': { config: { configured: true } },
+    '/public/superadmin/platform-mpesa/health': {
+        ready: true, blockers: [], environment: 'development', quarantined_count: 0,
+        config: { configured: true },
+    },
 };
 
 const route = (map) => (url) =>
@@ -31,12 +33,13 @@ describe('PlatformHealth', () => {
     it('counts and names what is wrong', async () => {
         apiClient.get.mockImplementation(route({
             ...healthy,
-            '/public/superadmin/payhero/webhook-health': {
+            '/public/superadmin/platform-mpesa/health': {
                 ready: false,
                 environment: 'production',
+                quarantined_count: 0,
                 blockers: [
                     'PUBLIC_BASE_URL is not set.',
-                    'PAYHERO_WEBHOOK_SECRET is empty.',
+                    'No Daraja credentials yet (Safaricom Go-Live for the MediFleet shortcode is pending).',
                 ],
             },
         }));
@@ -45,16 +48,21 @@ describe('PlatformHealth', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /2 issues/i }));
         expect(screen.getByText(/PUBLIC_BASE_URL is not set\./)).toBeInTheDocument();
-        expect(screen.getByText(/PAYHERO_WEBHOOK_SECRET is empty\./)).toBeInTheDocument();
+        expect(screen.getByText(/No Daraja credentials yet/)).toBeInTheDocument();
     });
 
-    it('flags subscription billing when it is not configured', async () => {
+    it('flags a nonzero quarantined count without treating it as a blocker', async () => {
         apiClient.get.mockImplementation(route({
             ...healthy,
-            '/public/superadmin/platform-payhero/health': { config: { configured: false } },
+            '/public/superadmin/platform-mpesa/health': {
+                ready: true, blockers: [], environment: 'production', quarantined_count: 3,
+            },
         }));
         render(<PlatformHealth />);
         expect(await screen.findByText(/1 issue/i)).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole('button', { name: /1 issue/i }));
+        expect(screen.getByText(/3 quarantined subscription charges need review/i)).toBeInTheDocument();
     });
 
     it('surfaces a failed check itself as an issue rather than crashing', async () => {

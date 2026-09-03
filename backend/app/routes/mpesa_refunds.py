@@ -22,6 +22,8 @@ from __future__ import annotations
 import json
 import logging
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, condecimal
@@ -160,6 +162,29 @@ def retry_dispatch_refund(
     tenant_hint = request.headers.get("X-Tenant-ID")
     refund = dispatch_refund(db, refund=refund, callback_tenant=tenant_hint)
     return _refund_view(refund)
+
+
+@router.get("/refunds")
+def list_refunds(
+    db: Session = Depends(get_db),
+    _user: dict = Depends(RequirePermission("mpesa:refund", "billing:read")),
+    status: Optional[str] = None,
+    limit: int = 100,
+):
+    """Refund register for the Refunds screen: newest first, optionally
+    filtered by status. Read-only, gated the same as the single-refund GET
+    (mpesa:refund holders manage refunds; billing:read holders, e.g. the
+    Accountant role, can see them for cross-checking, matching the read
+    gate mpesa_admin.py's own list routes use)."""
+    q = db.query(MpesaRefund)
+    if status is not None:
+        q = q.filter(MpesaRefund.status == status)
+    rows = (
+        q.order_by(MpesaRefund.requested_at.desc())
+        .limit(max(1, min(limit, 500)))
+        .all()
+    )
+    return [_refund_view(r) for r in rows]
 
 
 @router.get("/refunds/{refund_id}")

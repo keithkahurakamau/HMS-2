@@ -21,7 +21,8 @@ from app.core.daraja_callback import ACK_C2B_DECLINE, ACK_OK, TenantLookupUnavai
 from app.core.dependencies import RequirePermission, get_current_user
 from app.main import app
 from app.utils.encryption import encrypt_data
-from tests.daraja.conftest import make_invoice, make_mpesa_config
+from app.models.mpesa import MpesaRefund
+from tests.daraja.conftest import make_invoice, make_mpesa_config, make_pending_transaction
 
 # The six token-addressed callback paths Task 9 wires, matching
 # app/main.py's _CSRF_EXEMPT_PATHS exactly.
@@ -553,3 +554,49 @@ def test_callback_urls_get_requires_exactly_the_write_permission_not_any_of():
     assert required == [("payhero:manage",)], (
         f"GET /callback-urls must require exactly ('payhero:manage',), found {required}"
     )
+
+
+# ─── Refund register: list ──────────────────────────────────────────────────
+
+
+def test_list_refunds_route_returns_newest_first_and_respects_status_filter(
+    db, _authenticated_client,
+):
+    """GET /api/payments/mpesa/refunds is the Refunds screen's list source
+    (Task 11): it did not exist before this route, leaving the refund
+    register visible only one row at a time via GET /refunds/{id}."""
+    invoice = make_invoice(db, total_amount=Decimal("1000"))
+    txn = make_pending_transaction(db, amount=Decimal("500"), invoice_id=invoice.invoice_id)
+    txn.status = "Success"
+    txn.receipt_number = "QRC0001"
+    db.flush()
+
+    older = MpesaRefund(
+        source_transaction_id=txn.id, invoice_id=invoice.invoice_id,
+        phone_number="254712345678", amount=Decimal("100"), reason="Duplicate charge",
+        status="Requested", requested_by=1,
+        originator_conversation_id="OCID-OLDER",
+    )
+    newer = MpesaRefund(
+        source_transaction_id=txn.id, invoice_id=invoice.invoice_id,
+        phone_number="254712345678", amount=Decimal("50"), reason="Overcharge",
+        status="Completed", requested_by=1,
+        originator_conversation_id="OCID-NEWER",
+    )
+    db.add_all([older, newer])
+    db.commit()
+    # Force a deterministic ordering independent of same-instant server
+    # defaults: requested_at is server_default=func.now().
+    from datetime import timedelta
+    newer.requested_at = older.requested_at + timedelta(seconds=1)
+    db.commit()
+
+    resp = _authenticated_client.get("/api/payments/mpesa/refunds")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    ids = [r["id"] for r in body]
+    assert ids.index(newer.id) < ids.index(older.id)
+
+    filtered = _authenticated_client.get("/api/payments/mpesa/refunds?status=Completed")
+    assert filtered.status_code == 200, filtered.text
+    assert [r["id"] for r in filtered.json()] == [newer.id]
