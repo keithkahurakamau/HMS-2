@@ -77,18 +77,32 @@ logger = logging.getLogger(__name__)
 
 # SECURITY: a Daraja callback token is a path segment (Safaricom echoes the
 # URL we registered; we cannot make it a header instead), so it lands in
-# gunicorn's access log request line ("METHOD /path HTTP/1.1" status) and
-# in this module's own unhandled-exception handler, which logs
+# the access log's request line ("METHOD /path HTTP/1.1" status) and in
+# this module's own unhandled-exception handler, which logs
 # request.url.path directly. app/core/daraja_callback.py's whole design
 # treats that token as one of only two authentication layers for an
 # unsigned protocol, and app/utils/log_redact.py already redacts it from
 # every structured payload; a request line is free text, not a payload, so
-# it needs its own filter. One filter, attached to both loggers here,
-# covers every current and future route under /api/payments/mpesa/.
+# it needs its own filter.
+#
+# render-start.sh runs gunicorn with --worker-class
+# uvicorn.workers.UvicornWorker, and UvicornWorker.__init__ copies
+# gunicorn's log HANDLERS onto uvicorn's OWN loggers ("uvicorn.access",
+# "uvicorn.error") with propagate=False, rather than emitting through
+# "gunicorn.access" itself. A filter attached only to "gunicorn.access"
+# (this file's first attempt) never sees a single record under that
+# worker class: it looked correct against the filter function in
+# isolation and was wrong end to end, confirmed by actually running
+# gunicorn with this exact worker class and reading the access log (see
+# the Task 9 fix-round report for the reproduction). Attach to all three
+# names, not just the one the deployed worker class actually uses: a
+# future switch away from UvicornWorker, or a local `uvicorn` invocation
+# in dev, must not silently reopen this gap.
 from app.utils.log_redact import CallbackTokenPathFilter  # noqa: E402
 
 _callback_token_filter = CallbackTokenPathFilter()
-logging.getLogger("gunicorn.access").addFilter(_callback_token_filter)
+for _logger_name in ("gunicorn.access", "uvicorn.access", "uvicorn.error"):
+    logging.getLogger(_logger_name).addFilter(_callback_token_filter)
 logger.addFilter(_callback_token_filter)
 
 # 2. Setup SlowAPI Rate Limiter (Imported from app.core.limiter)
