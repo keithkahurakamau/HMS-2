@@ -390,6 +390,42 @@ MASTER_DB_PATCHES: list[str] = [
     "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_receipt  ON platform_mpesa_transactions (receipt_number);",
     "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_status   ON platform_mpesa_transactions (status);",
     "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_initiated ON platform_mpesa_transactions (initiated_at);",
+    # Task 10 fix round 1 (Critical): at most one Pending platform charge
+    # per subscription invoice, the same discipline
+    # uq_mpesa_txn_one_pending_per_invoice already enforces for the tenant
+    # rail. Without this, two genuine STK approvals against one invoice
+    # (e.g. a superadmin double-click) both settle: they carry different
+    # Safaricom receipts, so the receipt-keyed replay check in
+    # app/services/daraja/platform.py never catches either one. Declared
+    # on the model too (app/models/platform_mpesa.py's __table_args__) for
+    # create_all parity on a fresh bootstrap; this statement is what
+    # actually creates it against the real master DB.
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_platform_mpesa_txn_one_pending_per_invoice "
+    "ON platform_mpesa_transactions (subscription_invoice_id) "
+    "WHERE status = 'Pending' AND subscription_invoice_id IS NOT NULL;",
+    # Task 10 fix round 1: idempotency_keys is normally created by
+    # SQLAlchemy create_all on a tenant database's first boot
+    # (app/models/idempotency.py). The master DB never went through that
+    # bootstrap path for this table, so the superadmin platform-charge
+    # route (the first master-DB caller of app/core/idempotency.py's
+    # idempotent_guard) would otherwise fail with "relation does not
+    # exist" on first use. Column-for-column identical to the tenant
+    # schema; user_id here holds a superadmins.admin_id, not a tenant
+    # users.user_id, which is why it stays a plain, unconstrained INTEGER
+    # exactly as it already is for the tenant rail.
+    """
+    CREATE TABLE IF NOT EXISTS idempotency_keys (
+        user_id              INTEGER NOT NULL DEFAULT 0,
+        endpoint             VARCHAR(96) NOT NULL DEFAULT '',
+        key                  VARCHAR(255) NOT NULL,
+        request_fingerprint  VARCHAR(64) NOT NULL DEFAULT '',
+        status_code          INTEGER NOT NULL DEFAULT 200,
+        response_body        TEXT NOT NULL,
+        created_at           TIMESTAMPTZ DEFAULT now(),
+        CONSTRAINT pk_idempotency_keys PRIMARY KEY (user_id, endpoint, key)
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_idempotency_created ON idempotency_keys (created_at);",
 ]
 
 

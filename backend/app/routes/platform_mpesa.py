@@ -48,6 +48,11 @@ class ChargeRequest(BaseModel):
     phone_number: Optional[str] = Field(default=None, max_length=15)
     subscription_invoice_id: Optional[int] = None
     period_label: Optional[str] = Field(default=None, max_length=120)
+    # Round 1 review, fix 3: real idempotency, the same requirement
+    # app/routes/mpesa_payment.py's STKPushRequest already enforces for the
+    # tenant rail. A repeated key with the same body replays the first
+    # response instead of pushing a second STK prompt.
+    idempotency_key: str
 
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────
@@ -69,6 +74,8 @@ def charge_subscription(
         subscription_invoice_id=payload.subscription_invoice_id,
         period_label=payload.period_label,
         initiated_by=admin.get("admin_id"),
+        user_id=admin.get("admin_id"),
+        idempotency_key=payload.idempotency_key,
     )
 
 

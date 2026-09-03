@@ -266,10 +266,28 @@ def apply_platform_stk_callback(
         # Defect fix: this replay check used to omit status == "Success",
         # unlike its tenant twin (settlement.py:258-265). Benign only while
         # nothing wrote a receipt on the success path; now that settlement
-        # actually posts to the ledger below, a Quarantined row that
-        # happens to share a receipt_number (e.g. two callbacks disputing
-        # the same claimed receipt) must never be mistaken for "already
-        # settled" and cause a genuine settlement to be skipped.
+        # actually posts to the ledger below, a row that happens to match
+        # on receipt_number must never be mistaken for "already settled"
+        # unless it genuinely is, or a genuine new settlement gets silently
+        # skipped and never credited.
+        #
+        # Round 1 review, verified: receipt_number carries a real
+        # unique=True constraint (see PlatformMpesaTransaction), so two
+        # COMMITTED rows can never actually share one value; Postgres
+        # itself refuses it. That makes the "two distinct rows, same
+        # receipt_number, different statuses" case this filter guards
+        # against unreachable today, not a live path an attacker or a race
+        # can hit. The filter stays anyway, as defence in depth against a
+        # future schema change (the column losing its uniqueness, or a
+        # second table gaining its own receipt_number column that this
+        # query gets pointed at) rather than because it is doing live work
+        # right now. Tried to construct a real end-to-end test for this;
+        # the database rejected it exactly because the constraint already
+        # guarantees the property at a stronger level than this code does.
+        # See tests/daraja/test_platform_rail.py's
+        # test_replay_filter_status_predicate_excludes_non_success_rows for
+        # the honest, narrower thing that predicate can actually be shown
+        # to do.
         replay = (
             master_db.query(PlatformMpesaTransaction)
             .filter(

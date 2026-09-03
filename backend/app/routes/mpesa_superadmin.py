@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.config.database import get_master_db
 from app.config.settings import settings
 from app.core.dependencies import require_superadmin
-from app.models.platform_mpesa import PlatformMpesaConfig
+from app.models.platform_mpesa import PlatformMpesaConfig, PlatformMpesaTransaction
 from app.services.daraja.tokens import mint_callback_token, store_callback_token
 from app.services.daraja.platform_stk import _callback_url
 from app.utils.encryption import encrypt_data
@@ -142,11 +142,26 @@ def platform_health(master_db: Session = Depends(get_master_db)):
         except HTTPException:
             callback_url = None
 
+    # Round 1 review: a quarantined charge (money reached Safaricom, not
+    # credited to any invoice) was previously discoverable only by watching
+    # ERROR logs or polling GET /transactions?status=Quarantined. Surfacing
+    # the count here puts it on the one panel a superadmin actually checks,
+    # the way the readiness blockers above already are. A nonzero count is
+    # a "needs review" signal, not a rail-readiness blocker: it does not
+    # flip `ready` to False, the same way an overdue invoice does not stop
+    # new invoices from being raised.
+    quarantined_count = (
+        master_db.query(PlatformMpesaTransaction)
+        .filter(PlatformMpesaTransaction.status == "Quarantined")
+        .count()
+    )
+
     return {
         "environment": (config.environment if config else "sandbox"),
         "ready": not blockers,
         "blockers": blockers,
         "callback_url": callback_url,
+        "quarantined_count": quarantined_count,
         "config": _operator_view(config),
     }
 

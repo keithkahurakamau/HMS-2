@@ -22,8 +22,8 @@ config (environment="sandbox", every credential column NULL) is therefore a
 normal, expected state, reported as "not configured", not an error.
 """
 from sqlalchemy import (
-    Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer,
-    Numeric, String, Text,
+    Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer,
+    Numeric, String, Text, text,
 )
 from sqlalchemy.sql import func
 
@@ -140,3 +140,27 @@ class PlatformMpesaTransaction(Base):
     initiated_by = Column(Integer, ForeignKey("superadmins.admin_id"), nullable=True)
     initiated_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     settled_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        # CRITICAL fix, round 1 review: at most one Pending platform charge
+        # per subscription invoice, across every worker. Without this, a
+        # superadmin double-click (or any other path that ends up pushing
+        # twice for one invoice) sends two real STK prompts; two genuine
+        # approvals produce two different Safaricom receipts, so the
+        # receipt-keyed replay check in
+        # app/services/daraja/platform.py's apply_platform_stk_callback
+        # never catches either one, and both would reach settlement.
+        # app/services/daraja/platform_stk.py's _reserve_pending inserts
+        # and catches the conflict rather than checking then inserting,
+        # exactly the discipline app/models/mpesa.py's
+        # uq_mpesa_txn_one_pending_per_invoice already uses for the tenant
+        # rail; declared here for create_all parity, applied to the real
+        # master DB via MASTER_DB_PATCHES in scripts/migrate_all_tenants.py.
+        # A charge with no subscription_invoice_id (a bare connectivity
+        # test) is outside this guard, matching the WHERE clause.
+        Index(
+            "uq_platform_mpesa_txn_one_pending_per_invoice", "subscription_invoice_id",
+            unique=True,
+            postgresql_where=text("status = 'Pending' AND subscription_invoice_id IS NOT NULL"),
+        ),
+    )
