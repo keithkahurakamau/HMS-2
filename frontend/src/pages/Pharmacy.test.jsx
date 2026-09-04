@@ -439,7 +439,7 @@ describe('Pharmacy: payment flow', () => {
                     data: {
                         status: 'stk_push_sent',
                         external_reference: 'INV-999-abc',
-                        payhero_reference: 'PH-77',
+                        checkout_request_id: 'ws_CO_77',
                         transaction_id: 77,
                         invoice_status: 'Pending M-Pesa',
                     },
@@ -489,7 +489,7 @@ describe('Pharmacy: payment flow', () => {
         await waitFor(() => {
             expect(apiClient.post).toHaveBeenCalledWith(
                 '/pharmacy/dispense/200/pay',
-                expect.objectContaining({ method: 'cash', amount: 10 })
+                expect.objectContaining({ method: 'cash', amount: '10.00' })
             );
         });
         await waitFor(() => {
@@ -527,7 +527,7 @@ describe('Pharmacy: payment flow', () => {
         await waitFor(() => {
             expect(apiClient.post).toHaveBeenCalledWith(
                 '/pharmacy/dispense/201/pay',
-                expect.objectContaining({ method: 'card', amount: 10 })
+                expect.objectContaining({ method: 'card', amount: '10.00' })
             );
         });
         await waitFor(() => {
@@ -558,7 +558,7 @@ describe('Pharmacy: payment flow', () => {
                     data: {
                         status: 'stk_push_sent',
                         external_reference: 'INV-800-xyz',
-                        payhero_reference: 'PH-7700',
+                        checkout_request_id: 'ws_CO_7700',
                         transaction_id: 7700,
                         invoice_status: 'Pending M-Pesa',
                     },
@@ -581,7 +581,7 @@ describe('Pharmacy: payment flow', () => {
                 '/pharmacy/dispense/700/pay',
                 expect.objectContaining({
                     method: 'mpesa',
-                    amount: 10,
+                    amount: '10.00',
                     phone_number: '0712345678',
                 })
             );

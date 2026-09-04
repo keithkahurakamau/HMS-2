@@ -41,10 +41,12 @@ import app.routes.websockets as websockets_module
 import app.routes.radiology as radiology_module
 import app.routes.medical_history as medical_history_module
 import app.routes.public as public_module
-import app.routes.payhero_admin as payhero_admin_module
-import app.routes.payhero_payment as payhero_payment_module
-import app.routes.payhero_superadmin as payhero_superadmin_module
-import app.routes.platform_payhero as platform_payhero_module
+import app.routes.mpesa_refunds as mpesa_refunds_module
+import app.routes.mpesa_payment as mpesa_payment_module
+import app.routes.mpesa_admin as mpesa_admin_module
+import app.routes.mpesa_events as mpesa_events_module
+import app.routes.mpesa_superadmin as mpesa_superadmin_module
+import app.routes.platform_mpesa as platform_mpesa_module
 import app.routes.receivables as receivables_module
 import app.routes.privacy as privacy_module
 import app.routes.notifications as notifications_module
@@ -71,6 +73,36 @@ import app.routes.accounting_notes as accounting_notes_module
 # 1. Setup Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# SECURITY: a Daraja callback token is a path segment (Safaricom echoes the
+# URL we registered; we cannot make it a header instead), so it lands in
+# the access log's request line ("METHOD /path HTTP/1.1" status) and in
+# this module's own unhandled-exception handler, which logs
+# request.url.path directly. app/core/daraja_callback.py's whole design
+# treats that token as one of only two authentication layers for an
+# unsigned protocol, and app/utils/log_redact.py already redacts it from
+# every structured payload; a request line is free text, not a payload, so
+# it needs its own filter.
+#
+# render-start.sh runs gunicorn with --worker-class
+# uvicorn.workers.UvicornWorker, and UvicornWorker.__init__ copies
+# gunicorn's log HANDLERS onto uvicorn's OWN loggers ("uvicorn.access",
+# "uvicorn.error") with propagate=False, rather than emitting through
+# "gunicorn.access" itself. A filter attached only to "gunicorn.access"
+# (this file's first attempt) never sees a single record under that
+# worker class: it looked correct against the filter function in
+# isolation and was wrong end to end, confirmed by actually running
+# gunicorn with this exact worker class and reading the access log (see
+# the Task 9 fix-round report for the reproduction). Attach to all three
+# names, not just the one the deployed worker class actually uses: a
+# future switch away from UvicornWorker, or a local `uvicorn` invocation
+# in dev, must not silently reopen this gap.
+from app.utils.log_redact import CallbackTokenPathFilter  # noqa: E402
+
+_callback_token_filter = CallbackTokenPathFilter()
+for _logger_name in ("gunicorn.access", "uvicorn.access", "uvicorn.error"):
+    logging.getLogger(_logger_name).addFilter(_callback_token_filter)
+logger.addFilter(_callback_token_filter)
 
 # 2. Setup SlowAPI Rate Limiter (Imported from app.core.limiter)
 
@@ -260,17 +292,41 @@ async def security_headers_middleware(request: Request, call_next):
 #     requiring a token here would brick first-load auth). The other
 #     defences on these routes — bcrypt + rate limiting + per-route locks —
 #     hold the line on credential stuffing while CSRF stays excluded.
-#   - External webhooks (M-Pesa C2B callbacks) that can't possibly carry a
-#     CSRF header because they're called by Pay Hero's servers, not browsers.
-#     Authentication on those paths is HMAC signature based, not session based
-#     (see core/payhero_webhook.verify_payhero).
+#   - External webhooks (M-Pesa callbacks) that can't possibly carry a CSRF
+#     header because they're called by a payment provider's servers, not a
+#     browser.
+#       * The six Daraja callback paths below: direct Safaricom integration.
+#         Daraja does NOT sign its callbacks, so there is no signature to
+#         check and a comment claiming otherwise would be actively
+#         misleading. The model here is three-layered instead: an
+#         unguessable, rotatable callback token in the path (never the
+#         tenant database name), a Safaricom source-IP allow-list that fails
+#         closed in production when unconfigured, and a settlement
+#         cross-check that never trusts a callback's claimed amount (see
+#         core/daraja_callback.py). Each path is listed individually and
+#         precisely, never as a broad "/api/payments/mpesa/" prefix, which
+#         would also cover stk-push and any future config/admin route under
+#         this prefix, and auth on those routes is HttpOnly cookies with
+#         SameSite=None, so cross-site requests DO carry credentials and
+#         CSRF is load-bearing there.
 # Everything else — including the superadmin /hospitals admin surface, which
 # uses Bearer auth but still benefits from CSRF as defence-in-depth — must
 # present a matching token.
 _CSRF_EXEMPT_PATHS = (
     "/api/auth/login",
     "/api/public/superadmin/login",
-    "/api/payments/payhero/callback",
+    # Daraja callback paths only, never the bare "/api/payments/mpesa/"
+    # prefix (see the comment above). Trailing slash on each so a route
+    # under a similar-looking but different name, e.g. a future
+    # "/api/payments/mpesa/stk/callback-status", cannot match by accident.
+    "/api/payments/mpesa/stk/callback/",
+    "/api/payments/mpesa/c2b/validation/",
+    "/api/payments/mpesa/c2b/confirmation/",
+    "/api/payments/mpesa/b2c/result/",
+    "/api/payments/mpesa/b2c/timeout/",
+    "/api/payments/mpesa/status/result/",
+    "/api/payments/mpesa/status/timeout/",
+    "/api/payments/mpesa/platform/stk/callback/",
     # Inbound support email — called by the mail provider, not a browser.
     # Gated by HMAC signature instead of CSRF (EMAIL-003).
     "/api/public/support/inbound",
@@ -346,10 +402,12 @@ app.include_router(websockets_module.router)
 app.include_router(radiology_module.router)
 app.include_router(medical_history_module.router)
 app.include_router(public_module.router)
-app.include_router(payhero_admin_module.router)  # PAY-001: per-tenant Pay Hero config
-app.include_router(payhero_payment_module.router)  # PAY-001: Pay Hero aggregator
-app.include_router(payhero_superadmin_module.router)  # operator-only Pay Hero provisioning
-app.include_router(platform_payhero_module.router)  # superadmin subscription billing (platform rail)
+app.include_router(mpesa_refunds_module.router)  # Daraja migration Task 7: B2C refunds
+app.include_router(mpesa_payment_module.router)  # Daraja migration Task 9: STK push + all callbacks
+app.include_router(mpesa_admin_module.router)  # Daraja migration Task 9: per-tenant Daraja config
+app.include_router(mpesa_events_module.router)  # Daraja migration Task 15: the event log read API
+app.include_router(mpesa_superadmin_module.router)  # Daraja migration Task 10: platform Daraja config
+app.include_router(platform_mpesa_module.router)  # Daraja migration Task 10: platform Daraja charge + transactions
 app.include_router(receivables_module.router)  # superadmin receivables ledger (ageing, payments, dunning controls)
 app.include_router(privacy_module.router)
 app.include_router(notifications_module.router)

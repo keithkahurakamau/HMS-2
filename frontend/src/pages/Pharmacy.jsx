@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {} from 'react-router-dom';
 import { apiClient } from '../api/client';
+import { newIdempotencyKey } from '../api/mpesa';
 import {
     Search, Pill, CheckCircle2, AlertCircle,
     Printer, XCircle, Stethoscope,
@@ -57,10 +58,31 @@ export default function Pharmacy() {
     // (any of the items work, they share the invoice).
     const [payment, setPayment] = useState(null);
 
+    // The Pharmacy department's own id, so an M-Pesa push resolves to its
+    // own till (Task 14) instead of always falling back to the hospital
+    // default. Null when no department named "Pharmacy" exists yet, which
+    // is a normal state for a hospital that hasn't set one up: config_for
+    // falls back to the default in that case, the existing safe behaviour.
+    const [pharmacyDepartmentId, setPharmacyDepartmentId] = useState(null);
+    // One idempotency key per (phone number, OTC pay-straight-away attempt);
+    // see handleOTCPay below.
+    const otcIdemRef = useRef({ phone: null, key: null });
+
     // --- DATA FETCHING ---
     useEffect(() => {
         fetchPharmacyInventory();
         fetchRxQueue();
+        apiClient.get('/messaging/departments')
+            .then((res) => {
+                const dept = (res.data || []).find(
+                    (d) => (d.name || '').trim().toLowerCase() === 'pharmacy',
+                );
+                if (dept) setPharmacyDepartmentId(dept.department_id);
+            })
+            // A custom role without messaging:read, or no "Pharmacy"
+            // department yet, both leave department_id null: config_for's
+            // hospital-default fallback already handles that correctly.
+            .catch(() => {});
     }, []);
 
     const fetchPharmacyInventory = async () => {
@@ -232,6 +254,12 @@ export default function Pharmacy() {
         if (method === 'mpesa' && !phoneNumber) {
             return toast.error('M-Pesa needs a phone number.');
         }
+        // Reused only for a resubmit against the SAME phone number (a
+        // double click before the button disables); a different number is
+        // a genuinely new attempt and mints a fresh key.
+        if (method === 'mpesa' && otcIdemRef.current.phone !== phoneNumber) {
+            otcIdemRef.current = { phone: phoneNumber, key: newIdempotencyKey() };
+        }
         setIsProcessing(true);
         try {
             const responses = await dispenseItems(cart);  // walk-in
@@ -244,12 +272,20 @@ export default function Pharmacy() {
                 return;
             }
 
-            const amount = Number(last.invoice_balance ?? cartTotal);
+            // Formatted to 2dp BEFORE it ever reaches the network: money is
+            // formatted, never computed, at the API boundary. invoice_balance
+            // and cartTotal are both JS numbers and can carry float noise
+            // (e.g. 3300.2000000000003), which the mpesa route's condecimal
+            // amount field rejects outright.
+            const amount = Number(last.invoice_balance ?? cartTotal).toFixed(2);
             const res = await apiClient.post(`/pharmacy/dispense/${last.dispense_id}/pay`, {
                 method,
                 amount,
                 phone_number: method === 'mpesa' ? phoneNumber : null,
-                transaction_reference: reference || null });
+                transaction_reference: reference || null,
+                idempotency_key: method === 'mpesa' ? otcIdemRef.current.key : null,
+                department_id: pharmacyDepartmentId,
+            });
 
             if (method === 'mpesa') {
                 toast.success('STK push sent. Customer to confirm on their phone.');
@@ -260,7 +296,7 @@ export default function Pharmacy() {
                     amount,
                     patientName: 'Walk-in',
                     pendingMpesa: { external_reference: res.data?.external_reference,
-                                    payhero_reference: res.data?.payhero_reference,
+                                    checkout_request_id: res.data?.checkout_request_id,
                                     transaction_id: res.data?.transaction_id,
                                     phone: phoneNumber } });
             } else {
@@ -644,6 +680,7 @@ export default function Pharmacy() {
                     amountDue={payment.amount}
                     patientName={payment.patientName}
                     pendingMpesa={payment.pendingMpesa}
+                    departmentId={pharmacyDepartmentId}
                     onClose={() => setPayment(null)}
                     onSettled={handlePaymentSettled}
                 />
@@ -1018,7 +1055,7 @@ function Field({ label, children }) {
 const POLL_MS = 3000;
 const STK_TIMEOUT = 60;   // seconds the customer has to enter their PIN
 
-function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMpesa, onClose, onSettled }) {
+function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMpesa, departmentId, onClose, onSettled }) {
     const [method, setMethod] = useState('cash');     // 'cash' | 'mpesa'
     const [amount, setAmount] = useState(amountDue ? Number(amountDue).toFixed(2) : '');
     const [phone, setPhone] = useState('');
@@ -1029,8 +1066,13 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
     const [secondsLeft, setSecondsLeft] = useState(STK_TIMEOUT);
     const [mpesaError, setMpesaError] = useState(null);
     const [mpesaReceipt, setMpesaReceipt] = useState(null);
+    // One idempotency key per STK-push attempt: reused if this same attempt
+    // needs resubmitting, cleared by retry() so "Try again" after a
+    // resolved failure sends a genuinely new prompt rather than replaying
+    // the dead one.
+    const idemRef = useRef(null);
 
-    // Poll our own DB row (settled by the verified Pay Hero webhook) while a
+    // Poll our own DB row (settled by the verified Daraja callback) while a
     // push is pending, and run a visible countdown alongside it.
     // Cleanup exists: the cleanup clears both intervals.
     // react-doctor-disable-next-line react-doctor/effect-needs-cleanup
@@ -1088,20 +1130,28 @@ function PaymentModal({ invoiceId, dispenseId, amountDue, patientName, pendingMp
         setMpesaError(null);
         setMpesaReceipt(null);
         setSecondsLeft(STK_TIMEOUT);
+        idemRef.current = null; // the next send is a new attempt, not a retry
     };
 
     const submit = async () => {
         const amt = Number(amount);
         if (!amt || amt <= 0) return toast.error('Enter a valid amount.');
         if (method === 'mpesa' && !phone) return toast.error('M-Pesa needs a phone number.');
+        if (method === 'mpesa' && !idemRef.current) idemRef.current = newIdempotencyKey();
 
         setSubmitting(true);
         try {
             const payload = {
                 method,
-                amount: amt,
+                // Formatted to 2dp as a string before it reaches the network:
+                // the mpesa route's amount field is a condecimal and rejects
+                // a float that doesn't round-trip exactly.
+                amount: amt.toFixed(2),
                 phone_number: method === 'mpesa' ? phone : null,
-                transaction_reference: reference || null };
+                transaction_reference: reference || null,
+                idempotency_key: method === 'mpesa' ? idemRef.current : null,
+                department_id: departmentId,
+            };
             const res = await apiClient.post(`/pharmacy/dispense/${dispenseId}/pay`, payload);
 
             if (method === 'cash') {

@@ -59,6 +59,14 @@ class DispensePaymentRequest(BaseModel):
     phone_number: Optional[str] = None
     # Optional human-friendly reference (receipt no., card auth code, etc.).
     transaction_reference: Optional[str] = None
+    # Required when method == 'mpesa': forwarded to Daraja's initiate_stk_push
+    # so a retried request (a double click, a dropped response) replays the
+    # first push instead of sending a second prompt to the same phone.
+    idempotency_key: Optional[str] = None
+    # Forwarded to config_for (via initiate_stk_push): resolves the
+    # Pharmacy department's own active till when one exists, otherwise the
+    # hospital default. None (the default) is the hospital-wide till.
+    department_id: Optional[int] = None
 
 
 class CashPaymentResponse(BaseModel):
@@ -69,8 +77,11 @@ class CashPaymentResponse(BaseModel):
     invoice_status: str
 
 
-class PayHeroInitResponse(BaseModel):
+class MpesaInitResponse(BaseModel):
+    """Daraja STK push acknowledgement for a pharmacy dispense payment.
+    Replaces the removed Pay Hero aggregator's init response on this route
+    now that dispense payments go through the tenant's own Daraja till."""
     status: Literal["stk_push_sent"]
     external_reference: str
-    payhero_reference: Optional[str] = None
+    checkout_request_id: Optional[str] = None
     transaction_id: int

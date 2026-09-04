@@ -1,35 +1,38 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import {
-    CreditCard, Wallet, Hash, Link2, KeyRound, Building, Banknote,
-    Send, CheckCircle2, AlertCircle, Phone, Building2, Activity, ShieldCheck,
+    CreditCard, Wallet, Hash, Link2, Send, CheckCircle2, AlertCircle,
+    Phone, Building2, Activity,
 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import PasswordInput from '../../components/PasswordInput';
 import usePlatformPaymentSocket from '../../hooks/usePlatformPaymentSocket';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Superadmin: Subscription Billing (the platform's OWN Pay Hero rail).     */
+/*  Superadmin: Subscription Billing (the platform's OWN Daraja rail).       */
 /*                                                                            */
-/*  This is the ONLY rail where MediFleet receives money. The operator        */
-/*  provisions MediFleet's own Pay Hero account, charges a tenant's           */
-/*  subscription via STK into that account, and watches it settle live.       */
-/*  The hospital rail (M-Pesa Provisioning) stays custody-free.               */
+/*  This is the ONLY rail where MediFleet receives money. The operator       */
+/*  provisions MediFleet's own Daraja (direct Safaricom) shortcode, charges  */
+/*  a tenant's subscription via STK straight to that shortcode, and watches  */
+/*  it settle live. The hospital rail (M-Pesa Provisioning) stays           */
+/*  custody-free. Pay Hero, the aggregator this screen used to provision,   */
+/*  was removed in the Daraja migration's Task 12: there is no aggregator   */
+/*  settlement bank to nominate here any more, Safaricom pays MediFleet's   */
+/*  own shortcode directly.                                                  */
 /* ────────────────────────────────────────────────────────────────────────── */
 
 const blankConfig = {
-    shortcode: '', shortcode_type: 'paybill', payhero_channel_id: '',
-    payhero_username: '', payhero_password: '', payhero_webhook_secret: '',
-    settlement_bank_code: '', settlement_account_number: '', settlement_account_name: '',
+    shortcode: '', shortcode_type: 'paybill', environment: 'sandbox',
+    consumer_key: '', consumer_secret: '', passkey: '',
     account_reference: 'MEDIFLEET', transaction_desc: 'MediFleet Subscription',
 };
 
 const numericId = (t) => String(t.id || t.tenant_id || '').replace(/^tenant_/, '');
+const genKey = () => crypto.randomUUID();
 
 export default function PlatformSubscriptions() {
     const [health, setHealth] = useState(null);
-    const [banks, setBanks] = useState([]);
     const [form, setForm] = useState(blankConfig);
     const [saving, setSaving] = useState(false);
 
@@ -42,13 +45,17 @@ export default function PlatformSubscriptions() {
     const [savingContact, setSavingContact] = useState(false);
 
     const [txns, setTxns] = useState([]);
+    // Mirrors `txns` so the socket handler can decide whether the list is
+    // stale without reading state inside a state updater.
+    const txnsRef = useRef([]);
+    useEffect(() => { txnsRef.current = txns; }, [txns]);
 
     const loadHealth = async () => {
-        try { const { data } = await apiClient.get('/public/superadmin/platform-payhero/health'); setHealth(data); seedForm(data?.config); }
+        try { const { data } = await apiClient.get('/public/superadmin/platform-mpesa/health'); setHealth(data); seedForm(data?.config); }
         catch (err) { toast.error(err?.response?.data?.detail || 'Could not load billing status.'); }
     };
     const loadTxns = async () => {
-        try { const { data } = await apiClient.get('/public/superadmin/platform-payhero/transactions?limit=50'); setTxns(data || []); }
+        try { const { data } = await apiClient.get('/public/superadmin/platform-mpesa/transactions?limit=50'); setTxns(data || []); }
         catch { /* non-fatal */ }
     };
     const seedForm = (cfg) => {
@@ -56,11 +63,8 @@ export default function PlatformSubscriptions() {
         setForm(f => ({
             ...f,
             shortcode: cfg.shortcode || '', shortcode_type: cfg.shortcode_type || 'paybill',
-            payhero_channel_id: cfg.payhero_channel_id || '',
-            payhero_username: '', payhero_password: '', payhero_webhook_secret: '',
-            settlement_bank_code: cfg.settlement_bank_code || '',
-            settlement_account_number: cfg.settlement_account_number || '',
-            settlement_account_name: cfg.settlement_account_name || '',
+            environment: cfg.environment || 'sandbox',
+            consumer_key: '', consumer_secret: '', passkey: '',
             account_reference: cfg.account_reference || 'MEDIFLEET',
             transaction_desc: cfg.transaction_desc || 'MediFleet Subscription',
         }));
@@ -69,11 +73,7 @@ export default function PlatformSubscriptions() {
     useEffect(() => {
         (async () => {
             try {
-                const [bnk, hosp] = await Promise.all([
-                    apiClient.get('/public/superadmin/platform-payhero/banks'),
-                    apiClient.get('/public/hospitals?include_inactive=false'),
-                ]);
-                setBanks(bnk.data?.banks || []);
+                const hosp = await apiClient.get('/public/hospitals?include_inactive=false');
                 setTenants(hosp.data || []);
             } catch { /* noop */ }
             loadHealth();
@@ -83,26 +83,40 @@ export default function PlatformSubscriptions() {
 
     // Live settlement feed: merge incoming frames into the transactions list.
     usePlatformPaymentSocket(true, (evt) => {
+        // A frame for a transaction we are not holding means our list is
+        // stale, so refetch. That refetch must happen AFTER the updater, not
+        // inside it: React runs updater functions twice under StrictMode, so
+        // a fetch in there fires the request twice, and an updater that is
+        // not pure is wrong even where the duplicate happens to be harmless.
+        const matches = (t) => t.id === evt.transaction_id || t.external_reference === evt.external_reference;
+        // Staleness is read off the ref, never assigned inside the updater: an
+        // updater that writes to anything outside itself is impure, and React
+        // runs it twice under StrictMode. A ref that lags by a tick can only
+        // cost one redundant refetch, which is harmless.
+        const listIsStale = txnsRef.current.findIndex(matches) === -1;
+        // The merge still works off `prev`, so it stays correct even when
+        // several frames land before the next render.
         setTxns(prev => {
-            const idx = prev.findIndex(t => t.id === evt.transaction_id || t.external_reference === evt.external_reference);
-            if (idx === -1) { loadTxns(); return prev; }
+            const idx = prev.findIndex(matches);
+            if (idx === -1) return prev;
             const next = [...prev];
             next[idx] = { ...next[idx], status: evt.status, receipt_number: evt.receipt_number, result_desc: evt.result_desc };
             return next;
         });
+        if (listIsStale) loadTxns();
         if (evt.status === 'Success') toast.success(`Subscription settled, receipt ${evt.receipt_number || ''}`);
         else if (evt.status === 'Failed') toast.error(`Subscription charge failed: ${evt.result_desc || ''}`);
     });
 
     const saveConfig = async () => {
-        if (!form.settlement_bank_code || !form.payhero_channel_id) {
-            return toast.error('Channel id and settlement bank are required.');
+        if (!form.shortcode) {
+            return toast.error('MediFleet’s shortcode is required.');
         }
         setSaving(true);
         try {
-            await apiClient.post('/public/superadmin/platform-payhero/config', form);
+            await apiClient.post('/public/superadmin/platform-mpesa/config', form);
             toast.success('Subscription billing account saved.');
-            setForm(f => ({ ...f, payhero_username: '', payhero_password: '', payhero_webhook_secret: '' }));
+            setForm(f => ({ ...f, consumer_key: '', consumer_secret: '', passkey: '' }));
             loadHealth();
         } catch (err) { toast.error(err?.response?.data?.detail || 'Could not save.'); }
         finally { setSaving(false); }
@@ -112,7 +126,7 @@ export default function PlatformSubscriptions() {
         if (!chargeTenant) return toast.error('Pick a tenant first.');
         setSavingContact(true);
         try {
-            await apiClient.patch(`/public/superadmin/platform-payhero/tenant/${chargeTenant}/billing-contact`, {
+            await apiClient.patch(`/public/hospitals/${chargeTenant}`, {
                 billing_contact_msisdn: chargePhone,
             });
             toast.success('Billing contact saved for this tenant.');
@@ -125,18 +139,14 @@ export default function PlatformSubscriptions() {
         if (!isTest && !chargeAmount) return toast.error('Enter an amount.');
         setCharging(true);
         try {
-            if (isTest) {
-                await apiClient.post('/public/superadmin/platform-payhero/test-stk', {
-                    tenant_id: Number(chargeTenant), phone_number: chargePhone,
-                });
-                toast.success('KES 1 test push sent. Approve on the phone.');
-            } else {
-                await apiClient.post('/public/superadmin/platform-payhero/charge', {
-                    tenant_id: Number(chargeTenant), amount: Number(chargeAmount),
-                    phone_number: chargePhone || undefined, period_label: chargePeriod || undefined,
-                });
-                toast.success('Subscription charge dispatched.');
-            }
+            await apiClient.post('/public/superadmin/platform-mpesa/charge', {
+                tenant_id: Number(chargeTenant),
+                amount: isTest ? 1 : Number(chargeAmount),
+                phone_number: chargePhone || undefined,
+                period_label: isTest ? 'Connectivity test' : (chargePeriod || undefined),
+                idempotency_key: genKey(),
+            });
+            toast.success(isTest ? 'KES 1 test push sent. Approve on the phone.' : 'Subscription charge dispatched.');
             loadTxns();
         } catch (err) { toast.error(err?.response?.data?.detail || 'Charge failed.'); }
         finally { setCharging(false); }
@@ -150,7 +160,7 @@ export default function PlatformSubscriptions() {
                 eyebrow="Console"
                 icon={CreditCard}
                 title="Subscription Billing"
-                subtitle="Provision MediFleet's own Pay Hero account and charge tenants their subscription. This is the only money you receive."
+                subtitle="Provision MediFleet's own Daraja shortcode and charge tenants their subscription. This is the only money you receive."
                 tone="accent"
             />
 
@@ -160,9 +170,9 @@ export default function PlatformSubscriptions() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Config */}
                 <div data-tour="sub-config" className="lg:col-span-2 bg-white dark:bg-ink-900 border border-ink-200/70 dark:border-ink-800 rounded-xl p-6 space-y-5">
-                    <SectionHead icon={Wallet} title="Your MediFleet Pay Hero account" />
+                    <SectionHead icon={Wallet} title="Your MediFleet Daraja shortcode" />
                     <p className="text-xs text-ink-500 dark:text-ink-400 -mt-3">
-                        These are MediFleet's OWN account values, subscription proceeds settle to MediFleet's bank.
+                        These are MediFleet's OWN shortcode and Daraja API credentials. Safaricom pays this shortcode directly, there is no aggregator or settlement bank to configure.
                     </p>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -177,45 +187,33 @@ export default function PlatformSubscriptions() {
                         </Field>
                     </div>
 
-                    <SectionHead icon={Link2} title="Pay Hero credentials" />
-                    <Field label="Channel id">
-                        <input aria-label="Channel id" className="input" value={form.payhero_channel_id} onChange={set('payhero_channel_id')} placeholder="from your Pay Hero dashboard" />
-                    </Field>
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field label="API username">
-                            <PasswordInput autoComplete="new-password" value={form.payhero_username}
-                                   onChange={set('payhero_username')}
-                                   placeholder={health?.config?.uses_credentials ? '•••••• (leave blank to keep)' : 'API username'} />
-                        </Field>
-                        <Field label="API password">
-                            <PasswordInput autoComplete="new-password" value={form.payhero_password}
-                                   onChange={set('payhero_password')}
-                                   placeholder={health?.config?.uses_credentials ? '•••••• (leave blank to keep)' : 'API password'} />
-                        </Field>
-                    </div>
-                    <Field label="Webhook signing secret">
-                        <PasswordInput autoComplete="new-password" value={form.payhero_webhook_secret}
-                               onChange={set('payhero_webhook_secret')}
-                               placeholder={health?.config?.uses_webhook_secret ? '•••••• (leave blank to keep)' : 'your account webhook secret'} />
+                    <Field label="Daraja environment">
+                        <select className="input max-w-xs" value={form.environment} onChange={set('environment')}>
+                            <option value="sandbox">Sandbox</option>
+                            <option value="production">Production</option>
+                        </select>
                     </Field>
 
-                    <SectionHead icon={Building} title="Settlement bank (where MediFleet is paid)" />
+                    <SectionHead icon={Link2} title="Daraja API credentials" />
                     <div className="grid grid-cols-2 gap-3">
-                        <Field label="Bank">
-                            <select className="input" value={form.settlement_bank_code} onChange={set('settlement_bank_code')}>
-                                <option value="">, select bank, </option>
-                                {banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
-                            </select>
+                        <Field label="Consumer key">
+                            <PasswordInput autoComplete="new-password" value={form.consumer_key}
+                                   onChange={set('consumer_key')}
+                                   placeholder={health?.config?.has_credentials ? '•••••• (leave blank to keep)' : 'Consumer key'} />
                         </Field>
-                        <Field label="Account number">
-                            <input aria-label="Account number" className="input" value={form.settlement_account_number} onChange={set('settlement_account_number')} />
-                        </Field>
-                        <Field label="Account name">
-                            <input aria-label="Account name" className="input" value={form.settlement_account_name} onChange={set('settlement_account_name')} />
+                        <Field label="Consumer secret">
+                            <PasswordInput autoComplete="new-password" value={form.consumer_secret}
+                                   onChange={set('consumer_secret')}
+                                   placeholder={health?.config?.has_credentials ? '•••••• (leave blank to keep)' : 'Consumer secret'} />
                         </Field>
                     </div>
+                    <Field label="Passkey">
+                        <PasswordInput autoComplete="new-password" value={form.passkey}
+                               onChange={set('passkey')}
+                               placeholder={health?.config?.has_credentials ? '•••••• (leave blank to keep)' : 'Passkey'} />
+                    </Field>
 
-                    <SectionHead icon={Banknote} title="Customisation" />
+                    <SectionHead icon={Hash} title="Customisation" />
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Account reference"><input aria-label="Account reference" className="input" value={form.account_reference} onChange={set('account_reference')} /></Field>
                         <Field label="Transaction description"><input aria-label="Transaction description" className="input" value={form.transaction_desc} onChange={set('transaction_desc')} /></Field>
@@ -257,7 +255,7 @@ export default function PlatformSubscriptions() {
                             </button>
                             <button type="button" onClick={() => charge(true)} disabled={charging || !health?.ready}
                                     className="px-3 py-2 rounded-lg border border-accent-200 dark:border-accent-500/30 text-accent-700 dark:text-accent-300 text-sm font-medium hover:bg-accent-50 dark:hover:bg-accent-500/10 disabled:opacity-60 inline-flex items-center gap-1">
-                                <Send size={14} /> Test
+                                <Send size={14} /> Test (KES 1)
                             </button>
                         </div>
                         {!health?.ready && (
@@ -292,9 +290,9 @@ function SubsGuide() {
             <p className="text-sm text-accent-900/90 dark:text-accent-200/90 leading-relaxed">
                 Hospital patient payments never touch you, they settle to each hospital's own bank.
                 <strong> Subscriptions are the one inbound rail:</strong> you charge a tenant's billing
-                phone via M-Pesa and the money lands in <strong>MediFleet's own Pay Hero account</strong>,
-                then your settlement bank. Configure your account once below, set each tenant's billing
-                phone, then charge them and watch it settle live.
+                phone via M-Pesa and the money lands directly on <strong>MediFleet's own Daraja shortcode</strong>,
+                on Safaricom's own settlement schedule. Configure your shortcode once below, set each tenant's
+                billing phone, then charge them and watch it settle live.
             </p>
         </div>
     );
@@ -351,7 +349,7 @@ function TxnTable({ txns, tenants }) {
                     {txns.map(t => (
                         <tr key={t.id} className="hover:bg-ink-50">
                             <td><span className="inline-flex items-center gap-1.5"><Building2 size={14} className="text-ink-400" />{nameFor(t.tenant_id)}</span></td>
-                            <td className="font-mono text-xs">KES {(t.amount || 0).toLocaleString('en-KE')}</td>
+                            <td className="font-mono text-xs">KES {Number(t.amount || 0).toLocaleString('en-KE')}</td>
                             <td className="text-xs">{t.period_label || '-'}</td>
                             <td className={`font-semibold text-xs ${STATUS_TONE[t.status] || 'text-ink-500'}`}>{t.status}</td>
                             <td className="font-mono text-xs">{t.receipt_number || '-'}</td>

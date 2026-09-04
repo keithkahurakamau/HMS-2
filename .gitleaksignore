@@ -5,3 +5,8 @@
 # Dummy password literal in a password-change unit test (test asserts that a
 # wrong current password is rejected). Not a real credential.
 5822db117ce9012ae2e387ec688ca5e9ac974bd3:backend/tests/test_profile.py:generic-api-key:60
+
+# Idempotency key literal in a Daraja concurrency test: the value is the
+# descriptive string "cashier-1-double-click", which the generic-api-key
+# rule matched on entropy alone. Not a credential.
+9871a5e7346172e8b3e411fe92a2ee5e7260a480:backend/tests/daraja/test_concurrency.py:generic-api-key:269

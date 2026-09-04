@@ -30,7 +30,7 @@ const ACTIONS = [
     { label: 'Appointments',   desc: 'Book & manage',            to: '/app/appointments', icon: CalendarDays,    perm: 'appointments:read',module: 'appointments',    tone: 'brand' },
     { label: 'Calendar',       desc: 'Schedule & events',        to: '/app/calendar',     icon: CalendarClock,   perm: null,               module: 'appointments',    tone: 'teal' },
     { label: 'Medical History',desc: 'Longitudinal charts',      to: '/app/medical-history',icon: ClipboardList, perm: 'history:read',     module: 'medical_history', tone: 'indigo' },
-    { label: 'M-Pesa',         desc: 'Mobile-money settings',    to: '/app/mpesa-settings',icon: Smartphone,     perm: 'payhero:manage',   module: 'payhero',         tone: 'emerald' },
+    { label: 'M-Pesa',         desc: 'Mobile-money settings',    to: '/app/mpesa-settings',icon: Smartphone,     perm: 'payhero:manage',   module: 'mpesa',           tone: 'emerald' },
     { label: 'Messages',       desc: 'Team messaging',           to: '/app/messages',     icon: MessageSquare,   perm: null,               module: 'messaging',       tone: 'sky' },
 ];
 

@@ -64,7 +64,14 @@ MODULES: Tuple[ModuleDef, ...] = (
     ModuleDef("billing",      "Billing",            "Invoicing, statements, payment plans.",    False),
     ModuleDef("cheques",      "Cheques",            "Cheque receipting and reconciliation.",    False),
     ModuleDef("medical_history","Medical History",  "Longitudinal patient history.",            False),
-    ModuleDef("payhero",      "M-Pesa Payments",    "Mobile-money collections at the till and pharmacy.", True),
+    # Daraja migration: the direct Safaricom integration that replaced the
+    # Pay Hero aggregator. Pay Hero itself (the old "payhero" module key and
+    # its /api/admin/payhero/ and /api/payments/payhero/ routes) was removed
+    # in Task 12. A tenant's stored feature_flags can still carry a legacy
+    # "payhero" key from before that removal; see resolve_enabled_modules's
+    # alias block below for how that old entitlement still unlocks this
+    # module without requiring every tenant to re-save their flags.
+    ModuleDef("mpesa",        "M-Pesa Payments (Daraja)", "Direct Safaricom M-Pesa collection at the till and pharmacy.", True),
     ModuleDef("analytics",    "Analytics",          "Aggregated dashboards and reports.",       False),
     ModuleDef("patient_portal","Patient Portal",    "Self-service portal for patients.",        False),
     ModuleDef("branding",     "Branding",           "Logos, colours, document templates.",      False),
@@ -89,7 +96,7 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/users/",                       "users"),
     # NOTE: more specific /api/admin/<module>/ prefixes must appear before
     # the broad /api/admin/ rule so module gating routes them correctly.
-    ("/api/admin/payhero/",               "payhero"),
+    ("/api/admin/mpesa/",                 "mpesa"),
     ("/api/admin/",                       "users"),
     ("/api/me/",                          "users"),
     ("/api/support/",                     "support"),
@@ -116,7 +123,7 @@ URL_PREFIX_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/cheques/",                     "cheques"),
     ("/api/medical-history/",             "medical_history"),
     ("/api/medical_history/",             "medical_history"),
-    ("/api/payments/payhero/",            "payhero"),
+    ("/api/payments/mpesa/",              "mpesa"),
     ("/api/analytics/",                   "analytics"),
     ("/api/patient-portal/",              "patient_portal"),
     ("/api/branding/",                    "branding"),
@@ -161,12 +168,36 @@ def resolve_enabled_modules(flags_raw: Optional[str]) -> List[str]:
     − explicit-false (for non-always-on modules).
     """
     flags = _parse_flags(flags_raw)
-    # Legacy alias: the ``mpesa`` module was renamed to ``payhero`` in the
-    # Pay Hero swap. Existing tenants still carry the old key in their
-    # feature_flags column — translate it forward so they don't have to
-    # re-save their entitlement.
+    # Legacy alias, round 1 (pre-Pay-Hero era): the ORIGINAL ``mpesa`` module
+    # key was renamed to ``payhero`` when Pay Hero shipped. Existing tenants
+    # still carrying that old key translate forward so they don't have to
+    # re-save their entitlement. NOTE this predates, and is unrelated to, the
+    # NEW ``mpesa`` module key added below for the Daraja migration: the same
+    # string is reused because the pre-Pay-Hero integration and the
+    # post-Pay-Hero one are, again, the same product (direct Safaricom
+    # M-Pesa), not because either alias assumes the other.
     if "mpesa" in flags and "payhero" not in flags:
         flags["payhero"] = flags.pop("mpesa")
+    # Legacy alias, round 2: Pay Hero itself was removed in Task 12, but a
+    # tenant's stored feature_flags can still carry ``payhero: true`` from
+    # before that removal. An existing ``payhero`` entitlement forward-fills
+    # to the ``mpesa`` module so that hospital keeps collecting M-Pesa
+    # through Daraja without anyone having to touch their feature_flags.
+    # ``payhero`` is no longer a real ModuleDef (see MODULES above), so this
+    # alias is the only place that old key still does anything. An explicit
+    # False stays False: only a truthy ``payhero`` flag forward-fills
+    # ``mpesa``.
+    if flags.get("payhero") and "mpesa" not in flags:
+        flags["mpesa"] = flags["payhero"]
+    # An explicit False on the legacy key must forward-fill as an explicit
+    # False too. ``mpesa`` defaults to enabled (ModuleDef's default_enabled),
+    # so without this a hospital that deliberately switched M-Pesa off via
+    # ``payhero: false`` would see the module re-appear anyway, the nav
+    # item, the settings page and the route prefix all reachable again,
+    # exactly the silent re-enable this alias exists to prevent in the
+    # other direction.
+    elif "payhero" in flags and not flags["payhero"] and "mpesa" not in flags:
+        flags["mpesa"] = False
     enabled: set = set(DEFAULT_ENABLED)
     for key, value in flags.items():
         if key not in BY_KEY:

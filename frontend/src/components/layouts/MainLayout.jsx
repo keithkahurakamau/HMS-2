@@ -3,6 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useModules } from '../../context/ModuleContext';
 import { useJourney } from '../../context/JourneyContext';
+import { JOURNEYS } from '../../journeys';
 import {
     LayoutDashboard, Users, Stethoscope, TestTube,
     Pill, Bed, Package, Receipt, LogOut, Menu, X,
@@ -43,7 +44,8 @@ const ROUTE_TO_JOURNEY = [
     ['/app/branding',        'branding'],
     ['/app/accounting',      'accounting'],
     ['/app/support',         'support'],
-    ['/app/mpesa-settings',  'payhero'],
+    ['/app/mpesa-settings',  'mpesa'],
+    ['/app/mpesa/events',    'mpesa'],
     ['/app/home',            'dashboard'],
     ['/app/dashboard',       'dashboard'],
     ['/app',                 'dashboard'],   // role-redirect fallback
@@ -79,7 +81,8 @@ const NAVIGATION = [
     { name: 'Cheque Register',   path: '/app/cheques',         icon: <Banknote size={18} />,        allowedRoles: ['Admin', 'Receptionist', 'Doctor', 'Nurse'],       requiredPermission: 'cheques:read',     moduleKey: 'cheques' },
     { name: 'Accounting',        path: '/app/accounting',      icon: <BookOpen size={18} />,        allowedRoles: ['Admin', 'Accountant'],                            requiredPermission: 'accounting:view',  moduleKey: 'accounting' },
     { name: 'MediFleet Support', path: '/app/support',         icon: <LifeBuoy size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'support:manage',   moduleKey: 'support' },
-    { name: 'M-Pesa Payments',   path: '/app/mpesa-settings',  icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: ['payhero:manage', 'mpesa:manage'], moduleKey: 'payhero' },
+    { name: 'M-Pesa Payments',   path: '/app/mpesa-settings',  icon: <Smartphone size={18} />,      allowedRoles: ['Admin'],                                          requiredPermission: ['payhero:manage', 'mpesa:manage'], moduleKey: 'mpesa' },
+    { name: 'M-Pesa Event Log',  path: '/app/mpesa/events',    icon: <ListChecks size={18} />,      allowedRoles: ['Admin', 'Receptionist', 'Accountant'],            requiredPermission: ['billing:read', 'billing:manage'], moduleKey: 'mpesa' },
     { name: 'Settings',          path: '/app/settings',        icon: <Settings size={18} />,        allowedRoles: ['Admin'],                                          requiredPermission: 'settings:read',    moduleKey: 'settings' },
 ];
 
@@ -102,9 +105,17 @@ export default function MainLayout() {
     const { branding } = useBranding();
     const { startJourney, forceStartJourney, activeKey } = useJourney();
 
-    const currentJourneyKey = ROUTE_TO_JOURNEY.find(
+    // A route can map to a journey key with no actual tour content yet
+    // (JOURNEYS[key] undefined or empty): forceStartJourney already no-ops
+    // on that, but the manual "?" button must not render at all for it,
+    // or a click on it visibly does nothing. Checked here, once, rather
+    // than at every call site.
+    const mappedJourneyKey = ROUTE_TO_JOURNEY.find(
         ([prefix]) => location.pathname.startsWith(prefix)
     )?.[1] || null;
+    const currentJourneyKey = (mappedJourneyKey && JOURNEYS[mappedJourneyKey]?.length)
+        ? mappedJourneyKey
+        : null;
 
     useEffect(() => {
         if (!currentJourneyKey || activeKey) return;

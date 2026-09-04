@@ -479,7 +479,7 @@ class TestPaymentCashCard:
 # ─── 8. Payment — M-Pesa STK ───────────────────────────────────────────────
 
 class TestPaymentMpesa:
-    def test_mpesa_stk_push_returns_init_shape_or_502(
+    def test_mpesa_stk_push_returns_init_shape_or_expected_error(
         self, client, pharmacist_cookies, admin_cookies
     ):
         batch = _get_first_available_batch(client, pharmacist_cookies)
@@ -495,25 +495,27 @@ class TestPaymentMpesa:
                 f"/api/pharmacy/dispense/{d.json()['dispense_id']}/pay",
                 cookies=pharmacist_cookies,
                 json={"method": "mpesa", "amount": total,
-                      "phone_number": "0712345678"},
+                      "phone_number": "0712345678", "idempotency_key": "test-key-1"},
             )
-            # STK may legitimately fail with 502 in CI if Safaricom creds
-            # aren't configured for this tenant. Either shape is acceptable.
+            # This tenant (mayoclinic_db) normally has no Daraja till
+            # configured, so 400 "not configured" is the expected shape in
+            # CI. 502 covers an env with a till configured but unreachable
+            # Safaricom credentials; 200 covers one with a working sandbox
+            # till. All three are legitimate depending on the environment.
             if pay.status_code == 200:
                 body = pay.json()
                 assert body["status"] == "stk_push_sent"
                 assert body["checkout_request_id"]
-                assert body["mpesa_transaction_id"]
-            else:
-                assert pay.status_code == 502, (
-                    f"Expected 200 or 502, got {pay.status_code}: {pay.text}"
-                )
-                # Bare-bones credentials check on the error path.
+                assert body["transaction_id"]
+            elif pay.status_code == 502:
                 assert (
-                    "M-Pesa" in pay.text
-                    or "mpesa" in pay.text.lower()
-                    or "credentials" in pay.text.lower()
+                    "M-Pesa" in pay.text or "mpesa" in pay.text.lower()
                 ), pay.text
+            else:
+                assert pay.status_code == 400, (
+                    f"Expected 200, 502 or 400, got {pay.status_code}: {pay.text}"
+                )
+                assert "not configured" in pay.text.lower(), pay.text
         finally:
             _cleanup_patient(client, admin_cookies, patient["patient_id"])
 
@@ -530,7 +532,26 @@ class TestPaymentMpesa:
             pay = client.post(
                 f"/api/pharmacy/dispense/{d.json()['dispense_id']}/pay",
                 cookies=pharmacist_cookies,
-                json={"method": "mpesa", "amount": total},
+                json={"method": "mpesa", "amount": total, "idempotency_key": "test-key-1"},
+            )
+            assert pay.status_code == 400, pay.text
+        finally:
+            _cleanup_patient(client, admin_cookies, patient["patient_id"])
+
+    def test_mpesa_without_idempotency_key_is_400(self, client, pharmacist_cookies, admin_cookies):
+        batch = _get_first_available_batch(client, pharmacist_cookies)
+        patient = _new_patient(client, admin_cookies)
+        try:
+            d = _dispense(
+                client, pharmacist_cookies,
+                batch_id=batch["batch_id"], quantity=1,
+                patient_id=patient["patient_id"],
+            )
+            total = d.json()["total_cost"]
+            pay = client.post(
+                f"/api/pharmacy/dispense/{d.json()['dispense_id']}/pay",
+                cookies=pharmacist_cookies,
+                json={"method": "mpesa", "amount": total, "phone_number": "0712345678"},
             )
             assert pay.status_code == 400, pay.text
         finally:
@@ -554,7 +575,7 @@ class TestPaymentMpesa:
                 f"/api/pharmacy/dispense/{dispense_id}/pay",
                 cookies=pharmacist_cookies,
                 json={"method": "mpesa", "amount": total,
-                      "phone_number": "0712345678"},
+                      "phone_number": "0712345678", "idempotency_key": "test-key-1"},
             )
             if pay1.status_code != 200:
                 pytest.skip(
@@ -566,7 +587,7 @@ class TestPaymentMpesa:
                 f"/api/pharmacy/dispense/{dispense_id}/pay",
                 cookies=pharmacist_cookies,
                 json={"method": "mpesa", "amount": total,
-                      "phone_number": "0712345678"},
+                      "phone_number": "0712345678", "idempotency_key": "test-key-2"},
             )
             assert pay2.status_code == 200, pay2.text
             assert pay2.json()["checkout_request_id"] == first_id

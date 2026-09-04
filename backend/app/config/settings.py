@@ -32,23 +32,43 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # ── Pay Hero aggregator (PAY-001) ──────────────────────────────────
-    PAYHERO_ENV: str = "sandbox"               # 'sandbox' | 'production'
-    PAYHERO_BASE_URL: str = "https://backend.payhero.co.ke/api/v2"
+    # ── Pay Hero aggregator (PAY-001), REMOVED (Daraja migration Task 12) ──
+    # NO CODE READS THESE. Declared only so a deploy against a stale .env
+    # that still has these keys doesn't trip pydantic's extra="forbid" and
+    # take the API down at boot. Same pattern as the legacy MPESA_* shims
+    # below. Safe to delete from .env; safe to leave in place. Drop these
+    # fields entirely in a later release once deploys have rolled off any
+    # .env carrying them.
+    PAYHERO_ENV: str = "sandbox"
+    PAYHERO_BASE_URL: str = ""
     PAYHERO_USERNAME: SecretStr = SecretStr("")
     PAYHERO_PASSWORD: SecretStr = SecretStr("")
-    PAYHERO_CHANNEL_ID: str = ""               # Till / Paybill / Bank channel
+    PAYHERO_CHANNEL_ID: str = ""
     PAYHERO_WEBHOOK_SECRET: SecretStr = SecretStr("")
-    # Comma-separated CIDR allow-list (PAY-002). Empty disables IP check —
-    # only acceptable in development; verify_payhero raises in production.
     PAYHERO_WEBHOOK_CIDRS: str = ""
-    # H-4: CIDRs of the proxies/load-balancers we sit behind (e.g. Render/LB
-    # egress). X-Forwarded-For is only trusted when the *immediate* peer is one
-    # of these — otherwise a direct caller could spoof an allow-listed source.
-    # Empty falls back to a safe heuristic: trust XFF only when the peer is a
-    # private/loopback address (i.e. we're clearly behind a platform LB).
     PAYHERO_TRUSTED_PROXIES: str = ""
     PUBLIC_BASE_URL: str = ""                  # https://… used for callback URLs
+
+    # -- Daraja callback authentication (direct Safaricom integration) --
+    # Daraja does not sign callbacks, so the IP allow-list is one of three
+    # layers standing between us and a forged payment (see
+    # app.core.daraja_callback). Comma-separated CIDR list. Empty disables the
+    # IP check, only acceptable in development; verify_daraja_source raises in
+    # production.
+    DARAJA_WEBHOOK_CIDRS: str = ""
+    # Same H-4 reasoning as PAYHERO_TRUSTED_PROXIES: CIDRs of the proxies/load
+    # balancers we sit behind. X-Forwarded-For is only trusted when the
+    # immediate peer is one of these, otherwise a direct caller could spoof
+    # an allow-listed source. Empty falls back to trusting XFF only when the
+    # peer is a private/loopback address, which behind a platform load
+    # balancer is normally true of every caller, proxied or not: leaving this
+    # empty makes DARAJA_WEBHOOK_CIDRS advisory rather than enforced, since a
+    # direct public caller reaching the app through that same load balancer
+    # can then set X-Forwarded-For to an allow-listed address and pass
+    # unchecked. verify_daraja_source therefore fails closed in production
+    # when this is empty, exactly as it does for an empty
+    # DARAJA_WEBHOOK_CIDRS. Only acceptable empty in development.
+    DARAJA_TRUSTED_PROXIES: str = ""
 
     # ── Email / SMTP (EMAIL-001) ───────────────────────────────────────
     # Provider-agnostic: any SMTP relay works (Gmail, Mailgun, Resend,
@@ -222,10 +242,6 @@ class Settings(BaseSettings):
     def password_pepper(self) -> str:
         """Server-side pepper; empty bytes if not configured (dev only)."""
         return self.PASSWORD_PEPPER.get_secret_value()
-
-    @property
-    def payhero_webhook_secret(self) -> str:
-        return self.PAYHERO_WEBHOOK_SECRET.get_secret_value()
 
     @property
     def smtp_password(self) -> str:

@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, CreditCard, Settings,
     ShieldAlert, LogOut, Users, LifeBuoy,
-    Menu, X, Smartphone, Wallet, KeyRound,
+    Menu, X, Wallet, KeyRound,
 } from 'lucide-react';
 import { clearSuperAdminSession } from '../../pages/superadmin/superAdminAuth';
 import { apiClient } from '../../api/client';
@@ -17,7 +17,6 @@ import PlatformHealth from '../PlatformHealth';
 // routes that have a journey defined in journeys/index.js need an entry.
 const ROUTE_TO_JOURNEY = [
     ['/superadmin/subscriptions', 'platform_subscriptions'],
-    ['/superadmin/payments',      'payhero_provisioning'],
 ];
 
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -40,7 +39,6 @@ const NAV = [
     { name: 'Revenue & Tiers',          path: '/superadmin/billing',   icon: <CreditCard size={18} /> },
     { name: 'Receivables',              path: '/superadmin/receivables', icon: <Wallet size={18} /> },
     { name: 'Subscription Billing',     path: '/superadmin/subscriptions', icon: <Wallet size={18} /> },
-    { name: 'M-Pesa Provisioning',      path: '/superadmin/payments',  icon: <Smartphone size={18} /> },
     { name: 'Platform Settings',        path: '/superadmin/settings',  icon: <Settings size={18} /> },
 ];
 

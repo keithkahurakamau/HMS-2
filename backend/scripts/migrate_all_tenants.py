@@ -31,6 +31,7 @@ tenant gets a chance.
 """
 from __future__ import annotations
 
+import importlib.util
 import logging
 import os
 import subprocess
@@ -60,7 +61,7 @@ from app.config.database import Base, DATABASE_URL  # noqa: E402,F401
 from app.models import (  # noqa: E402,F401
     accounting, audit, auth_tokens, billing, breach, calendar, cheque, clinical,
     clinical_extras, clinical_files, dialysis, email_events, idempotency, inventory, laboratory, master, maternity as _maternity,
-    medical_history, messaging, notification, patient, payhero, radiology, referral,
+    medical_history, messaging, mpesa, mpesa_events, notification, patient, radiology, referral,
     settings as _settings, support, theatre, user, wards,
 )
 
@@ -205,7 +206,10 @@ MASTER_DB_PATCHES: list[str] = [
     # These tables + the tenants billing columns live in the MASTER DB. The
     # alembic revision only runs against tenant DBs, so without these explicit
     # master patches the platform billing tables would never be created in
-    # production. Every statement is idempotent.
+    # production. Every statement is idempotent. Pay Hero code itself was
+    # removed in the Daraja migration's Task 12; these tables are kept
+    # (dropping live tables is a separate, irreversible operator decision,
+    # not made here).
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS billing_contact_msisdn VARCHAR(20);",
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS billing_contact_name VARCHAR(120);",
     """
@@ -327,6 +331,104 @@ MASTER_DB_PATCHES: list[str] = [
     """,
     "CREATE INDEX IF NOT EXISTS ix_dunning_invoice ON dunning_events (invoice_id);",
     "CREATE INDEX IF NOT EXISTS ix_dunning_tenant   ON dunning_events (tenant_id);",
+    # Daraja migration, task 3: platform-level M-Pesa (subscription rail).
+    # These two tables live in the MASTER DB only, the same way
+    # platform_payhero_configs/platform_payhero_transactions above do: the
+    # model file (app/models/platform_mpesa.py) is deliberately absent from
+    # the `from app.models import (...)` block up top, because that block
+    # feeds an unfiltered Base.metadata.create_all() run against every
+    # tenant engine. Listing it there would create the operator's own
+    # billing tables inside every hospital database. Every statement below
+    # is idempotent, because MASTER_DB_PATCHES runs on every deploy.
+    """
+    CREATE TABLE IF NOT EXISTS platform_mpesa_configs (
+        id                           SERIAL PRIMARY KEY,
+        shortcode                    VARCHAR(20)  NOT NULL DEFAULT '',
+        shortcode_type               VARCHAR(20)  NOT NULL DEFAULT 'paybill',
+        environment                  VARCHAR(20)  NOT NULL DEFAULT 'sandbox',
+        consumer_key_encrypted       VARCHAR(255),
+        consumer_secret_encrypted    VARCHAR(255),
+        passkey_encrypted            VARCHAR(255),
+        initiator_name               VARCHAR(80),
+        initiator_password_encrypted VARCHAR(255),
+        callback_token_encrypted     VARCHAR(255),
+        callback_token_lookup        VARCHAR(64) UNIQUE,
+        callback_token_rotated_at    TIMESTAMPTZ,
+        account_reference            VARCHAR(50)  DEFAULT 'MEDIFLEET',
+        transaction_desc             VARCHAR(100) DEFAULT 'MediFleet Subscription',
+        is_active                    BOOLEAN      DEFAULT TRUE,
+        last_test_at                 TIMESTAMPTZ,
+        last_test_status             VARCHAR(40),
+        last_test_message            TEXT,
+        created_at                   TIMESTAMPTZ  DEFAULT now(),
+        updated_at                   TIMESTAMPTZ,
+        updated_by                   INTEGER REFERENCES superadmins(admin_id),
+        CONSTRAINT ck_platform_mpesa_configs_callback_token_pair
+            CHECK ((callback_token_encrypted IS NULL) = (callback_token_lookup IS NULL))
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS platform_mpesa_transactions (
+        id                       SERIAL PRIMARY KEY,
+        tenant_id                INTEGER NOT NULL REFERENCES tenants(tenant_id),
+        subscription_invoice_id  INTEGER REFERENCES subscription_invoices(id),
+        phone_number             VARCHAR(20)  NOT NULL,
+        amount                   NUMERIC(12, 2) NOT NULL,
+        checkout_request_id      VARCHAR(100),
+        merchant_request_id      VARCHAR(100),
+        external_reference       VARCHAR(100) NOT NULL UNIQUE,
+        receipt_number           VARCHAR(50)  UNIQUE,
+        status                   VARCHAR(50)  DEFAULT 'Pending',
+        result_desc              VARCHAR(255),
+        period_label             VARCHAR(120),
+        initiated_by             INTEGER REFERENCES superadmins(admin_id),
+        initiated_at             TIMESTAMPTZ DEFAULT now(),
+        settled_at               TIMESTAMPTZ
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_tenant   ON platform_mpesa_transactions (tenant_id);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_invoice  ON platform_mpesa_transactions (subscription_invoice_id);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_checkout ON platform_mpesa_transactions (checkout_request_id);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_extref   ON platform_mpesa_transactions (external_reference);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_receipt  ON platform_mpesa_transactions (receipt_number);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_status   ON platform_mpesa_transactions (status);",
+    "CREATE INDEX IF NOT EXISTS ix_plat_mpesa_txn_initiated ON platform_mpesa_transactions (initiated_at);",
+    # Task 10 fix round 1 (Critical): at most one Pending platform charge
+    # per subscription invoice, the same discipline
+    # uq_mpesa_txn_one_pending_per_invoice already enforces for the tenant
+    # rail. Without this, two genuine STK approvals against one invoice
+    # (e.g. a superadmin double-click) both settle: they carry different
+    # Safaricom receipts, so the receipt-keyed replay check in
+    # app/services/daraja/platform.py never catches either one. Declared
+    # on the model too (app/models/platform_mpesa.py's __table_args__) for
+    # create_all parity on a fresh bootstrap; this statement is what
+    # actually creates it against the real master DB.
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_platform_mpesa_txn_one_pending_per_invoice "
+    "ON platform_mpesa_transactions (subscription_invoice_id) "
+    "WHERE status = 'Pending' AND subscription_invoice_id IS NOT NULL;",
+    # Task 10 fix round 1: idempotency_keys is normally created by
+    # SQLAlchemy create_all on a tenant database's first boot
+    # (app/models/idempotency.py). The master DB never went through that
+    # bootstrap path for this table, so the superadmin platform-charge
+    # route (the first master-DB caller of app/core/idempotency.py's
+    # idempotent_guard) would otherwise fail with "relation does not
+    # exist" on first use. Column-for-column identical to the tenant
+    # schema; user_id here holds a superadmins.admin_id, not a tenant
+    # users.user_id, which is why it stays a plain, unconstrained INTEGER
+    # exactly as it already is for the tenant rail.
+    """
+    CREATE TABLE IF NOT EXISTS idempotency_keys (
+        user_id              INTEGER NOT NULL DEFAULT 0,
+        endpoint             VARCHAR(96) NOT NULL DEFAULT '',
+        key                  VARCHAR(255) NOT NULL,
+        request_fingerprint  VARCHAR(64) NOT NULL DEFAULT '',
+        status_code          INTEGER NOT NULL DEFAULT 200,
+        response_body        TEXT NOT NULL,
+        created_at           TIMESTAMPTZ DEFAULT now(),
+        CONSTRAINT pk_idempotency_keys PRIMARY KEY (user_id, endpoint, key)
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_idempotency_created ON idempotency_keys (created_at);",
 ]
 
 
@@ -664,6 +766,25 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
         "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS last_test_status VARCHAR(40);"),
     ("mpesa_configs",
         "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS last_test_message TEXT;"),
+    # f2a3b4c5d6e7: per-department tills. department_id and mpesa_config_id
+    # must exist before _apply_mpesa_till_indexes (below) can create its four
+    # partial unique indexes, two of which are on department_id itself.
+    ("mpesa_configs",
+        "ALTER TABLE mpesa_configs ADD COLUMN IF NOT EXISTS department_id INTEGER "
+        "REFERENCES departments(department_id) ON DELETE SET NULL;"),
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS mpesa_config_id INTEGER "
+        "REFERENCES mpesa_configs(id);"),
+    # b4c5d6e7f8a9: C2B Transaction Status correlation. The async result
+    # callback identifies which row it answers by conversation_id, since the
+    # receipt itself is exactly what that callback is trying to confirm.
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS conversation_id VARCHAR(64);"),
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS originator_conversation_id VARCHAR(64);"),
+    ("mpesa_transactions",
+        "CREATE INDEX IF NOT EXISTS ix_mpesa_transactions_conversation_id "
+        "ON mpesa_transactions (conversation_id);"),
     # c4e62d8a1f37 — bidirectional cheque register
     ("cheques",
         "ALTER TABLE cheques ADD COLUMN IF NOT EXISTS direction VARCHAR(20) NOT NULL DEFAULT 'incoming';"),
@@ -720,6 +841,25 @@ TENANT_COLUMN_PATCHES: list[tuple[str, str]] = [
     ("patients", "CREATE INDEX IF NOT EXISTS ix_patients_id_number_bidx ON patients (id_number_bidx);"),
     ("patients", "CREATE INDEX IF NOT EXISTS ix_patients_telephone_1_bidx ON patients (telephone_1_bidx);"),
     ("patients", "CREATE INDEX IF NOT EXISTS ix_patients_email_bidx ON patients (email_bidx);"),
+    # d6e7f8a9b0c1: B2C refund dispatch-attempt marker. Written and
+    # committed by dispatch_refund BEFORE it calls Safaricom, so it
+    # survives a lost response and can tell "never dispatched" apart from
+    # "dispatched once, outcome unknown".
+    ("mpesa_refunds",
+        "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS first_dispatch_attempted_at TIMESTAMPTZ;"),
+    # e9f0a1b2c3d4: reconciliation correlation + surfaced-once tracking.
+    ("mpesa_refunds",
+        "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS status_query_conversation_id VARCHAR(64);"),
+    ("mpesa_refunds",
+        "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS surfaced_at TIMESTAMPTZ;"),
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS surfaced_at TIMESTAMPTZ;"),
+    # f0a1b2c3d4e5: reason-keyed surfacing throttle, so a row surfaced once
+    # can still notify again for a genuinely different reason later.
+    ("mpesa_refunds",
+        "ALTER TABLE mpesa_refunds ADD COLUMN IF NOT EXISTS surfaced_reason VARCHAR(255);"),
+    ("mpesa_transactions",
+        "ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS surfaced_reason VARCHAR(255);"),
 ]
 
 
@@ -765,6 +905,111 @@ def _apply_tenant_column_patches(tenant_url: str) -> None:
                 LOG.debug("[%s] column patches: no drift", label)
     except Exception as exc:  # noqa: BLE001
         LOG.error("[%s] column patch pass failed: %s", label, exc)
+    finally:
+        engine.dispose()
+
+
+def _load_department_tills_migration():
+    """Load alembic/versions/f2a3b4c5d6e7_department_tills.py by file path.
+
+    alembic/versions has no ``__init__.py`` (it isn't an importable
+    package), so this is the same pattern
+    tests/daraja/test_department_tills.py already uses to reach
+    ``pending_dedup_sql``. Loading it rather than retyping the SQL means the
+    legacy/safety-net path below and the migration's own dedup pass cannot
+    silently drift apart.
+    """
+    path = BACKEND_DIR / "alembic" / "versions" / "f2a3b4c5d6e7_department_tills.py"
+    spec = importlib.util.spec_from_file_location("department_tills_migration", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _apply_mpesa_till_indexes(tenant_url: str) -> None:
+    """Create the four partial unique indexes from f2a3b4c5d6e7 (per-department
+    tills, and one Pending push per invoice/dispense) on tenants that will
+    never actually run that migration.
+
+    A legacy tenant (no alembic_version) is bootstrapped by
+    ``_bootstrap_legacy_tenant``: create_all, then stamp straight to head.
+    create_all does not add columns or indexes to a table that already
+    exists, and stamping head means ``alembic upgrade head`` is a permanent
+    no-op for that tenant afterwards, so the migration's own upgrade(),
+    dedup-then-index-create included, never runs. Silently: two terminals in
+    one department can push two STK prompts for the same invoice, with no
+    error anywhere, on exactly the tenants nobody tests.
+
+    TENANT_COLUMN_PATCHES (applied just before this, in migrate_one) is what
+    guarantees mpesa_configs.department_id and
+    mpesa_transactions.mpesa_config_id exist first; two of these four
+    indexes are on department_id itself.
+
+    The same legacy data problem the migration guards against exists here
+    too: these are exactly the tenants still carrying Pay Hero era rows with
+    two Pending transactions for one invoice (no per-invoice guard existed
+    before this task), so the duplicate-resolution pass runs BEFORE the
+    CREATE UNIQUE INDEX statements, using the migration's own
+    ``pending_dedup_sql`` rather than a second copy that could drift from it.
+
+    Every statement here is IF NOT EXISTS / idempotent: safe to run on every
+    deploy, against every tenant, converged or not.
+    """
+    engine = create_engine(tenant_url)
+    label = tenant_url.rsplit("@", 1)[-1]
+    try:
+        with engine.begin() as conn:
+            existing_tables = set(inspect(conn).get_table_names())
+            if "mpesa_configs" not in existing_tables or "mpesa_transactions" not in existing_tables:
+                return
+
+            indexes_before = {ix["name"] for ix in inspect(conn).get_indexes("mpesa_configs")}
+            indexes_before |= {ix["name"] for ix in inspect(conn).get_indexes("mpesa_transactions")}
+
+            mig = _load_department_tills_migration()
+            resolved = 0
+            for scope_column in ("invoice_id", "dispense_id"):
+                result = conn.execute(
+                    text(mig.pending_dedup_sql(scope_column)),
+                    {"desc": mig.SUPERSEDED_PENDING_RESULT_DESC},
+                )
+                resolved += result.rowcount or 0
+            if resolved:
+                LOG.warning(
+                    "[%s] resolved %d pre-existing duplicate Pending mpesa_transactions "
+                    "row(s) before creating the till concurrency indexes",
+                    label, resolved,
+                )
+
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_configs_department "
+                "ON mpesa_configs (department_id) WHERE department_id IS NOT NULL;"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_configs_default "
+                "ON mpesa_configs ((department_id IS NULL)) WHERE department_id IS NULL;"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_txn_one_pending_per_invoice "
+                "ON mpesa_transactions (invoice_id) "
+                "WHERE status = 'Pending' AND invoice_id IS NOT NULL;"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_mpesa_txn_one_pending_per_dispense "
+                "ON mpesa_transactions (dispense_id) "
+                "WHERE status = 'Pending' AND dispense_id IS NOT NULL;"
+            ))
+
+            indexes_after = {ix["name"] for ix in inspect(conn).get_indexes("mpesa_configs")}
+            indexes_after |= {ix["name"] for ix in inspect(conn).get_indexes("mpesa_transactions")}
+            added = indexes_after - indexes_before
+            if added:
+                LOG.warning(
+                    "[%s] created till concurrency index(es): %s",
+                    label, ", ".join(sorted(added)),
+                )
+    except Exception as exc:  # noqa: BLE001
+        LOG.error("[%s] mpesa till index pass failed: %s", label, exc)
     finally:
         engine.dispose()
 
@@ -1005,6 +1250,12 @@ def migrate_one(tenant_db_name: str, default_url: str) -> None:
     # ADD COLUMN IF NOT EXISTS statements the relevant migrations carry so
     # legacy-stamped tenants pick up columns added since their bootstrap.
     _apply_tenant_column_patches(tenant_url)
+    # Safety net (I6): legacy-stamped tenants never run f2a3b4c5d6e7's
+    # upgrade(), so they never get its four partial unique indexes (two
+    # terminals in a department can otherwise push two STK prompts for one
+    # invoice, silently). Resolves the same legacy duplicate-Pending data
+    # problem first, then creates the indexes; both steps are idempotent.
+    _apply_mpesa_till_indexes(tenant_url)
     # Accounting reference data (CoA, currency, settings, ledger mappings) —
     # without it post_from_event skips every payment and the transaction log
     # stays empty (idempotent; customised tenants untouched).

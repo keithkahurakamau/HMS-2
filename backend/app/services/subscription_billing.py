@@ -127,11 +127,22 @@ def billing_lock(db: Session) -> Iterator[bool]:
     session-level lock only means anything here if it is acquired and held
     inside a single transaction that never commits until the run is done.
     That is exactly what this does: the dedicated connection's transaction
-    stays open (uncommitted) for the whole `with` block, and closing the
-    connection in `finally` releases the lock even if the explicit unlock
-    below fails to run, because Postgres always drops a session's advisory
-    locks when its backend disconnects. That removes the stranding failure
-    mode entirely instead of just narrowing it.
+    stays open (uncommitted) for the whole `with` block.
+
+    THE EXPLICIT UNLOCK IS THE REAL PROTECTION, NOT `conn.close()`. Under
+    the default QueuePool, closing a connection returns it to the pool and
+    issues a ROLLBACK; it does NOT disconnect the backend, and a ROLLBACK
+    does not drop a session-level pg_advisory_lock. A pooled connection
+    can then be handed back out still holding this lock, which is exactly
+    the stranding bug this docstring exists to warn about (an earlier
+    version of this function hit it for real, on the receivables branch).
+    So the explicit pg_advisory_unlock above is not a nicety alongside a
+    reliable close, it is the only thing that actually releases the lock
+    in the common case. If that explicit unlock itself fails,
+    `conn.invalidate()` is called before closing: invalidate marks the
+    underlying DBAPI connection as unusable and the pool discards it (a
+    real disconnect, which does drop the lock) rather than returning it to
+    the pool.
 
     Acquisition is non-blocking (pg_try_advisory_lock): a caller that finds
     the lock held should skip its run rather than wait, so yields False
@@ -151,9 +162,11 @@ def billing_lock(db: Session) -> Iterator[bool]:
                     conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": BILLING_LOCK_KEY})
                 except Exception:
                     logger.exception(
-                        "Explicit pg_advisory_unlock failed; closing the dedicated "
-                        "billing_lock connection below still releases it."
+                        "Explicit pg_advisory_unlock failed; invalidating the "
+                        "dedicated billing_lock connection so it is discarded "
+                        "rather than returned to the pool still holding the lock."
                     )
+                    conn.invalidate()
     finally:
         conn.close()
 

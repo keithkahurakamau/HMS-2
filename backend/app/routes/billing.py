@@ -84,7 +84,11 @@ def get_billing_queue(
         db.query(Invoice)
         .options(joinedload(Invoice.patient), selectinload(Invoice.items))
         .filter(Invoice.status.in_(["Pending", "Partially Paid", "Pending M-Pesa"]))
-        .order_by(Invoice.billing_date.asc())
+        # Newest first. Ordered oldest-first, a hospital whose backlog exceeds
+        # `limit` never sees the invoice it just raised: the cashier's own bill
+        # falls off the end of the first page. The cashier is almost always
+        # looking for a bill from the last few minutes, not the oldest on file.
+        .order_by(Invoice.billing_date.desc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -307,13 +311,13 @@ def charge_consultation_fee(req: ConsultationFeeRequest, request: Request, db: S
 @router.get("/transactions", dependencies=[Depends(RequirePermission("billing:read"))])
 def get_payment_transactions(db: Session = Depends(get_db), limit: int = Query(200, ge=1, le=1000)):
     """Unified cashflow ledger for the cashier: every settled payment (cash,
-    card/bank, M-Pesa) plus Pay Hero attempts that never settled (pending
+    card/bank, M-Pesa) plus Daraja attempts that never settled (pending
     STK pushes, failures, quarantined mismatches) so M-Pesa status is never
     invisible. Each row carries a type, a receipt reference, a status, and a
     human-readable description.
     """
     from app.models.patient import Patient
-    from app.models.payhero import PayHeroTransaction
+    from app.models.mpesa import MpesaTransaction
 
     rows = (
         db.query(Payment, Invoice, Patient)
@@ -347,8 +351,8 @@ def get_payment_transactions(db: Session = Depends(get_db), limit: int = Query(2
         })
 
     unsettled = (
-        db.query(PayHeroTransaction)
-        .order_by(PayHeroTransaction.transaction_date.desc())
+        db.query(MpesaTransaction)
+        .order_by(MpesaTransaction.transaction_date.desc())
         .limit(limit)
         .all()
     )
@@ -358,7 +362,7 @@ def get_payment_transactions(db: Session = Depends(get_db), limit: int = Query(2
             continue
         status = t.status or "Pending"
         out.append({
-            "id": f"payhero-{t.id}",
+            "id": f"mpesa-{t.id}",
             "date": t.transaction_date.isoformat() if t.transaction_date else None,
             "type": "M-Pesa",
             "invoice_id": t.invoice_id,
@@ -379,16 +383,18 @@ def get_payment_transactions(db: Session = Depends(get_db), limit: int = Query(2
 
 @router.get("/mpesa-transactions", dependencies=[Depends(RequirePermission("billing:read"))])
 def get_billing_mpesa_transactions(db: Session = Depends(get_db)):
-    """Returns Pay Hero (M-Pesa rail) transactions for cashiers to verify receipts.
+    """Returns Daraja (M-Pesa rail) transactions for cashiers to verify receipts.
 
     Route path keeps the legacy ``/mpesa-transactions`` name for frontend
-    compatibility; the rail is Pay Hero. AUTH-002 hardened access to
-    ``billing:read`` (Doctor / Pharmacist / Receptionist / Accountant).
+    compatibility. Pay Hero, the aggregator this endpoint originally queried,
+    was removed in the Daraja migration's Task 12; the rail is now the direct
+    Safaricom Daraja integration. AUTH-002 hardened access to ``billing:read``
+    (Doctor / Pharmacist / Receptionist / Accountant).
     """
-    from app.models.payhero import PayHeroTransaction
+    from app.models.mpesa import MpesaTransaction
     transactions = (
-        db.query(PayHeroTransaction)
-        .order_by(PayHeroTransaction.transaction_date.desc())
+        db.query(MpesaTransaction)
+        .order_by(MpesaTransaction.transaction_date.desc())
         .limit(100)
         .all()
     )
