@@ -22,12 +22,17 @@ guarantee holds for everything else unchanged.
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+
+from typing import Optional
+
+from app.models.mpesa_events import MpesaEvent
 
 from app.models.mpesa import MpesaRefund, MpesaTransaction
 from app.services.daraja.b2c import _config_for_source, _notify_refund_needs_review
@@ -384,3 +389,85 @@ def surface_refund(session: Session, refund: MpesaRefund, *, reason: str) -> Non
         refund.surfaced_at = datetime.now(timezone.utc)
         refund.surfaced_reason = truncated_reason
         session.commit()
+
+
+def replay_unapplied_callbacks(
+    session: Session, *, older_than: timedelta, now: Optional[datetime] = None
+) -> int:
+    """Re-apply callbacks Safaricom delivered that we accepted but never acted on.
+
+    The gap this closes: a handler that raises rolls its own session back, so
+    before the inbound journal existed there was no record left that Safaricom
+    had ever called. Safaricom does not retry an STK callback, and STK Query's
+    bare ResultCode 0 carries neither receipt nor amount, so requery_stk
+    correctly refuses to settle from it. The row therefore waited forever on a
+    retry that was never coming. That is not hypothetical: it stranded two
+    confirmed sandbox payments.
+
+    A journalled row still at `received` past `older_than` is precisely "a
+    response reached us and was not applied". Replaying it is not an inference
+    and not a timer-driven guess: it is the real callback, run back through
+    apply_stk_callback, which keeps every amount check, receipt cross-check and
+    replay guard that a first-time callback goes through. Settlement is already
+    idempotent on the receipt, so replaying one that did in fact apply is a
+    no-op rather than a double credit.
+
+    The grace period matters: a callback handled normally is marked `applied`
+    within milliseconds, so anything older is genuinely stuck, and waiting
+    lets the ordinary path win whenever it can.
+    """
+    from app.services.daraja.events import INBOUND_APPLIED, INBOUND_RECEIVED
+
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - older_than
+
+    stuck = (
+        session.query(MpesaEvent)
+        .filter(
+            MpesaEvent.direction == "inbound",
+            MpesaEvent.outcome == INBOUND_RECEIVED,
+            MpesaEvent.flow == "stk_callback",
+            MpesaEvent.created_at < cutoff,
+        )
+        .order_by(MpesaEvent.id.asc())
+        .limit(100)
+        .all()
+    )
+
+    replayed = 0
+    for event in stuck:
+        payload = _loads(event.request_payload)
+        if payload is None:
+            # Nothing to replay. Leave it at `received` rather than marking it
+            # applied: a row we could not act on must stay visible.
+            logger.warning(
+                "Reconciliation: journalled callback %s has no replayable payload", event.id
+            )
+            continue
+        try:
+            apply_stk_callback(session, payload)
+            session.commit()
+        except Exception:  # noqa: BLE001, one poisoned row must not stop the rest
+            session.rollback()
+            logger.exception(
+                "Reconciliation: replay of journalled callback %s failed", event.id
+            )
+            continue
+        event.outcome = INBOUND_APPLIED
+        session.commit()
+        replayed += 1
+        logger.info(
+            "Reconciliation: replayed callback %s that had been accepted but never applied",
+            event.id,
+        )
+    return replayed
+
+
+def _loads(raw: Optional[str]) -> Optional[dict]:
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    return value if isinstance(value, dict) else None

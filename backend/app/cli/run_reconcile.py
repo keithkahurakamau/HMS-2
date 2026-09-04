@@ -44,6 +44,10 @@ def main() -> int:
             return 0
 
         log.info(
+            "Replayed %d callback(s) that Safaricom delivered but we had not applied",
+            result.callbacks_replayed,
+        )
+        log.info(
             "Resolved %d STK transaction(s) synchronously", result.transactions_resolved
         )
         log.info(
