@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../../api/client';
 import toast from 'react-hot-toast';
 import {
@@ -45,6 +45,10 @@ export default function PlatformSubscriptions() {
     const [savingContact, setSavingContact] = useState(false);
 
     const [txns, setTxns] = useState([]);
+    // Mirrors `txns` so the socket handler can decide whether the list is
+    // stale without reading state inside a state updater.
+    const txnsRef = useRef([]);
+    useEffect(() => { txnsRef.current = txns; }, [txns]);
 
     const loadHealth = async () => {
         try { const { data } = await apiClient.get('/public/superadmin/platform-mpesa/health'); setHealth(data); seedForm(data?.config); }
@@ -84,10 +88,17 @@ export default function PlatformSubscriptions() {
         // inside it: React runs updater functions twice under StrictMode, so
         // a fetch in there fires the request twice, and an updater that is
         // not pure is wrong even where the duplicate happens to be harmless.
-        let listIsStale = false;
+        const matches = (t) => t.id === evt.transaction_id || t.external_reference === evt.external_reference;
+        // Staleness is read off the ref, never assigned inside the updater: an
+        // updater that writes to anything outside itself is impure, and React
+        // runs it twice under StrictMode. A ref that lags by a tick can only
+        // cost one redundant refetch, which is harmless.
+        const listIsStale = txnsRef.current.findIndex(matches) === -1;
+        // The merge still works off `prev`, so it stays correct even when
+        // several frames land before the next render.
         setTxns(prev => {
-            const idx = prev.findIndex(t => t.id === evt.transaction_id || t.external_reference === evt.external_reference);
-            if (idx === -1) { listIsStale = true; return prev; }
+            const idx = prev.findIndex(matches);
+            if (idx === -1) return prev;
             const next = [...prev];
             next[idx] = { ...next[idx], status: evt.status, receipt_number: evt.receipt_number, result_desc: evt.result_desc };
             return next;
