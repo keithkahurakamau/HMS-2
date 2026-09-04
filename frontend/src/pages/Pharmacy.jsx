@@ -6,7 +6,7 @@ import {
     Printer, XCircle, Stethoscope,
     ShoppingCart, Plus, Minus, Trash2, CreditCard, Store, Activity,
     Banknote, Smartphone, X as XIcon, ReceiptText, History,
-    Wallet, Paperclip, FileText, UserPlus, RotateCcw } from 'lucide-react';
+    Wallet, Paperclip, FileText, UserPlus, RotateCcw, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { printPrescription } from '../utils/printTemplates';
 import { printDocument, printUtils } from '../utils/printDocument';
@@ -21,6 +21,7 @@ import DepartmentQueue from '../components/DepartmentQueue';
 import ActionsMenu from './clinical/ActionsMenu';
 import FilesModal from './clinical/modals/FilesModal';
 import QueuePatientModal from './clinical/modals/QueuePatientModal';
+import StarterCatalogueTab from './pharmacy/StarterCatalogueTab';
 
 // Pure helper hoisted to module scope (no component state).
 const genKey = () => crypto.randomUUID();
@@ -31,9 +32,15 @@ export default function Pharmacy() {
     const hasPerm = (p) => perms.includes(p);
 
     // --- APP STATE ---
-    const [activeTab, setActiveTab] = useState('rx'); // 'rx' | 'otc' | 'transactions'
+    const [activeTab, setActiveTab] = useState('rx'); // 'rx' | 'otc' | 'transactions' | 'starter'
     const [isLoading, setIsLoading] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // Operator-controlled per-hospital toggle (Tenant.feature_flags,
+    // "pharmacy_starter_catalogue"). Defaults to hidden until the status
+    // check resolves, so a hospital without the flag never sees the tab
+    // flash in and out.
+    const [starterCatalogueEnabled, setStarterCatalogueEnabled] = useState(false);
 
     // --- RX FULFILLMENT STATE (DYNAMIC) ---
     const [queue, setQueue] = useState([]);
@@ -61,6 +68,12 @@ export default function Pharmacy() {
     useEffect(() => {
         fetchPharmacyInventory();
         fetchRxQueue();
+        // This is a UX aid, not a security boundary: the /adopt and full
+        // catalogue endpoints re-check the flag server-side regardless of
+        // what this call returns. A failed check just leaves the tab hidden.
+        apiClient.get('/pharmacy/starter-catalogue/status')
+            .then((res) => setStarterCatalogueEnabled(!!res.data?.enabled))
+            .catch(() => setStarterCatalogueEnabled(false));
     }, []);
 
     const fetchPharmacyInventory = async () => {
@@ -432,6 +445,11 @@ export default function Pharmacy() {
                     <button type="button" role="tab" aria-selected={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} className={`segmented-option ${activeTab === 'transactions' ? 'segmented-option-active' : ''}`}>
                         <History size={16} className={activeTab === 'transactions' ? 'text-brand-600 dark:text-brand-400' : 'text-ink-400'} /> Transactions
                     </button>
+                    {starterCatalogueEnabled && (
+                        <button type="button" role="tab" aria-selected={activeTab === 'starter'} onClick={() => setActiveTab('starter')} className={`segmented-option ${activeTab === 'starter' ? 'segmented-option-active' : ''}`}>
+                            <Sparkles size={16} className={activeTab === 'starter' ? 'text-brand-600 dark:text-brand-400' : 'text-ink-400'} /> Starter Catalogue
+                        </button>
+                    )}
                 </div>
                 <div className="text-right px-3 text-xs font-semibold text-ink-500">
                     {/* react-doctor-disable-next-line react-doctor/rendering-hydration-mismatch-time */}
@@ -634,6 +652,12 @@ export default function Pharmacy() {
             {activeTab === 'transactions' && (
                 <div data-tour="pharmacy-transactions" className="flex-1 flex flex-col overflow-hidden">
                     <TransactionsTab />
+                </div>
+            )}
+
+            {activeTab === 'starter' && starterCatalogueEnabled && (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    <StarterCatalogueTab canManage={hasPerm('pharmacy:manage')} />
                 </div>
             )}
 
