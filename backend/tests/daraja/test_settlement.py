@@ -401,6 +401,48 @@ def test_settle_invoice_match_posts_a_real_ledger_entry_with_a_user(db):
     assert lines["1140"].credit == Decimal("300.00")
 
 
+def test_settle_invoice_match_posts_a_ledger_entry_with_no_acting_user(db):
+    """The anonymous webhook path: a Safaricom callback has no logged-in user.
+
+    JournalEntry.created_by is a NOT NULL foreign key, so posting None raised
+    NotNullViolation and poisoned the session, rolling back the whole
+    settlement. In production that meant a real, confirmed M-Pesa payment left
+    the invoice sitting at Pending with no error the cashier could see: the
+    money had arrived and the books never recorded it.
+
+    Every other settlement test passes an explicit user_id, which is exactly
+    why the suite stayed green while the live callback path was broken.
+    """
+    from app.models.accounting import JournalEntry
+
+    seed_mpesa_ledger_mapping(db)
+    invoice = make_invoice(db, total_amount=Decimal("300.00"), created_by=1)
+    txn = make_pending_transaction(db, amount=Decimal("300.00"), invoice_id=invoice.invoice_id)
+    txn.receipt_number = "ANON0001"
+    txn.status = "Success"
+    db.commit()
+
+    # user_id omitted entirely, exactly as the callback handler calls it.
+    settle_invoice_match(db, invoice=invoice, txn=txn, match_basis="stk_callback")
+
+    entry = (
+        db.query(JournalEntry)
+        .filter(JournalEntry.source_type == "billing.payment.mpesa", JournalEntry.source_id == txn.id)
+        .first()
+    )
+    assert entry is not None, "unattended settlement posted no ledger entry"
+    assert entry.status == "posted"
+    # Attributed to whoever raised the invoice, not left null and not a
+    # synthetic account, so the audit trail still names a real person.
+    # (The scratch tenant seeds a single user, so that is user 1 here.)
+    assert entry.created_by == invoice.created_by
+    assert entry.created_by is not None
+    # And the settlement itself completed, which is the part that actually
+    # broke: the invoice must be paid, not stranded at Pending.
+    assert invoice.amount_paid == Decimal("300.00")
+    assert invoice.status == "Paid"
+
+
 def test_settle_invoice_match_notification_body_has_no_em_dash_when_receipt_missing(db, monkeypatch):
     """Ported from payhero_service.py, whose notify body fell back to an
     em dash when the receipt was missing. That character must be gone,

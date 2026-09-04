@@ -444,6 +444,15 @@ def settle_invoice_match(
     txn.invoice_id = invoice.invoice_id
     txn.match_basis = match_basis
 
+    # A Safaricom callback carries no logged-in user, but
+    # acc_journal_entries.created_by is a NOT NULL foreign key to users. Posting
+    # None there raises NotNullViolation, which rolls the whole settlement back:
+    # the money has arrived, the receipt is real, and the invoice silently stays
+    # Pending. Attribute an unattended settlement to the member of staff who
+    # raised the invoice. That is the closest true answer available (they own the
+    # bill being paid), it is guaranteed present because Invoice.created_by is
+    # itself NOT NULL, and it keeps the ledger's audit trail pointing at a real
+    # person rather than at a synthetic system account.
     post_from_event(
         db,
         source_key="billing.payment.mpesa",
@@ -451,7 +460,7 @@ def settle_invoice_match(
         amount=amount,
         memo=f"M-Pesa receipt {txn.receipt_number or txn.external_reference}",
         reference=f"INV-{invoice.invoice_id}",
-        user_id=user_id,
+        user_id=user_id or invoice.created_by,
     )
 
     # M-Pesa settles asynchronously via callback, the cashier isn't

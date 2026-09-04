@@ -892,15 +892,20 @@ def _apply_completed_refund_to_invoice(db: Session, refund: MpesaRefund) -> None
     still say the invoice is fully paid after part of that payment went
     back out to the patient, an accounting hole, not a missing nicety.
 
-    TODO(ledger): this does not post a ledger entry for the refund.
-    settle_invoice_match posts through post_from_event, and that path has
-    a known, separately-tracked defect: JournalEntry.created_by is
-    NOT NULL while post_from_event defaults user_id=None, so a call with
-    no human actor (exactly what an unattended B2C result callback is)
-    poisons the session on its own INSERT. Do not add a ledger post here
-    until that is fixed, or every unattended completion fails here
-    instead of merely failing to post. The invoice adjustment above is
-    unaffected by that defect and must not wait on it.
+    TODO(ledger): this still does not post a ledger entry for the refund,
+    so a completed refund adjusts the invoice but leaves the books unaware
+    that money went back out.
+
+    The blocker named here is now GONE. The NOT NULL JournalEntry.created_by
+    defect was real, and it was not merely theoretical: it broke every
+    unattended STK and C2B settlement in live testing, stranding confirmed
+    payments at Pending. settle_invoice_match now falls back to
+    invoice.created_by when no user is acting, so a ledger post from this
+    path would no longer poison the session.
+
+    What remains before adding one is an accounting decision, not a
+    technical one: which accounts a refund debits and credits, and whether
+    it reverses the original entry or posts its own.
     """
     if not refund.invoice_id:
         return
