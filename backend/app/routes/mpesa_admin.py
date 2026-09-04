@@ -56,7 +56,14 @@ router = APIRouter(prefix="/api/admin/mpesa", tags=["Payments, M-Pesa Admin"])
 # parallel write codename here would let a role hold one without the other
 # for no operational reason.
 _MANAGE = "payhero:manage"
-_READ_ANY = ("payhero:manage", "mpesa:read")
+# Two read surfaces, deliberately not one. The ledger (what money arrived,
+# what is still unmatched) is operational: the front desk needs it to answer
+# "did that payment land". The settings surface (which credentials are set,
+# the refund caps, the callback token's state) is the rail's security
+# posture, and reads as reconnaissance in the wrong hands. A role that can
+# read the ledger has no reason to read the configuration.
+_LEDGER_READ_ANY = (_MANAGE, "mpesa:read")
+_SETTINGS_READ_ANY = (_MANAGE,)
 
 
 # ─── Schemas ────────────────────────────────────────────────────────────────
@@ -175,7 +182,7 @@ def _public_view(config: Optional[MpesaConfig]) -> dict:
 @router.get("/config")
 def get_mpesa_config(
     db: Session = Depends(get_db),
-    _user: dict = Depends(RequirePermission(*_READ_ANY)),
+    _user: dict = Depends(RequirePermission(*_SETTINGS_READ_ANY)),
 ):
     return _public_view(_active_default_config(db))
 
@@ -300,7 +307,7 @@ def register_c2b(
 @router.get("/c2b-readiness")
 def get_c2b_readiness(
     db: Session = Depends(get_db),
-    _user: dict = Depends(RequirePermission(*_READ_ANY)),
+    _user: dict = Depends(RequirePermission(*_SETTINGS_READ_ANY)),
 ):
     """Per-till readiness: whether C2B URLs are registered AND whether
     initiator credentials exist to verify a payment once one arrives. A
@@ -443,7 +450,7 @@ def rotate_callback_token(
 @router.get("/unmatched")
 def list_unmatched_receipts(
     db: Session = Depends(get_db),
-    _user: dict = Depends(RequirePermission(*_READ_ANY)),
+    _user: dict = Depends(RequirePermission(*_LEDGER_READ_ANY)),
     limit: int = 100,
 ):
     rows = (
@@ -539,7 +546,7 @@ def assign_unmatched_receipt(
 @router.get("/transactions")
 def get_transactions(
     db: Session = Depends(get_db),
-    _user: dict = Depends(RequirePermission(*_READ_ANY)),
+    _user: dict = Depends(RequirePermission(*_LEDGER_READ_ANY)),
 ):
     transactions = (
         db.query(MpesaTransaction)
