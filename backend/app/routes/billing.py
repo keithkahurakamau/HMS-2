@@ -84,7 +84,11 @@ def get_billing_queue(
         db.query(Invoice)
         .options(joinedload(Invoice.patient), selectinload(Invoice.items))
         .filter(Invoice.status.in_(["Pending", "Partially Paid", "Pending M-Pesa"]))
-        .order_by(Invoice.billing_date.asc())
+        # Newest first. Ordered oldest-first, a hospital whose backlog exceeds
+        # `limit` never sees the invoice it just raised: the cashier's own bill
+        # falls off the end of the first page. The cashier is almost always
+        # looking for a bill from the last few minutes, not the oldest on file.
+        .order_by(Invoice.billing_date.desc())
         .offset(skip)
         .limit(limit)
         .all()
