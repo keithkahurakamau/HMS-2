@@ -38,6 +38,7 @@ from pydantic import BaseModel, condecimal
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config.database import MasterSessionLocal, get_db, get_tenant_engine
+from app.services.daraja.events import journal_inbound, mark_inbound_applied
 from app.core import daraja_callback as dc
 from app.core.daraja_callback import (
     ACK_C2B_DECLINE,
@@ -204,7 +205,7 @@ async def _resolve_or_none(tenant_hint: str, token: str, *, label: str) -> Optio
         raise HTTPException(status_code=503, detail="Temporarily unable to process callback.")
 
 
-async def _run_handler_and_ack(db: Session, func, *args, label: str, **kwargs) -> None:
+async def _run_handler_and_ack(db: Session, func, *args, label: str, **kwargs) -> bool:
     """Shared tail for every callback below except C2B validation (which
     needs the handler's return value to decide ACK_OK vs ACK_C2B_DECLINE,
     and its own accept-on-error rule; see c2b_validation).
@@ -219,10 +220,26 @@ async def _run_handler_and_ack(db: Session, func, *args, label: str, **kwargs) -
     """
     try:
         await run_in_threadpool(func, db, *args, **kwargs)
+        return True
     except Exception:  # noqa: BLE001, always acknowledge; the failure is ours to chase.
         logger.exception("%s: handler raised", label)
+        return False
     finally:
         await run_in_threadpool(db.close)
+
+
+
+def _stk_checkout_id(payload: Optional[dict]) -> Optional[str]:
+    """CheckoutRequestID out of an STK callback, or None if it is not there.
+
+    Indexing only: the replay pass finds its work by outcome, not by this, so
+    a malformed payload costs a searchable column and nothing else.
+    """
+    try:
+        value = (payload or {}).get("Body", {}).get("stkCallback", {}).get("CheckoutRequestID")
+        return str(value) if value else None
+    except (AttributeError, TypeError):
+        return None
 
 
 @router.post("/stk/callback/{tenant_hint}/{token}")
@@ -238,8 +255,22 @@ async def stk_callback(tenant_hint: str, token: str, request: Request):
         logger.warning("STK callback: unparseable JSON body; acknowledged, not processed")
         return ACK_OK
 
+    # Journal the callback on its own committed transaction BEFORE handling it.
+    # A handler that raises rolls its own session back, taking any event row
+    # written on that session with it, and Safaricom does not retry an STK
+    # callback: without this, an accepted callback we failed to apply leaves
+    # no trace to replay and the payment is stranded at Pending forever.
+    event_id = await run_in_threadpool(
+        journal_inbound, db_name,
+        flow="stk_callback",
+        payload=payload,
+        checkout_request_id=_stk_checkout_id(payload),
+    )
+
     db = await run_in_threadpool(_tenant_session, db_name)
-    await _run_handler_and_ack(db, apply_stk_callback, payload, label="STK callback")
+    applied = await _run_handler_and_ack(db, apply_stk_callback, payload, label="STK callback")
+    if applied:
+        await run_in_threadpool(mark_inbound_applied, db_name, event_id)
     return ACK_OK
 
 

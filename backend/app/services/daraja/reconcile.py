@@ -118,6 +118,7 @@ from app.services.daraja.reconcile_queries import (
     TXN_TERMINAL,
     requery_c2b,
     requery_refund,
+    replay_unapplied_callbacks,
     requery_stk,
     surface_refund,
     surface_transaction,
@@ -138,6 +139,11 @@ RECONCILE_LOCK_KEY = 7825201
 # genuinely outstanding at 5 minutes almost never is; requery_c2b's own
 # outstanding-query guard is what actually prevents an overwrite past that,
 # not this threshold.
+# A callback handled normally is marked applied within milliseconds, so a
+# journalled row still unapplied after this long was genuinely dropped.
+# Short, because the money is already the patient's and the invoice is wrong
+# until it settles, but not zero, so the ordinary path always wins the race.
+CALLBACK_REPLAY_AFTER = timedelta(minutes=2)
 PENDING_STALE_AFTER = timedelta(minutes=5)
 UNVERIFIED_STALE_AFTER = timedelta(minutes=5)
 REFUND_STALE_AFTER = timedelta(minutes=10)
@@ -189,6 +195,7 @@ class ReconcileRunResult:
     stk_still_pending: int = 0         # STK Pending rows asked again; Safaricom had no verdict yet
     c2b_requeried: int = 0             # C2B Unverified rows re-asked; answer, if any, arrives later
     refunds_requeried: int = 0         # Processing refunds asked again; answer, if any, arrives later
+    callbacks_replayed: int = 0        # Accepted-but-unapplied callbacks re-applied from the journal
     surfaced: list[str] = field(default_factory=list)
     failures: list[str] = field(default_factory=list)
     # True only when this run did not execute at all because another run
@@ -273,10 +280,11 @@ def _age(reference: Optional[datetime], now: datetime) -> Optional[timedelta]:
 
 def _reconcile_tenant(
     session: Session, tenant_db_name: str, *, now: datetime, budget: _RowBudget,
-) -> tuple[int, int, int, int, list[str], list[str]]:
+) -> tuple[int, int, int, int, int, list[str], list[str]]:
     """Run every reconciliation check against one tenant's own Daraja
     tables. Returns (transactions_resolved, stk_still_pending,
-    c2b_requeried, refunds_requeried, surfaced, failures): plain values,
+    c2b_requeried, refunds_requeried, callbacks_replayed, surfaced,
+    failures): plain values,
     not a dataclass, so this function stays independent of
     ReconcileRunResult's shape.
 
@@ -298,6 +306,19 @@ def _reconcile_tenant(
     refunds_requeried = 0
     surfaced: list[str] = []
     failures: list[str] = []
+
+    # Case 0: replay callbacks Safaricom delivered that we never applied.
+    # Runs before the Pending sweep deliberately: a replay that settles a row
+    # takes it out of `pending` below, so the same run does not then re-ask
+    # Safaricom about a transaction it has just resolved from the real callback.
+    callbacks_replayed = 0
+    try:
+        callbacks_replayed = replay_unapplied_callbacks(
+            session, older_than=CALLBACK_REPLAY_AFTER, now=now
+        )
+    except Exception as exc:  # noqa: BLE001, replay must not stop the rest of the run
+        logger.exception("Reconciliation: callback replay pass failed")
+        failures.append(f"{tenant_db_name}: callback replay: {exc}")
 
     # Case 1: STK Pending.
     pending = (
@@ -461,7 +482,7 @@ def _reconcile_tenant(
 
     return (
         transactions_resolved, stk_still_pending, c2b_requeried, refunds_requeried,
-        surfaced, failures,
+        callbacks_replayed, surfaced, failures,
     )
 
 
@@ -534,12 +555,14 @@ def run_reconciliation(
 
             try:
                 (
-                    resolved, still_pending, c2b_requeried, refund_requeried, surfaced, failures,
+                    resolved, still_pending, c2b_requeried, refund_requeried,
+                    replayed, surfaced, failures,
                 ) = _reconcile_tenant(session, tenant.db_name, now=run_now, budget=budget)
                 result.transactions_resolved += resolved
                 result.stk_still_pending += still_pending
                 result.c2b_requeried += c2b_requeried
                 result.refunds_requeried += refund_requeried
+                result.callbacks_replayed += replayed
                 result.surfaced.extend(surfaced)
                 result.failures.extend(failures)
             except Exception as exc:  # noqa: BLE001

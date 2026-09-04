@@ -194,3 +194,106 @@ def _dump(payload: Optional[dict]) -> Optional[str]:
         return json.dumps(payload, default=str)[:8000]
     except Exception:  # noqa: BLE001, see record_event's own docstring
         return None
+
+
+# ─── Durable inbound-callback journal ───────────────────────────────────────
+#
+# record_event above rides the caller's transaction by design, which is right
+# for a diagnostic row: it must never own a commit that a caller's advisory
+# lock depends on. But it means an inbound callback recorded that way dies
+# with a rollback, and that is exactly what happened in live testing: a
+# settlement raised, the session rolled back, and the only evidence Safaricom
+# had ever called us went with it. Safaricom does not retry an STK callback,
+# so the payment was stranded with nothing left to replay.
+#
+# These two functions exist for that one job. They use their OWN session and
+# their OWN commit, so the record survives whatever the handler does next.
+# The payload is stored through the same allowlist redaction as everything
+# else (which keeps every field apply_stk_callback reads: CallbackMetadata,
+# Amount, MpesaReceiptNumber, CheckoutRequestID, ResultCode), so a journalled
+# callback is replayable without ever storing a field the allowlist rejects.
+
+INBOUND_RECEIVED = "received"
+INBOUND_APPLIED = "applied"
+
+
+def _own_session(db_name: str) -> Session:
+    from sqlalchemy.orm import sessionmaker
+    from app.config.database import get_tenant_engine
+
+    return sessionmaker(autocommit=False, autoflush=False, bind=get_tenant_engine(db_name))()
+
+
+def journal_inbound(
+    db_name: str,
+    *,
+    flow: str,
+    payload: Optional[dict],
+    checkout_request_id: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+) -> Optional[int]:
+    """Commit an inbound callback to the event log before it is handled.
+
+    Returns the event id, or None if journalling failed. Never raises: a
+    journal failure must not cost us the acknowledgement to Safaricom, which
+    is the one thing that stops them retrying into a duplicate.
+    """
+    session = None
+    try:
+        session = _own_session(db_name)
+        event = MpesaEvent(
+            flow=flow,
+            direction="inbound",
+            outcome=INBOUND_RECEIVED,
+            checkout_request_id=checkout_request_id,
+            conversation_id=conversation_id,
+            request_payload=_dump(redact_payload(payload)),
+        )
+        session.add(event)
+        session.commit()
+        return event.id
+    except Exception:  # noqa: BLE001, journalling must never break the ack
+        logger.warning("journal_inbound: could not journal %s callback", flow, exc_info=True)
+        if session is not None:
+            try:
+                session.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+        return None
+    finally:
+        if session is not None:
+            try:
+                session.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def mark_inbound_applied(db_name: str, event_id: Optional[int]) -> None:
+    """Flip a journalled callback to `applied` once its handler has committed.
+
+    Anything left at `received` past its grace period is, by definition, a
+    callback we accepted and never acted on, which is what the replay pass in
+    reconcile_queries.py looks for.
+    """
+    if event_id is None:
+        return
+    session = None
+    try:
+        session = _own_session(db_name)
+        event = session.query(MpesaEvent).filter(MpesaEvent.id == event_id).first()
+        if event is not None and event.outcome == INBOUND_RECEIVED:
+            event.outcome = INBOUND_APPLIED
+            session.commit()
+    except Exception:  # noqa: BLE001
+        logger.warning("mark_inbound_applied: could not mark event %s", event_id, exc_info=True)
+        if session is not None:
+            try:
+                session.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+    finally:
+        if session is not None:
+            try:
+                session.close()
+            except Exception:  # noqa: BLE001
+                pass
